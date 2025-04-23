@@ -9,7 +9,7 @@ const config: Config.InitialOptions = {
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   collectCoverage: false,
   coverageDirectory: "./workdocs/reports/coverage",
-  collectCoverageFrom: ["src/**/*.{js,jsx,ts,tsx}", "!src/**/cli.ts"],
+  collectCoverageFrom: ["src/**/*.{js,jsx,ts,tsx}", "!src/bin/**/*"],
   reporters: ["default"],
 };
 

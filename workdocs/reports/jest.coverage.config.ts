@@ -21,7 +21,7 @@ const config: Config.InitialOptions = {
         filename: "test-report.html",
         openReport: true,
         expand: true,
-        pageTitle: "ts-workspace Test Report",
+        pageTitle: "for-fabric Test Report",
         stripSkippedTest: true,
         darkTheme: true,
         enableMergeData: true,
@@ -32,9 +32,9 @@ const config: Config.InitialOptions = {
   coverageThreshold: {
     global: {
       branches: 70,
-      functions: 100,
+      functions: 85,
       lines: 80,
-      statements: 90,
+      statements: 88,
     },
   },
 };

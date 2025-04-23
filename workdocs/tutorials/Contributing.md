@@ -18,8 +18,8 @@ to abide by its terms.
 ### Bootstrapping the project
 
 ```bash
-git clone https://github.com/decaf-ts/ts-workspace.git
-cd ts-workspace
+git clone https://github.com/decaf-ts/for-fabric.git
+cd for-fabric
 npm install
 npm run build
 ```
