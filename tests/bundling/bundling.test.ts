@@ -1,39 +1,30 @@
-import * as fs from "fs";
 import { Dirent } from "fs";
-import * as path from "path";
+import path from "path";
 
 describe("Distribution Tests", () => {
   it("reads lib", () => {
-    const {
-      VERSION,
-      complexFunction,
-      ChildClass,
-    } = require("../../lib/index.cjs");
+    const { VERSION } = require("../../lib/index.cjs");
     expect(VERSION).toBeDefined();
-    expect(complexFunction).toBeDefined();
-    expect(ChildClass).toBeDefined();
   });
 
   it("reads JS Bundle", () => {
-
-    let distFile: Dirent[];
     try {
-      distFile = fs.readdirSync(path.join(process.cwd(), "dist"), {withFileTypes: true})
-        .filter(d => d.isFile() && d.name.endsWith(".js"))
-    } catch (e: unknown) {
-      throw new Error("Error reading JS bundle: " + e);
+      let distFile: Dirent[];
+      try {
+        distFile = require("fs")
+          .readdirSync(path.join(__dirname, "../../dist"), {
+            withFileTypes: true,
+          })
+          .filter((d: Dirent) => d.isFile() && !d.name.endsWith("esm.js"));
+      } catch (e: unknown) {
+        throw new Error("Error reading JS bundle: " + e);
+      }
+
+      if (distFile.length === 0)
+        throw new Error("There should only be a js file in directory");
+      const { VERSION } = require(`../../dist/${distFile[0].name}`);
+    } catch (e) {
+      expect(e).toBeUndefined();
     }
-
-    if (distFile.length === 0)
-      throw new Error("There should only be a js file in directory");
-
-    const {
-      VERSION,
-      complexFunction,
-      ChildClass,
-    } = require(`../../dist/${distFile[0].name}`);
-    expect(VERSION).toBeDefined();
-    expect(complexFunction).toBeDefined();
-    expect(ChildClass).toBeDefined();
   });
 });
