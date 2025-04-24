@@ -105,5 +105,32 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.31.0"
+  },
+  "peerDependencies": {
+    "@decaf-ts/core": "latest",
+    "@decaf-ts/db-decorators": "latest",
+    "@decaf-ts/decorator-validation": "latest",
+    "@decaf-ts/for-couchdb": "latest",
+    "@decaf-ts/injectable-decorators": "latest",
+    "@decaf-ts/reflection": "latest",
+    "reflect-metadata": "^0.2.1"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.13.3",
+    "@hyperledger/fabric-gateway": "^1.7.1",
+    "fabric-ca-client": "^2.2.20",
+    "fabric-common": "^2.2.20",
+    "fabric-contract-api": "^2.5.8",
+    "fabric-shim": "^2.5.8",
+    "jsrsasign": "^11.1.0",
+    "jsrsasign-util": "^1.0.5"
+  },
+  "overrides": {
+    "fabric-common": {
+      "jsrsasign": "^11.1.0"
+    },
+    "fabric-ca-client": {
+      "jsrsasign": "^11.1.0"
+    }
   }
 }
