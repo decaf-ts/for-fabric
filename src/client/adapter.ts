@@ -1,8 +1,14 @@
 import { CouchDBAdapter, MangoQuery } from "@decaf-ts/for-couchdb";
 import grpc, { Client } from "@grpc/grpc-js";
-import { Constructor } from "@decaf-ts/decorator-validation";
+import { Constructor, model, Model } from "@decaf-ts/decorator-validation";
 import { User } from "fabric-common";
-import { debug, Logger, Logging } from "@decaf-ts/logging";
+import {
+  log,
+  logAsDebug,
+  logAsVerbose,
+  Logger,
+  Logging,
+} from "@decaf-ts/logging";
 import { PeerConfig } from "./types";
 import {
   connect,
@@ -13,7 +19,13 @@ import {
   Contract as Contrakt,
 } from "@hyperledger/fabric-gateway";
 import { getIdentity, getSigner, readFile } from "./fabric-fs";
-import { BaseError } from "@decaf-ts/db-decorators";
+import {
+  BaseError,
+  InternalError,
+  modelToTransient,
+  OperationKeys,
+  SerializationError,
+} from "@decaf-ts/db-decorators";
 
 export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
   protected static decoder = new TextDecoder("utf8");
@@ -27,7 +39,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     super(config, flavour);
   }
 
-  @debug(true)
   protected index<M>(models: Constructor<M>): Promise<void> {
     throw new Error();
   }
@@ -36,21 +47,24 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
   create(
     tableName: string,
     id: string | number,
-    model: Record<string, any>
+    model: Record<string, any>,
+    transient: Record<string, any> = {}
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.create);
-    return Promise.resolve(undefined);
-  }
+    log.info(`Creating record ${tableName}.${id}`);
+    const result = await this.forTable(tableName).submitTransaction(
+      OperationKeys.CREATE,
+      [model.serialize()],
+      transient
+    );
 
-  @debug(true)
-  delete(tableName: string, id: string | number): Promise<Record<string, any>> {
-    const log = this.log.for(this.delete);
-    return Promise.resolve(undefined);
-  }
-  @debug(true)
-  raw<V>(rawInput: MangoQuery, process: boolean): Promise<V> {
-    const log = this.log.for(this.raw);
-    return Promise.resolve(undefined);
+    let decoded;
+    try {
+      decoded = JSON.parse(FabricAdapter.decoder.decode(result));
+    } catch (e: unknown) {
+      throw new InternalError(`Failed to decode result: ${e}`);
+    }
+    return decoded;
   }
 
   @debug(true)
@@ -59,14 +73,93 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return Promise.resolve(undefined);
   }
 
-  @debug(true)
-  update(
+  @logAsDebug()
+  async update(
     tableName: string,
     id: string | number,
-    model: Record<string, any>
+    model: Record<string, any>,
+    transient: Record<string, any> = {}
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.update);
-    return Promise.resolve(undefined);
+    log.info(`Updating record ${tableName}.${id}`);
+    log.verbose(`with model: ${JSON.stringify(model, null, 2)}`, 3);
+    log.debug(`with transient: ${JSON.stringify(transient, null, 2)}`);
+    const result = await this.forTable(tableName).submitTransaction(
+      OperationKeys.UPDATE,
+      [model.serialize()],
+      transient
+    );
+
+    let decoded;
+    try {
+      decoded = JSON.parse(FabricAdapter.decoder.decode(result));
+    } catch (e: unknown) {
+      log.debug(`Failed to decode result: ${e}`);
+      throw new InternalError(`Failed to decode result: ${e}`);
+    }
+    log.debug(`decoded result: ${JSON.stringify(decoded, null, 2)}`);
+    return decoded;
+  }
+
+  @logAsDebug()
+  async delete(
+    tableName: string,
+    id: string | number
+  ): Promise<Record<string, any>> {
+    const log = this.log.for(this.delete);
+    log.verbose(`deleting record ${tableName}.${id}`, 3);
+    const result = await this.forTable(tableName).evaluateTransaction(
+      OperationKeys.READ,
+      [id]
+    );
+
+    let decoded;
+    try {
+      decoded = JSON.parse(FabricAdapter.decoder.decode(result));
+    } catch (e: unknown) {
+      log.debug(`Failed to decode result: ${e}`);
+      throw new InternalError(`Failed to decode result: ${e}`);
+    }
+    return decoded;
+  }
+
+  @logAsDebug()
+  async raw<V>(rawInput: MangoQuery, process: boolean): Promise<V> {
+    const log = this.log.for(this.raw);
+    let input: string;
+    try {
+      input = JSON.stringify(rawInput);
+    } catch (e: unknown) {
+      throw new InternalError(`Failed to process raw input for query: ${e}`);
+    }
+    let transactionResult: any;
+    try {
+      transactionResult = await this.evaluateTransaction("query", [input]);
+    } catch (e: any) {
+      throw this.parseError(e);
+    }
+    let result: any;
+    try {
+      result = JSON.parse(FabricAdapter.decoder.decode(transactionResult));
+    } catch (e: unknown) {
+      throw new SerializationError(`Failed to process result: ${e}`);
+    }
+
+    const parseRecord = (record: Record<any, any>) => {
+      if (isModel(record)) return Model.build(record);
+      return record;
+    };
+
+    if (Array.isArray(result)) {
+      if (!result.length) return result as V;
+      const el = result[0];
+      if (isModel(el))
+        // if the first one is a model, all are models
+        return result.map((el) => Model.build(el)) as V;
+      return result as V;
+    }
+
+    return parseRecord(result as any) as V;
   }
 
   protected user(): Promise<User> {
@@ -74,16 +167,15 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return Promise.resolve(undefined);
   }
 
-  protected async Client(config: PeerConfig): Promise<Client> {
-    if (!this.client) this.client = await FabricAdapter.getClient(config);
+  protected async Client(): Promise<Client> {
+    if (!this.client) this.client = await FabricAdapter.getClient(this.native);
     return this.client;
   }
 
-  protected async Gateway(mspId: string, config: PeerConfig): Promise<Gateway> {
+  protected async Gateway(): Promise<Gateway> {
     return (await FabricAdapter.getConnection(
-      await this.Client(config),
-      mspId,
-      config
+      await this.Client(),
+      this.native
     )) as Gateway;
   }
 
@@ -106,7 +198,7 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     chaincodeName: string,
     contractName: string
   ): Contrakt {
-    const log = this.log.for(this.Network);
+    const log = this.log.for(this.Contract);
     const network = this.Network(gateway, channelName);
     let contract: Contrakt;
     try {
@@ -128,7 +220,7 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     endorsingOrganizations?: Array<string>
   ): Promise<Uint8Array> {
     const log = this.log.for(this.transaction);
-    const gateway = await this.Gateway(this.native.msp as string, this.native);
+    const gateway = await this.Gateway();
     try {
       const contract = this.Contract(
         gateway,
@@ -136,8 +228,9 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
         this.native.chaincodeName as string,
         this.native.contractName as string
       );
-      log.debug(
-        `${submit ? "Submit" : "Evaluate"}ting transaction ${this.native.contractName}.${api} with args: ${args?.map((a) => a.toString()).join("\n") || "none"}`
+
+      log.verbose(
+        `${submit ? "Submit" : "Evaluate"}ting transaction ${this.native.contractName}.${api}`
       );
       const method = submit ? contract.submit : contract.evaluate;
 
@@ -152,9 +245,13 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
 
       return await method.call(contract, api, proposalOptions);
     } catch (e: any) {
+      log.verbose(
+        `Failed to ${submit ? "submit" : "evaluate"} transaction: ${e}`,
+        3
+      );
       throw this.parseError(e);
     } finally {
-      this.log.debug(`Closing ${this.native.msp} gateway connection`);
+      this.log.verbose(`Closing ${this.native.msp} gateway connection`, 3);
       gateway.close();
     }
   }
@@ -193,10 +290,16 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     );
   }
 
-  async close(): Promise<void> {
+  async destroy(): Promise<void> {
     if (this.client) {
-      this.log.debug(`Closing ${this.native.msp} gateway client`);
-      this.client.close();
+      const log = this.log.for(this.destroy);
+      log.verbose(`Closing ${this.native.msp} gateway client`);
+      try {
+        this.client.close();
+        super.destroy();
+      } catch (e: unknown) {
+        log.error(`Failed to gracefully close client: ${e}`);
+      }
     }
   }
 
@@ -204,7 +307,7 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     const log = this.log.for(this.getClient);
     log.debug(`Retrieving TLS cert from ${config.tlsCertPath}`);
     const tlsRootCert = await readFile(config.tlsCertPath);
-    log.debug(`generating TLS credentials for msp ${config.msp}`);
+    log.verbose(`generating TLS credentials for msp ${config.msp}`);
     const tlsCredentials = grpc.credentials.createSsl(tlsRootCert);
     log.debug(`generating Gateway Client for url ${config.peerEndpoint}`);
     return new Client(config.peerEndpoint, tlsCredentials);
@@ -212,10 +315,10 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
 
   protected static async getConnection(
     client: Client,
-    mspId: string,
     config: PeerConfig
-  ) {
+  ): Promise<Gateway> {
     const log = this.log.for(this.getConnection);
+    const mspId = config.msp as string;
     log.debug(
       `Retrieving Peer Identity for ${mspId} under ${config.certDirectoryPath}`
     );
@@ -243,7 +346,7 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
       },
     } as ConnectOptions;
 
-    log.debug(`Connecting to ${mspId}`);
+    log.verbose(`Connecting to ${mspId}`);
     return connect(options);
   }
 }
