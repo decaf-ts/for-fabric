@@ -1,15 +1,15 @@
 import { CouchDBAdapter, MangoQuery } from "@decaf-ts/for-couchdb";
 import grpc, { Client } from "@grpc/grpc-js";
-import { Constructor, model, Model } from "@decaf-ts/decorator-validation";
+import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import { User } from "fabric-common";
 import {
-  log,
   logAsDebug,
+  logAsSilly,
   logAsVerbose,
   Logger,
   Logging,
 } from "@decaf-ts/logging";
-import { PeerConfig } from "./types";
+import { CAConfig, PeerConfig } from "./types";
 import {
   connect,
   ConnectOptions,
@@ -26,6 +26,7 @@ import {
   OperationKeys,
   SerializationError,
 } from "@decaf-ts/db-decorators";
+import { FabricCAService } from "./services/FabricCAService";
 
 export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
   protected static decoder = new TextDecoder("utf8");
@@ -35,16 +36,70 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
 
   private client?: Client;
 
+  private ca?: FabricCAService;
+
+  private currentUser?: string;
+
   constructor(config: PeerConfig, flavour: string = "fabric") {
     super(config, flavour);
   }
 
   protected index<M>(models: Constructor<M>): Promise<void> {
-    throw new Error();
+    throw new Error(`Not implemented`);
   }
 
-  @debug(true)
-  create(
+  @logAsSilly()
+  prepare<M extends Model>(
+    m: M,
+    pk: string | number
+  ): {
+    record: Record<string, any>;
+    id: string;
+    transient: Record<string, any>;
+  } {
+    const log = this.log.for(this.prepare);
+    const { model, transient } = modelToTransient(m);
+    log.debug(
+      `after transient split: ${JSON.stringify(model, null, 2)}\ntransient: ${JSON.stringify(transient, null, 2)}`
+    );
+    const prepared = super.prepare(model, pk);
+    return {
+      record: prepared.record,
+      id: prepared.id,
+      transient: transient || {},
+    };
+  }
+
+  @logAsSilly()
+  revert<M extends Model>(
+    obj: Record<string, any>,
+    clazz: string | Constructor<M>,
+    pk: string,
+    id: string | number | bigint
+  ): M {
+    return super.revert(obj, clazz, pk, id);
+  }
+
+  @logAsDebug(true)
+  impersonate(cfg: Partial<PeerConfig>): FabricAdapter {
+    return new Proxy(this, {
+      get: (target, prop) => {
+        if (prop === "native") return Object.assign({}, target.native, cfg);
+        if (prop in target) {
+          return target[prop as keyof FabricAdapter];
+        }
+      },
+    });
+  }
+
+  protected forTable(tableName: string) {
+    return this.impersonate({
+      contractName: tableName,
+    });
+  }
+
+  @logAsSilly(true)
+  async create(
     tableName: string,
     id: string | number,
     model: Record<string, any>,
@@ -67,13 +122,26 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return decoded;
   }
 
-  @debug(true)
-  read(tableName: string, id: string | number): Promise<Record<string, any>> {
-    const log = this.log.for(this.read);
-    return Promise.resolve(undefined);
+  @logAsSilly(true)
+  async read(
+    tableName: string,
+    id: string | number
+  ): Promise<Record<string, any>> {
+    const result = await this.forTable(tableName).evaluateTransaction(
+      OperationKeys.READ,
+      [id]
+    );
+
+    let decoded;
+    try {
+      decoded = JSON.parse(FabricAdapter.decoder.decode(result));
+    } catch (e: unknown) {
+      throw new InternalError(`Failed to decode result: ${e}`);
+    }
+    return decoded;
   }
 
-  @logAsDebug()
+  @logAsSilly(true)
   async update(
     tableName: string,
     id: string | number,
@@ -101,7 +169,7 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return decoded;
   }
 
-  @logAsDebug()
+  @logAsSilly(true)
   async delete(
     tableName: string,
     id: string | number
@@ -123,7 +191,42 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return decoded;
   }
 
-  @logAsDebug()
+  @logAsSilly(true)
+  createAll(
+    tableName: string,
+    ids: string[] | number[],
+    models: Record<string, any>[]
+  ): Promise<Record<string, any>[]> {
+    throw new Error("Method not implemented.");
+  }
+
+  @logAsSilly()
+  readAll(
+    tableName: string,
+    ids: (string | number | bigint)[]
+  ): Promise<Record<string, any>[]> {
+    throw new Error("Method not implemented.");
+  }
+
+  @logAsSilly()
+  updateAll(
+    tableName: string,
+    ids: string[] | number[],
+    models: Record<string, any>[]
+  ): Promise<Record<string, any>[]> {
+    throw new Error("Method not implemented.");
+  }
+
+  @logAsSilly()
+  deleteAll(
+    tableName: string,
+    ids: (string | number | bigint)[]
+  ): Promise<Record<string, any>[]> {
+    throw new Error("Method not implemented.");
+  }
+
+  @logAsSilly()
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async raw<V>(rawInput: MangoQuery, process: boolean): Promise<V> {
     const log = this.log.for(this.raw);
     let input: string;
@@ -144,18 +247,20 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     } catch (e: unknown) {
       throw new SerializationError(`Failed to process result: ${e}`);
     }
-
+    log.debug(`raw result: ${JSON.stringify(result, null, 2)}`);
     const parseRecord = (record: Record<any, any>) => {
-      if (isModel(record)) return Model.build(record);
+      if (Model.isModel(record)) return Model.build(record);
       return record;
     };
 
     if (Array.isArray(result)) {
       if (!result.length) return result as V;
       const el = result[0];
-      if (isModel(el))
+      if (Model.isModel(el)) {
+        log.debug(`raw result is an array of models. building...`);
         // if the first one is a model, all are models
         return result.map((el) => Model.build(el)) as V;
+      }
       return result as V;
     }
 
@@ -164,12 +269,17 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
 
   protected user(): Promise<User> {
     const log = this.log.for(this.user);
-    return Promise.resolve(undefined);
+    this.CA().
   }
 
   protected async Client(): Promise<Client> {
     if (!this.client) this.client = await FabricAdapter.getClient(this.native);
     return this.client;
+  }
+
+  protected CA(): FabricCAService {
+    if (!this.ca) this.ca = FabricAdapter.getCA(this.native);
+    return this.ca;
   }
 
   protected async Gateway(): Promise<Gateway> {
@@ -192,6 +302,7 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return network;
   }
 
+  @logAsVerbose()
   protected Contract(
     gateway: Gateway,
     channelName: string,
@@ -212,6 +323,7 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return contract;
   }
 
+  @logAsDebug(true)
   protected async transaction(
     api: string,
     submit = true,
@@ -234,6 +346,8 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
       );
       const method = submit ? contract.submit : contract.evaluate;
 
+      // TODO
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       endorsingOrganizations = endorsingOrganizations?.length
         ? endorsingOrganizations
         : undefined;
@@ -296,11 +410,15 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
       log.verbose(`Closing ${this.native.msp} gateway client`);
       try {
         this.client.close();
-        super.destroy();
+        await super.destroy();
       } catch (e: unknown) {
         log.error(`Failed to gracefully close client: ${e}`);
       }
     }
+  }
+
+  toString(){
+    return `${this.flavour} adapter (msp: ${this.native.msp}, ca: ${this.native.caName})`;
   }
 
   protected static async getClient(config: PeerConfig) {
@@ -311,6 +429,10 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     const tlsCredentials = grpc.credentials.createSsl(tlsRootCert);
     log.debug(`generating Gateway Client for url ${config.peerEndpoint}`);
     return new Client(config.peerEndpoint, tlsCredentials);
+  }
+
+  protected static getCA(config: CAConfig) {
+    return new FabricCAService(config);
   }
 
   protected static async getConnection(
