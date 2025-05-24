@@ -3,9 +3,6 @@ import grpc, { Client } from "@grpc/grpc-js";
 import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import { User } from "fabric-common";
 import {
-  logAsDebug,
-  logAsSilly,
-  logAsVerbose,
   Logger,
   Logging,
 } from "@decaf-ts/logging";
@@ -48,7 +45,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     throw new Error(`Not implemented`);
   }
 
-  @logAsSilly()
   prepare<M extends Model>(
     m: M,
     pk: string | number
@@ -70,7 +66,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     };
   }
 
-  @logAsSilly()
   revert<M extends Model>(
     obj: Record<string, any>,
     clazz: string | Constructor<M>,
@@ -80,7 +75,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return super.revert(obj, clazz, pk, id);
   }
 
-  @logAsDebug(true)
   impersonate(cfg: Partial<PeerConfig>): FabricAdapter {
     return new Proxy(this, {
       get: (target, prop) => {
@@ -98,7 +92,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     });
   }
 
-  @logAsSilly(true)
   async create(
     tableName: string,
     id: string | number,
@@ -122,7 +115,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return decoded;
   }
 
-  @logAsSilly(true)
   async read(
     tableName: string,
     id: string | number
@@ -141,7 +133,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return decoded;
   }
 
-  @logAsSilly(true)
   async update(
     tableName: string,
     id: string | number,
@@ -169,7 +160,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return decoded;
   }
 
-  @logAsSilly(true)
   async delete(
     tableName: string,
     id: string | number
@@ -191,7 +181,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     return decoded;
   }
 
-  @logAsSilly(true)
   createAll(
     tableName: string,
     ids: string[] | number[],
@@ -200,7 +189,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     throw new Error("Method not implemented.");
   }
 
-  @logAsSilly()
   readAll(
     tableName: string,
     ids: (string | number | bigint)[]
@@ -208,7 +196,6 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     throw new Error("Method not implemented.");
   }
 
-  @logAsSilly()
   updateAll(
     tableName: string,
     ids: string[] | number[],
