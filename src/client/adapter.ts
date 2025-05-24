@@ -3,7 +3,7 @@ import grpc, { Client } from "@grpc/grpc-js";
 import { Constructor } from "@decaf-ts/decorator-validation";
 import { User } from "fabric-common";
 import { debug, Logger, Logging } from "@decaf-ts/logging";
-import { PeerConfig } from "./types";
+import { FabricFlags, PeerConfig } from "./types";
 import {
   connect,
   ConnectOptions,
@@ -13,9 +13,14 @@ import {
   Contract as Contrakt,
 } from "@hyperledger/fabric-gateway";
 import { getIdentity, getSigner, readFile } from "./fabric-fs";
-import { BaseError } from "@decaf-ts/db-decorators";
+import { BaseError, Context } from "@decaf-ts/db-decorators";
+import { final } from "@decaf-ts/core";
 
-export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
+export class FabricAdapter extends CouchDBAdapter<
+  PeerConfig,
+  FabricFlags,
+  Context<FabricFlags>
+> {
   protected static decoder = new TextDecoder("utf8");
 
   protected static readonly log: Logger = Logging.for(FabricAdapter);
@@ -60,17 +65,13 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
   }
 
   @debug(true)
+  @final()
   update(
     tableName: string,
     id: string | number,
     model: Record<string, any>
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.update);
-    return Promise.resolve(undefined);
-  }
-
-  protected user(): Promise<User> {
-    const log = this.log.for(this.user);
     return Promise.resolve(undefined);
   }
 
@@ -159,7 +160,7 @@ export class FabricAdapter extends CouchDBAdapter<PeerConfig> {
     }
   }
 
-  protected parseError(err: Error | string, reason?: string): BaseError {
+  override parseError(err: Error | string, reason?: string): BaseError {
     return super.parseError(err, reason);
   }
 

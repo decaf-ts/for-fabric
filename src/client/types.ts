@@ -1,4 +1,5 @@
 import { LoggingConfig } from "@decaf-ts/logging";
+import { RepositoryFlags } from "@decaf-ts/db-decorators";
 
 export type PeerConfig = {
   cryptoPath: string;
@@ -29,3 +30,5 @@ export type PeerConfigOverride = Pick<
 >;
 
 export interface PeerEnvironment extends LoggingConfig {}
+
+export interface FabricFlags extends RepositoryFlags {}
