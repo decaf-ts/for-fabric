@@ -1,8 +1,12 @@
 import { CouchDBAdapter, MangoQuery } from "@decaf-ts/for-couchdb";
 import grpc, { Client } from "@grpc/grpc-js";
-import { Constructor } from "@decaf-ts/decorator-validation";
-import { User } from "fabric-common";
-import { debug, Logger, Logging } from "@decaf-ts/logging";
+import {
+  Constructor,
+  Model,
+  Serializer,
+  stringFormat,
+} from "@decaf-ts/decorator-validation";
+import { debug, Logging } from "@decaf-ts/logging";
 import { FabricFlags, PeerConfig } from "./types";
 import {
   connect,
@@ -13,7 +17,14 @@ import {
   Contract as Contrakt,
 } from "@hyperledger/fabric-gateway";
 import { getIdentity, getSigner, readFile } from "./fabric-fs";
-import { BaseError, Context } from "@decaf-ts/db-decorators";
+import {
+  BaseError,
+  Context,
+  InternalError,
+  OperationKeys,
+  SerializationError,
+  BulkCrudOperationKeys,
+} from "@decaf-ts/db-decorators";
 import { final } from "@decaf-ts/core";
 
 export class FabricAdapter extends CouchDBAdapter<
@@ -21,58 +32,231 @@ export class FabricAdapter extends CouchDBAdapter<
   FabricFlags,
   Context<FabricFlags>
 > {
-  protected static decoder = new TextDecoder("utf8");
-
-  protected static readonly log: Logger = Logging.for(FabricAdapter);
-  protected readonly log: Logger = FabricAdapter.log;
-
+  private static decoder = new TextDecoder("utf8");
+  private static log = Logging.for(FabricAdapter);
   private client?: Client;
 
   constructor(config: PeerConfig, flavour: string = "fabric") {
     super(config, flavour);
   }
 
+  protected decode(data: Uint8Array): string {
+    return FabricAdapter.decoder.decode(data);
+  }
+
+  protected override flags<M extends Model>(
+    operation: OperationKeys,
+    model: Constructor<M>,
+    flags: Partial<FabricFlags>
+  ): FabricFlags {
+    return Object.assign(
+      super.flags(operation, model, Object.assign({}, this.native, flags))
+    ) as FabricFlags;
+  }
+
+  override async createAll(
+    tableName: string,
+    ids: string[] | number[],
+    models: Record<string, any>[],
+    transient: Record<string, any>,
+    serializer: Serializer<any>
+  ): Promise<Record<string, any>[]> {
+    const log = this.log.for(this.createAll);
+    if (ids.length !== models.length)
+      throw new InternalError(
+        `Ids and models must have the same length: ${ids.length} != ${models.length}`
+      );
+    log.info(`adding ${ids.length} entries to ${tableName} table`);
+    log.verbose(`pks: ${ids}`);
+    const result = await this.submitTransaction(
+      BulkCrudOperationKeys.CREATE_ALL,
+      [ids, models.map((m) => serializer.serialize(m))],
+      transient
+    );
+    return serializer.deserialize(
+      (this.decode(result) as any).map((r: any) => serializer.deserialize(r))
+    );
+  }
+
+  override async readAll(
+    tableName: string,
+    ids: string[] | number[],
+    serializer: Serializer<any>
+  ): Promise<Record<string, any>[]> {
+    const log = this.log.for(this.readAll);
+    log.info(`reading ${ids.length} entries to ${tableName} table`);
+    log.verbose(`pks: ${ids}`);
+    const result = await this.submitTransaction(
+      BulkCrudOperationKeys.DELETE_ALL,
+      [ids]
+    );
+    return serializer.deserialize(
+      (this.decode(result) as any).map((r: any) => serializer.deserialize(r))
+    );
+  }
+
+  override async updateAll(
+    tableName: string,
+    ids: string[] | number[],
+    models: Record<string, any>[],
+    transient: Record<string, any>,
+    serializer: Serializer<any>
+  ): Promise<Record<string, any>[]> {
+    const log = this.log.for(this.updateAll);
+    if (ids.length !== models.length)
+      throw new InternalError(
+        `Ids and models must have the same length: ${ids.length} != ${models.length}`
+      );
+    log.info(`updating ${ids.length} entries to ${tableName} table`);
+    log.verbose(`pks: ${ids}`);
+    const result = await this.submitTransaction(
+      BulkCrudOperationKeys.CREATE_ALL,
+      [ids, models.map((m) => serializer.serialize(m))],
+      transient
+    );
+    return serializer.deserialize(
+      (this.decode(result) as any).map((r: any) => serializer.deserialize(r))
+    );
+  }
+
+  override async deleteAll(
+    tableName: string,
+    ids: (string | number | bigint)[],
+    serializer: Serializer<any>
+  ): Promise<Record<string, any>[]> {
+    const log = this.log.for(this.deleteAll);
+    log.info(`deleting ${ids.length} entries to ${tableName} table`);
+    log.verbose(`pks: ${ids}`);
+    const result = await this.submitTransaction(
+      BulkCrudOperationKeys.DELETE_ALL,
+      [ids]
+    );
+    return serializer.deserialize(
+      (this.decode(result) as any).map((r: any) => serializer.deserialize(r))
+    );
+  }
+
   @debug(true)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected index<M>(models: Constructor<M>): Promise<void> {
     throw new Error();
   }
 
   @debug(true)
-  create(
+  @final()
+  override async create(
     tableName: string,
     id: string | number,
-    model: Record<string, any>
+    model: Record<string, any>,
+    transient: Record<string, any>,
+    serializer: Serializer<any>
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.create);
-    return Promise.resolve(undefined);
-  }
-
-  @debug(true)
-  delete(tableName: string, id: string | number): Promise<Record<string, any>> {
-    const log = this.log.for(this.delete);
-    return Promise.resolve(undefined);
-  }
-  @debug(true)
-  raw<V>(rawInput: MangoQuery, process: boolean): Promise<V> {
-    const log = this.log.for(this.raw);
-    return Promise.resolve(undefined);
-  }
-
-  @debug(true)
-  read(tableName: string, id: string | number): Promise<Record<string, any>> {
-    const log = this.log.for(this.read);
-    return Promise.resolve(undefined);
+    log.verbose(`adding entry to ${tableName} table`);
+    log.debug(`pk: ${id}`);
+    const result = await this.submitTransaction(
+      OperationKeys.CREATE,
+      [serializer.serialize(model)],
+      transient
+    );
+    return serializer.deserialize(this.decode(result));
   }
 
   @debug(true)
   @final()
-  update(
+  async read(
     tableName: string,
     id: string | number,
-    model: Record<string, any>
+    serializer: Serializer<any>
+  ): Promise<Record<string, any>> {
+    const log = this.log.for(this.read);
+    log.verbose(`reading entry from ${tableName} table`);
+    log.debug(`pk: ${id}`);
+    const result = await this.evaluateTransaction(OperationKeys.READ, [id]);
+    return serializer.deserialize(this.decode(result));
+  }
+
+  @debug(true)
+  @final()
+  async update(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>,
+    transient: Record<string, any>,
+    serializer: Serializer<any>
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.update);
-    return Promise.resolve(undefined);
+    log.verbose(`updating entry to ${tableName} table`);
+    log.debug(`pk: ${id}`);
+    const result = await this.submitTransaction(
+      OperationKeys.UPDATE,
+      [serializer.serialize(model)],
+      transient
+    );
+    return serializer.deserialize(this.decode(result));
+  }
+
+  @debug(true)
+  @final()
+  async delete(
+    tableName: string,
+    id: string | number,
+    serializer: Serializer<any>
+  ): Promise<Record<string, any>> {
+    const log = this.log.for(this.delete);
+    log.verbose(`deleting entry from ${tableName} table`);
+    log.debug(`pk: ${id}`);
+    const result = await this.submitTransaction(OperationKeys.DELETE, [
+      tableName,
+      id,
+    ]);
+    return serializer.deserialize(this.decode(result));
+  }
+
+  @debug(true)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async raw<V>(rawInput: MangoQuery, process: boolean): Promise<V> {
+    const log = this.log.for(this.raw);
+    log.info(`Performing raw  query on table`);
+    log.debug(`processing raw input for query: ${JSON.stringify(rawInput)}`);
+    let input: string;
+    try {
+      input = JSON.stringify(rawInput);
+    } catch (e: any) {
+      throw new SerializationError(
+        `Failed to process raw input for query: ${e}`
+      );
+    }
+    let transactionResult: any;
+    try {
+      transactionResult = await this.evaluateTransaction("query", [input]);
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+    let result: any;
+    try {
+      result = JSON.parse(this.decode(transactionResult));
+    } catch (e: any) {
+      throw new SerializationError(
+        stringFormat("Failed to process result: {0}", e.message)
+      );
+    }
+
+    const parseRecord = (record: Record<any, any>) => {
+      if (Model.isModel(record)) return Model.build(record);
+      return record;
+    };
+
+    if (Array.isArray(result)) {
+      if (!result.length) return result as V;
+      const el = result[0];
+      if (Model.isModel(el))
+        // if the first one is a model, all are models
+        return result.map((el) => Model.build(el)) as V;
+      return result as V;
+    }
+
+    return parseRecord(result as any) as V;
   }
 
   protected async Client(config: PeerConfig): Promise<Client> {
@@ -142,6 +326,7 @@ export class FabricAdapter extends CouchDBAdapter<
       );
       const method = submit ? contract.submit : contract.evaluate;
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       endorsingOrganizations = endorsingOrganizations?.length
         ? endorsingOrganizations
         : undefined;

@@ -31,4 +31,4 @@ export type PeerConfigOverride = Pick<
 
 export interface PeerEnvironment extends LoggingConfig {}
 
-export interface FabricFlags extends RepositoryFlags {}
+export interface FabricFlags extends RepositoryFlags, PeerConfigOverride {}
