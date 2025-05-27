@@ -84,8 +84,6 @@ export async function getFirstDirFileNameContent(
 }
 
 export async function getSigner(keyDirectoryPath: string): Promise<Signer> {
-  let privateKey;
-
   const signerFileReader = async (path: string) => {
     const { promises } = await normalizeImport(import("fs"));
     const keyPath = await getFirstDirFileName(path);
@@ -101,7 +99,7 @@ export async function getSigner(keyDirectoryPath: string): Promise<Signer> {
   // --
 
   // web based implementation
-  privateKey = await extractPrivateKey(privateKeyPem);
+  const privateKey = await extractPrivateKey(privateKeyPem);
   const keys = Object.getOwnPropertySymbols(privateKey);
   const k = (privateKey as any)[keys[0]];
   // --
