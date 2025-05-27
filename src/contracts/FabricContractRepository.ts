@@ -2,15 +2,10 @@ import { Repository, ObserverHandler, EventIds, table } from "@decaf-ts/core";
 import { FabricContractAdapter } from "./ContractAdapter";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
-import { Constructor, model, Model } from "@decaf-ts/decorator-validation";
+import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
-import {
-  BulkCrudOperationKeys,
-  id,
-  OperationKeys,
-  transient,
-} from "@decaf-ts/db-decorators";
+import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
 
 export class FabricContractRepository<M extends Model> extends Repository<
   M,
@@ -19,7 +14,11 @@ export class FabricContractRepository<M extends Model> extends Repository<
   FabricContractFlags,
   FabricContractContext
 > {
-  constructor(adapter?: FabricContractAdapter, clazz?: Constructor<M>) {
+  constructor(
+    adapter?: FabricContractAdapter,
+    clazz?: Constructor<M>,
+    protected trackedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
+  ) {
     super(adapter, clazz);
   }
 
@@ -120,13 +119,18 @@ export class FabricContractRepository<M extends Model> extends Repository<
     );
   }
 
-  override updateObservers(
+  async raw(rawInput: MangoQuery, docsOnly: boolean, ...args: any[]) {
+    return this.adapter.raw(rawInput, docsOnly, ...args);
+  }
+
+  override async updateObservers(
     table: string,
     event: OperationKeys | BulkCrudOperationKeys | string,
     id: EventIds,
     ctx: FabricContractContext,
     ...args: any[]
   ): Promise<void> {
-    return super.updateObservers(table, event, id, ctx, ...args);
+    if (!this.trackedEvents || this.trackedEvents.indexOf(event) !== -1)
+      return await super.updateObservers(table, event, id, ctx, ...args);
   }
 }

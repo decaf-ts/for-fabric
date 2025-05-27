@@ -3,23 +3,26 @@ import { FabricContractAdapter } from "../ContractAdapter";
 import { Contract, Context as Ctx } from "fabric-contract-api";
 import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
+import { FabricContractRepository } from "../FabricContractRepository";
 
-export class CrudContract<M extends Model> extends Contract {
-  protected adapter: FabricContractAdapter;
+export abstract class FabricCrudContract<M extends Model> extends Contract {
+  protected static adapter: FabricContractAdapter;
 
-  constructor(
+  protected constructor(
     name: string,
     private clazz: Constructor<M>
   ) {
     super(name);
-    this.adapter = new FabricContractAdapter(
-      undefined,
-      `fabric-${name}-contract`
-    );
+    FabricCrudContract.adapter =
+      FabricCrudContract.adapter || new FabricContractAdapter(undefined);
   }
 
-  protected repository(ctx: Ctx) {
-    return Repository.forModel(this.clazz, this.adapter.alias, ctx);
+  protected repository(ctx: Ctx): FabricContractRepository<M> {
+    return Repository.forModel(
+      this.clazz,
+      FabricCrudContract.adapter.alias,
+      ctx
+    );
   }
 
   async create(ctx: Ctx, model: M, ...args: any[]): Promise<M> {
@@ -68,5 +71,15 @@ export class CrudContract<M extends Model> extends Contract {
   async updateAll(ctx: Ctx, models: M[], ...args: any[]): Promise<M[]> {
     const repo = this.repository(ctx);
     return repo.updateAll(models, ...args);
+  }
+
+  async raw(
+    ctx: Ctx,
+    rawInput: any,
+    docsOnly: boolean,
+    ...args: any[]
+  ): Promise<any> {
+    const repo = this.repository(ctx);
+    return repo.raw(rawInput, docsOnly, ...args);
   }
 }

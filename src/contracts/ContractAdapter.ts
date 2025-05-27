@@ -108,6 +108,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected index<M>(models: Constructor<M>): Promise<void> {
     return Promise.resolve(undefined);
   }
