@@ -12,18 +12,18 @@ export type PeerConfig = {
   caTlsCertificate: string;
   caCert: string;
   caKey: string;
-  chaincodeName?: string;
+  chaincodeName: string;
   contractName?: string;
   ca?: string;
-  msp?: string;
-  channel?: string;
+  mspId: string;
+  channel: string;
 };
 
 export type PeerConfigOverride = Pick<
   PeerConfig,
   | "keyDirectoryPath"
   | "certDirectoryPath"
-  | "msp"
+  | "mspId"
   | "channel"
   | "chaincodeName"
   | "contractName"

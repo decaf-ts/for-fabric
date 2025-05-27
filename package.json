@@ -4,8 +4,18 @@
   "description": "template for ts projects",
   "type": "module",
   "exports": {
-    "require": "./lib/index.cjs",
-    "import": "./lib/esm/index.js"
+    "./client": {
+      "require": "./lib/client/index.cjs",
+      "import": "./lib/esm/client/index.js"
+    },
+    "./contracts": {
+      "require": "./lib/contracts/index.cjs",
+      "import": "./lib/esm/contracts/index.js"
+    },
+    "./shared": {
+      "require": "./lib/shared/index.cjs",
+      "import": "./lib/esm/shared/index.js"
+    }
   },
   "types": "lib/index.d.ts",
   "scripts": {
@@ -112,8 +122,8 @@
     "@decaf-ts/decorator-validation": "latest",
     "@decaf-ts/for-couchdb": "latest",
     "@decaf-ts/injectable-decorators": "latest",
-    "@decaf-ts/reflection": "latest",
     "@decaf-ts/logging": "latest",
+    "@decaf-ts/reflection": "latest",
     "reflect-metadata": "^0.2.1"
   },
   "dependencies": {
@@ -123,6 +133,7 @@
     "fabric-common": "^2.2.20",
     "fabric-contract-api": "^2.5.8",
     "fabric-shim": "^2.5.8",
+    "json-stringify-deterministic": "^1.0.12",
     "jsrsasign": "^11.1.0",
     "jsrsasign-util": "^1.0.5"
   },

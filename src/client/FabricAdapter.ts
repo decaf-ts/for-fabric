@@ -1,9 +1,9 @@
-import { CouchDBAdapter, MangoQuery } from "@decaf-ts/for-couchdb";
+import { CouchDBAdapter, type MangoQuery } from "@decaf-ts/for-couchdb";
 import grpc, { Client } from "@grpc/grpc-js";
 import {
-  Constructor,
+  type Constructor,
   Model,
-  Serializer,
+  type Serializer,
   stringFormat,
 } from "@decaf-ts/decorator-validation";
 import { debug, Logging } from "@decaf-ts/logging";
@@ -26,6 +26,7 @@ import {
   BulkCrudOperationKeys,
 } from "@decaf-ts/db-decorators";
 import { final } from "@decaf-ts/core";
+import { FabricClientFlavour } from "./constants";
 
 export class FabricAdapter extends CouchDBAdapter<
   PeerConfig,
@@ -36,8 +37,12 @@ export class FabricAdapter extends CouchDBAdapter<
   private static log = Logging.for(FabricAdapter);
   private client?: Client;
 
-  constructor(config: PeerConfig, flavour: string = "fabric") {
-    super(config, flavour);
+  protected override get log() {
+    return FabricAdapter.log;
+  }
+
+  constructor(config: PeerConfig, alias?: string) {
+    super(config, FabricClientFlavour, alias);
   }
 
   protected decode(data: Uint8Array): string {
@@ -259,50 +264,17 @@ export class FabricAdapter extends CouchDBAdapter<
     return parseRecord(result as any) as V;
   }
 
-  protected async Client(config: PeerConfig): Promise<Client> {
-    if (!this.client) this.client = await FabricAdapter.getClient(config);
+  protected async Client(): Promise<Client> {
+    if (!this.client) this.client = await FabricAdapter.getClient(this.native);
     return this.client;
   }
 
-  protected async Gateway(mspId: string, config: PeerConfig): Promise<Gateway> {
-    return (await FabricAdapter.getConnection(
-      await this.Client(config),
-      mspId,
-      config
-    )) as Gateway;
+  protected async Gateway(): Promise<Gateway> {
+    return FabricAdapter.getGateway(this.native, await this.Client());
   }
 
-  protected Network(gateway: Gateway, channelName: string): Network {
-    const log = this.log.for(this.Network);
-    let network: Network;
-    try {
-      log.debug(`Connecting to channel ${channelName}`);
-      network = gateway.getNetwork(channelName);
-    } catch (e: any) {
-      throw this.parseError(e);
-    }
-
-    return network;
-  }
-
-  protected Contract(
-    gateway: Gateway,
-    channelName: string,
-    chaincodeName: string,
-    contractName: string
-  ): Contrakt {
-    const log = this.log.for(this.Network);
-    const network = this.Network(gateway, channelName);
-    let contract: Contrakt;
-    try {
-      log.debug(
-        `Retrieving chaincode ${chaincodeName} contract ${contractName} from network ${channelName}`
-      );
-      contract = network.getContract(chaincodeName, contractName);
-    } catch (e: any) {
-      throw this.parseError(e);
-    }
-    return contract;
+  protected async Contract(): Promise<Contrakt> {
+    return FabricAdapter.getContract(await this.Gateway(), this.native);
   }
 
   protected async transaction(
@@ -313,17 +285,13 @@ export class FabricAdapter extends CouchDBAdapter<
     endorsingOrganizations?: Array<string>
   ): Promise<Uint8Array> {
     const log = this.log.for(this.transaction);
-    const gateway = await this.Gateway(this.native.msp as string, this.native);
+    const gateway = await this.Gateway();
     try {
-      const contract = this.Contract(
-        gateway,
-        this.native.channel as string,
-        this.native.chaincodeName as string,
-        this.native.contractName as string
+      const contract = await this.Contract();
+      log.verbose(
+        `${submit ? "Submit" : "Evaluate"}ting transaction ${this.native.contractName}.${api}`
       );
-      log.debug(
-        `${submit ? "Submit" : "Evaluate"}ting transaction ${this.native.contractName}.${api} with args: ${args?.map((a) => a.toString()).join("\n") || "none"}`
-      );
+      log.debug(`args: ${args?.map((a) => a.toString()).join("\n") || "none"}`);
       const method = submit ? contract.submit : contract.evaluate;
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -340,13 +308,13 @@ export class FabricAdapter extends CouchDBAdapter<
     } catch (e: any) {
       throw this.parseError(e);
     } finally {
-      this.log.debug(`Closing ${this.native.msp} gateway connection`);
+      this.log.debug(`Closing ${this.native.mspId} gateway connection`);
       gateway.close();
     }
   }
 
   override parseError(err: Error | string, reason?: string): BaseError {
-    return super.parseError(err, reason);
+    return FabricAdapter.parseError(err, reason);
   }
 
   protected async submitTransaction(
@@ -381,31 +349,62 @@ export class FabricAdapter extends CouchDBAdapter<
 
   async close(): Promise<void> {
     if (this.client) {
-      this.log.debug(`Closing ${this.native.msp} gateway client`);
+      this.log.verbose(`Closing ${this.native.mspId} gateway client`);
       this.client.close();
     }
   }
 
-  protected static async getClient(config: PeerConfig) {
+  static getContract(gateway: Gateway, config: PeerConfig): Contrakt {
+    const log = this.log.for(this.getContract);
+    const network = this.getNetwork(gateway, config.channel);
+    let contract: Contrakt;
+    try {
+      log.debug(
+        `Retrieving chaincode ${config.chaincodeName} contract ${config.contractName} from network ${config.channel}`
+      );
+      contract = network.getContract(config.chaincodeName, config.contractName);
+    } catch (e: any) {
+      throw this.parseError(e);
+    }
+    return contract;
+  }
+
+  static getNetwork(gateway: Gateway, channelName: string): Network {
+    const log = this.log.for(this.getNetwork);
+    let network: Network;
+    try {
+      log.debug(`Connecting to channel ${channelName}`);
+      network = gateway.getNetwork(channelName);
+    } catch (e: any) {
+      throw this.parseError(e);
+    }
+
+    return network;
+  }
+
+  static async getGateway(config: PeerConfig, client?: Client) {
+    return (await this.getConnection(
+      client || (await this.getClient(config)),
+      config
+    )) as Gateway;
+  }
+
+  static async getClient(config: PeerConfig) {
     const log = this.log.for(this.getClient);
     log.debug(`Retrieving TLS cert from ${config.tlsCertPath}`);
     const tlsRootCert = await readFile(config.tlsCertPath);
-    log.debug(`generating TLS credentials for msp ${config.msp}`);
+    log.debug(`generating TLS credentials for msp ${config.mspId}`);
     const tlsCredentials = grpc.credentials.createSsl(tlsRootCert);
     log.debug(`generating Gateway Client for url ${config.peerEndpoint}`);
     return new Client(config.peerEndpoint, tlsCredentials);
   }
 
-  protected static async getConnection(
-    client: Client,
-    mspId: string,
-    config: PeerConfig
-  ) {
+  static async getConnection(client: Client, config: PeerConfig) {
     const log = this.log.for(this.getConnection);
     log.debug(
-      `Retrieving Peer Identity for ${mspId} under ${config.certDirectoryPath}`
+      `Retrieving Peer Identity for ${config.mspId} under ${config.certDirectoryPath}`
     );
-    const identity = await getIdentity(mspId, config.certDirectoryPath);
+    const identity = await getIdentity(config.mspId, config.certDirectoryPath);
     log.debug(`Retrieving signer key from ${config.keyDirectoryPath}`);
 
     const signer = await getSigner(config.keyDirectoryPath);
@@ -429,7 +428,14 @@ export class FabricAdapter extends CouchDBAdapter<
       },
     } as ConnectOptions;
 
-    log.debug(`Connecting to ${mspId}`);
+    log.debug(`Connecting to ${config.mspId}`);
     return connect(options);
+  }
+
+  protected static override parseError(
+    err: Error | string,
+    reason?: string
+  ): BaseError {
+    return super.parseError(err, reason);
   }
 }
