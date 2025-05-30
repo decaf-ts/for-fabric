@@ -1,4 +1,4 @@
 [![Banner](./workdocs/assets/Banner.png)](https://decaf-ts.github.io/ts-workspace/)
-## Typescript Template
+## Hyperledger Fabric Integration for DECAF
 
-This repository is meant to provide an enterprise template for any standard Typescript project
+A TypeScript library that provides seamless integration with Hyperledger Fabric networks, offering both client-side connectivity and chaincode contract development capabilities. It extends the DECAF database abstraction framework to work with Fabric's ledger, enabling consistent data access patterns across different storage technologies.

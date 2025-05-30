@@ -7,6 +7,65 @@ import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
 
+/**
+ * @description Repository for Hyperledger Fabric chaincode models
+ * @summary Provides CRUD operations for models within Fabric chaincode contracts
+ * @template M - Type extending Model
+ * @template MangoQuery - Query type for CouchDB-like queries
+ * @template FabricContractAdapter - Adapter type for Fabric contract operations
+ * @template FabricContractFlags - Flags specific to Fabric contract operations
+ * @template FabricContractContext - Context type for Fabric contract operations
+ * @class FabricContractRepository
+ * @example
+ * ```typescript
+ * // In a Fabric chaincode contract class
+ * import { FabricContractRepository, FabricContractAdapter } from '@decaf-ts/for-fabric';
+ * 
+ * @table('assets')
+ * class Asset extends Model {
+ *   @id()
+ *   id: string;
+ *   
+ *   @property()
+ *   data: string;
+ * }
+ * 
+ * export class MyContract extends Contract {
+ *   private adapter = new FabricContractAdapter();
+ *   private repository: FabricContractRepository<Asset>;
+ *   
+ *   constructor() {
+ *     super('MyContract');
+ *     this.repository = new FabricContractRepository<Asset>(this.adapter, Asset);
+ *   }
+ *   
+ *   @Transaction()
+ *   async createAsset(ctx: Context, id: string, data: string): Promise<void> {
+ *     const asset = new Asset();
+ *     asset.id = id;
+ *     asset.data = data;
+ *     
+ *     await this.repository.create(asset, { stub: ctx.stub });
+ *   }
+ * }
+ * ```
+ * @mermaid
+ * sequenceDiagram
+ *   participant Contract
+ *   participant Repository
+ *   participant Adapter
+ *   participant StateDB
+ *   
+ *   Contract->>Repository: create(model, ctx)
+ *   Repository->>Adapter: prepare(model, pk)
+ *   Repository->>Adapter: create(tableName, id, record, transient, ctx)
+ *   Adapter->>StateDB: putState(id, serializedData)
+ *   StateDB-->>Adapter: Success
+ *   Adapter-->>Repository: record
+ *   Repository->>Adapter: revert(record, class, pk, id, transient)
+ *   Adapter-->>Repository: model
+ *   Repository-->>Contract: model
+ */
 export class FabricContractRepository<M extends Model> extends Repository<
   M,
   MangoQuery,
@@ -14,6 +73,13 @@ export class FabricContractRepository<M extends Model> extends Repository<
   FabricContractFlags,
   FabricContractContext
 > {
+  /**
+   * @description Creates a new FabricContractRepository instance
+   * @summary Initializes a repository for managing models in Fabric chaincode
+   * @param {FabricContractAdapter} [adapter] - The adapter for interacting with the state database
+   * @param {Constructor<M>} [clazz] - The model constructor
+   * @param {(OperationKeys | BulkCrudOperationKeys | string)[]} [trackedEvents] - Events to track for observer notifications
+   */
   constructor(
     adapter?: FabricContractAdapter,
     clazz?: Constructor<M>,
@@ -22,10 +88,22 @@ export class FabricContractRepository<M extends Model> extends Repository<
     super(adapter, clazz);
   }
 
+  /**
+   * @description Gets the observer handler for this repository
+   * @summary Returns a FabricContractRepositoryObservableHandler instance
+   * @return {ObserverHandler} The observer handler
+   */
   override ObserverHandler(): ObserverHandler {
     return new FabricContractRepositoryObservableHandler();
   }
 
+  /**
+   * @description Creates a single model in the state database
+   * @summary Prepares, creates, and reverts a model using the adapter
+   * @param {M} model - The model to create
+   * @param {...any[]} args - Additional arguments, including the chaincode context
+   * @return {Promise<M>} Promise resolving to the created model
+   */
   override async create(model: M, ...args: any[]): Promise<M> {
     // eslint-disable-next-line prefer-const
     let { record, id, transient } = this.adapter.prepare(model, this.pk);
@@ -47,6 +125,13 @@ export class FabricContractRepository<M extends Model> extends Repository<
     );
   }
 
+  /**
+   * @description Creates multiple models in the state database
+   * @summary Prepares, creates, and reverts multiple models using the adapter
+   * @param {M[]} models - The models to create
+   * @param {...any[]} args - Additional arguments, including the chaincode context
+   * @return {Promise<M[]>} Promise resolving to the created models
+   */
   override async createAll(models: M[], ...args: any[]): Promise<M[]> {
     if (!models.length) return models;
     const prepared = models.map((m) => this.adapter.prepare(m, this.pk));
@@ -73,6 +158,13 @@ export class FabricContractRepository<M extends Model> extends Repository<
     );
   }
 
+  /**
+   * @description Updates a single model in the state database
+   * @summary Prepares, updates, and reverts a model using the adapter
+   * @param {M} model - The model to update
+   * @param {...any[]} args - Additional arguments, including the chaincode context
+   * @return {Promise<M>} Promise resolving to the updated model
+   */
   override async update(model: M, ...args: any[]): Promise<M> {
     // eslint-disable-next-line prefer-const
     let { record, id, transient } = this.adapter.prepare(model, this.pk);
@@ -94,6 +186,13 @@ export class FabricContractRepository<M extends Model> extends Repository<
     );
   }
 
+  /**
+   * @description Updates multiple models in the state database
+   * @summary Prepares, updates, and reverts multiple models using the adapter
+   * @param {M[]} models - The models to update
+   * @param {...any[]} args - Additional arguments, including the chaincode context
+   * @return {Promise<M[]>} Promise resolving to the updated models
+   */
   override async updateAll(models: M[], ...args: any[]): Promise<M[]> {
     if (!models.length) return models;
     const records = models.map((m) => this.adapter.prepare(m, this.pk));
@@ -119,10 +218,28 @@ export class FabricContractRepository<M extends Model> extends Repository<
     );
   }
 
+  /**
+   * @description Executes a raw query against the state database
+   * @summary Delegates to the adapter's raw method
+   * @param {MangoQuery} rawInput - The Mango Query to execute
+   * @param {boolean} docsOnly - Whether to return only documents
+   * @param {...any[]} args - Additional arguments, including the chaincode context
+   * @return {Promise<any>} Promise resolving to the query results
+   */
   async raw(rawInput: MangoQuery, docsOnly: boolean, ...args: any[]) {
     return this.adapter.raw(rawInput, docsOnly, ...args);
   }
 
+  /**
+   * @description Updates observers based on tracked events
+   * @summary Filters events based on trackedEvents and delegates to the parent method
+   * @param {string} table - The table/collection name
+   * @param {OperationKeys | BulkCrudOperationKeys | string} event - The event type
+   * @param {EventIds} id - The event identifier
+   * @param {FabricContractContext} ctx - The Fabric contract context
+   * @param {...any[]} args - Additional arguments
+   * @return {Promise<void>} Promise that resolves when observers are updated
+   */
   override async updateObservers(
     table: string,
     event: OperationKeys | BulkCrudOperationKeys | string,

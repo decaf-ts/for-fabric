@@ -10,9 +10,44 @@ import {
 import { LoggingConfig } from "@decaf-ts/logging";
 import { Context as Ctx } from "fabric-contract-api";
 
+/**
+ * @description Logger implementation for Fabric chaincode contracts
+ * @summary Adapts the standard logging interface to work with Fabric's chaincode context
+ * @class ContractLogger
+ * @extends {MiniLogger}
+ * @example
+ * ```typescript
+ * // In a Fabric chaincode contract
+ * import { ContractLogger } from '@decaf-ts/for-fabric';
+ *
+ * export class MyContract extends Contract {
+ *   @Transaction()
+ *   async myFunction(ctx: Context): Promise<void> {
+ *     const logger = new ContractLogger('MyContract', { level: 'info' }, ctx);
+ *
+ *     logger.info('Processing transaction');
+ *     logger.debug('Transaction details:', { ... });
+ *
+ *     // Do something
+ *
+ *     logger.info('Transaction complete');
+ *   }
+ * }
+ * ```
+ */
 export class ContractLogger extends MiniLogger {
+  /**
+   * @description The underlying Fabric logger instance
+   */
   protected logger: Logger;
 
+  /**
+   * @description Creates a new ContractLogger instance
+   * @summary Initializes a logger that works with Fabric's chaincode context
+   * @param {string} context - The logging context name
+   * @param {Partial<LoggingConfig> | undefined} conf - Optional logging configuration
+   * @param {Ctx} ctx - The Fabric chaincode context
+   */
   constructor(
     context: string,
     conf: Partial<LoggingConfig> | undefined,
@@ -23,6 +58,14 @@ export class ContractLogger extends MiniLogger {
     ctx.logging.setLevel(this.config("level") as string);
   }
 
+  /**
+   * @description Logs a message at the specified level
+   * @summary Overrides the base log method to use the Fabric context's logger
+   * @param {LogLevel} level - The log level
+   * @param {StringLike | Error} msg - The message to log
+   * @param {string} [stack] - Optional stack trace for errors
+   * @return {void}
+   */
   protected override log(
     level: LogLevel,
     msg: StringLike | Error,
@@ -58,6 +101,16 @@ export class ContractLogger extends MiniLogger {
   }
 }
 
+/**
+ * @description Factory function for creating ContractLogger instances
+ * @summary Creates a new ContractLogger with the given context, config, and Fabric context
+ * @param {string} object - The logging context name
+ * @param {Partial<LoggingConfig> | undefined} config - Optional logging configuration
+ * @param {Ctx} ctx - The Fabric chaincode context
+ * @return {ContractLogger} A new ContractLogger instance
+ * @function factory
+ * @memberOf module:fabric-contracts
+ */
 const factory: LoggerFactory = (
   object: string,
   config: Partial<LoggingConfig> | undefined,
@@ -66,4 +119,5 @@ const factory: LoggerFactory = (
   return new ContractLogger(object, config || {}, ctx);
 };
 
+// Set the factory as the default logger factory
 Logging.setFactory(factory);

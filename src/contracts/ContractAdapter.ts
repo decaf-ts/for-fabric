@@ -10,21 +10,76 @@ import { ContractLogger } from "./logging";
 import { Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import { Iterators, StateQueryResponse } from "fabric-shim-api";
-import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
 
+/**
+ * @description Adapter for Hyperledger Fabric chaincode state database operations
+ * @summary Provides a CouchDB-like interface for interacting with the Fabric state database from within a chaincode contract
+ * @template void - No configuration needed for contract adapter
+ * @template FabricContractFlags - Flags specific to Fabric contract operations
+ * @template FabricContractContext - Context type for Fabric contract operations
+ * @class FabricContractAdapter
+ * @example
+ * ```typescript
+ * // In a Fabric chaincode contract class
+ * import { FabricContractAdapter } from '@decaf-ts/for-fabric';
+ *
+ * export class MyContract extends Contract {
+ *   private adapter = new FabricContractAdapter();
+ *
+ *   @Transaction()
+ *   async createAsset(ctx: Context, id: string, data: string): Promise<void> {
+ *     const model = { id, data, timestamp: Date.now() };
+ *     await this.adapter.create('assets', id, model, {}, { stub: ctx.stub });
+ *   }
+ * }
+ * ```
+ * @mermaid
+ * sequenceDiagram
+ *   participant Contract
+ *   participant FabricContractAdapter
+ *   participant Stub
+ *   participant StateDB
+ *
+ *   Contract->>FabricContractAdapter: create(tableName, id, model, transient, ctx)
+ *   FabricContractAdapter->>FabricContractAdapter: Serialize model to JSON
+ *   FabricContractAdapter->>Stub: putState(id, serializedData)
+ *   Stub->>StateDB: Write data
+ *   StateDB-->>Stub: Success
+ *   Stub-->>FabricContractAdapter: Success
+ *   FabricContractAdapter-->>Contract: model
+ */
 export class FabricContractAdapter extends CouchDBAdapter<
   void,
   FabricContractFlags,
   FabricContractContext
 > {
+  /**
+   * @description Text decoder for converting binary data to strings
+   */
   private static textDecoder = new TextDecoder("utf8");
 
+  /**
+   * @description Creates a logger for a specific chaincode context
+   * @summary Returns a ContractLogger instance configured for the current context
+   * @param {Ctx} ctx - The Fabric chaincode context
+   * @return {ContractLogger} The logger instance
+   */
   private logFor(ctx: Ctx): ContractLogger {
     return Logging.for(FabricContractAdapter, {}, ctx) as ContractLogger;
   }
 
+  /**
+   * @description Context constructor for this adapter
+   * @summary Overrides the base Context constructor with FabricContractContext
+   */
   override Context: Constructor<FabricContractContext> = FabricContractContext;
 
+  /**
+   * @description Gets the repository constructor for this adapter
+   * @summary Returns the FabricContractRepository constructor for creating repositories
+   * @template M - Type extending Model
+   * @return {Constructor<Repository<M, MangoQuery, FabricContractAdapter, FabricContractFlags, FabricContractContext>>} The repository constructor
+   */
   override repository<M extends Model>(): Constructor<
     Repository<
       M,
@@ -37,14 +92,36 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return FabricContractRepository;
   }
 
+  /**
+   * @description Creates a new FabricContractAdapter instance
+   * @summary Initializes an adapter for interacting with the Fabric state database
+   * @param {void} scope - Not used in this adapter
+   * @param {string} [alias] - Optional alias for the adapter instance
+   */
   constructor(scope: void, alias?: string) {
     super(scope, FabricContractFlavour, alias);
   }
 
+  /**
+   * @description Decodes binary data to string
+   * @summary Converts a Uint8Array to a string using UTF-8 encoding
+   * @param {Uint8Array} buffer - The binary data to decode
+   * @return {string} The decoded string
+   */
   protected decode(buffer: Uint8Array) {
     return FabricContractAdapter.textDecoder.decode(buffer);
   }
 
+  /**
+   * @description Creates operation flags for Fabric contract operations
+   * @summary Merges default flags with Fabric-specific context information
+   * @template M - Type extending Model
+   * @param {OperationKeys} operation - The operation being performed
+   * @param {Constructor<M>} model - The model constructor
+   * @param {Partial<FabricContractFlags>} flags - Partial flags to merge with defaults
+   * @param {Ctx} ctx - The Fabric chaincode context
+   * @return {FabricContractFlags} The merged flags
+   */
   protected override flags<M extends Model>(
     operation: OperationKeys,
     model: Constructor<M>,
@@ -58,6 +135,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
     });
   }
 
+  /**
+   * @description Creates a record in the state database
+   * @summary Serializes a model and stores it in the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier
+   * @param {Record<string, any>} model - The record data
+   * @param {Record<string, any>} transient - Transient data (not used in this implementation)
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the created record
+   */
   @debug(true)
   async create(
     tableName: string,
@@ -88,6 +175,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
+  /**
+   * @description Deletes a record from the state database
+   * @summary Retrieves a record and then removes it from the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier to delete
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the deleted record
+   */
   async delete(
     tableName: string,
     id: string | number,
@@ -108,11 +203,26 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
+  /**
+   * @description Creates an index for a model
+   * @summary This method is not implemented for Fabric contracts and returns a resolved promise
+   * @template M - Type extending Model
+   * @param {Constructor<M>} models - The model constructor
+   * @return {Promise<void>} Promise that resolves immediately
+   */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected index<M>(models: Constructor<M>): Promise<void> {
     return Promise.resolve(undefined);
   }
 
+  /**
+   * @description Reads a record from the state database
+   * @summary Retrieves and deserializes a record from the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the retrieved record
+   */
   async read(
     tableName: string,
     id: string | number,
@@ -132,6 +242,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
+  /**
+   * @description Updates a record in the state database
+   * @summary Serializes a model and updates it in the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier
+   * @param {Record<string, any>} model - The updated record data
+   * @param {Record<string, any>} transient - Transient data (not used in this implementation)
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the updated record
+   */
   async update(
     tableName: string,
     id: string | number,
@@ -161,6 +281,31 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
+  /**
+   * @description Processes results from a state query iterator
+   * @summary Iterates through query results and converts them to a structured format
+   * @param {Logger} log - Logger instance for debugging
+   * @param {Iterators.StateQueryIterator} iterator - The state query iterator
+   * @param {boolean} [isHistory=false] - Whether this is a history query
+   * @return {Promise<any[]>} Promise resolving to an array of processed results
+   * @mermaid
+   * sequenceDiagram
+   *   participant Caller
+   *   participant ResultIterator
+   *   participant Iterator
+   *
+   *   Caller->>ResultIterator: resultIterator(log, iterator, isHistory)
+   *   loop Until done
+   *     ResultIterator->>Iterator: next()
+   *     Iterator-->>ResultIterator: { value, done }
+   *     alt Has value
+   *       ResultIterator->>ResultIterator: Process value based on isHistory
+   *       ResultIterator->>ResultIterator: Add to results array
+   *     end
+   *   end
+   *   ResultIterator->>Iterator: close()
+   *   ResultIterator-->>Caller: allResults
+   */
   protected async resultIterator(
     log: Logger,
     iterator: Iterators.StateQueryIterator,
@@ -199,6 +344,34 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return allResults;
   }
 
+  /**
+   * @description Executes a raw query against the state database
+   * @summary Performs a rich query using CouchDB syntax against the Fabric state database
+   * @template R - The return type
+   * @param {MangoQuery} rawInput - The Mango Query to execute
+   * @param {boolean} docsOnly - Whether to return only documents (not used in this implementation)
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<R>} Promise resolving to the query results
+   * @mermaid
+   * sequenceDiagram
+   *   participant Caller
+   *   participant FabricContractAdapter
+   *   participant Stub
+   *   participant StateDB
+   *
+   *   Caller->>FabricContractAdapter: raw(rawInput, docsOnly, ctx)
+   *   FabricContractAdapter->>FabricContractAdapter: Extract limit and skip
+   *   alt With pagination
+   *     FabricContractAdapter->>Stub: getQueryResultWithPagination(query, limit, skip)
+   *   else Without pagination
+   *     FabricContractAdapter->>Stub: getQueryResult(query)
+   *   end
+   *   Stub->>StateDB: Execute query
+   *   StateDB-->>Stub: Iterator
+   *   Stub-->>FabricContractAdapter: Iterator
+   *   FabricContractAdapter->>FabricContractAdapter: resultIterator(log, iterator)
+   *   FabricContractAdapter-->>Caller: results
+   */
   async raw<R>(
     rawInput: MangoQuery,
     docsOnly: boolean,
@@ -237,6 +410,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return results;
   }
 
+  /**
+   * @description Static method for class decoration
+   * @summary Empty method used for class decoration purposes
+   */
   static decoration() {}
 }
 

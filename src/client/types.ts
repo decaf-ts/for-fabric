@@ -20,7 +20,7 @@ import { RepositoryFlags } from "@decaf-ts/db-decorators";
  * @property {string} [ca] - Optional certificate authority name
  * @property {string} mspId - Membership Service Provider ID
  * @property {string} channel - Channel name
- * @memberOf module:fabric-client
+ * @memberOf module:fabric.client
  */
 export type PeerConfig = {
   cryptoPath: string;
@@ -50,7 +50,8 @@ export type PeerConfig = {
  * @property {string} channel - Channel name
  * @property {string} chaincodeName - Name of the chaincode to interact with
  * @property {string} [contractName] - Optional name of the specific contract within the chaincode
- * @memberOf module:fabric-client
+ *
+ * @memberOf module:fabric.client
  */
 export type PeerConfigOverride = Pick<
   PeerConfig,
@@ -67,7 +68,7 @@ export type PeerConfigOverride = Pick<
  * @summary Extends the logging configuration for Fabric peer environments
  * @interface PeerEnvironment
  * @extends {LoggingConfig}
- * @memberOf module:fabric-client
+ * @memberOf module:fabric.client
  */
 export interface PeerEnvironment extends LoggingConfig {}
 
@@ -77,6 +78,6 @@ export interface PeerEnvironment extends LoggingConfig {}
  * @interface FabricFlags
  * @extends {RepositoryFlags}
  * @extends {PeerConfigOverride}
- * @memberOf module:fabric-client
+ * @memberOf module:fabric.client
  */
 export interface FabricFlags extends RepositoryFlags, PeerConfigOverride {}
