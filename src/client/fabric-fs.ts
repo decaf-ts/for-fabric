@@ -6,6 +6,15 @@ import { isBrowser } from "@decaf-ts/utils/lib/utils/web";
 
 const log = Logging.for("fabric-fs");
 
+/**
+ * @description Loads content from a file or returns the content if already loaded
+ * @summary Determines if the input is already content or a path to a file, and loads the file if needed
+ * @param {string | Uint8Array} contentOrPath - The content or path to load
+ * @param {Function} fileReader - Function to read the file if contentOrPath is a path
+ * @return {Promise<string | Uint8Array | Buffer>} The content
+ * @function contentOfLoadFile
+ * @memberOf module:fabric-client
+ */
 export async function contentOfLoadFile(
   contentOrPath: string | Uint8Array,
   fileReader: (path: string) => Promise<string | Uint8Array | Buffer>
@@ -20,6 +29,14 @@ export async function contentOfLoadFile(
   return await fileReader(contentOrPath);
 }
 
+/**
+ * @description Reads a file from the file system
+ * @summary Loads a file using the Node.js file system module
+ * @param {string | Buffer} contentOrPath - The content or path to load
+ * @return {Promise<Buffer>} The file content as a Buffer
+ * @function readFile
+ * @memberOf module:fabric-client
+ */
 export async function readFile(contentOrPath: string | Buffer) {
   if (typeof contentOrPath !== "string") return contentOrPath;
 
@@ -31,6 +48,17 @@ export async function readFile(contentOrPath: string | Buffer) {
   return await fileReader(contentOrPath);
 }
 
+/**
+ * @description Creates a Certificate Authority user
+ * @summary Initializes a user with the given credentials for interacting with a Fabric CA
+ * @param {string} userName - The user name
+ * @param {string} privateKey - The private key as a string
+ * @param {string} certificate - The certificate as a string
+ * @param {string} mspId - The Membership Service Provider ID
+ * @return {Promise<User>} Promise resolving to the created user
+ * @function getCAUser
+ * @memberOf module:fabric-client
+ */
 export async function getCAUser(
   userName: string,
   privateKey: string,
@@ -48,6 +76,15 @@ export async function getCAUser(
   return user;
 }
 
+/**
+ * @description Gets an identity from a certificate directory
+ * @summary Loads a certificate from a directory and creates an Identity object
+ * @param {string} mspId - The Membership Service Provider ID
+ * @param {string} certDirectoryPath - Path to the directory containing the certificate
+ * @return {Promise<Identity>} Promise resolving to the identity
+ * @function getIdentity
+ * @memberOf module:fabric-client
+ */
 export async function getIdentity(
   mspId: string,
   certDirectoryPath: string
@@ -67,6 +104,14 @@ export async function getIdentity(
   return { mspId, credentials };
 }
 
+/**
+ * @description Gets the full path of the first file in a directory
+ * @summary Reads a directory and returns the path to the first file found
+ * @param {string} dirPath - Path to the directory
+ * @return {Promise<string>} Promise resolving to the full path of the first file
+ * @function getFirstDirFileName
+ * @memberOf module:fabric-client
+ */
 export async function getFirstDirFileName(dirPath: string): Promise<string> {
   const { promises } = await normalizeImport(import("fs"));
   const { join } = await normalizeImport(import("path"));
@@ -74,6 +119,14 @@ export async function getFirstDirFileName(dirPath: string): Promise<string> {
   return join(dirPath, files[0]);
 }
 
+/**
+ * @description Gets the content of the first file in a directory
+ * @summary Reads a directory, finds the first file, and returns its content as a string
+ * @param {string} dirPath - Path to the directory
+ * @return {Promise<string>} Promise resolving to the content of the first file
+ * @function getFirstDirFileNameContent
+ * @memberOf module:fabric-client
+ */
 export async function getFirstDirFileNameContent(
   dirPath: string
 ): Promise<string> {
@@ -83,6 +136,14 @@ export async function getFirstDirFileNameContent(
   return (await promises.readFile(join(dirPath, files[0]))).toString();
 }
 
+/**
+ * @description Gets a signer from a key directory
+ * @summary Loads a private key from a directory and creates a Signer for Fabric transactions
+ * @param {string} keyDirectoryPath - Path to the directory containing the private key
+ * @return {Promise<Signer>} Promise resolving to the signer
+ * @function getSigner
+ * @memberOf module:fabric-client
+ */
 export async function getSigner(keyDirectoryPath: string): Promise<Signer> {
   const signerFileReader = async (path: string) => {
     const { promises } = await normalizeImport(import("fs"));
@@ -107,6 +168,27 @@ export async function getSigner(keyDirectoryPath: string): Promise<Signer> {
   return signers.newPrivateKeySigner(k as any);
 }
 
+/**
+ * @description Extracts a private key from a PEM buffer
+ * @summary Converts a PEM-encoded private key to a CryptoKey object
+ * @param {Buffer} pem - The PEM-encoded private key
+ * @return {Promise<CryptoKey>} Promise resolving to the CryptoKey
+ * @function extractPrivateKey
+ * @memberOf module:fabric-client
+ * @mermaid
+ * sequenceDiagram
+ *   participant Caller
+ *   participant ExtractPrivateKey
+ *   participant SubtleCrypto
+ *   
+ *   Caller->>ExtractPrivateKey: extractPrivateKey(pem)
+ *   ExtractPrivateKey->>ExtractPrivateKey: Get SubtleCrypto implementation
+ *   ExtractPrivateKey->>ExtractPrivateKey: Parse PEM format
+ *   ExtractPrivateKey->>ExtractPrivateKey: Convert to binary DER
+ *   ExtractPrivateKey->>SubtleCrypto: importKey(pkcs8, binaryDer, options)
+ *   SubtleCrypto-->>ExtractPrivateKey: CryptoKey
+ *   ExtractPrivateKey-->>Caller: CryptoKey
+ */
 export async function extractPrivateKey(pem: Buffer) {
   const libName = "crypto";
   let subtle;
