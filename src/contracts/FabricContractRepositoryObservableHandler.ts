@@ -43,7 +43,7 @@ export class FabricContractRepositoryObservableHandler extends ObserverHandler {
   /**
    * @description Creates a new FabricContractRepositoryObservableHandler instance
    * @summary Initializes the handler with a list of supported events
-   * @param {(OperationKeys | BulkCrudOperationKeys | string)[]} [supportedEvents] - Events that will trigger Fabric events
+   * @param {Array<OperationKeys | BulkCrudOperationKeys | string>} [supportedEvents] - Events that will trigger Fabric events
    */
   constructor(
     private supportedEvents: (

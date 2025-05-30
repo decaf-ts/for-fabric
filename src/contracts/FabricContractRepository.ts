@@ -1,4 +1,4 @@
-import { Repository, ObserverHandler, EventIds, table } from "@decaf-ts/core";
+import { Repository, ObserverHandler, EventIds } from "@decaf-ts/core";
 import { FabricContractAdapter } from "./ContractAdapter";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
@@ -15,36 +15,41 @@ import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
  * @template FabricContractAdapter - Adapter type for Fabric contract operations
  * @template FabricContractFlags - Flags specific to Fabric contract operations
  * @template FabricContractContext - Context type for Fabric contract operations
+ *
+ * @param {FabricContractAdapter} [adapter] - The adapter for interacting with the state database
+ * @param {Constructor<M>} [clazz] - The model constructor
+ * @param {Array<OperationKeys | BulkCrudOperationKeys | string>} [trackedEvents] - Events to track for observer notifications
+ *
  * @class FabricContractRepository
  * @example
  * ```typescript
  * // In a Fabric chaincode contract class
  * import { FabricContractRepository, FabricContractAdapter } from '@decaf-ts/for-fabric';
- * 
+ *
  * @table('assets')
  * class Asset extends Model {
  *   @id()
  *   id: string;
- *   
+ *
  *   @property()
  *   data: string;
  * }
- * 
+ *
  * export class MyContract extends Contract {
  *   private adapter = new FabricContractAdapter();
  *   private repository: FabricContractRepository<Asset>;
- *   
+ *
  *   constructor() {
  *     super('MyContract');
  *     this.repository = new FabricContractRepository<Asset>(this.adapter, Asset);
  *   }
- *   
+ *
  *   @Transaction()
  *   async createAsset(ctx: Context, id: string, data: string): Promise<void> {
  *     const asset = new Asset();
  *     asset.id = id;
  *     asset.data = data;
- *     
+ *
  *     await this.repository.create(asset, { stub: ctx.stub });
  *   }
  * }
@@ -55,7 +60,7 @@ import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
  *   participant Repository
  *   participant Adapter
  *   participant StateDB
- *   
+ *
  *   Contract->>Repository: create(model, ctx)
  *   Repository->>Adapter: prepare(model, pk)
  *   Repository->>Adapter: create(tableName, id, record, transient, ctx)
@@ -73,13 +78,6 @@ export class FabricContractRepository<M extends Model> extends Repository<
   FabricContractFlags,
   FabricContractContext
 > {
-  /**
-   * @description Creates a new FabricContractRepository instance
-   * @summary Initializes a repository for managing models in Fabric chaincode
-   * @param {FabricContractAdapter} [adapter] - The adapter for interacting with the state database
-   * @param {Constructor<M>} [clazz] - The model constructor
-   * @param {(OperationKeys | BulkCrudOperationKeys | string)[]} [trackedEvents] - Events to track for observer notifications
-   */
   constructor(
     adapter?: FabricContractAdapter,
     clazz?: Constructor<M>,

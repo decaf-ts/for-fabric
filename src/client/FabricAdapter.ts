@@ -51,9 +51,9 @@ import { FabricClientFlavour } from "./constants";
  *   certDirectoryPath: '/path/to/cert/dir',
  *   keyDirectoryPath: '/path/to/key/dir'
  * };
- * 
+ *
  * const adapter = new FabricAdapter(config, 'org1-adapter');
- * 
+ *
  * // Use the adapter to interact with the Fabric network
  * const result = await adapter.read('users', 'user1', mySerializer);
  * ```
@@ -65,7 +65,7 @@ import { FabricClientFlavour } from "./constants";
  *   participant Network
  *   participant Contract
  *   participant Chaincode
- *   
+ *
  *   Client->>FabricAdapter: create(tableName, id, model, transient, serializer)
  *   FabricAdapter->>FabricAdapter: submitTransaction(OperationKeys.CREATE, [serializedModel], transient)
  *   FabricAdapter->>Gateway: connect()
@@ -152,10 +152,10 @@ export class FabricAdapter extends CouchDBAdapter<
    * @summary Submits a transaction to create multiple records in the Fabric ledger
    * @param {string} tableName - The name of the table/collection
    * @param {string[] | number[]} ids - Array of record identifiers
-   * @param {Record<string, any>[]} models - Array of record data
+   * @param {Array<Record<string, any>>} models - Array of record data
    * @param {Record<string, any>} transient - Transient data for the transaction
    * @param {Serializer<any>} serializer - Serializer for the model data
-   * @return {Promise<Record<string, any>[]>} Promise resolving to the created records
+   * @return {Promise<Array<Record<string, any>>>} Promise resolving to the created records
    */
   override async createAll(
     tableName: string,
@@ -187,7 +187,7 @@ export class FabricAdapter extends CouchDBAdapter<
    * @param {string} tableName - The name of the table/collection
    * @param {string[] | number[]} ids - Array of record identifiers to read
    * @param {Serializer<any>} serializer - Serializer for the model data
-   * @return {Promise<Record<string, any>[]>} Promise resolving to the retrieved records
+   * @return {Promise<Array<Record<string, any>>>} Promise resolving to the retrieved records
    */
   override async readAll(
     tableName: string,
@@ -211,10 +211,10 @@ export class FabricAdapter extends CouchDBAdapter<
    * @summary Submits a transaction to update multiple records in the Fabric ledger
    * @param {string} tableName - The name of the table/collection
    * @param {string[] | number[]} ids - Array of record identifiers
-   * @param {Record<string, any>[]} models - Array of updated record data
+   * @param {Array<Record<string, any>>} models - Array of updated record data
    * @param {Record<string, any>} transient - Transient data for the transaction
    * @param {Serializer<any>} serializer - Serializer for the model data
-   * @return {Promise<Record<string, any>[]>} Promise resolving to the updated records
+   * @return {Promise<Array<Record<string, any>>>} Promise resolving to the updated records
    */
   override async updateAll(
     tableName: string,
@@ -244,9 +244,9 @@ export class FabricAdapter extends CouchDBAdapter<
    * @description Deletes multiple records in a single transaction
    * @summary Submits a transaction to delete multiple records from the Fabric ledger
    * @param {string} tableName - The name of the table/collection
-   * @param {(string | number | bigint)[]} ids - Array of record identifiers to delete
+   * @param {Array<string | number | bigint>} ids - Array of record identifiers to delete
    * @param {Serializer<any>} serializer - Serializer for the model data
-   * @return {Promise<Record<string, any>[]>} Promise resolving to the deleted records
+   * @return {Promise<Array<Record<string, any>>>} Promise resolving to the deleted records
    */
   override async deleteAll(
     tableName: string,
@@ -398,7 +398,7 @@ export class FabricAdapter extends CouchDBAdapter<
    *   participant FabricAdapter
    *   participant Contract
    *   participant Chaincode
-   *   
+   *
    *   Client->>FabricAdapter: raw(rawInput, process)
    *   FabricAdapter->>FabricAdapter: JSON.stringify(rawInput)
    *   FabricAdapter->>FabricAdapter: evaluateTransaction("query", [input])
@@ -499,7 +499,7 @@ export class FabricAdapter extends CouchDBAdapter<
    *   participant Gateway
    *   participant Contract
    *   participant Chaincode
-   *   
+   *
    *   FabricAdapter->>Gateway: connect()
    *   FabricAdapter->>Contract: getContract()
    *   alt submit transaction
@@ -704,7 +704,7 @@ export class FabricAdapter extends CouchDBAdapter<
    *   participant Identity
    *   participant Signer
    *   participant Gateway
-   *   
+   *
    *   Caller->>FabricAdapter: getConnection(client, config)
    *   FabricAdapter->>Identity: getIdentity(mspId, certDirectoryPath)
    *   Identity-->>FabricAdapter: identity
