@@ -13,6 +13,11 @@ import { Context as Ctx } from "fabric-contract-api";
 /**
  * @description Logger implementation for Fabric chaincode contracts
  * @summary Adapts the standard logging interface to work with Fabric's chaincode context
+ *
+ * @param {string} context - The logging context name
+ * @param {Partial<LoggingConfig> | undefined} conf - Optional logging configuration
+ * @param {Ctx} ctx - The Fabric chaincode context
+ *
  * @class ContractLogger
  * @extends {MiniLogger}
  * @example
@@ -41,13 +46,6 @@ export class ContractLogger extends MiniLogger {
    */
   protected logger: Logger;
 
-  /**
-   * @description Creates a new ContractLogger instance
-   * @summary Initializes a logger that works with Fabric's chaincode context
-   * @param {string} context - The logging context name
-   * @param {Partial<LoggingConfig> | undefined} conf - Optional logging configuration
-   * @param {Ctx} ctx - The Fabric chaincode context
-   */
   constructor(
     context: string,
     conf: Partial<LoggingConfig> | undefined,
@@ -109,7 +107,7 @@ export class ContractLogger extends MiniLogger {
  * @param {Ctx} ctx - The Fabric chaincode context
  * @return {ContractLogger} A new ContractLogger instance
  * @function factory
- * @memberOf module:fabric-contracts
+ * @memberOf module:fabric.contracts
  */
 const factory: LoggerFactory = (
   object: string,
