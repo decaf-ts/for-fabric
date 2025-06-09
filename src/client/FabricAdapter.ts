@@ -6,7 +6,7 @@ import {
   type Serializer,
   stringFormat,
 } from "@decaf-ts/decorator-validation";
-import { debug, Logging } from "@decaf-ts/logging";
+import { debug, Logger, Logging } from "@decaf-ts/logging";
 import { FabricFlags, PeerConfig } from "./types";
 import {
   connect,
@@ -92,7 +92,7 @@ export class FabricAdapter extends CouchDBAdapter<
   /**
    * @description Static logger instance for the FabricAdapter class
    */
-  private static log = Logging.for(FabricAdapter);
+  private static log: Logger = Logging.for(FabricAdapter);
 
   /**
    * @description gRPC client instance for connecting to the Fabric peer
@@ -102,9 +102,9 @@ export class FabricAdapter extends CouchDBAdapter<
   /**
    * @description Gets the logger instance for this adapter
    * @summary Returns the static logger instance for the FabricAdapter class
-   * @return {Logging} The logger instance
+   * @return {Logger} The logger instance
    */
-  protected override get log() {
+  protected override get log(): Logger {
     return FabricAdapter.log;
   }
 

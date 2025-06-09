@@ -11,7 +11,6 @@ import { FabricContractRepository } from "../FabricContractRepository";
  * @template M - Type extending Model
  * @class FabricCrudContract
  * @extends {Contract}
- * @memberOf module:fabric-contracts
  * @example
  * ```typescript
  * // Define a model
@@ -19,17 +18,17 @@ import { FabricContractRepository } from "../FabricContractRepository";
  * class Asset extends Model {
  *   @id()
  *   id: string;
- *   
+ *
  *   @property()
  *   data: string;
  * }
- * 
+ *
  * // Create a contract that extends FabricCrudContract
  * export class AssetContract extends FabricCrudContract<Asset> {
  *   constructor() {
  *     super('AssetContract', Asset);
  *   }
- *   
+ *
  *   // Add custom methods as needed
  *   async getAssetHistory(ctx: Context, id: string): Promise<any[]> {
  *     // Custom implementation
@@ -43,7 +42,7 @@ import { FabricContractRepository } from "../FabricContractRepository";
  *   participant Repository
  *   participant Adapter
  *   participant StateDB
- *   
+ *
  *   Client->>Contract: create(ctx, model)
  *   Contract->>Repository: repository(ctx)
  *   Contract->>Repository: create(model, ctx)
