@@ -20,3 +20,8 @@
 /.confluence-token
 /node_modules
 !.gitkeep
+
+/docker/infrastructure/*
+!/docker/infrastructure/docker-compose.yaml
+!/docker/infrastructure/configtx.yaml
+!/docker/infrastructure/storage/*
