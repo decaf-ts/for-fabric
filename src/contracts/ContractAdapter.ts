@@ -7,7 +7,6 @@ import { OperationKeys, SerializationError } from "@decaf-ts/db-decorators";
 import { Context as Ctx } from "fabric-contract-api";
 import { debug, Logger, Logging } from "@decaf-ts/logging";
 import { ContractLogger } from "./logging";
-import { Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import { Iterators, StateQueryResponse } from "fabric-shim-api";
 
@@ -81,13 +80,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @return {Constructor<Repository<M, MangoQuery, FabricContractAdapter, FabricContractFlags, FabricContractContext>>} The repository constructor
    */
   override repository<M extends Model>(): Constructor<
-    Repository<
-      M,
-      MangoQuery,
-      FabricContractAdapter,
-      FabricContractFlags,
-      FabricContractContext
-    >
+    FabricContractRepository<M>
   > {
     return FabricContractRepository;
   }
@@ -122,13 +115,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {Ctx} ctx - The Fabric chaincode context
    * @return {FabricContractFlags} The merged flags
    */
-  protected override flags<M extends Model>(
+  protected override async flags<M extends Model>(
     operation: OperationKeys,
     model: Constructor<M>,
     flags: Partial<FabricContractFlags>,
     ctx: Ctx
-  ): FabricContractFlags {
-    return Object.assign(super.flags(operation, model, flags), {
+  ): Promise<FabricContractFlags> {
+    return Object.assign(await super.flags(operation, model, flags), {
       stub: ctx.stub,
       identity: ctx.clientIdentity,
       logger: this.logFor(ctx),
