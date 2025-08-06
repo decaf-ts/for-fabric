@@ -1249,7 +1249,7 @@ services:
       --block-number 0 \
       --output-file /weaver/peer/genesis_block.pb \
       --tls \
-      --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem &&
+      --tls-ca-cert-file /weaver/peer/orderer-tls-ca-cert.pem &&
 
       touch /boot/boot-org-b-peer-0.lock
       "
@@ -1280,7 +1280,7 @@ services:
       --block-number 0 \
       --output-file /weaver/peer/genesis_block.pb \
       --tls \
-      --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem &&
+      --tls-ca-cert-file /weaver/peer/orderer-tls-ca-cert.pem &&
 
       touch /boot/boot-org-c-peer-0.lock
       "
