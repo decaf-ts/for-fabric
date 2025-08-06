@@ -1220,6 +1220,10 @@ services:
       --tls \
       --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem &&
 
+      docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs peer-join-channel \
+      -d -s \
+      --blockpath /weaver/peer/genesis_block.pb &&
+
       touch /boot/boot-org-a-peer-0.lock
       "
 
@@ -1251,6 +1255,10 @@ services:
       --tls \
       --tls-ca-cert-file /weaver/peer/orderer-tls-ca-cert.pem &&
 
+      docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs peer-join-channel \
+      -d -s \
+      --blockpath /weaver/peer/genesis_block.pb &&
+
       touch /boot/boot-org-b-peer-0.lock
       "
 
@@ -1281,6 +1289,10 @@ services:
       --output-file /weaver/peer/genesis_block.pb \
       --tls \
       --tls-ca-cert-file /weaver/peer/orderer-tls-ca-cert.pem &&
+
+      docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs peer-join-channel \
+      -d -s \
+      --blockpath /weaver/peer/genesis_block.pb &&
 
       touch /boot/boot-org-c-peer-0.lock
       "
