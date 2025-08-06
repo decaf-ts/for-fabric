@@ -122,12 +122,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {Ctx} ctx - The Fabric chaincode context
    * @return {FabricContractFlags} The merged flags
    */
-  protected override flags<M extends Model>(
+  protected override async flags<M extends Model>(
     operation: OperationKeys,
     model: Constructor<M>,
     flags: Partial<FabricContractFlags>,
     ctx: Ctx
-  ): FabricContractFlags {
+  ): Promise<FabricContractFlags> {
     return Object.assign(super.flags(operation, model, flags), {
       stub: ctx.stub,
       identity: ctx.clientIdentity,

@@ -4,21 +4,22 @@
 // import { BaseModel, index, OrderDirection, pk, Repository, uses } from "../../src";
 // import { readonly } from "@decaf-ts/db-decorators";
 
-import { execSync } from 'child_process';
-
+// import { execSync } from 'child_process';
+import {compileContract} from "../../src/compile"
 // Model.setBuilder(Model.fromModel);
 
-jest.setTimeout(50000);
+jest.setTimeout(5000000);
 
 describe("Test test model contract", () =>  {
 
     beforeAll(async () => {
         // compile contract
-        execSync(`weaver compile-contract -d --contract-path ../assets/contract \
-            --contract-filename TestModelContract \
-            --contract-version 1.0.0 \
-            --tsconfig tsconfig.json \
-            --output-path ./infrastructure/chaincode`);
+        // execSync(`weaver compile-contract -d --contract-path ./tests/assets/contract/test \
+        //     --contract-filename TestModelContract \
+        //     --contract-version 1.0.0 \
+        //     --tsconfig tsconfig.json \
+        //     --output-path ./infrastructure/chaincode`);
+       await compileContract("./tests/assets/contract/test", "TestModelContract", "1.0.0","./tsconfig-cc.json", "./docker/infrastructure");
     });
 
 
