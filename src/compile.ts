@@ -35,12 +35,13 @@ export async function compileContract(
           tsconfig: tsConfigFile,
           transpiler: "typescript",
           transpileOnly: true,
+          exclude: ["node_modules"]
         }),
       ],
     });
 
     await bundle.write({
-      file: `${resolvePath(destinationDirectory)}/${contractName}.js`,
+      file: `${resolvePath(destinationDirectory)}/contract.js`,
       format: "umd",
       name: contractName,
       sourcemap: sourceMaps,

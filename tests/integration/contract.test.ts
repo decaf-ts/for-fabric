@@ -19,7 +19,7 @@ describe("Test test model contract", () =>  {
         //     --contract-version 1.0.0 \
         //     --tsconfig tsconfig.json \
         //     --output-path ./infrastructure/chaincode`);
-       await compileContract("./tests/assets/contract/test", "TestModelContract", "1.0.0","./tsconfig-cc.json", "./docker/infrastructure");
+       await compileContract("./tests/assets/contract/test", "TestModelContract", "1.0.0","./tsconfig-cc.json", "./docker/infrastructure/chaincode");
     });
 
 
