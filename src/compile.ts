@@ -39,7 +39,7 @@ export async function compileContract(
       ],
     });
 
-    bundle.write({
+    await bundle.write({
       file: `${resolvePath(destinationDirectory)}/${contractName}.js`,
       format: "umd",
       name: contractName,
