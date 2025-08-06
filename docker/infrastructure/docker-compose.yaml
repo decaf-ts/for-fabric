@@ -1224,6 +1224,13 @@ services:
       -d -s \
       --blockpath /weaver/peer/genesis_block.pb &&
 
+      docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
+      --chaincode-path ./weaver/chaincode/basic \
+      --lang node \
+      --chaincode-output /weaver/peer/simple.tar.gz \
+      --chaincode-name simple \
+      --chaincode-version 1.0 -s &&
+
       touch /boot/boot-org-a-peer-0.lock
       "
 
@@ -1259,6 +1266,13 @@ services:
       -d -s \
       --blockpath /weaver/peer/genesis_block.pb &&
 
+      docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
+      --chaincode-path ./weaver/chaincode/basic \
+      --lang node \
+      --chaincode-output /weaver/peer/simple.tar.gz \
+      --chaincode-name simple \
+      --chaincode-version 1.0 -s &&
+
       touch /boot/boot-org-b-peer-0.lock
       "
 
@@ -1293,6 +1307,13 @@ services:
       docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs peer-join-channel \
       -d -s \
       --blockpath /weaver/peer/genesis_block.pb &&
+
+      docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
+      --chaincode-path ./weaver/chaincode/basic \
+      --lang node \
+      --chaincode-output /weaver/peer/simple.tar.gz \
+      --chaincode-name simple \
+      --chaincode-version 1.0 -s &&
 
       touch /boot/boot-org-c-peer-0.lock
       "
