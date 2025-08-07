@@ -1125,7 +1125,6 @@ services:
       --peer-id org-b-peer-0
       --listen-address 0.0.0.0:7032
       --address org-b-peer-0:7032
-      --chaincode-listen-address org-b-peer-0:7054
       --gossip-external-endpoint org-b-peer-0:7032
       --file-system-path /weaver/peer/production
       --local-mspdir /weaver/peer/client/msp
