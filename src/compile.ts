@@ -57,7 +57,6 @@ export async function compileContract(
 export function compileStandaloneFile(filePath: string, outDir: string) {
   const compilerOptions: ts.CompilerOptions = {
     target: ts.ScriptTarget.ES2022,
-    lib: ["es2022"],
     module: ts.ModuleKind.CommonJS,
     allowJs: true,
     checkJs: true,
