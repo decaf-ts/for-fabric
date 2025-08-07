@@ -1043,7 +1043,6 @@ services:
       - CORE_PEER_GOSSIP_SKIPHANDSHAKE=true
     ports:
       - "7031:7031"
-      - "7053:7052"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - org-a-peer-0-vol:/weaver/peer:rw
@@ -1085,7 +1084,6 @@ services:
       --couchdb-address org-a-peer-0-couchdb:5984
       --operations-address 127.0.0.1:8010
       --snapshot-root-dir /weaver/peer/production/snapshot-dir
-      --chaincode-listen-address docker-hostname:7053
 
   org-b-peer-0:
     container_name: org-b-peer-0
@@ -1098,7 +1096,6 @@ services:
       - CORE_PEER_GOSSIP_SKIPHANDSHAKE=true
     ports:
       - "7032:7032"
-      - "7054:7052"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - org-b-peer-0-vol:/weaver/peer:rw
@@ -1140,7 +1137,6 @@ services:
       --couchdb-address org-b-peer-0-couchdb:5984
       --operations-address 127.0.0.1:8010
       --snapshot-root-dir /weaver/peer/production/snapshot-dir
-      --chaincode-listen-address docker-hostname:7054
 
   org-c-peer-0:
     container_name: org-c-peer-0
@@ -1153,7 +1149,6 @@ services:
       - CORE_PEER_GOSSIP_SKIPHANDSHAKE=true
     ports:
       - "7033:7033"
-      - "7055:7052"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - org-c-peer-0-vol:/weaver/peer:rw
@@ -1195,7 +1190,6 @@ services:
       --couchdb-address org-c-peer-0-couchdb:5984
       --operations-address 127.0.0.1:8010
       --snapshot-root-dir /weaver/peer/production/snapshot-dir
-      --chaincode-listen-address docker-hostname:7055
 
   boot-org-a-peer-0:
     container_name: boot-org-a-peer-0
