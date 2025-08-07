@@ -1234,6 +1234,15 @@ services:
       docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
       --chaincode-path ./weaver/peer/simple.tar.gz &&
 
+      docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
+      --orderer-address org-a-orderer-0:7021 \
+      --channel-id simple-channel \
+      --chaincode-name simple \
+      --chaincode-version 1.0 \
+      --sequence 1 \
+      --enable-tls \
+      --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem &&
+
       touch /boot/boot-org-a-peer-0.lock
       "
 
@@ -1279,6 +1288,15 @@ services:
       docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
       --chaincode-path ./weaver/peer/simple.tar.gz &&
 
+      docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
+      --orderer-address org-a-orderer-0:7021 \
+      --channel-id simple-channel \
+      --chaincode-name simple \
+      --chaincode-version 1.0 \
+      --sequence 1 \
+      --enable-tls \
+      --tls-ca-cert-file /weaver/peer/orderer-tls-ca-cert.pem &&
+
       touch /boot/boot-org-b-peer-0.lock
       "
 
@@ -1323,6 +1341,15 @@ services:
 
       docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
       --chaincode-path ./weaver/peer/simple.tar.gz &&
+
+      docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
+      --orderer-address org-a-orderer-0:7021 \
+      --channel-id simple-channel \
+      --chaincode-name simple \
+      --chaincode-version 1.0 \
+      --sequence 1 \
+      --enable-tls \
+      --tls-ca-cert-file /weaver/peer/orderer-tls-ca-cert.pem &&
 
       touch /boot/boot-org-c-peer-0.lock
       "
