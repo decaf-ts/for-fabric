@@ -5,7 +5,7 @@
 // import { readonly } from "@decaf-ts/db-decorators";
 
 // import { execSync } from 'child_process';
-import {compileContract} from "../../src/compile"
+import {compileContract, compileStandaloneFile} from "../../src/compile"
 // Model.setBuilder(Model.fromModel);
 
 jest.setTimeout(5000000);
@@ -19,7 +19,8 @@ describe("Test test model contract", () =>  {
         //     --contract-version 1.0.0 \
         //     --tsconfig tsconfig.json \
         //     --output-path ./infrastructure/chaincode`);
-       await compileContract("./tests/assets/contract/test", "TestModelContract", "1.0.0","./tsconfig-cc.json", "./docker/infrastructure/chaincode");
+    //    await compileContract("./tests/assets/contract/test", "TestModelContract", "1.0.0","./tsconfig-cc.json", "./docker/infrastructure/chaincode");
+    compileStandaloneFile("./tests/assets/contract/asset-tranfer/index.ts", "./docker/infrastructure/chaincode");
     });
 
 

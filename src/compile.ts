@@ -56,7 +56,7 @@ export async function compileContract(
 
 export function compileStandaloneFile(filePath: string, outDir: string) {
   const compilerOptions: ts.CompilerOptions = {
-    target: ts.ScriptTarget.ES2015,
+    target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.CommonJS,
     outDir,
     strict: true,
@@ -70,7 +70,7 @@ export function compileStandaloneFile(filePath: string, outDir: string) {
     console.log(`Written: ${outputPath}`);
   };
 
-  const program = ts.createProgram([filePath], compilerOptions, host);
+  const program = ts.createProgram([path.join(resolvePath(filePath))], compilerOptions, host);
   const emitResult = program.emit();
 
   const diagnostics = ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics);
