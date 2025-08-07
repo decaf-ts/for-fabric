@@ -923,7 +923,7 @@ services:
       --listen-address 0.0.0.0
       --port 7021
       --msp-dir /weaver/orderer/client/msp
-      --msp-id Orderer0Org1MSP
+      --msp-id Orderer0OrgaMSP
       --admin-listen-address 0.0.0.0:9021
       --consensus-snapdir /weaver/orderer/production/orderer/etcdraft/snapshot
       --consensus-waldir /weaver/orderer/production/orderer/etcdraft/wal
