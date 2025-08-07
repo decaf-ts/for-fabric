@@ -433,7 +433,7 @@ Orderer: &OrdererDefaults
     # a subset of the host:port items enumerated in this list should be
     # replicated under the Orderer.Addresses key above.
     Consenters:
-      - Host: org-1-orderer-0
+      - Host: org-a-orderer-0
         Port: 7021
         ClientTLSCert: /weaver/client/orderer/tls-msp/signcerts/cert.pem
         ServerTLSCert: /weaver/client/orderer/tls-msp/signcerts/cert.pem
