@@ -6,6 +6,7 @@ import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import json from "@rollup/plugin-json";
 import path from "path";
+import ts from "typescript"
 
 export function resolvePath(inputPath: string): string {
   return path.isAbsolute(inputPath)
@@ -51,4 +52,39 @@ export async function compileContract(
     throw error;
   }
 
+}
+
+export function compileStandaloneFile(filePath: string, outDir: string) {
+  const compilerOptions: ts.CompilerOptions = {
+    target: ts.ScriptTarget.ES2015,
+    module: ts.ModuleKind.CommonJS,
+    outDir,
+    strict: true,
+    skipLibCheck: true,
+  };
+
+  const host = ts.createCompilerHost(compilerOptions);
+  host.writeFile = (fileName, content) => {
+    const outputPath = path.join(outDir, path.basename(fileName));
+    fs.writeFileSync(outputPath, content);
+    console.log(`Written: ${outputPath}`);
+  };
+
+  const program = ts.createProgram([filePath], compilerOptions, host);
+  const emitResult = program.emit();
+
+  const diagnostics = ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics);
+
+  diagnostics.forEach(diagnostic => {
+    if (diagnostic.file && diagnostic.start !== undefined) {
+      const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+      const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+      console.log(`${diagnostic.file.fileName} (${line + 1},${character + 1}): ${message}`);
+    } else {
+      console.log(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
+    }
+  });
+
+  const exitCode = emitResult.emitSkipped ? 1 : 0;
+  console.log(`Process exited with code ${exitCode}`);
 }
