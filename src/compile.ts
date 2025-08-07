@@ -57,10 +57,28 @@ export async function compileContract(
 export function compileStandaloneFile(filePath: string, outDir: string) {
   const compilerOptions: ts.CompilerOptions = {
     target: ts.ScriptTarget.ES2022,
+    lib: ["es2022"],
     module: ts.ModuleKind.CommonJS,
-    outDir,
+    allowJs: true,
+    checkJs: true,
+    declaration: false,
+    declarationMap: false,
+    emitDeclarationOnly: false,
+    isolatedModules: true,
+    sourceMap: false,
+    removeComments: true,
     strict: true,
     skipLibCheck: true,
+    resolveJsonModule: true,
+    forceConsistentCasingInFileNames: true,
+    experimentalDecorators: true,
+    emitDecoratorMetadata: true,
+    moduleResolution: ts.ModuleResolutionKind.NodeJs,
+    noImplicitAny: true,
+    useDefineForClassFields: true,
+    allowSyntheticDefaultImports: true,
+    esModuleInterop: false,
+    outDir,
   };
 
   const host = ts.createCompilerHost(compilerOptions);
