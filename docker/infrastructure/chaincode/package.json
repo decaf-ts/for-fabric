@@ -16,6 +16,8 @@
   "author": "PDM",
   "dependencies": {
     "fabric-contract-api": "^2.5.4",
-    "fabric-shim": "2.4.2"
+    "fabric-shim": "2.4.2",
+    "json-stringify-deterministic": "^1.0.0",
+    "sort-keys-recursive": "^2.1.0"
   }
 }

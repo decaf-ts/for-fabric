@@ -7,6 +7,7 @@
 !chaincode/
 !chaincode/package.json
 !chaincode/package-lock.json
+!chaincode/npm-shrinkwrap.json
 !storage/
 !storage/**/
 
