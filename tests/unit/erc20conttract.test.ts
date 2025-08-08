@@ -2,14 +2,14 @@ import { MiniLogger } from "@decaf-ts/logging";
 import { FabricContractContext } from "../../src/contracts";
 import { TestERC20Contract } from "../TestModelContract";
 
-const state: Record<string, Uint8Array> = {};
+const state: Record<string, any> = {};
 
 const ctx = {
   stub: {
     getMspID: () => {
       return "Aeon";
     },
-    setEvent: (name: string, payload: Uint8Array): void => {
+    setEvent: (name: string, payload: any): void => {
       console.info(
         `Event "${name}" triggered with payload of length ${payload.length}`
       );
@@ -24,7 +24,7 @@ const ctx = {
       if (key in state) return state[key];
       throw new Error("Missing");
     },
-    putState: async (key: string, value: Uint8Array) => {
+    putState: async (key: string, value: any) => {
       state[key] = value;
     },
     deleteState: async (key: string) => {
@@ -87,5 +87,9 @@ describe(`ERC20 token test`, function () {
   it("initializes", async () => {
     const created = await contract.Initialize(ctx, "TestToken", "TT", 1000);
     expect(created).toBe(true);
+
+    const tokenName = await contract.TokenName(ctx);
+
+    expect(tokenName).toEqual("TestToken");
   });
 });

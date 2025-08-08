@@ -59,6 +59,8 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    */
   protected static adapter: FabricContractAdapter;
 
+  protected repo: FabricContractRepository<M>;
+
   /**
    * @description Creates a new FabricCrudContract instance
    * @summary Initializes a contract with a name and model class
@@ -72,6 +74,8 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
     super(name);
     FabricCrudContract.adapter =
       FabricCrudContract.adapter || new FabricContractAdapter(undefined, name);
+
+    this.repo = Repository.forModel(clazz, FabricCrudContract.adapter.alias);
   }
 
   /**
@@ -80,13 +84,13 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {Ctx} ctx - The Fabric chaincode context
    * @return {FabricContractRepository<M>} The repository instance
    */
-  protected repository(ctx: Ctx): FabricContractRepository<M> {
-    return Repository.forModel(
-      this.clazz,
-      FabricCrudContract.adapter.alias,
-      ctx
-    );
-  }
+  // protected repository(ctx: Ctx): FabricContractRepository<M> {
+  //   return Repository.forModel(
+  //     this.clazz,
+  //     FabricCrudContract.adapter.alias,
+  //     ctx
+  //   );
+  // }
 
   /**
    * @description Creates a single model in the state database
@@ -97,8 +101,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @return {Promise<M>} Promise resolving to the created model
    */
   async create(ctx: Ctx, model: M, ...args: any[]): Promise<M> {
-    const repo = this.repository(ctx);
-    return repo.create(model, ...args);
+    return this.repo.create(model, ctx, ...args);
   }
 
   /**
@@ -110,8 +113,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @return {Promise<M[]>} Promise resolving to the created models
    */
   async createAll(ctx: Ctx, models: M[], ...args: any[]): Promise<M[]> {
-    const repo = this.repository(ctx);
-    return repo.createAll(models, ...args);
+    return this.repo.createAll(models, ctx, ...args);
   }
 
   /**
@@ -123,8 +125,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @return {Promise<M>} Promise resolving to the deleted model
    */
   async delete(ctx: Ctx, key: string | number, ...args: any[]): Promise<M> {
-    const repo = this.repository(ctx);
-    return repo.delete(key, ...args);
+    return this.repo.delete(key, ctx, ...args);
   }
 
   /**
@@ -140,8 +141,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
     ctx: Ctx,
     ...args: any[]
   ): Promise<M[]> {
-    const repo = this.repository(ctx);
-    return repo.deleteAll(keys, ...args);
+    return this.repo.deleteAll(keys, ctx, ...args);
   }
 
   /**
@@ -153,8 +153,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @return {Promise<M>} Promise resolving to the retrieved model
    */
   async read(ctx: Ctx, key: string | number, ...args: any[]): Promise<M> {
-    const repo = this.repository(ctx);
-    return repo.read(key, ...args);
+    return this.repo.read(key, ctx, ...args);
   }
 
   /**
@@ -170,8 +169,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
     keys: string[] | number[],
     ...args: any[]
   ): Promise<M[]> {
-    const repo = this.repository(ctx);
-    return repo.readAll(keys, ...args);
+    return this.repo.readAll(keys, ctx, ...args);
   }
 
   /**
@@ -183,8 +181,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @return {Promise<M>} Promise resolving to the updated model
    */
   async update(ctx: Ctx, model: M, ...args: any[]): Promise<M> {
-    const repo = this.repository(ctx);
-    return repo.update(model, ctx, ...args);
+    return this.repo.update(model, ctx, ...args);
   }
 
   /**
@@ -196,8 +193,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @return {Promise<M[]>} Promise resolving to the updated models
    */
   async updateAll(ctx: Ctx, models: M[], ...args: any[]): Promise<M[]> {
-    const repo = this.repository(ctx);
-    return repo.updateAll(models, ...args);
+    return this.repo.updateAll(models, ctx, ...args);
   }
 
   /**
@@ -215,7 +211,6 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
     docsOnly: boolean,
     ...args: any[]
   ): Promise<any> {
-    const repo = this.repository(ctx);
-    return repo.raw(rawInput, docsOnly, ...args);
+    return this.repo.raw(rawInput, docsOnly, ctx, ...args);
   }
 }

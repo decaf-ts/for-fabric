@@ -32,15 +32,57 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
       FabricERC20Contract.adapter.alias
     );
 
-    this.walletRepository = FabricContractRepository.forModel(
-      ERC20Wallet,
-      FabricERC20Contract.adapter.alias
-    );
-
     this.allowanceRepository = FabricContractRepository.forModel(
       Allowance,
       FabricERC20Contract.adapter.alias
     );
+  }
+
+  @Transaction(false)
+  async TokenName(ctx: FabricContractContext): Promise<string> {
+    // Check contract options are already set first to execute the function
+    await this.CheckInitialized(ctx);
+
+    const token = (
+      await this.tokenRepository.select(undefined, ctx).execute()
+    )[0];
+
+    return token.name;
+  }
+
+  /**
+   * Return the symbol of the token. E.g. “HIX”.
+   *
+   * @param {Context} ctx the transaction context
+   * @returns {String} Returns the symbol of the token
+   */
+  @Transaction(false)
+  async Symbol(ctx: FabricContractContext): Promise<string> {
+    // Check contract options are already set first to execute the function
+    await this.CheckInitialized(ctx);
+
+    const token = (
+      await this.tokenRepository.select(undefined, ctx).execute()
+    )[0];
+    return token.symbol;
+  }
+
+  /**
+   * Return the number of decimals the token uses
+   * e.g. 8, means to divide the token amount by 100000000 to get its user representation.
+   *
+   * @param {Context} ctx the transaction context
+   * @returns {Number} Returns the number of decimals
+   */
+  @Transaction(false)
+  async Decimals(ctx: FabricContractContext): Promise<number> {
+    // Check contract options are already set first to execute the function
+    await this.CheckInitialized(ctx);
+
+    const token = (
+      await this.tokenRepository.select(undefined, ctx).execute()
+    )[0];
+    return token.decimals;
   }
 
   /**
@@ -358,6 +400,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     const token = new ERC20Token({
       name: name,
+      owner: ctx.identity.getID(),
       symbol: symbol,
       decimals: decimals,
     });
