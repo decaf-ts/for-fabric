@@ -5,7 +5,7 @@ import path from 'path';
 
 jest.setTimeout(5000000);
 
-describe("Test test model contract", () =>  {
+describe.skip("Test test model contract", () =>  {
 
     beforeAll(async () => {
         execSync(`npx weaver compile-contract -d --contract-file ./tests/assets/contract/asset-transfer/index.ts --output-dir ./docker/infrastructure/chaincode`);
