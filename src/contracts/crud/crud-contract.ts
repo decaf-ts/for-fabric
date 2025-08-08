@@ -1,6 +1,6 @@
 import { FabricContractAdapter } from "../ContractAdapter";
 
-import { Contract, Context as Ctx } from "fabric-contract-api";
+import { Transaction, Contract, Context as Ctx } from "fabric-contract-api";
 import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "../FabricContractRepository";
@@ -100,6 +100,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M>} Promise resolving to the created model
    */
+  @Transaction()
   async create(ctx: Ctx, model: M, ...args: any[]): Promise<M> {
     return this.repo.create(model, ctx, ...args);
   }
@@ -112,6 +113,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M[]>} Promise resolving to the created models
    */
+  @Transaction()
   async createAll(ctx: Ctx, models: M[], ...args: any[]): Promise<M[]> {
     return this.repo.createAll(models, ctx, ...args);
   }
@@ -124,6 +126,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M>} Promise resolving to the deleted model
    */
+  @Transaction()
   async delete(ctx: Ctx, key: string | number, ...args: any[]): Promise<M> {
     return this.repo.delete(key, ctx, ...args);
   }
@@ -136,6 +139,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M[]>} Promise resolving to the deleted models
    */
+  @Transaction()
   async deleteAll(
     keys: string[] | number[],
     ctx: Ctx,
@@ -152,6 +156,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M>} Promise resolving to the retrieved model
    */
+  @Transaction(false)
   async read(ctx: Ctx, key: string | number, ...args: any[]): Promise<M> {
     return this.repo.read(key, ctx, ...args);
   }
@@ -164,6 +169,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M[]>} Promise resolving to the retrieved models
    */
+  @Transaction(false)
   async readAll(
     ctx: Ctx,
     keys: string[] | number[],
@@ -180,6 +186,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M>} Promise resolving to the updated model
    */
+  @Transaction()
   async update(ctx: Ctx, model: M, ...args: any[]): Promise<M> {
     return this.repo.update(model, ctx, ...args);
   }
@@ -192,6 +199,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M[]>} Promise resolving to the updated models
    */
+  @Transaction()
   async updateAll(ctx: Ctx, models: M[], ...args: any[]): Promise<M[]> {
     return this.repo.updateAll(models, ctx, ...args);
   }
@@ -205,6 +213,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<any>} Promise resolving to the query results
    */
+  @Transaction(false)
   async raw(
     ctx: Ctx,
     rawInput: any,
