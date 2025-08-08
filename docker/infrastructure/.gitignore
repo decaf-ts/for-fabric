@@ -4,10 +4,7 @@
 # Allow these top-level files/folders
 !configtx.yaml
 !docker-compose.yaml
-!chaincode/
-!chaincode/package.json
-!chaincode/package-lock.json
-!chaincode/npm-shrinkwrap.json
+/chaincode
 !storage/
 !storage/**/
 
