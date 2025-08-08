@@ -17,6 +17,7 @@
   "dependencies": {
     "@decaf-ts/core": "^0.5.8",
     "@decaf-ts/decorator-validation": "^1.7.12",
+    "@decaf-ts/for-couchdb": "^0.3.9",
     "fabric-contract-api": "^2.5.4",
     "fabric-shim": "2.4.2",
     "json-stringify-deterministic": "^1.0.0",

@@ -1,17 +1,21 @@
 
 import { execSync } from 'child_process';
+import {compileStandaloneFile, overrideContractImports} from '../../src/contracts/compile';
 import fs from 'fs';
 import path from 'path';
 
 jest.setTimeout(5000000);
 
-describe.skip("Test test model contract", () =>  {
+describe("Test test model contract", () =>  {
 
     beforeAll(async () => {
-        execSync(`npx weaver compile-contract -d --contract-file ./tests/assets/contract/asset-transfer/index.ts --output-dir ./docker/infrastructure/chaincode`);
-    
-        fs.copyFileSync(path.join(process.cwd(), "./tests/assets/contract/asset-transfer/package.json"), path.join(process.cwd(), "./docker/infrastructure/chaincode/package.json"));
-        fs.copyFileSync(path.join(process.cwd(), "./tests/assets/contract/asset-transfer/npm-shrinkwrap.json"), path.join(process.cwd(), "./docker/infrastructure/chaincode/npm-shrinkwrap.json"))
+        execSync(`npx weaver compile-contract -d --contract-file ./tests/assets/contract/test/index.ts --output-dir ./docker/infrastructure/chaincode`);
+        
+        overrideContractImports("./docker/infrastructure/chaincode")
+        // compileStandaloneFile("./tests/assets/contract/test/index.ts", "./docker/infrastructure/chaincode");
+
+        fs.copyFileSync(path.join(process.cwd(), "./tests/assets/contract/test/package.json"), path.join(process.cwd(), "./docker/infrastructure/chaincode/package.json"));
+        fs.copyFileSync(path.join(process.cwd(), "./tests/assets/contract/test/npm-shrinkwrap.json"), path.join(process.cwd(), "./docker/infrastructure/chaincode/npm-shrinkwrap.json"))
     });
 
 
