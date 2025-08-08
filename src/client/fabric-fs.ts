@@ -2,7 +2,7 @@ import { normalizeImport } from "@decaf-ts/utils";
 import { Logging } from "@decaf-ts/logging";
 import { User } from "fabric-common";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
-import { isBrowser } from "@decaf-ts/utils/lib/utils/web";
+import { isBrowser } from "@decaf-ts/utils";
 
 const log = Logging.for("fabric-fs");
 

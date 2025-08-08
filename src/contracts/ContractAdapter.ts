@@ -10,6 +10,7 @@ import { ContractLogger } from "./logging";
 import { Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import { Iterators, StateQueryResponse } from "fabric-shim-api";
+import { FabricStatement } from "./erc20/Statement";
 
 /**
  * @description Adapter for Hyperledger Fabric chaincode state database operations
@@ -408,6 +409,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
       `${Array.isArray(results) ? results.length : 1}`
     );
     return results;
+  }
+
+  override Statement<M extends Model>(
+    ctx?: FabricContractContext
+  ): FabricStatement<M, any> {
+    if (!ctx) {
+      throw new Error("Context is required");
+    }
+    return new FabricStatement(this, ctx);
   }
 
   /**

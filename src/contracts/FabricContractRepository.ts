@@ -1,4 +1,10 @@
-import { Repository, ObserverHandler, EventIds } from "@decaf-ts/core";
+import {
+  Repository,
+  ObserverHandler,
+  EventIds,
+  SelectSelector,
+  WhereOption,
+} from "@decaf-ts/core";
 import { FabricContractAdapter } from "./ContractAdapter";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
@@ -6,6 +12,7 @@ import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
+import { Context } from "fabric-contract-api";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -247,5 +254,23 @@ export class FabricContractRepository<M extends Model> extends Repository<
   ): Promise<void> {
     if (!this.trackedEvents || this.trackedEvents.indexOf(event) !== -1)
       return await super.updateObservers(table, event, id, ctx, ...args);
+  }
+
+  override select<S extends readonly (keyof M)[]>(): WhereOption<M, M[]>;
+  override select<S extends readonly (keyof M)[]>(
+    selector: readonly [...S]
+  ): WhereOption<M, Pick<M, S[number]>[]>;
+  override select<S extends readonly (keyof M)[]>(
+    selector: undefined,
+    ctx: FabricContractContext
+  ): WhereOption<M, M[]>;
+  override select<S extends readonly (keyof M)[]>(
+    selector?: readonly [...S],
+    ctx?: FabricContractContext
+  ): WhereOption<M, M[]> | WhereOption<M, Pick<M, S[number]>[]> {
+    if (!selector) {
+      return this.adapter.Statement<M>(ctx).select().from(this.class);
+    }
+    return this.adapter.Statement<M>(ctx).select(selector).from(this.class);
   }
 }

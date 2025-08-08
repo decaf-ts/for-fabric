@@ -71,7 +71,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
   ) {
     super(name);
     FabricCrudContract.adapter =
-      FabricCrudContract.adapter || new FabricContractAdapter(undefined);
+      FabricCrudContract.adapter || new FabricContractAdapter(undefined, name);
   }
 
   /**
