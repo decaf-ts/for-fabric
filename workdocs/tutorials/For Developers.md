@@ -77,12 +77,13 @@ The following npm scripts are available for development:
 This repo comes with eslint + prettier preconfigured to the default standards.
 
 Please configure your IDE to recognize these files and perform automatic validation and fixes on save:
- - Webstorm:
-   - eslint recommended setup preconfigured under `.idea/jsLinters/eslint.xml`
-   - prettier recommended setup preconfigured under `.idea/prettier.xml`
- - VSCode(ium):
-   - eslint recommended setup preconfigured under `.vscode/settings.json`
-   - prettier recommended setup preconfigured under `.vscode/settings.json`
+
+- Webstorm:
+  - eslint recommended setup preconfigured under `.idea/jsLinters/eslint.xml`
+  - prettier recommended setup preconfigured under `.idea/prettier.xml`
+- VSCode(ium):
+  - eslint recommended setup preconfigured under `.vscode/settings.json`
+  - prettier recommended setup preconfigured under `.vscode/settings.json`
 
 ## Testing
 
@@ -99,6 +100,47 @@ Preconfigured Jest based testing:
 - uses `jest.config.ts` as its base config;
 - uses `workdocs/reports/jest.coverage.config.ts` as its base config;
 - defines the coverage threshold in `workdocs/reports/jest.coverage.config.ts`;
+
+### Testing Contracts
+
+#### General information
+
+To test a contract implementation you wish to test, there is a basic infrastructure available to boot the contract.
+
+In the docker/infrastructure folder, you will find this basic setup. To test a contract, copy the contract’s JavaScript code into the chaincode folder.
+
+The contract must include:
+
+- package.json
+
+- npm-shrinkwrap.json
+
+- Transpiled files for the contract
+
+#### Transpiling a contract
+
+If you need to transpile the contract you can use the weaver binary.
+An example is provided bellow pointing to a test implementation.
+
+```
+npx weaver compile-contract -d --contract-file ./tests/assets/contract/asset-transfer/index.ts --output-dir ./docker/infrastructure/chaincode
+```
+
+#### Testing Flow
+
+To test the contract you have to transpile and place it in the docker/infrastrucure/chaincode folder. Don't forget to add a package.json and a package-lock.json or npm-shrinkwrap.json file for that contract. An example of these files could be found under tests/contract/asset-transfer/\*.
+
+After the chaincode is in place you simply have to run:  
+`npm run infrastructure:up`
+
+To reset the environment to test another contract or to clean test the same contract first destroy the current environment by running the command:
+
+`npm run infrastructure:down`
+
+When the command finishes remove the folder docker/infrastructure/storage and run the command:
+`git checkout docker/infrastructure/storage`
+
+This sucessfully resets the repository and you can restart the process by changing the contract to be tested or booting the infrastructure again.
 
 ## Documentation
 
@@ -298,23 +340,24 @@ To access and run them:
 For **WebStorm** users, everything comes integrated right out of the box 🎉  
 Common commands for builds, tests, and documentation generation are available in the **Run/Debug configurations** dropdown for quick access and execution via:
 
- - Jest integration:
-   - `tests/Unit Tests` - Runs all unit tests (analog to `test:unit`)
-   - `tests/Integration Tests` - Runs all integration tests (analog to `test:integration`)
-   - `tests/Bundling Tests` - Runs the dist and bundling tests (analog to `test:bundling`)
-   - `All Tests` - Runs all tests (analog to `test:all`)
+- Jest integration:
 
- - Node integration:
-   - `repo/docs` - Builds documentation (analog to `docs`)
-   - `repo/coverage` - runs `test:all`, collects coverage (csv, HTML), generates test reports (junit, HTML) (analog to `coverage`)
-   - `repo/uml` - builds uml into png files (analog to `uml`)
-   - `repo/test:circular` - test code for circular dependencies (analog to `test:circular`)
-   - `repo/lint-fix` - tries to fix linting issues (analog to `lint-fix`)
-   - `repo/drawings` - compiles draw.io files to png (one per page) (analog to `drawings`)
-   - `repo/flash-forward` - updates all dependencies to latest versions (analog to `flash-forward`)
-   - `repo/update-scripts` - runs cli to update repo's configs (CI, Doc boilerplate, Linting, Style, etc) via it's template repository (analog to `drawings`)
-   - `build:prod` - `build`s code in production mode (minify, uglify, doc extraction, and no source-map for bundled production)
-   - `build` - `build`s code in development mode
+  - `tests/Unit Tests` - Runs all unit tests (analog to `test:unit`)
+  - `tests/Integration Tests` - Runs all integration tests (analog to `test:integration`)
+  - `tests/Bundling Tests` - Runs the dist and bundling tests (analog to `test:bundling`)
+  - `All Tests` - Runs all tests (analog to `test:all`)
+
+- Node integration:
+  - `repo/docs` - Builds documentation (analog to `docs`)
+  - `repo/coverage` - runs `test:all`, collects coverage (csv, HTML), generates test reports (junit, HTML) (analog to `coverage`)
+  - `repo/uml` - builds uml into png files (analog to `uml`)
+  - `repo/test:circular` - test code for circular dependencies (analog to `test:circular`)
+  - `repo/lint-fix` - tries to fix linting issues (analog to `lint-fix`)
+  - `repo/drawings` - compiles draw.io files to png (one per page) (analog to `drawings`)
+  - `repo/flash-forward` - updates all dependencies to latest versions (analog to `flash-forward`)
+  - `repo/update-scripts` - runs cli to update repo's configs (CI, Doc boilerplate, Linting, Style, etc) via it's template repository (analog to `drawings`)
+  - `build:prod` - `build`s code in production mode (minify, uglify, doc extraction, and no source-map for bundled production)
+  - `build` - `build`s code in development mode
 
 ## Considerations
 
