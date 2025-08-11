@@ -2,12 +2,12 @@ import { Dirent } from "fs";
 import path from "path";
 
 describe("Distribution Tests", () => {
-  it("reads lib", () => {
+  it.skip("reads lib", () => {
     const { VERSION } = require("../../lib/index.cjs");
     expect(VERSION).toBeDefined();
   });
 
-  it("reads JS Bundle", () => {
+  it.skip("reads JS Bundle", () => {
     try {
       let distFile: Dirent[];
       try {

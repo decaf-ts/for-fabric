@@ -1,0 +1,14 @@
+# Ignore everything by default
+*
+
+# Allow these top-level files/folders
+!configtx.yaml
+!docker-compose.yaml
+/chaincode
+!storage/
+!storage/**/
+
+!.gitignore
+
+# Allow .git.lock files in all storage subdirectories
+!storage/**/.git.lock

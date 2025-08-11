@@ -42,6 +42,8 @@
     "drawings": "for FILE in workdocs/drawings/*.drawio; do echo \"converting $FILE to image...\" && docker run --rm -v $(pwd):/data rlespinasse/drawio-export --format png $FILE; done && cp -rf workdocs/drawings/export/* workdocs/resources/",
     "uml": "cd workdocs/uml && for FILE in ./*.puml; do docker run --rm -v $(pwd):/work -w /work miy4/plantuml -DPLANTUML_LIMIT_SIZE=8192 -tpng $FILE; done && cd ../.. && cp -fr workdocs/uml/*.png workdocs/resources/",
     "docs": "npx rimraf ./docs && mkdir docs && npx build-scripts --docs",
+    "infrastructure:up": "docker compose -f ./docker/infrastructure/docker-compose.yaml up -d",
+    "infrastructure:down": "docker compose -f ./docker/infrastructure/docker-compose.yaml down --rmi local -v",
     "publish-docs": "docker run -it --rm --user $(id -u):$(id -g) -v \"$(pwd)/workdocs/confluence:/content\" -e ATLASSIAN_API_TOKEN=$(cat .confluence-token) ghcr.io/markdown-confluence/publish:latest"
   },
   "repository": {
@@ -84,6 +86,7 @@
   },
   "homepage": "https://github.com/decaf-ts/ts-workspace#readme",
   "devDependencies": {
+    "@decaf-ts/fabric-weaver": "^0.0.14",
     "@decaf-ts/utils": "^0.2.6",
     "@eslint/js": "^9.25.1",
     "@rollup/plugin-commonjs": "^28.0.3",
@@ -135,7 +138,8 @@
     "fabric-shim": "^2.5.8",
     "json-stringify-deterministic": "^1.0.12",
     "jsrsasign": "^11.1.0",
-    "jsrsasign-util": "^1.0.5"
+    "jsrsasign-util": "^1.0.5",
+    "rollup-plugin-ts": "^3.4.5"
   },
   "overrides": {
     "fabric-common": {
