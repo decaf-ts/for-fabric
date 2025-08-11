@@ -9,6 +9,7 @@ import {
 } from "@decaf-ts/logging";
 import { LoggingConfig } from "@decaf-ts/logging";
 import { Context as Ctx } from "fabric-contract-api";
+import { FabricContractContext } from "./ContractContext";
 
 /**
  * @description Logger implementation for Fabric chaincode contracts
@@ -49,11 +50,14 @@ export class ContractLogger extends MiniLogger {
   constructor(
     context: string,
     conf: Partial<LoggingConfig> | undefined,
-    ctx: Ctx
+    ctx?: FabricContractContext
   ) {
     super(context, conf);
-    this.logger = ctx.logging.getLogger(context) as unknown as Logger;
-    ctx.logging.setLevel(this.config("level") as string);
+    if (!ctx) {
+      this.logger = new MiniLogger(context, conf);
+    } else {
+      this.logger = ctx.logger;
+    }
   }
 
   /**

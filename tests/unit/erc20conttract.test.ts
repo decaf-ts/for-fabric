@@ -1,6 +1,6 @@
 import { MiniLogger } from "@decaf-ts/logging";
 import { FabricContractContext } from "../../src/contracts";
-import { TestERC20Contract } from "../TestModelContract";
+import { TestERC20Contract } from "../assets/contract/test/TestERc20Contract";
 
 const state: Record<string, any> = {};
 
@@ -39,9 +39,7 @@ const ctx = {
       pageSize: number,
       bookmark: string
     ) => {
-      const keys = Object.keys(state)
-        .filter((k) => k.includes(query)) // naive "query"
-        .sort();
+      const keys = Object.keys(state);
 
       let startIndex = 0;
       if (bookmark) {
