@@ -86,8 +86,8 @@
   },
   "homepage": "https://github.com/decaf-ts/ts-workspace#readme",
   "devDependencies": {
-    "@decaf-ts/fabric-weaver": "^0.0.14",
-    "@decaf-ts/utils": "^0.2.6",
+    "@decaf-ts/fabric-weaver": "latest",
+    "@decaf-ts/utils": "latest",
     "@eslint/js": "^9.25.1",
     "@rollup/plugin-commonjs": "^28.0.3",
     "@rollup/plugin-json": "^6.1.0",
@@ -139,7 +139,8 @@
     "json-stringify-deterministic": "^1.0.12",
     "jsrsasign": "^11.1.0",
     "jsrsasign-util": "^1.0.5",
-    "rollup-plugin-ts": "^3.4.5"
+    "rollup-plugin-ts": "^3.4.5",
+    "sort-keys-recursive": "^2.1.10"
   },
   "overrides": {
     "fabric-common": {

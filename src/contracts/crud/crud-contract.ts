@@ -1,10 +1,19 @@
 import { FabricContractAdapter } from "../ContractAdapter";
 
-import { Transaction, Contract, Context as Ctx } from "fabric-contract-api";
-import { Constructor, JSONSerializer, Model, serializedBy } from "@decaf-ts/decorator-validation";
+import { Contract, Context as Ctx } from "fabric-contract-api";
+import {
+  Constructor,
+  Model,
+  Serialization,
+  serializedBy,
+  Serializer,
+} from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "../FabricContractRepository";
+import { DeterministicSerializer } from "../../shared/DeterministicSerializer";
+import { FabricContractSerializer } from "../constants";
 
+Serialization.register(FabricContractSerializer, DeterministicSerializer);
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode
  * @summary Provides standard create, read, update, and delete operations for models in Fabric chaincode
@@ -59,7 +68,9 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    */
   protected static adapter: FabricContractAdapter;
 
-  protected repo: FabricContractRepository<M>;
+  protected readonly repo: FabricContractRepository<M>;
+
+  protected static readonly serializer = new DeterministicSerializer();
 
   /**
    * @description Creates a new FabricCrudContract instance
@@ -69,30 +80,14 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    */
   protected constructor(
     name: string,
-    private clazz: Constructor<M>
+    protected readonly clazz: Constructor<M>
   ) {
     super(name);
     FabricCrudContract.adapter =
       FabricCrudContract.adapter || new FabricContractAdapter(undefined, name);
 
-    // serializedBy(JSONSerializer<M>)(this.clazz)
-
     this.repo = Repository.forModel(clazz, FabricCrudContract.adapter.alias);
   }
-
-  /**
-   * @description Gets a repository for the model
-   * @summary Creates a repository instance for the model class with the current context
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @return {FabricContractRepository<M>} The repository instance
-   */
-  // protected repository(ctx: Ctx): FabricContractRepository<M> {
-  //   return Repository.forModel(
-  //     this.clazz,
-  //     FabricCrudContract.adapter.alias,
-  //     ctx
-  //   );
-  // }
 
   /**
    * @description Creates a single model in the state database
@@ -102,8 +97,13 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M>} Promise resolving to the created model
    */
-  async create(ctx: Ctx, model: M, ...args: any[]): Promise<M | string> {
-    return this.repo.create(model, ctx, ...args);
+  async create(
+    ctx: Ctx,
+    model: string | M,
+    ...args: any[]
+  ): Promise<string | M> {
+    if (typeof model === "string") model = this.deserialize<M>(model) as any;
+    return this.repo.create(model as unknown as M, ctx, ...args);
   }
 
   /**
@@ -114,8 +114,14 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M[]>} Promise resolving to the created models
    */
-  async createAll(ctx: Ctx, models: M[], ...args: any[]): Promise<M[] | string> {
-    return this.repo.createAll(models, ctx, ...args);
+  async createAll(
+    ctx: Ctx,
+    models: string | M[],
+    ...args: any[]
+  ): Promise<string | M[]> {
+    if (typeof models === "string")
+      models = (JSON.parse(models) as []).map((m) => new this.clazz(m)) as any;
+    return this.repo.createAll(models as unknown as M[], ctx, ...args);
   }
 
   /**
@@ -126,7 +132,11 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M>} Promise resolving to the deleted model
    */
-  async delete(ctx: Ctx, key: string | number, ...args: any[]): Promise<M | string> {
+  async delete(
+    ctx: Ctx,
+    key: string | number,
+    ...args: any[]
+  ): Promise<M | string> {
     return this.repo.delete(key, ctx, ...args);
   }
 
@@ -154,7 +164,11 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M>} Promise resolving to the retrieved model
    */
-  async read(ctx: Ctx, key: string | number, ...args: any[]): Promise<M | string> {
+  async read(
+    ctx: Ctx,
+    key: string | number,
+    ...args: any[]
+  ): Promise<M | string> {
     return this.repo.read(key, ctx, ...args);
   }
 
@@ -182,8 +196,13 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M>} Promise resolving to the updated model
    */
-  async update(ctx: Ctx, model: M, ...args: any[]): Promise<M | string> {
-    return this.repo.update(model, ctx, ...args);
+  async update(
+    ctx: Ctx,
+    model: string | M,
+    ...args: any[]
+  ): Promise<string | M> {
+    if (typeof model === "string") model = this.deserialize<M>(model) as any;
+    return this.repo.update(model as unknown as M, ctx, ...args);
   }
 
   /**
@@ -194,8 +213,14 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @param {...any[]} args - Additional arguments
    * @return {Promise<M[]>} Promise resolving to the updated models
    */
-  async updateAll(ctx: Ctx, models: M[], ...args: any[]): Promise<M[] | string> {
-    return this.repo.updateAll(models, ctx, ...args);
+  async updateAll(
+    ctx: Ctx,
+    models: string | M[],
+    ...args: any[]
+  ): Promise<string | M[]> {
+    if (typeof models === "string")
+      models = (JSON.parse(models) as []).map((m) => new this.clazz(m)) as any;
+    return this.repo.updateAll(models as unknown as M[], ctx, ...args);
   }
 
   /**
@@ -214,5 +239,15 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
     ...args: any[]
   ): Promise<any | string> {
     return this.repo.raw(rawInput, docsOnly, ctx, ...args);
+  }
+
+  protected serialize(model: M): string {
+    return FabricCrudContract.serializer.serialize(model);
+  }
+
+  protected deserialize<M extends Model>(str: string) {
+    return (
+      FabricCrudContract.serializer as unknown as Serializer<M>
+    ).deserialize(str);
   }
 }

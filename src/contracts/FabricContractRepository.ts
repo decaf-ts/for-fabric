@@ -2,7 +2,6 @@ import {
   Repository,
   ObserverHandler,
   EventIds,
-  SelectSelector,
   WhereOption,
 } from "@decaf-ts/core";
 import { FabricContractAdapter } from "./ContractAdapter";
@@ -12,7 +11,6 @@ import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
-import { Context } from "fabric-contract-api";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
