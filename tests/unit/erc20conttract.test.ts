@@ -1,6 +1,8 @@
 import { MiniLogger } from "@decaf-ts/logging";
 import { FabricContractContext } from "../../src/contracts";
 import { TestERC20Contract } from "../assets/contract/test/TestERc20Contract";
+import { v4 as uuidv4 } from "uuid";
+import { CouchDBStatement } from "@decaf-ts/for-couchdb";
 
 const state: Record<string, any> = {};
 
@@ -56,7 +58,7 @@ const ctx = {
             if (currentIndex < paginatedKeys.length) {
               const key = paginatedKeys[currentIndex++];
               return {
-                value: { key, value: Buffer.from(JSON.stringify(state[key])) },
+                value: { key, value: state[key] },
                 done: false,
               };
             }
@@ -75,6 +77,12 @@ const ctx = {
     getMSPID: () => "Aeon",
   },
 } as unknown as FabricContractContext;
+
+jest
+  .spyOn(CouchDBStatement.prototype as any, "processRecord")
+  .mockImplementation((r: any) => {
+    return r.Record;
+  });
 
 describe(`ERC20 token test`, function () {
   let contract: TestERC20Contract;
