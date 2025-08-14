@@ -1,5 +1,6 @@
 import { LoggingConfig } from "@decaf-ts/logging";
 import { RepositoryFlags } from "@decaf-ts/db-decorators";
+import { TLSOptions } from "fabric-ca-client";
 
 /**
  * @description Configuration for connecting to a Hyperledger Fabric peer
@@ -81,3 +82,30 @@ export interface PeerEnvironment extends LoggingConfig {}
  * @memberOf module:fabric.client
  */
 export interface FabricFlags extends RepositoryFlags, PeerConfigOverride {}
+
+/**
+ * @description Configuration for connecting to a Hyperledger Fabric peer
+ * @summary Contains all the necessary parameters to establish a connection to a Fabric peer and interact with chaincode
+ * @typedef {Object} CAConfig
+ * @property {string} url - Path to the crypto materials
+ * @property {TLSOptions} tls - Path to the directory containing private keys
+ * @property {string} caName - Path to the directory containing certificates
+ * @property {string} tlsCertPath - Path to the TLS certificate
+ * @property {string} caCert - Endpoint URL for the peer
+ * @property {string} caKey - Host alias for the peer
+ * @memberOf module:fabric.client
+ */
+export type CAConfig = {
+  url: string;
+  tls?: TLSOptions;
+  caName: string;
+  caCert: string;
+  caKey: string;
+};
+
+export interface Credentials {
+  userName?: string;
+  password?: string;
+}
+
+

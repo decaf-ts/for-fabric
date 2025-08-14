@@ -1,5 +1,5 @@
 import { Dispatch } from "@decaf-ts/core";
-import { PeerConfig } from "./types";
+import { PeerConfig } from "../shared/types";
 import { Client } from "@grpc/grpc-js";
 import { FabricAdapter } from "./FabricAdapter";
 import { InternalError } from "@decaf-ts/db-decorators";

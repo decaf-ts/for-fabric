@@ -2,7 +2,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {type Contract} from 'fabric-contract-api';
-import {TestModelContract} from './TestModelContract';
+import { type Contract } from "fabric-contract-api";
 
-export const contracts: typeof Contract[] = [TestModelContract];
+import { TestSerializedContract } from "./TestSerializedContract";
+
+export const contracts: (typeof Contract)[] = [TestSerializedContract];

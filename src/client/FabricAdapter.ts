@@ -7,7 +7,7 @@ import {
   stringFormat,
 } from "@decaf-ts/decorator-validation";
 import { debug, Logger, Logging } from "@decaf-ts/logging";
-import { FabricFlags, PeerConfig } from "./types";
+import { FabricFlags, PeerConfig } from "../shared/types";
 import {
   connect,
   ConnectOptions,
@@ -137,13 +137,13 @@ export class FabricAdapter extends CouchDBAdapter<
    * @param {Partial<FabricFlags>} flags - Partial flags to merge with defaults
    * @return {FabricFlags} The merged flags
    */
-  protected override flags<M extends Model>(
+  protected override async flags<M extends Model>(
     operation: OperationKeys,
     model: Constructor<M>,
     flags: Partial<FabricFlags>
-  ): FabricFlags {
+  ): Promise<FabricFlags> {
     return Object.assign(
-      super.flags(operation, model, Object.assign({}, this.native, flags))
+      await super.flags(operation, model, Object.assign({}, this.native, flags))
     ) as FabricFlags;
   }
 

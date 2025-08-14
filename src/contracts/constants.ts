@@ -6,3 +6,7 @@
  */
 export const FabricContractFlavour = "fabric-contract";
 export const FabricContractSerializer = "fabric-contract-deterministic";
+
+export enum IdentityType {
+  X509 = "X.509",
+}

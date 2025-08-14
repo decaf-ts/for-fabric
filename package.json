@@ -87,7 +87,7 @@
   "homepage": "https://github.com/decaf-ts/ts-workspace#readme",
   "devDependencies": {
     "@decaf-ts/fabric-weaver": "latest",
-    "@decaf-ts/utils": "latest",
+    "@decaf-ts/utils": "^0.3.4",
     "@eslint/js": "^9.25.1",
     "@rollup/plugin-commonjs": "^28.0.3",
     "@rollup/plugin-json": "^6.1.0",
@@ -132,9 +132,12 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.13.3",
     "@hyperledger/fabric-gateway": "^1.7.1",
+    "@peculiar/webcrypto": "^1.5.0",
+    "@peculiar/x509": "^1.13.0",
     "fabric-ca-client": "^2.2.20",
     "fabric-common": "^2.2.20",
     "fabric-contract-api": "^2.5.8",
+    "fabric-network": "^2.2.20",
     "fabric-shim": "^2.5.8",
     "json-stringify-deterministic": "^1.0.12",
     "jsrsasign": "^11.1.0",
