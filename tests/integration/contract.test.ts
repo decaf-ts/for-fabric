@@ -78,7 +78,7 @@ describe.skip("Test Basic Contract", () => {
   });
 });
 
-describe.skip("Test Crud Contract", () => {
+describe("Test Crud Contract", () => {
   beforeAll(async () => {
     // Compile/Transpile the contract to JavaScript
     execSync(
@@ -153,7 +153,7 @@ describe.skip("Test Crud Contract", () => {
   });
 });
 
-describe("Test Serialized Crud Contract", () => {
+describe.skip("Test Serialized Crud Contract", () => {
   beforeAll(async () => {
     // Compile/Transpile the contract to JavaScript
     execSync(
