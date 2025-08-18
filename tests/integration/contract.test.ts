@@ -13,8 +13,8 @@ describe("Test Basic Crud Contract", () =>  {
 
 
         // Copy necessary files to the chaincode directory
-        fs.copyFileSync(path.join(process.cwd(), "./tests/assets/contract/test/package.json"), path.join(process.cwd(), "./docker/infrastructure/chaincode/package.json"));
-        fs.copyFileSync(path.join(process.cwd(), "./tests/assets/contract/test/npm-shrinkwrap.json"), path.join(process.cwd(), "./docker/infrastructure/chaincode/npm-shrinkwrap.json"))
+        fs.copyFileSync(path.join(process.cwd(), "./tests/assets/contract/basic-crud-contract/package.json"), path.join(process.cwd(), "./docker/infrastructure/chaincode/package.json"));
+        fs.copyFileSync(path.join(process.cwd(), "./tests/assets/contract/basic-crud-contract/npm-shrinkwrap.json"), path.join(process.cwd(), "./docker/infrastructure/chaincode/npm-shrinkwrap.json"))
 
         //Boot infrastructure for testing
         execSync(`npm run infrastructure:up`);

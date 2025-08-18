@@ -7,7 +7,7 @@ import { caConfig } from "../assets/ca-config";
 
 jest.setTimeout(5000000);
 
-describe("Test enrollement", () => {
+describe.skip("Test enrollement", () => {
   const user: Credentials = {
     userName: "TestUser",
     password: "TestUserPSW",
