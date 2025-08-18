@@ -4,8 +4,9 @@ import path from "path";
 
 jest.setTimeout(5000000);
 
-describe("Test Basic Contract", () => {
+describe.skip("Test Basic Contract", () => {
   beforeAll(async () => {
+    await new Promise((r) => setTimeout(r, 30000)); // Wait for readiness
     // Compile/Transpile the contract to JavaScript
     execSync(
       `npx weaver compile-contract -d --contract-file ./tests/assets/contract/basic-fabric-contract/index.ts --output-dir ./docker/infrastructure/chaincode`
@@ -77,7 +78,7 @@ describe("Test Basic Contract", () => {
   });
 });
 
-describe.skip("Test Basic Crud Contract", () => {
+describe("Test Basic Crud Contract", () => {
   beforeAll(async () => {
     // Compile/Transpile the contract to JavaScript
     execSync(
@@ -108,6 +109,8 @@ describe.skip("Test Basic Crud Contract", () => {
   });
 
   it("Should create data", async () => {
+    await new Promise((r) => setTimeout(r, 30000)); // Wait for readiness
+
     // // Prepare the JSON argument for the chaincode
     // const chaincodeArgs = JSON.stringify({
     //   function: "createData",

@@ -8,6 +8,6 @@
 
 // export const contracts: (typeof Contract)[] = [TestModelContract];
 
-import { TestModelContract } from './TestModelContract';
+import { TestModelContract } from "./TestModelContract";
 
-export const contracts: any[] = [ TestModelContract ];
+export const contracts: any[] = [TestModelContract];

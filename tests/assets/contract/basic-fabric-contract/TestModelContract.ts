@@ -1,11 +1,18 @@
-import { Contract, Info, Transaction, Context } from "fabric-contract-api";
+import { Info, Transaction, Context } from "fabric-contract-api";
 import { TestModel } from "./TestModel";
+import { FabricCrudContract } from "../../../../src/contracts/crud/crud-contract";
+import { Object as FabricObject } from "fabric-contract-api";
+import { Model } from "@decaf-ts/decorator-validation";
+import { BaseModel } from "@decaf-ts/core";
+
+FabricObject()(Model);
+FabricObject()(BaseModel);
 
 @Info({
   title: "TestContract",
   description: "Test implementation of crud contract",
 })
-export class TestModelContract extends Contract {
+export class TestModelContract extends FabricCrudContract<TestModel> {
   @Transaction()
   public async createData(
     ctx: Context,
