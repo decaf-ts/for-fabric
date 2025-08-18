@@ -16,7 +16,8 @@ describe.skip("Test enrollement", () => {
 
   beforeAll(async () => {});
 
-  // it("register and enroll ", () => {
+  it("register and enroll ", () => {
   //   FabricEnrollmentService.
-  // });
+  console.log("done")
+  });
 });
