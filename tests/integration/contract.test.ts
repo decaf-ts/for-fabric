@@ -4,7 +4,7 @@ import path from "path";
 
 jest.setTimeout(5000000);
 
-describe.skip("Test Basic Contract", () => {
+describe("Test Basic Contract", () => {
   beforeAll(async () => {
     // Compile/Transpile the contract to JavaScript
     execSync(
@@ -77,7 +77,7 @@ describe.skip("Test Basic Contract", () => {
   });
 });
 
-describe("Test Basic Crud Contract", () => {
+describe.skip("Test Basic Crud Contract", () => {
   beforeAll(async () => {
     // Compile/Transpile the contract to JavaScript
     execSync(
