@@ -33,11 +33,11 @@ export class SerializedCrudContract<
 
   @Transaction()
   override async deleteAll(
-    keys: string[] | number[],
-    ctx: Ctx
+    ctx: Ctx,
+    keys: string[] | number[]
   ): Promise<string> {
     return JSON.stringify(
-      ((await super.deleteAll(keys, ctx)) as M[]).map(
+      ((await super.deleteAll(ctx, keys)) as M[]).map(
         (m) => this.serialize(m) as string
       )
     );
@@ -72,7 +72,7 @@ export class SerializedCrudContract<
 
   override async raw(
     ctx: Ctx,
-    rawInput: MangoQuery,
+    rawInput: string,
     docsOnly: boolean
   ): Promise<any> {
     return super.raw(ctx, rawInput, docsOnly);

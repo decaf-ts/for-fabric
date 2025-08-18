@@ -149,8 +149,8 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    * @return {Promise<M[]>} Promise resolving to the deleted models
    */
   async deleteAll(
-    keys: string[] | number[],
     ctx: Ctx,
+    keys: string[] | number[],
     ...args: any[]
   ): Promise<M[] | string> {
     return this.repo.deleteAll(keys, ctx, ...args);
