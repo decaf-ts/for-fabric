@@ -1,8 +1,7 @@
-import { BaseModel } from "@decaf-ts/core";
 import { Object as FabricObject, Property } from "fabric-contract-api";
 
 @FabricObject()
-export class TestModel extends BaseModel {
+export class TestModel {
   @Property()
   public name!: string;
 
