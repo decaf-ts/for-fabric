@@ -1,19 +1,12 @@
 import { FabricContractAdapter } from "../ContractAdapter";
 
 import { Contract, Context as Ctx } from "fabric-contract-api";
-import {
-  Constructor,
-  Model,
-  Serialization,
-  serializedBy,
-  Serializer,
-} from "@decaf-ts/decorator-validation";
+import { Constructor, Model, Serializer } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "../FabricContractRepository";
 import { DeterministicSerializer } from "../../shared/DeterministicSerializer";
-import { FabricContractSerializer } from "../constants";
+import { MangoQuery } from "@decaf-ts/for-couchdb";
 
-Serialization.register(FabricContractSerializer, DeterministicSerializer);
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode
  * @summary Provides standard create, read, update, and delete operations for models in Fabric chaincode
@@ -102,6 +95,10 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
+    const log = FabricCrudContract.adapter.logFor(ctx);
+
+    log.info(`Creating model: ${JSON.stringify(model)}`);
+
     if (typeof model === "string") model = this.deserialize<M>(model) as any;
     return this.repo.create(model as unknown as M, ctx, ...args);
   }
@@ -150,9 +147,10 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    */
   async deleteAll(
     ctx: Ctx,
-    keys: string[] | number[],
+    keys: string | string[] | number[],
     ...args: any[]
   ): Promise<M[] | string> {
+    if (typeof keys === "string") keys = JSON.parse(keys) as string[];
     return this.repo.deleteAll(keys, ctx, ...args);
   }
 
@@ -182,9 +180,10 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    */
   async readAll(
     ctx: Ctx,
-    keys: string[] | number[],
+    keys: string | string[] | number[],
     ...args: any[]
   ): Promise<M[] | string> {
+    if (typeof keys === "string") keys = JSON.parse(keys) as string[];
     return this.repo.readAll(keys, ctx, ...args);
   }
 
@@ -234,10 +233,12 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
    */
   async raw(
     ctx: Ctx,
-    rawInput: any,
+    rawInput: MangoQuery | string,
     docsOnly: boolean,
     ...args: any[]
   ): Promise<any | string> {
+    if (typeof rawInput === "string")
+      rawInput = JSON.parse(rawInput) as MangoQuery;
     return this.repo.raw(rawInput, docsOnly, ctx, ...args);
   }
 
