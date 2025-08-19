@@ -65,7 +65,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {Ctx} ctx - The Fabric chaincode context
    * @return {ContractLogger} The logger instance
    */
-  private logFor(ctx: Ctx): ContractLogger {
+  public logFor(ctx: Ctx): ContractLogger {
     return Logging.for(FabricContractAdapter, {}, ctx) as ContractLogger;
   }
 
