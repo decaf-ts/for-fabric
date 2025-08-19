@@ -12,6 +12,10 @@ export class SerializedCrudContract<
 
   @Transaction()
   override async create(ctx: Ctx, model: string): Promise<string> {
+    const log = SerializedCrudContract.adapter.logFor(ctx);
+
+    log.info(`Creating model: ${model}`);
+
     const m = this.deserialize<M>(model);
     return this.serialize((await super.create(ctx, m)) as M);
   }
@@ -27,31 +31,34 @@ export class SerializedCrudContract<
   }
 
   @Transaction()
-  override async delete(ctx: Ctx, key: string | number): Promise<string> {
+  override async delete(ctx: Ctx, key: string): Promise<string> {
     return this.serialize((await super.delete(ctx, key)) as M);
   }
 
   @Transaction()
-  override async deleteAll(
-    ctx: Ctx,
-    keys: string[] | number[]
-  ): Promise<string> {
+  override async deleteAll(ctx: Ctx, keys: string): Promise<string> {
+    const parsedKeys: string[] = JSON.parse(keys);
+
     return JSON.stringify(
-      ((await super.deleteAll(ctx, keys)) as M[]).map(
+      ((await super.deleteAll(ctx, parsedKeys)) as M[]).map(
         (m) => this.serialize(m) as string
       )
     );
   }
 
   @Transaction(false)
-  override async read(ctx: Ctx, key: string | number): Promise<string> {
+  override async read(ctx: Ctx, key: string): Promise<string> {
     return this.serialize((await super.read(ctx, key)) as M);
   }
 
   @Transaction(false)
-  override async readAll(ctx: Ctx, keys: string[] | number[]): Promise<string> {
+  override async readAll(ctx: Ctx, keys: string): Promise<string> {
+    const parsedKeys: string[] = JSON.parse(keys);
+
     return JSON.stringify(
-      ((await super.readAll(ctx, keys)) as M[]).map((m) => this.serialize(m))
+      ((await super.readAll(ctx, parsedKeys)) as M[]).map((m) =>
+        this.serialize(m)
+      )
     );
   }
 
@@ -75,6 +82,7 @@ export class SerializedCrudContract<
     rawInput: string,
     docsOnly: boolean
   ): Promise<any> {
-    return super.raw(ctx, rawInput, docsOnly);
+    const parsedInput: MangoQuery = JSON.parse(rawInput);
+    return super.raw(ctx, parsedInput, docsOnly);
   }
 }
