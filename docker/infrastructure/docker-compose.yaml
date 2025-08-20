@@ -1223,6 +1223,25 @@ services:
       -d -s \
       --blockpath /weaver/peer/genesis_block.pb &&
 
+      docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
+      --chaincode-path ./weaver/chaincode/basic \
+      --lang node \
+      --chaincode-output /weaver/peer/simple.tar.gz \
+      --chaincode-name simple \
+      --chaincode-version 1.0 -s &&
+
+      docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
+      --chaincode-path ./weaver/peer/simple.tar.gz &&
+
+      docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
+      --orderer-address org-a-orderer-0:7021 \
+      --channel-id simple-channel \
+      --chaincode-name simple \
+      --chaincode-version 1.0 \
+      --sequence 1 \
+      --enable-tls \
+      --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem &&
+
       touch /boot/boot-org-a-peer-0.lock
       "
 
@@ -1257,6 +1276,25 @@ services:
       docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs peer-join-channel \
       -d -s \
       --blockpath /weaver/peer/genesis_block.pb &&
+
+      docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
+      --chaincode-path ./weaver/chaincode/basic \
+      --lang node \
+      --chaincode-output /weaver/peer/simple.tar.gz \
+      --chaincode-name simple \
+      --chaincode-version 1.0 -s &&
+
+      docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
+      --chaincode-path ./weaver/peer/simple.tar.gz &&
+
+      docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
+      --orderer-address org-a-orderer-0:7021 \
+      --channel-id simple-channel \
+      --chaincode-name simple \
+      --chaincode-version 1.0 \
+      --sequence 1 \
+      --enable-tls \
+      --tls-ca-cert-file /weaver/peer/orderer-tls-ca-cert.pem &&
 
       touch /boot/boot-org-b-peer-0.lock
       "
@@ -1293,7 +1331,63 @@ services:
       -d -s \
       --blockpath /weaver/peer/genesis_block.pb &&
 
+      docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
+      --chaincode-path ./weaver/chaincode/basic \
+      --lang node \
+      --chaincode-output /weaver/peer/simple.tar.gz \
+      --chaincode-name simple \
+      --chaincode-version 1.0 -s &&
+
+      docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
+      --chaincode-path ./weaver/peer/simple.tar.gz &&
+
+      docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
+      --orderer-address org-a-orderer-0:7021 \
+      --channel-id simple-channel \
+      --chaincode-name simple \
+      --chaincode-version 1.0 \
+      --sequence 1 \
+      --enable-tls \
+      --tls-ca-cert-file /weaver/peer/orderer-tls-ca-cert.pem &&
+
       touch /boot/boot-org-c-peer-0.lock
+      "
+
+  commit-chaincode:
+    container_name: commit-chaincode
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
+    restart: no
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - boot-files:/boot:rw
+    depends_on:
+      boot-org-a-peer-0:
+        condition: service_completed_successfully
+      boot-org-b-peer-0:
+        condition: service_completed_successfully
+      boot-org-c-peer-0:
+        condition: service_completed_successfully
+    networks:
+      test_network:
+    command: >
+      bash -c "
+      if [ -f /boot/commit-chaincode.lock ]; then
+        echo 'Already commited. Skipping...';
+        exit 0;
+      fi;
+
+      docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs commit-chaincode -d -s \
+      --orderer-address org-a-orderer-0:7021 \
+      --channel-id simple-channel \
+      --chaincode-name simple \
+      --chaincode-version 1.0 \
+      --sequence 1 \
+      --enable-tls \
+      --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem \
+      --peer-addresses org-a-peer-0:7031,org-b-peer-0:7032,org-c-peer-0:7033
+      --peer-root-tls ./weaver/peer/tls-ca-cert.pem,./weaver/peer/org-b-tls-ca-cert.pem,./weaver/peer/org-c-tls-ca-cert.pem &&
+
+      touch /boot/commit-chaincode.lock
       "
 
 volumes:
