@@ -7,10 +7,9 @@ jest.setTimeout(5000000);
 
 describe("Test Contracts", () => {
   beforeAll(async () => {
-    //Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`);
-
-    await new Promise((r) => setTimeout(r, 15000)); // Wait for readiness
+    // //Boot infrastructure for testing
+    // execSync(`npm run infrastructure:up`);
+    // await new Promise((r) => setTimeout(r, 15000)); // Wait for readiness
   });
 
   const ensureFolderExists = (dirPath: string) => {
@@ -67,70 +66,6 @@ describe("Test Contracts", () => {
         )
       );
     }
-
-    //Boot contract on peers
-    if (boot) {
-      execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
-      --chaincode-path ./weaver/chaincode/basic/${contractName} \
-      --lang node \
-      --chaincode-output /weaver/peer/${contractName}.tar.gz \
-      --chaincode-name ${contractName} \
-      --chaincode-version 1.0 -s`);
-
-      execSync(`docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
-      --chaincode-path ./weaver/chaincode/basic/${contractName} \
-      --lang node \
-      --chaincode-output /weaver/peer/${contractName}.tar.gz \
-      --chaincode-name ${contractName} \
-      --chaincode-version 1.0 -s`);
-
-      execSync(`docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
-      --chaincode-path ./weaver/chaincode/basic/${contractName} \
-      --lang node \
-      --chaincode-output /weaver/peer/${contractName}.tar.gz \
-      --chaincode-name ${contractName} \
-      --chaincode-version 1.0 -s`);
-
-      execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
-      --chaincode-path ./weaver/peer/${contractName}.tar.gz`);
-
-      execSync(`docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
-      --chaincode-path ./weaver/peer/${contractName}.tar.gz`);
-
-      execSync(`docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
-      --chaincode-path ./weaver/peer/${contractName}.tar.gz`);
-
-      execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
-      --orderer-address org-a-orderer-0:7021 \
-      --channel-id simple-channel \
-      --chaincode-name ${contractName} \
-      --chaincode-version 1.0 \
-      --sequence 1 \
-      --enable-tls \
-      --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem`);
-
-      execSync(`docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
-      --orderer-address org-a-orderer-0:7021 \
-      --channel-id simple-channel \
-      --chaincode-name ${contractName} \
-      --chaincode-version 1.0 \
-      --sequence 1 \
-      --enable-tls \
-      --tls-ca-cert-file /weaver/peer/orderer-tls-ca-cert.pem`);
-
-      execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs commit-chaincode -d -s \
-      --orderer-address org-a-orderer-0:7021 \
-      --channel-id simple-channel \
-      --chaincode-name ${contractName} \
-      --chaincode-version 1.0 \
-      --sequence 1 \
-      --enable-tls \
-      --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem \
-      --peer-addresses org-a-peer-0:7031,org-b-peer-0:7032,org-c-peer-0:7033
-      --peer-root-tls ./weaver/peer/tls-ca-cert.pem,./weaver/peer/org-b-tls-ca-cert.pem,./weaver/peer/org-c-tls-ca-cert.pem`);
-
-      await new Promise((r) => setTimeout(r, 30000)); // Wait for readiness
-    }
   };
 
   describe("Test Serialized Contract", () => {
@@ -139,6 +74,9 @@ describe("Test Contracts", () => {
 
     beforeAll(async () => {
       await prepareContract(contractName, contractFolder);
+
+      execSync(`npm run infrastructure:up`);
+      await new Promise((r) => setTimeout(r, 15000)); // Wait for readiness
     });
 
     it("Should test", async () => {
