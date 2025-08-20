@@ -1,5 +1,7 @@
 import { FabricContractAdapter } from "../ContractAdapter";
 
+const adapter = new FabricContractAdapter();
+
 import { Contract, Context as Ctx } from "fabric-contract-api";
 import { Constructor, Model, Serializer } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
@@ -59,7 +61,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
   /**
    * @description Shared adapter instance for all contract instances
    */
-  protected static adapter: FabricContractAdapter;
+  protected static adapter: FabricContractAdapter = adapter;
 
   protected readonly repo: FabricContractRepository<M>;
 
@@ -76,9 +78,6 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
     protected readonly clazz: Constructor<M>
   ) {
     super(name);
-    FabricCrudContract.adapter =
-      FabricCrudContract.adapter || new FabricContractAdapter(undefined);
-
     this.repo = Repository.forModel(clazz, FabricCrudContract.adapter.alias);
   }
 
