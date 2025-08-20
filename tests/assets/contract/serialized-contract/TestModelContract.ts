@@ -56,4 +56,9 @@ export class TestModelContract extends SerializedCrudContract<TestModel> {
 
     return JSON.stringify(m1);
   }
+
+  @Transaction(false)
+  public async healthcheck(ctx: Context): Promise<string> {
+    return "ready";
+  }
 }

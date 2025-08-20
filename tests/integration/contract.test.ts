@@ -120,7 +120,7 @@ describe("Test Serialized Crud Contract", () => {
     // Prepare the JSON argument for the chaincode
     const chaincodeArgs = JSON.stringify({
       function: "createData",
-      Args: ["test1", JSON.stringify(model)],
+      Args: ["test1", JSON.stringify({ name: "Alice", nif: "12345" })],
     });
 
     // Invoke the chaincode
@@ -161,7 +161,7 @@ describe("Test Serialized Crud Contract", () => {
     // Prepare the JSON argument for the chaincode
     const chaincodeArgs1 = JSON.stringify({
       function: "create",
-      Args: [JSON.stringify(model)],
+      Args: [model],
     });
 
     // Invoke the chaincode
