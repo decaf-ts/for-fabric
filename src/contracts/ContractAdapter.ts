@@ -572,7 +572,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
         // type([String.name, Number.name, BigInt.name]),
         propMetadata(pkKey, NumericSequence),
         onCreate(pkOnCreate, NumericSequence)
-      );
+      )
+      .apply();
   }
 }
 
