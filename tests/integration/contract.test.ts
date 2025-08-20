@@ -10,10 +10,10 @@ describe("Test Contracts", () => {
     //Boot infrastructure for testing
     execSync(`npm run infrastructure:up`);
 
-    await new Promise((r) => setTimeout(r, 60000)); // Wait for readiness
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for readiness
   });
 
-  const ensureFolderExists = (dirPath) => {
+  const ensureFolderExists = (dirPath: string) => {
     const basePath = process.cwd();
 
     const resolvedPath = path.join(basePath, dirPath);
@@ -28,42 +28,121 @@ describe("Test Contracts", () => {
     }
   };
 
-  describe("Test Serialized Contract", () => {
-    beforeAll(async () => {
-      // Check if contract was present
-      const boot = ensureFolderExists(
-        "./docker/infrastructure/chaincode/serialized"
+  const prepareContract = async (
+    contractName: string,
+    contractFolder: string
+  ) => {
+    // Check if contract was present
+    const boot = ensureFolderExists(
+      `./docker/infrastructure/chaincode/${contractName}`
+    );
+
+    // Prepare contract file structure
+    if (boot) {
+      // Compile/Transpile the contract to JavaScript
+      execSync(
+        `npx weaver compile-contract -d --contract-file ./tests/assets/contract/${contractFolder}/index.ts --output-dir ./docker/infrastructure/chaincode/${contractName}`
       );
 
-      if (boot) {
-        // Compile/Transpile the contract to JavaScript
-        execSync(
-          `npx weaver compile-contract -d --contract-file ./tests/assets/contract/serialized-contract/index.ts --output-dir ./docker/infrastructure/chaincode/serialized`
-        );
+      // Copy necessary files to the chaincode directory
+      fs.copyFileSync(
+        path.join(
+          process.cwd(),
+          `./tests/assets/contract/${contractFolder}/package.json`
+        ),
+        path.join(
+          process.cwd(),
+          `./docker/infrastructure/chaincode/${contractName}/package.json`
+        )
+      );
 
-        // Copy necessary files to the chaincode directory
-        fs.copyFileSync(
-          path.join(
-            process.cwd(),
-            "./tests/assets/contract/serialized-contract/package.json"
-          ),
-          path.join(
-            process.cwd(),
-            "./docker/infrastructure/chaincode/serialized/package.json"
-          )
-        );
+      fs.copyFileSync(
+        path.join(
+          process.cwd(),
+          `./tests/assets/contract/${contractFolder}/npm-shrinkwrap.json`
+        ),
+        path.join(
+          process.cwd(),
+          `./docker/infrastructure/chaincode/${contractName}/npm-shrinkwrap.json`
+        )
+      );
+    }
 
-        fs.copyFileSync(
-          path.join(
-            process.cwd(),
-            "./tests/assets/contract/serialized-contract/npm-shrinkwrap.json"
-          ),
-          path.join(
-            process.cwd(),
-            "./docker/infrastructure/chaincode/serialized/npm-shrinkwrap.json"
-          )
-        );
-      }
+    //Boot contract on peers
+    if (boot) {
+      execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
+      --chaincode-path ./weaver/chaincode/basic/${contractName} \
+      --lang node \
+      --chaincode-output /weaver/peer/${contractName}.tar.gz \
+      --chaincode-name ${contractName} \
+      --chaincode-version 1.0 -s`);
+
+      execSync(`docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
+      --chaincode-path ./weaver/chaincode/basic/${contractName} \
+      --lang node \
+      --chaincode-output /weaver/peer/${contractName}.tar.gz \
+      --chaincode-name ${contractName} \
+      --chaincode-version 1.0 -s`);
+
+      execSync(`docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
+      --chaincode-path ./weaver/chaincode/basic/${contractName} \
+      --lang node \
+      --chaincode-output /weaver/peer/${contractName}.tar.gz \
+      --chaincode-name ${contractName} \
+      --chaincode-version 1.0 -s`);
+
+      execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
+      --chaincode-path ./weaver/peer/${contractName}.tar.gz`);
+
+      execSync(`docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
+      --chaincode-path ./weaver/peer/${contractName}.tar.gz`);
+
+      execSync(`docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs install-chaincode -d -s \
+      --chaincode-path ./weaver/peer/${contractName}.tar.gz`);
+
+      execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
+      --orderer-address org-a-orderer-0:7021 \
+      --channel-id simple-channel \
+      --chaincode-name ${contractName} \
+      --chaincode-version 1.0 \
+      --sequence 1 \
+      --enable-tls \
+      --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem`);
+
+      execSync(`docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
+      --orderer-address org-a-orderer-0:7021 \
+      --channel-id simple-channel \
+      --chaincode-name ${contractName} \
+      --chaincode-version 1.0 \
+      --sequence 1 \
+      --enable-tls \
+      --tls-ca-cert-file /weaver/peer/orderer-tls-ca-cert.pem`);
+
+      execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs commit-chaincode -d -s \
+      --orderer-address org-a-orderer-0:7021 \
+      --channel-id simple-channel \
+      --chaincode-name ${contractName} \
+      --chaincode-version 1.0 \
+      --sequence 1 \
+      --enable-tls \
+      --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem \
+      --peer-addresses org-a-peer-0:7031,org-b-peer-0:7032,org-c-peer-0:7033
+      --peer-root-tls ./weaver/peer/tls-ca-cert.pem,./weaver/peer/org-b-tls-ca-cert.pem,./weaver/peer/org-c-tls-ca-cert.pem`);
+
+      await new Promise((r) => setTimeout(r, 30000)); // Wait for readiness
+    }
+  };
+
+  describe("Test Serialized Contract", () => {
+    const contractName = "serialized";
+    const contractFolder = "serialized-contract";
+
+    beforeAll(async () => {
+      await prepareContract(contractName, contractFolder);
+    });
+
+    it("Should test", async () => {
+      console.log("Testing serialized contract");
     });
   });
 });
