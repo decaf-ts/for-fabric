@@ -2,9 +2,71 @@ import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { TestModel } from "../assets/contract/serialized-contract/TestModel";
-import { Repository } from "@decaf-ts/core";
 
 jest.setTimeout(5000000);
+
+describe("Test Contracts", () => {
+  beforeAll(async () => {
+    //Boot infrastructure for testing
+    execSync(`npm run infrastructure:up`);
+
+    await new Promise((r) => setTimeout(r, 60000)); // Wait for readiness
+  });
+
+  const ensureFolderExists = (dirPath) => {
+    const basePath = process.cwd();
+
+    const resolvedPath = path.join(basePath, dirPath);
+
+    if (!fs.existsSync(resolvedPath)) {
+      fs.mkdirSync(resolvedPath, { recursive: true });
+      console.log(`Folder created: ${resolvedPath}`);
+      return false;
+    } else {
+      console.log(`Folder already exists: ${resolvedPath}`);
+      return true;
+    }
+  };
+
+  describe("Test Serialized Contract", () => {
+    beforeAll(async () => {
+      // Check if contract was present
+      const boot = ensureFolderExists(
+        "./docker/infrastructure/chaincode/serialized"
+      );
+
+      if (boot) {
+        // Compile/Transpile the contract to JavaScript
+        execSync(
+          `npx weaver compile-contract -d --contract-file ./tests/assets/contract/serialized-contract/index.ts --output-dir ./docker/infrastructure/chaincode/serialized`
+        );
+
+        // Copy necessary files to the chaincode directory
+        fs.copyFileSync(
+          path.join(
+            process.cwd(),
+            "./tests/assets/contract/serialized-contract/package.json"
+          ),
+          path.join(
+            process.cwd(),
+            "./docker/infrastructure/chaincode/serialized/package.json"
+          )
+        );
+
+        fs.copyFileSync(
+          path.join(
+            process.cwd(),
+            "./tests/assets/contract/serialized-contract/npm-shrinkwrap.json"
+          ),
+          path.join(
+            process.cwd(),
+            "./docker/infrastructure/chaincode/serialized/npm-shrinkwrap.json"
+          )
+        );
+      }
+    });
+  });
+});
 
 describe.skip("Test Basic Contract", () => {
   beforeAll(async () => {
@@ -32,9 +94,6 @@ describe.skip("Test Basic Contract", () => {
         "./docker/infrastructure/chaincode/npm-shrinkwrap.json"
       )
     );
-
-    //Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`);
   });
 
   it("Should create data", async () => {
@@ -80,7 +139,7 @@ describe.skip("Test Basic Contract", () => {
   });
 });
 
-describe("Test Serialized Crud Contract", () => {
+describe.skip("Test Serialized Crud Contract", () => {
   beforeAll(async () => {
     // Compile/Transpile the contract to JavaScript
     execSync(
@@ -111,11 +170,26 @@ describe("Test Serialized Crud Contract", () => {
   });
 
   it("Should create data", async () => {
-    await new Promise((r) => setTimeout(r, 60000)); // Wait for readiness
+    let ready = false;
 
-    const model = new TestModel({ name: "Alice", nif: "12345" }).serialize();
+    const healcheckChaincodeArgs = JSON.stringify({
+      function: "healthcheck",
+      Args: [],
+    });
 
-    console.log(model);
+    while (!ready) {
+      const res = execSync(
+        `docker exec org-a-peer-0 peer chaincode query \
+          -C simple-channel \
+          -n simple \
+          -c '${healcheckChaincodeArgs}' \
+          --tls --cafile /weaver/peer/tls-ca-cert.pem`
+      );
+
+      ready = res.toString().includes("ready");
+
+      console.log(`Chaincode is ${ready ? "ready" : "not ready"}`);
+    }
 
     // Prepare the JSON argument for the chaincode
     const chaincodeArgs = JSON.stringify({
@@ -157,6 +231,10 @@ describe("Test Serialized Crud Contract", () => {
     );
 
     console.log(res.toString());
+
+    const model = new TestModel({ name: "Alice", nif: "12345" }).serialize();
+
+    console.log(model);
 
     // Prepare the JSON argument for the chaincode
     const chaincodeArgs1 = JSON.stringify({

@@ -1,11 +1,11 @@
 {
-  "name": "basic",
+  "name": "serialized",
   "version": "1.0.0",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
-      "name": "basic",
+      "name": "serialized",
       "version": "1.0.0",
       "dependencies": {
         "@decaf-ts/core": "^0.5.8",
