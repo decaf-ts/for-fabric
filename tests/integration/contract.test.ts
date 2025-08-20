@@ -5,86 +5,6 @@ import { TestModel } from "../assets/contract/serialized-contract/TestModel";
 
 jest.setTimeout(5000000);
 
-describe("Test Contracts", () => {
-  beforeAll(async () => {
-    // //Boot infrastructure for testing
-    // execSync(`npm run infrastructure:up`);
-    // await new Promise((r) => setTimeout(r, 15000)); // Wait for readiness
-  });
-
-  const ensureFolderExists = (dirPath: string) => {
-    const basePath = process.cwd();
-
-    const resolvedPath = path.join(basePath, dirPath);
-
-    if (!fs.existsSync(resolvedPath)) {
-      fs.mkdirSync(resolvedPath, { recursive: true });
-      console.log(`Folder created: ${resolvedPath}`);
-      return false;
-    } else {
-      console.log(`Folder already exists: ${resolvedPath}`);
-      return true;
-    }
-  };
-
-  const prepareContract = async (
-    contractName: string,
-    contractFolder: string
-  ) => {
-    // Check if contract was present
-    const boot = ensureFolderExists(
-      `./docker/infrastructure/chaincode/${contractName}`
-    );
-
-    // Prepare contract file structure
-    if (boot) {
-      // Compile/Transpile the contract to JavaScript
-      execSync(
-        `npx weaver compile-contract -d --contract-file ./tests/assets/contract/${contractFolder}/index.ts --output-dir ./docker/infrastructure/chaincode/${contractName}`
-      );
-
-      // Copy necessary files to the chaincode directory
-      fs.copyFileSync(
-        path.join(
-          process.cwd(),
-          `./tests/assets/contract/${contractFolder}/package.json`
-        ),
-        path.join(
-          process.cwd(),
-          `./docker/infrastructure/chaincode/${contractName}/package.json`
-        )
-      );
-
-      fs.copyFileSync(
-        path.join(
-          process.cwd(),
-          `./tests/assets/contract/${contractFolder}/npm-shrinkwrap.json`
-        ),
-        path.join(
-          process.cwd(),
-          `./docker/infrastructure/chaincode/${contractName}/npm-shrinkwrap.json`
-        )
-      );
-    }
-  };
-
-  describe("Test Serialized Contract", () => {
-    const contractName = "serialized";
-    const contractFolder = "serialized-contract";
-
-    beforeAll(async () => {
-      await prepareContract(contractName, contractFolder);
-
-      execSync(`npm run infrastructure:up`);
-      await new Promise((r) => setTimeout(r, 15000)); // Wait for readiness
-    });
-
-    it("Should test", async () => {
-      console.log("Testing serialized contract");
-    });
-  });
-});
-
 describe.skip("Test Basic Contract", () => {
   beforeAll(async () => {
     await new Promise((r) => setTimeout(r, 30000)); // Wait for readiness
@@ -111,6 +31,9 @@ describe.skip("Test Basic Contract", () => {
         "./docker/infrastructure/chaincode/npm-shrinkwrap.json"
       )
     );
+
+    //Boot infrastructure for testing
+    execSync(`npm run infrastructure:up`);
   });
 
   it("Should create data", async () => {

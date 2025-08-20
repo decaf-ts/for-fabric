@@ -1224,7 +1224,7 @@ services:
       --blockpath /weaver/peer/genesis_block.pb &&
 
       docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
-      --chaincode-path ./weaver/chaincode/basic/serialized \
+      --chaincode-path ./weaver/chaincode/basic \
       --lang node \
       --chaincode-output /weaver/peer/simple.tar.gz \
       --chaincode-name simple \
@@ -1278,7 +1278,7 @@ services:
       --blockpath /weaver/peer/genesis_block.pb &&
 
       docker exec org-b-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
-      --chaincode-path ./weaver/chaincode/basic/serialized \
+      --chaincode-path ./weaver/chaincode/basic \
       --lang node \
       --chaincode-output /weaver/peer/simple.tar.gz \
       --chaincode-name simple \
@@ -1332,7 +1332,7 @@ services:
       --blockpath /weaver/peer/genesis_block.pb &&
 
       docker exec org-c-peer-0 node ./weaver/lib/core/cli.cjs package-chaincode -d \
-      --chaincode-path ./weaver/chaincode/basic/serialized \
+      --chaincode-path ./weaver/chaincode/basic \
       --lang node \
       --chaincode-output /weaver/peer/simple.tar.gz \
       --chaincode-name simple \
