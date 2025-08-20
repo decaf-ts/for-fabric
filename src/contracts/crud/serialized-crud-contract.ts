@@ -14,9 +14,11 @@ export class SerializedCrudContract<
   override async create(ctx: Ctx, model: string): Promise<string> {
     const log = SerializedCrudContract.adapter.logFor(ctx);
 
-    log.info(`Creating model: ${model}`);
+    log.info(`[Serialized] - Creating model: ${model}`);
 
     const m = this.deserialize<M>(model);
+
+    log.info(`[Serialized] - Model deserialized: ${JSON.stringify(m)}`);
     return this.serialize((await super.create(ctx, m)) as M);
   }
 

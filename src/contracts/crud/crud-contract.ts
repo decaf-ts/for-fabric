@@ -97,9 +97,9 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
   ): Promise<string | M> {
     const log = FabricCrudContract.adapter.logFor(ctx);
 
-    log.info(`Creating model: ${JSON.stringify(model)}`);
-
     if (typeof model === "string") model = this.deserialize<M>(model) as any;
+
+    log.info(`[CRUD] - Creating model: ${JSON.stringify(model)}`);
     return this.repo.create(model as unknown as M, ctx, ...args);
   }
 
