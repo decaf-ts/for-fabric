@@ -1,16 +1,134 @@
 import { CouchDBAdapter, MangoQuery } from "@decaf-ts/for-couchdb";
-import { Constructor, Model } from "@decaf-ts/decorator-validation";
+import {
+  Constructor,
+  Decoration,
+  Model,
+  propMetadata,
+  required,
+} from "@decaf-ts/decorator-validation";
 import { FabricContractFlavour } from "./constants";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
-import { OperationKeys, SerializationError } from "@decaf-ts/db-decorators";
+import {
+  Context,
+  DBKeys,
+  InternalError,
+  onCreate,
+  onUpdate,
+  OperationKeys,
+  readonly,
+  RepositoryFlags,
+  SerializationError,
+} from "@decaf-ts/db-decorators";
 import { Context as Ctx } from "fabric-contract-api";
 import { debug, Logger, Logging } from "@decaf-ts/logging";
 import { ContractLogger } from "./logging";
-import { Repository } from "@decaf-ts/core";
+import {
+  OrderDirection,
+  PersistenceKeys,
+  RelationsMetadata,
+  Repository,
+  Sequence,
+  sequenceNameForModel,
+  SequenceOptions,
+  UnsupportedError,
+  index,
+  DefaultSequenceOptions,
+  NumericSequence,
+} from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
-import { Iterators, StateQueryResponse } from "fabric-shim-api";
+import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
 import { FabricStatement } from "./erc20/Statement";
+
+/**
+ * @description Sets the creator or updater field in a model based on the user in the context
+ * @summary Callback function used in decorators to automatically set the created_by or updated_by fields
+ * with the username from the context when a document is created or updated
+ * @template M - Type extending Model
+ * @template R - Type extending NanoRepository<M>
+ * @template V - Type extending RelationsMetadata
+ * @param {R} this - The repository instance
+ * @param {Context<NanoFlags>} context - The operation context containing user information
+ * @param {V} data - The relation metadata
+ * @param key - The property key to set with the username
+ * @param {M} model - The model instance being created or updated
+ * @return {Promise<void>} A promise that resolves when the operation is complete
+ * @function createdByOnNanoCreateUpdate
+ * @memberOf module:for-nano
+ * @mermaid
+ * sequenceDiagram
+ *   participant F as createdByOnNanoCreateUpdate
+ *   participant C as Context
+ *   participant M as Model
+ *   F->>C: get("user")
+ *   C-->>F: user object
+ *   F->>M: set key to user.name
+ *   Note over F: If no user in context
+ *   F-->>F: throw UnsupportedError
+ */
+export async function createdByOnFabricCreateUpdate<
+  M extends Model,
+  R extends FabricContractRepository<M>,
+  V extends RelationsMetadata,
+>(
+  this: R,
+  context: Context<FabricContractFlags>,
+  data: V,
+  key: keyof M,
+  model: M
+): Promise<void> {
+  try {
+    const user = context.get("clientIdentity") as ClientIdentity;
+    model[key] = user.getID() as M[typeof key];
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (e: unknown) {
+    throw new UnsupportedError(
+      "No User found in context. Please provide a user in the context"
+    );
+  }
+}
+
+export async function pkOnCreate<
+  M extends Model,
+  R extends FabricContractRepository<M>,
+  V extends SequenceOptions,
+  F extends FabricContractFlags,
+>(
+  this: R,
+  context: Context<F>,
+  data: V,
+  key: keyof M,
+  model: M
+): Promise<void> {
+  if (!data.type || model[key]) {
+    return;
+  }
+
+  const setPrimaryKeyValue = function <M extends Model>(
+    target: M,
+    propertyKey: string,
+    value: string | number | bigint
+  ) {
+    Object.defineProperty(target, propertyKey, {
+      enumerable: true,
+      writable: false,
+      configurable: true,
+      value: value,
+    });
+  };
+  if (!data.name) data.name = sequenceNameForModel(model, "pk");
+  let sequence: Sequence;
+  try {
+    sequence = await this.adapter.Sequence(data);
+  } catch (e: any) {
+    throw new InternalError(
+      `Failed to instantiate Sequence ${data.name}: ${e}`
+    );
+  }
+
+  const next = await sequence.next();
+  setPrimaryKeyValue(model, key as string, next);
+}
 
 /**
  * @description Adapter for Hyperledger Fabric chaincode state database operations
@@ -425,7 +543,37 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @description Static method for class decoration
    * @summary Empty method used for class decoration purposes
    */
-  static decoration() {}
+  static decoration() {
+    const createdByKey = Repository.key(PersistenceKeys.CREATED_BY);
+    const updatedByKey = Repository.key(PersistenceKeys.UPDATED_BY);
+    Decoration.flavouredAs(FabricContractFlavour)
+      .for(createdByKey)
+      .define(
+        onCreate(createdByOnFabricCreateUpdate),
+        propMetadata(createdByKey, {})
+      )
+      .apply();
+
+    Decoration.flavouredAs(FabricContractFlavour)
+      .for(updatedByKey)
+      .define(
+        onCreate(createdByOnFabricCreateUpdate),
+        propMetadata(updatedByKey, {})
+      )
+      .apply();
+
+    const pkKey = Repository.key(DBKeys.ID);
+    Decoration.flavouredAs(FabricContractFlavour)
+      .for(pkKey)
+      .define(
+        index([OrderDirection.ASC, OrderDirection.DSC]),
+        required(),
+        readonly(),
+        // type([String.name, Number.name, BigInt.name]),
+        propMetadata(pkKey, NumericSequence),
+        onCreate(pkOnCreate, NumericSequence)
+      );
+  }
 }
 
 FabricContractAdapter.decoration();
