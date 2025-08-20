@@ -88,7 +88,7 @@ export async function createdByOnFabricCreateUpdate<
   }
 }
 
-export async function pkOnCreate<
+export async function pkFabricOnCreate<
   M extends Model,
   R extends FabricContractRepository<M>,
   V extends SequenceOptions,
@@ -571,7 +571,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
         readonly(),
         // type([String.name, Number.name, BigInt.name]),
         propMetadata(pkKey, NumericSequence),
-        onCreate(pkOnCreate, NumericSequence)
+        onCreate(pkFabricOnCreate, NumericSequence)
       )
       .apply();
   }
