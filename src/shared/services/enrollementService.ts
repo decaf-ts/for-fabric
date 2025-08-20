@@ -99,11 +99,13 @@ export class FabricEnrollmentService {
     verify = false;
 
     const root = (trustedRoots as string[]).shift() as string;
-    this.logger.debug(stringFormat("Retrieving CA certificate from {0}", root));
+    // this.logger.debug(stringFormat("Retrieving CA certificate from {0}", root));
+    console.log(process.cwd());
+
     const certificate = await CoreUtils.getFirstDirFileNameContent(root);
-    this.logger.debug(
-      stringFormat("Creating CA Client for CA {0} under {1}", caName, url)
-    );
+    // this.logger.debug(
+    //   stringFormat("Creating CA Client for CA {0} under {1}", caName, url)
+    // );
     this.ca = new FabricCAClient(
       url,
       {
