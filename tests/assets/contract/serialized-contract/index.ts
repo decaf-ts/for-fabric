@@ -9,5 +9,7 @@
 // export const contracts: (typeof Contract)[] = [TestModelContract];
 
 import { TestModelContract } from "./TestModelContract";
+import { FabricCrudContract } from "../../../../src/contracts/crud/crud-contract";
+console.log(FabricCrudContract.name);
 
 export const contracts: any[] = [TestModelContract];

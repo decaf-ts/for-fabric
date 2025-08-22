@@ -1,6 +1,5 @@
 import { Model } from "@decaf-ts/decorator-validation";
 import { TestModel } from "./TestModel";
-
 import {
   Info,
   Object as FabricObject,
