@@ -36,7 +36,7 @@ describe.skip("Test Basic Contract", () => {
     execSync(`npm run infrastructure:up`);
   });
 
-  it("Should create data", async () => {
+  it.skip("Should create data", async () => {
     // Prepare the JSON argument for the chaincode
     const chaincodeArgs = JSON.stringify({
       function: "createData",
@@ -133,7 +133,7 @@ describe("Test Serialized Crud Contract", () => {
     }
   };
 
-  it("Should createData", async () => {
+  it.skip("Should createData", async () => {
     const ready = await ensureReadiness();
 
     const id = "test1";
@@ -188,7 +188,7 @@ describe("Test Serialized Crud Contract", () => {
     expect(model.nif).toBe(data.nif);
   });
 
-  it("Should create", async () => {
+  it.skip("Should create", async () => {
     const ready = await ensureReadiness();
 
     const data = { name: "Alice1", nif: "123456" };

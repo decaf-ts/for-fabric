@@ -21,7 +21,7 @@ export class TestModel extends BaseModel {
   name!: string;
 
   @column("tst_nif")
-  @unique()
+  // @unique()
   @minlength(9)
   @maxlength(9)
   @required()

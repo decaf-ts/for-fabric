@@ -6,6 +6,7 @@ console.log(
 import { Context } from "fabric-contract-api";
 import { TestModel } from "../assets/contract/serialized-contract/TestModel";
 import { TestModelContract } from "../assets/contract/serialized-contract/TestModelContract";
+import { NotFoundError } from "@decaf-ts/db-decorators";
 
 jest.setTimeout(5000000);
 
@@ -37,7 +38,7 @@ const ctx = {
     },
     getState: async (key: string) => {
       if (key in state) return state[key];
-      throw new Error("Missing");
+      throw new NotFoundError("Missing record");
     },
     putState: async (key: string, value: any) => {
       state[key] = value;
@@ -105,7 +106,7 @@ describe("Tests serialization contract", () => {
   });
 
   it("Should create", async () => {
-    const m = new TestModel({ name: "Alice", nif: "12345" }).serialize();
+    const m = new TestModel({ name: "Alice", nif: "123456789" }).serialize();
 
     const res = await contract.create(ctx as unknown as Context, m);
 
