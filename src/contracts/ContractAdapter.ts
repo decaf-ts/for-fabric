@@ -14,10 +14,8 @@ import {
   DBKeys,
   InternalError,
   onCreate,
-  onUpdate,
   OperationKeys,
   readonly,
-  RepositoryFlags,
   SerializationError,
 } from "@decaf-ts/db-decorators";
 import { Context as Ctx } from "fabric-contract-api";
@@ -33,12 +31,12 @@ import {
   SequenceOptions,
   UnsupportedError,
   index,
-  DefaultSequenceOptions,
   NumericSequence,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
 import { FabricStatement } from "./erc20/Statement";
+import { FabricContractDBSequence } from "./FabricContractSequence";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -117,16 +115,16 @@ export async function pkFabricOnCreate<
     });
   };
   if (!data.name) data.name = sequenceNameForModel(model, "pk");
-  let sequence: Sequence;
+  let sequence: FabricContractDBSequence;
   try {
-    sequence = await this.adapter.Sequence(data);
+    sequence = (await this.adapter.Sequence(data)) as FabricContractDBSequence;
   } catch (e: any) {
     throw new InternalError(
       `Failed to instantiate Sequence ${data.name}: ${e}`
     );
   }
 
-  const next = await sequence.next();
+  const next = await sequence.next(context as FabricContractContext);
   setPrimaryKeyValue(model, key as string, next);
 }
 
@@ -537,6 +535,17 @@ export class FabricContractAdapter extends CouchDBAdapter<
       throw new Error("Context is required");
     }
     return new FabricStatement(this, ctx);
+  }
+
+  override async Sequence(options: SequenceOptions): Promise<Sequence> {
+    return new FabricContractDBSequence(
+      options,
+      this as unknown as CouchDBAdapter<
+        void,
+        FabricContractFlags,
+        FabricContractContext
+      >
+    );
   }
 
   /**

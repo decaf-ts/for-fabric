@@ -1,7 +1,5 @@
 import { FabricContractAdapter } from "../ContractAdapter";
-
 const adapter = new FabricContractAdapter();
-
 import { Contract, Context as Ctx } from "fabric-contract-api";
 import { Constructor, Model, Serializer } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";

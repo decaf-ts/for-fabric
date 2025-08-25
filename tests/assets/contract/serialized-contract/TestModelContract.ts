@@ -1,3 +1,9 @@
+import { FabricCrudContract } from "../../../../src/contracts/crud/crud-contract";
+
+console.log(
+  "Forcing Fabric Crud Contract before models to trigger adaptor decorators override:",
+  FabricCrudContract
+);
 import { Model } from "@decaf-ts/decorator-validation";
 import { TestModel } from "./TestModel";
 import {

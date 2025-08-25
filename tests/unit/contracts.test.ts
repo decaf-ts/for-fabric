@@ -1,3 +1,8 @@
+import { FabricCrudContract } from "../../src/contracts/crud/crud-contract";
+console.log(
+  "Forcing Fabric Crud Contract before models to trigger adaptor decorators override:",
+  FabricCrudContract
+);
 import { Context } from "fabric-contract-api";
 import { TestModel } from "../assets/contract/serialized-contract/TestModel";
 import { TestModelContract } from "../assets/contract/serialized-contract/TestModelContract";
