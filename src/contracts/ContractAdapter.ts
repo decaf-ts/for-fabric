@@ -70,7 +70,7 @@ export async function createdByOnFabricCreateUpdate<
   V extends RelationsMetadata,
 >(
   this: R,
-  context: Context<FabricContractFlags>,
+  context: FabricContractContext,
   data: V,
   key: keyof M,
   model: M
@@ -90,10 +90,9 @@ export async function pkFabricOnCreate<
   M extends Model,
   R extends FabricContractRepository<M>,
   V extends SequenceOptions,
-  F extends FabricContractFlags,
 >(
   this: R,
-  context: Context<F>,
+  context: FabricContractContext,
   data: V,
   key: keyof M,
   model: M
@@ -189,7 +188,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @description Context constructor for this adapter
    * @summary Overrides the base Context constructor with FabricContractContext
    */
-  override Context: Constructor<FabricContractContext> = FabricContractContext;
+  override Context = FabricContractContext;
 
   /**
    * @description Gets the repository constructor for this adapter
