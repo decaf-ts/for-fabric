@@ -128,16 +128,23 @@ describe("Test Serialized Crud Contract", () => {
 
       return res.toString();
     } catch (e: unknown) {
-      console.log(e);
+      console.log("Chaincode not ready. Retrying...");
+      await new Promise((r) => setTimeout(r, 5000)); // Wait for 5 seconds before retrying
       return ensureReadiness();
     }
   };
 
-  it.skip("Should createData", async () => {
+  it("boots infrastructure", async () => {
+    console.log("Booting infrastructure...");
+    const ready = await ensureReadiness();
+    console.log("Is Ready: ", ready);
+  });
+
+  it("Should createData", async () => {
     const ready = await ensureReadiness();
 
     const id = "test1";
-    const data = { name: "Alice", nif: "12345" };
+    const data = { name: "Alice", nif: "123456789" };
 
     console.log("Is Ready: ", ready);
 
@@ -188,10 +195,10 @@ describe("Test Serialized Crud Contract", () => {
     expect(model.nif).toBe(data.nif);
   });
 
-  it.skip("Should create", async () => {
+  it("Should create", async () => {
     const ready = await ensureReadiness();
 
-    const data = { name: "Alice1", nif: "123456" };
+    const data = { name: "Alice1", nif: "123456789" };
 
     console.log("Is Ready: ", ready);
     const model = new TestModel(data);
