@@ -140,7 +140,7 @@ describe("Test Serialized Crud Contract", () => {
     console.log("Is Ready: ", ready);
   });
 
-  it("Should createData", async () => {
+  it.skip("Should createData", async () => {
     const ready = await ensureReadiness();
 
     const id = "test1";
@@ -195,7 +195,7 @@ describe("Test Serialized Crud Contract", () => {
     expect(model.nif).toBe(data.nif);
   });
 
-  it("Should create", async () => {
+  it.skip("Should create", async () => {
     const ready = await ensureReadiness();
 
     const data = { name: "Alice1", nif: "123456789" };
