@@ -35,6 +35,9 @@ class ChaincodeWrapper {
         case "create":
           result = await this.contract.create(stub, ...params);
           break;
+        case "createData":
+          result = await this.contract.create(stub, ...params);
+          break;
         case "read":
           result = await this.contract.read(stub, ...params);
           break;
