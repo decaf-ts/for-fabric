@@ -7,7 +7,6 @@ console.log(FabricCrudContract.name);
 import { TestModelContract } from "./TestModelContract";
 
 import { Shim, ChaincodeResponse, ChaincodeStub } from "fabric-shim";
-import { TestModelContract } from "./TestModelContract";
 
 class ChaincodeWrapper {
   contract: TestModelContract;
