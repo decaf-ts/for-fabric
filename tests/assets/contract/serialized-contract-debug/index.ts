@@ -56,6 +56,10 @@ class ChaincodeWrapper {
 }
 
 // Start chaincode
-Shim.start(new ChaincodeWrapper())
-  .then(() => console.log("Chaincode started"))
-  .catch((err) => console.error("Error starting chaincode", err));
+try {
+  Shim.start(new ChaincodeWrapper());
+  console.log("Chaincode started successfully");
+} catch (err) {
+  console.error(`Error starting chaincode: ${err}`);
+  process.exit(1);
+}
