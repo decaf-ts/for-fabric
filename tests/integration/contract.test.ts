@@ -83,21 +83,21 @@ describe("Test Serialized Crud Contract", () => {
   beforeAll(async () => {
     // Compile/Transpile the contract to JavaScript
     execSync(
-      `npx weaver compile-contract -d --contract-file ./tests/assets/contract/serialized-contract/index.ts --output-dir ./docker/infrastructure/chaincode`
+      `npx weaver compile-contract -d --contract-file ./tests/assets/contract/serialized-contract-debug/index.ts --output-dir ./docker/infrastructure/chaincode`
     );
 
     // Copy necessary files to the chaincode directory
     fs.copyFileSync(
       path.join(
         process.cwd(),
-        "./tests/assets/contract/serialized-contract/package.json"
+        "./tests/assets/contract/serialized-contract-debug/package.json"
       ),
       path.join(process.cwd(), "./docker/infrastructure/chaincode/package.json")
     );
     fs.copyFileSync(
       path.join(
         process.cwd(),
-        "./tests/assets/contract/serialized-contract/npm-shrinkwrap.json"
+        "./tests/assets/contract/serialized-contract-debug/npm-shrinkwrap.json"
       ),
       path.join(
         process.cwd(),
