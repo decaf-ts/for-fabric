@@ -30,6 +30,9 @@ class ChaincodeWrapper {
     try {
       let result;
       switch (fcn) {
+        case "healthcheck":
+          result = await this.contract.healthcheck(stub as any);
+          break;
         case "create":
           result = await this.contract.create(stub, ...params);
           break;
