@@ -17,9 +17,9 @@
       "type": "node",
       "request": "attach",
       "name": "Attach to Remote",
-      "address": "localhost",
-      "localRoot": "${workspaceFolder}", // your local source code path
-      "remoteRoot": "/path/to/app/on/server" // remote path where Node runs
+      "address": "172.18.0.13",
+      "localRoot": "${workspaceFolder}/docker/infrastructure/chaincode", // your local source code path
+      "remoteRoot": "/usr/local/src"
     },
     {
       "name": "build:prod",
