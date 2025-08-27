@@ -133,6 +133,10 @@ Run:
 
 #### Debuging Flow
 
+To be able to debug the contracts there are a few changes we need to make. First on the start command needs to change to `  "start": "node --inspect=0.0.0.0:9229 path/to/entry/file"   ` the the code should be adapted so it can be called via node. An example of the entry file can be found in /tests/assets/serialized-contract-debug/index.js.
+
+After this adjustmets boot the infrastructure with the debug prepared contract. Check the ip of the instance of the contract you want to debug, copy it and when running the Attach To Remote Launch a input prompt will ask for the remote address. Paste the ip from the container and you are ready to debug. You can place breakpoints in the docker/infrastructure/chaincode folder.
+
 #### Testing Flow
 
 To test the contract you have to transpile and place it in the docker/infrastrucure/chaincode folder. Don't forget to add a package.json and a package-lock.json or npm-shrinkwrap.json file for that contract. An example of these files could be found under tests/contract/asset-transfer/\*.

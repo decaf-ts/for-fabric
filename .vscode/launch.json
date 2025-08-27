@@ -17,7 +17,7 @@
       "type": "node",
       "request": "attach",
       "name": "Attach to Remote",
-      "address": "172.18.0.13",
+      "address": "${input:remoteAddr}",
       "localRoot": "${workspaceFolder}/docker/infrastructure/chaincode", // your local source code path
       "remoteRoot": "/usr/local/src"
     },
@@ -130,6 +130,14 @@
         "NODE_ENV": "development"
       },
       "console": "integratedTerminal"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "remoteAddr",
+      "type": "promptString",
+      "description": "Enter the remote address",
+      "default": "172.18.0.13"
     }
   ]
 }
