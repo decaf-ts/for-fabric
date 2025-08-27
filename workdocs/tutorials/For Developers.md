@@ -101,23 +101,23 @@ Preconfigured Jest based testing:
 - uses `workdocs/reports/jest.coverage.config.ts` as its base config;
 - defines the coverage threshold in `workdocs/reports/jest.coverage.config.ts`;
 
-### Testing Contracts
+## Contracts
 
-#### General information
+### General information
 
-To test a contract implementation you wish to test, there is a basic infrastructure available to boot the contract.
+To test/debug a contract implementation first you need to deploy it, there is a basic infrastructure available to boot the contract.
 
-In the docker/infrastructure folder, you will find this basic setup. To test a contract, copy the contract’s JavaScript code into the chaincode folder.
+In the docker/infrastructure folder, you will find this basic setup. To test/debug a contract, copy the contract’s JavaScript code into the chaincode folder.
 
 The contract must include:
 
 - package.json
 
-- npm-shrinkwrap.json
+- npm-shrinkwrap.json/ package-lock.json
 
 - Transpiled files for the contract
 
-#### Transpiling a contract
+### Transpiling a contract
 
 If you need to transpile the contract you can use the weaver binary.
 An example is provided bellow pointing to a test implementation.
@@ -125,6 +125,13 @@ An example is provided bellow pointing to a test implementation.
 ```
 npx weaver compile-contract -d --contract-file ./tests/assets/contract/asset-transfer/index.ts --output-dir ./docker/infrastructure/chaincode
 ```
+
+### Booting the contract infrastructure
+
+Run:
+`npm run infrastructure:up`
+
+#### Debuging Flow
 
 #### Testing Flow
 
@@ -138,7 +145,7 @@ To reset the environment to test another contract or to clean test the same cont
 `npm run infrastructure:down`
 
 When the command finishes remove the folder docker/infrastructure/storage and run the command:
-`git checkout docker/infrastructure/storage`
+`git checkout docker/`
 
 This sucessfully resets the repository and you can restart the process by changing the contract to be tested or booting the infrastructure again.
 
