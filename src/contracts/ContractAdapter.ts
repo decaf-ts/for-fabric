@@ -32,6 +32,7 @@ import {
   UnsupportedError,
   index,
   NumericSequence,
+  Adapter,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
@@ -552,7 +553,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @description Static method for class decoration
    * @summary Empty method used for class decoration purposes
    */
-  static decoration() {
+  static override decoration() {
+    super.decoration();
     const createdByKey = Repository.key(PersistenceKeys.CREATED_BY);
     const updatedByKey = Repository.key(PersistenceKeys.UPDATED_BY);
     Decoration.flavouredAs(FabricContractFlavour)
@@ -587,3 +589,4 @@ export class FabricContractAdapter extends CouchDBAdapter<
 }
 
 FabricContractAdapter.decoration();
+Adapter.setCurrent(FabricContractFlavour);
