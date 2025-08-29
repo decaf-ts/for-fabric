@@ -12,7 +12,7 @@ import { Object as FabricObject, Property } from "fabric-contract-api";
 @model()
 @FabricObject()
 export class TestModel extends BaseModel {
-  @pk()
+  @pk({ type: "Number" })
   id!: number;
 
   @column("tst_name")
