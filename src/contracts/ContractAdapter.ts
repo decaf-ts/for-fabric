@@ -272,7 +272,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ...args: any[]
   ): Promise<Record<string, any>> {
     const { stub, logger } = args.pop();
-    const log = logger.for(this.create);
+    // const log = logger.for(this.create);
     let data: Buffer;
     try {
       data = Buffer.from(JSON.stringify(model));
@@ -282,7 +282,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
     }
 
-    log.info(`adding entry to ${tableName} table with pk ${id}`);
+    // log.info(`adding entry to ${tableName} table with pk ${id}`);
 
     try {
       await stub.putState(id.toString(), data);
@@ -352,7 +352,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     let model: Record<string, any>;
     try {
       log.verbose(`retrieving entry with pk ${id} from ${tableName} table`);
-      model = JSON.parse(await stub.getState(id.toString()));
+      const res = await stub.getState(id.toString());
+      model = JSON.parse(res);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
