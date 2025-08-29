@@ -14,6 +14,7 @@ import {
   DBKeys,
   InternalError,
   onCreate,
+  onCreateUpdate,
   OperationKeys,
   readonly,
   SerializationError,
@@ -568,7 +569,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     Decoration.flavouredAs(FabricContractFlavour)
       .for(updatedByKey)
       .define(
-        onCreate(createdByOnFabricCreateUpdate),
+        onCreateUpdate(createdByOnFabricCreateUpdate),
         propMetadata(updatedByKey, {})
       )
       .apply();
