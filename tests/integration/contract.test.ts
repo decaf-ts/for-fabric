@@ -134,13 +134,13 @@ describe("Test Serialized Crud Contract", () => {
     }
   };
 
-  it.skip("boots infrastructure", async () => {
+  it("boots infrastructure", async () => {
     console.log("Booting infrastructure...");
     const ready = await ensureReadiness();
     console.log("Is Ready: ", ready);
   });
 
-  it.skip("Should createData", async () => {
+  it("Should createData", async () => {
     const ready = await ensureReadiness();
 
     const id = "a";
@@ -250,7 +250,7 @@ describe("Test Serialized Crud Contract", () => {
     console.log("Response: ", test.toString());
   });
 
-  it.skip("Should create", async () => {
+  it("Should create", async () => {
     const ready = await ensureReadiness();
 
     const data = { name: "Alice1", nif: "123456789" };
@@ -264,6 +264,90 @@ describe("Test Serialized Crud Contract", () => {
     const chaincodeArgs = JSON.stringify({
       function: "create",
       Args: [model.serialize()],
+    });
+
+    // Invoke the chaincode
+    const test = execSync(
+      `docker exec org-a-peer-0 peer chaincode invoke \
+      -C simple-channel \
+      -n simple \
+      -c '${chaincodeArgs}' \
+      --peerAddresses org-a-peer-0:7031 \
+      --tlsRootCertFiles /weaver/peer/tls-ca-cert.pem \
+      --peerAddresses org-b-peer-0:7032 \
+      --tlsRootCertFiles /weaver/peer/org-b-tls-ca-cert.pem \
+      --peerAddresses org-c-peer-0:7033 \
+      --tlsRootCertFiles /weaver/peer/org-c-tls-ca-cert.pem \
+      -o org-a-orderer-0:7021 \
+      --tls --cafile /weaver/peer/tls-ca-cert.pem`
+    );
+
+    console.log(test.toString());
+    // console.log(chaincodeArgs);
+    // // Query the chaincode
+    // const queryArgs = JSON.stringify({
+    //   function: "readData",
+    //   Args: ["test1"],
+    // });
+    // const res = execSync(
+    //   `docker exec org-a-peer-0 peer chaincode query \
+    //   -C simple-channel \
+    //   -n simple \
+    //   -c '${queryArgs}' \
+    //   --tls --cafile /weaver/peer/tls-ca-cert.pem`
+    // );
+    // console.log(res.toString());
+    // Prepare the JSON argument for the chaincode
+    // const chaincodeArgs1 = JSON.stringify({
+    //   function: "create",
+    //   Args: [JSON.stringify(model)],
+    // });
+    // // Invoke the chaincode
+    // execSync(
+    //   `docker exec org-a-peer-0 peer chaincode invoke \
+    //   -C simple-channel \
+    //   -n simple \
+    //   -c '${chaincodeArgs1}' \
+    //   --peerAddresses org-a-peer-0:7031 \
+    //   --tlsRootCertFiles /weaver/peer/tls-ca-cert.pem \
+    //   --peerAddresses org-b-peer-0:7032 \
+    //   --tlsRootCertFiles /weaver/peer/org-b-tls-ca-cert.pem \
+    //   --peerAddresses org-c-peer-0:7033 \
+    //   --tlsRootCertFiles /weaver/peer/org-c-tls-ca-cert.pem \
+    //   -o org-a-orderer-0:7021 \
+    //   --tls --cafile /weaver/peer/tls-ca-cert.pem`
+    // );
+    // // Query the chaincode
+    // const queryArgs = JSON.stringify({
+    //   function: "readData",
+    //   Args: ["test1"],
+    // });
+    // const res = execSync(
+    //   `docker exec org-a-peer-0 peer chaincode query \
+    //   -C simple-channel \
+    //   -n simple \
+    //   -c '${queryArgs}' \
+    //   --tls --cafile /weaver/peer/tls-ca-cert.pem`
+    // );
+    // console.log(res.toString());
+  });
+
+  it("Should createALl", async () => {
+    const ready = await ensureReadiness();
+
+    const data = { name: "Alice1", nif: "123456789" };
+    const data1 = { name: "Alice2", nif: "123456789" };
+
+    console.log("Is Ready: ", ready);
+    const model = new TestModel(data);
+    const model1 = new TestModel(data1);
+
+    console.log(model.serialize());
+    const models = [model.serialize(), model1.serialize()];
+    // Prepare the JSON argument for the chaincode
+    const chaincodeArgs = JSON.stringify({
+      function: "createAll",
+      Args: [JSON.stringify(models)],
     });
 
     // Invoke the chaincode

@@ -37,6 +37,7 @@ import { FabricContractRepository } from "./FabricContractRepository";
 import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
 import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
+import { NotFoundError } from "../shared/errors";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -70,7 +71,7 @@ export async function createdByOnFabricCreateUpdate<
   V extends RelationsMetadata,
 >(
   this: R,
-  context: FabricContractContext,
+  context: Context<FabricContractFlags>,
   data: V,
   key: keyof M,
   model: M
@@ -90,9 +91,10 @@ export async function pkFabricOnCreate<
   M extends Model,
   R extends FabricContractRepository<M>,
   V extends SequenceOptions,
+  F extends FabricContractFlags,
 >(
   this: R,
-  context: FabricContractContext,
+  context: Context<F>,
   data: V,
   key: keyof M,
   model: M
@@ -188,7 +190,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @description Context constructor for this adapter
    * @summary Overrides the base Context constructor with FabricContractContext
    */
-  override Context = FabricContractContext;
+  override Context: Constructor<FabricContractContext> = FabricContractContext;
 
   /**
    * @description Gets the repository constructor for this adapter
@@ -352,7 +354,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
     try {
       log.verbose(`retrieving entry with pk ${id} from ${tableName} table`);
       const res = await stub.getState(id.toString());
-      model = JSON.parse(res);
+      const resStr = res.toString();
+
+      if (resStr.length === "" || resStr === "null" || resStr === "undefined") {
+        throw new NotFoundError(
+          `The record with id ${id} does not exist in table ${tableName}`
+        );
+      }
+
+      model = JSON.parse(res.toString());
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
