@@ -13,6 +13,7 @@ import {
   Context,
   DBKeys,
   InternalError,
+  NotFoundError,
   onCreate,
   OperationKeys,
   readonly,
@@ -37,7 +38,6 @@ import { FabricContractRepository } from "./FabricContractRepository";
 import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
 import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
-import { NotFoundError } from "../shared/errors";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
