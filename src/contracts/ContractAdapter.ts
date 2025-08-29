@@ -356,7 +356,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       const res = await stub.getState(id.toString());
       const resStr = res.toString();
 
-      if (resStr.length === "" || resStr === "null" || resStr === "undefined") {
+      if (resStr === "" || resStr === "null" || resStr === "undefined") {
         throw new NotFoundError(
           `The record with id ${id} does not exist in table ${tableName}`
         );
@@ -536,6 +536,26 @@ export class FabricContractAdapter extends CouchDBAdapter<
       `${Array.isArray(results) ? results.length : 1}`
     );
     return results;
+  }
+
+  override updatePrefix(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>,
+    ...args: any[]
+  ): (string | number | Record<string, any>)[] {
+    const ctx: FabricContractContext = args.pop();
+    const record: Record<string, any> = {};
+    // record[CouchDBKeys.TABLE] = tableName;
+    // record[CouchDBKeys.ID] = this.generateId(tableName, id);
+    // const rev = model[PersistenceKeys.METADATA];
+    // if (!rev)
+    //   throw new InternalError(
+    //     `No revision number found for record with id ${id}`
+    //   );
+    Object.assign(record, model);
+    // record[CouchDBKeys.REV] = rev;
+    return [tableName, id, record, {}, ctx];
   }
 
   override Statement<M extends Model>(
