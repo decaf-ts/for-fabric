@@ -1,4 +1,4 @@
-import { CouchDBAdapter, MangoQuery } from "@decaf-ts/for-couchdb";
+import { CouchDBAdapter, CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
 import {
   Constructor,
   Decoration,
@@ -38,6 +38,7 @@ import { FabricContractRepository } from "./FabricContractRepository";
 import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
 import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
+import { MissingContextError } from "../shared/errors";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -284,7 +285,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
 
     // log.info(`adding entry to ${tableName} table with pk ${id}`);
-
+    id = stub.createCompositeKey(tableName, [id.toString()]);
     try {
       await stub.putState(id.toString(), data);
     } catch (e: unknown) {
@@ -546,15 +547,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ): (string | number | Record<string, any>)[] {
     const ctx: FabricContractContext = args.pop();
     const record: Record<string, any> = {};
-    // record[CouchDBKeys.TABLE] = tableName;
-    // record[CouchDBKeys.ID] = this.generateId(tableName, id);
-    // const rev = model[PersistenceKeys.METADATA];
-    // if (!rev)
-    //   throw new InternalError(
-    //     `No revision number found for record with id ${id}`
-    //   );
+    record[CouchDBKeys.TABLE] = tableName;
+    record[CouchDBKeys.ID] = this.generateId(tableName, id);
     Object.assign(record, model);
-    // record[CouchDBKeys.REV] = rev;
     return [tableName, id, record, {}, ctx];
   }
 
@@ -562,7 +557,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ctx?: FabricContractContext
   ): FabricStatement<M, any> {
     if (!ctx) {
-      throw new Error("Context is required");
+      throw new MissingContextError("Context is required");
     }
     return new FabricStatement(this, ctx);
   }

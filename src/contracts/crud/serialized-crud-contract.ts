@@ -79,6 +79,7 @@ export class SerializedCrudContract<
     );
   }
 
+  @Transaction(false)
   override async raw(
     ctx: Ctx,
     rawInput: string,

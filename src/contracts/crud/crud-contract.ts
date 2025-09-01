@@ -6,6 +6,7 @@ import { Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "../FabricContractRepository";
 import { DeterministicSerializer } from "../../shared/DeterministicSerializer";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
+import { Checkable } from "../../shared/interfaces/Checkable";
 
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode
@@ -55,7 +56,10 @@ import { MangoQuery } from "@decaf-ts/for-couchdb";
  *   Repository-->>Contract: model
  *   Contract-->>Client: model
  */
-export abstract class FabricCrudContract<M extends Model> extends Contract {
+export abstract class FabricCrudContract<M extends Model>
+  extends Contract
+  implements Checkable
+{
   /**
    * @description Shared adapter instance for all contract instances
    */
@@ -64,6 +68,8 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
   protected readonly repo: FabricContractRepository<M>;
 
   protected static readonly serializer = new DeterministicSerializer();
+
+  protected initialized: boolean = false;
 
   /**
    * @description Creates a new FabricCrudContract instance
@@ -77,6 +83,7 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
   ) {
     super(name);
     this.repo = Repository.forModel(clazz, FabricCrudContract.adapter.alias);
+    this.initialized = true;
   }
 
   /**
@@ -217,6 +224,11 @@ export abstract class FabricCrudContract<M extends Model> extends Contract {
     if (typeof models === "string")
       models = (JSON.parse(models) as []).map((m) => new this.clazz(m)) as any;
     return this.repo.updateAll(models as unknown as M[], ctx, ...args);
+  }
+
+  async healthcheck(ctx: Ctx): Promise<string | boolean> {
+    ctx.logging.getLogger().info(`Running Healthcheck: ${this.initialized}...`);
+    return this.initialized;
   }
 
   /**
