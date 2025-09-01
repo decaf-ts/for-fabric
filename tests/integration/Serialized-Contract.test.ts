@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { TestModel } from "../assets/contract/serialized-contract/TestModel";
-import { randomName, randomNif } from "../utils";
+import { createCompositeKey, randomName, randomNif } from "../utils";
 
 jest.setTimeout(5000000);
 
@@ -91,6 +91,39 @@ describe("Test Serialized Crud Contract", () => {
     );
   };
 
+  const readBlockChain = async (functionName: string, args: any[]) => {
+    try {
+      // Prepare the JSON argument for the chaincode
+      const chaincodeArgs = JSON.stringify({
+        function: functionName,
+        Args: args,
+      });
+
+      // Invoke the chaincode
+      const res = execSync(
+        `docker exec org-a-peer-0 peer chaincode query \
+          -C simple-channel \
+          -n simple \
+          -c '${chaincodeArgs}' \
+          --tls --cafile /weaver/peer/tls-ca-cert.pem`
+      );
+
+      const processed = res.toString();
+      console.log("Blockchain read:", processed);
+
+      return processed;
+    } catch (e: unknown) {
+      console.log("Failed to read blockchain");
+      return "";
+    }
+  };
+
+  const sequenceTableName = "??sequence";
+  const modelTableName = "tst_user";
+  const sequenceId = "TestModel_pk";
+
+  let cachedModel: any;
+
   it("Boosts infrastructure", async () => {
     console.log("Booting infrastructure...");
     const ready = await ensureReadiness();
@@ -99,7 +132,7 @@ describe("Test Serialized Crud Contract", () => {
     expect(ready).toBeDefined();
   });
 
-  it("Healthcheck Shoudl return false", async () => {
+  it("Healthcheck Should return false", async () => {
     const ready = await ensureReadiness();
 
     // FOR SOME REASON THE TRIM INSIDE THE CONTRACT IS NOT WORKING
@@ -139,5 +172,59 @@ describe("Test Serialized Crud Contract", () => {
     } catch (e) {
       expect(e).toBeUndefined();
     }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let sequence1;
+
+    try {
+      sequence1 = await readBlockChain("readByPass", [
+        createCompositeKey(sequenceTableName, [sequenceId]),
+      ]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Model created successfully: ", sequence1);
+
+    sequence1 = JSON.parse(sequence1);
+
+    expect(sequence1.id).toBe(sequenceId);
+    expect(sequence1.current).toBeGreaterThan(0);
+
+    let record;
+    try {
+      record = await readBlockChain("readByPass", [
+        createCompositeKey(modelTableName, [String(sequence1.current)]),
+      ]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record);
+
+    record = JSON.parse(record);
+    cachedModel = record;
+
+    expect(record["tst_name"]).toBe(model.name);
+    expect(record["tst_nif"]).toBe(model.nif);
+  });
+
+  it("Should read model", async () => {
+    const ready = await ensureReadiness();
+
+    expect(trim(ready)).toBe("true");
+
+    let record;
+    try {
+      record = await readBlockChain("read", [
+        createCompositeKey(modelTableName, [String(cachedModel.id)]),
+      ]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record);
   });
 });

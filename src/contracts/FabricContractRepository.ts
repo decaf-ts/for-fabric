@@ -110,7 +110,9 @@ export class FabricContractRepository<M extends Model> extends Repository<
    */
   override async createAll(models: M[], ...args: any[]): Promise<M[]> {
     if (!models.length) return models;
-    const prepared = models.map((m) => this.adapter.prepare(m, this.pk));
+    const prepared = models.map((m) =>
+      this.adapter.prepare(m, this.pk, this.tableName, ...args)
+    );
     const ids = prepared.map((p) => p.id);
     let records = prepared.map((p) => p.record);
     const transients = prepared.map((p) => p.transient).filter((e) => !!e);
@@ -143,7 +145,12 @@ export class FabricContractRepository<M extends Model> extends Repository<
    */
   override async update(model: M, ...args: any[]): Promise<M> {
     // eslint-disable-next-line prefer-const
-    let { record, id, transient } = this.adapter.prepare(model, this.pk);
+    let { record, id, transient } = this.adapter.prepare(
+      model,
+      this.pk,
+      this.tableName,
+      ...args
+    );
     record = await this.adapter.update(
       this.tableName,
       id,
@@ -171,7 +178,9 @@ export class FabricContractRepository<M extends Model> extends Repository<
    */
   override async updateAll(models: M[], ...args: any[]): Promise<M[]> {
     if (!models.length) return models;
-    const records = models.map((m) => this.adapter.prepare(m, this.pk));
+    const records = models.map((m) =>
+      this.adapter.prepare(m, this.pk, this.tableName, ...args)
+    );
     const transients = records.map((p) => p.transient).filter((e) => !!e);
     let c: FabricContractContext | undefined = undefined;
     if (args.length) c = args[args.length - 1] as FabricContractContext;

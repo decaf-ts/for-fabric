@@ -297,42 +297,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   /**
-   * @description Reads a record from the state database
-   * @summary Retrieves and deserializes a record from the Fabric state database
-   * @param {string} tableName - The name of the table/collection
-   * @param {string | number} id - The record identifier
-   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
-   * @return {Promise<Record<string, any>>} Promise resolving to the retrieved record
-   */
-  async read(
-    tableName: string,
-    id: string | number,
-    ...args: any[]
-  ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
-    const log = logger.for(this.read);
-
-    let model: Record<string, any>;
-    try {
-      log.verbose(`retrieving entry with pk ${id} from ${tableName} table`);
-      const res = await stub.getState(id.toString());
-      const resStr = res.toString();
-
-      if (resStr === "" || resStr === "null" || resStr === "undefined") {
-        throw new NotFoundError(
-          `The record with id ${id} does not exist in table ${tableName}`
-        );
-      }
-
-      model = JSON.parse(res.toString());
-    } catch (e: unknown) {
-      throw this.parseError(e as Error);
-    }
-
-    return model;
-  }
-
-  /**
    * @description Updates a record in the state database
    * @summary Serializes a model and updates it in the Fabric state database
    * @param {string} tableName - The name of the table/collection
@@ -582,7 +546,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @return {Promise<Record<string, any>>} Promise resolving to the created record
    */
   @debug(true)
-  async create(
+  override async create(
     tableName: string,
     id: string | number,
     model: Record<string, any>,
@@ -611,6 +575,45 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
+  /**
+   * @description Reads a record from the state database
+   * @summary Retrieves and deserializes a record from the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the retrieved record
+   */
+  override async read(
+    tableName: string,
+    id: string | number,
+    ...args: any[]
+  ): Promise<Record<string, any>> {
+    const { stub, logger } = args.pop();
+    const log = logger.for(this.read);
+
+    let model: Record<string, any>;
+    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+    try {
+      log.verbose(
+        `retrieving entry with pk ${composedKey} from ${tableName} table`
+      );
+      const res = await stub.getState(composedKey);
+      const resStr = res.toString();
+
+      if (resStr === "" || resStr === "null" || resStr === "undefined") {
+        throw new NotFoundError(
+          `The record with id ${id} does not exist in table ${tableName}`
+        );
+      }
+
+      model = JSON.parse(res.toString());
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+
+    return model;
+  }
+
   override prepare<M extends Model>(
     model: M,
     pk: keyof M,
@@ -627,6 +630,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const split = modelToTransient(model);
     const result = Object.entries(split.model).reduce(
       (accum: Record<string, any>, [key, val]) => {
+        if (key === "_id") return accum;
         if (typeof val === "undefined") return accum;
         const mappedProp = Repository.column(model, key);
         if (this.isReserved(mappedProp))
@@ -648,9 +652,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
       });
     }
 
+    log.info(`Preparing record for ${tableName} table with pk ${model[pk]}`);
+
     return {
       record: result,
-      id: stub.createCompositeKey(tableName, [model[pk] as string]),
+      id: stub.createCompositeKey(tableName, [String(model[pk])]),
       transient: split.transient,
     };
   }

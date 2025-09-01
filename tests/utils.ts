@@ -1,27 +1,29 @@
-export function createCompositeKey(objectType, attributes = []) {
-  const DELIMITER = "\u0000"; // Fabric reserved delimiter
-  if (!objectType) {
-    throw new Error("objectType is required");
-  }
+export function createCompositeKey(
+  objectType: string,
+  attributes: string[]
+): string {
+  const COMPOSITEKEY_NS = "\x00";
+  const MIN_UNICODE_RUNE_VALUE = "\u0000";
+
+  validateCompositeKeyAttribute(objectType);
   if (!Array.isArray(attributes)) {
-    throw new Error("attributes must be an array of strings");
+    throw new Error("attributes must be an array");
   }
 
-  // Start with the objectType and delimiter
-  let key = objectType + DELIMITER;
-
-  // Append each attribute followed by delimiter
-  for (const attr of attributes) {
-    if (typeof attr !== "string") {
-      throw new Error("All attributes must be strings");
-    }
-    key += attr + DELIMITER;
+  let compositeKey = COMPOSITEKEY_NS + objectType + MIN_UNICODE_RUNE_VALUE;
+  attributes.forEach((attribute) => {
+    validateCompositeKeyAttribute(attribute);
+    compositeKey = compositeKey + attribute + MIN_UNICODE_RUNE_VALUE;
+  });
+  return compositeKey;
+}
+export function validateCompositeKeyAttribute(attr: any) {
+  if (!attr || typeof attr !== "string" || attr.length === 0) {
+    throw new Error("object type or attribute not a non-zero length string");
   }
-
-  return key;
 }
 
-export function random(sample, n) {
+export function random(sample: string[], n: number): string {
   let result = "";
   for (let i = 0; i < n; i++) {
     const randomIndex = Math.floor(Math.random() * sample.length);
@@ -29,12 +31,12 @@ export function random(sample, n) {
   }
   return result;
 }
-export function randomName(n) {
+export function randomName(n: number): string {
   const sample =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
   return random(sample, n);
 }
-export function randomNif(n) {
+export function randomNif(n: number): string {
   const sample = "1234567890";
   return random(sample, n);
 }

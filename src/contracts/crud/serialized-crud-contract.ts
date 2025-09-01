@@ -85,7 +85,7 @@ export class SerializedCrudContract<
   @Transaction(false)
   override async healthcheck(ctx: Ctx): Promise<string> {
     //TODO: TRIM NOT WORKING CHECK LATER
-    return `${await super.healthcheck(ctx)}`.trim();
+    return String(await super.healthcheck(ctx)).trim();
   }
 
   @Transaction()
