@@ -140,6 +140,8 @@ describe("Test Serialized Crud Contract", () => {
     console.log("Is Ready: ", ready);
   });
 
+  it("Should Create", async () => {});
+
   it("Should createData", async () => {
     const ready = await ensureReadiness();
 

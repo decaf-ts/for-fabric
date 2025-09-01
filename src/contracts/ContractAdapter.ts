@@ -13,6 +13,7 @@ import {
   Context,
   DBKeys,
   InternalError,
+  modelToTransient,
   NotFoundError,
   onCreate,
   OperationKeys,
@@ -253,46 +254,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
       identity: ctx.clientIdentity,
       logger: this.logFor(ctx),
     });
-  }
-
-  /**
-   * @description Creates a record in the state database
-   * @summary Serializes a model and stores it in the Fabric state database
-   * @param {string} tableName - The name of the table/collection
-   * @param {string | number} id - The record identifier
-   * @param {Record<string, any>} model - The record data
-   * @param {Record<string, any>} transient - Transient data (not used in this implementation)
-   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
-   * @return {Promise<Record<string, any>>} Promise resolving to the created record
-   */
-  @debug(true)
-  async create(
-    tableName: string,
-    id: string | number,
-    model: Record<string, any>,
-    transient: Record<string, any>,
-    ...args: any[]
-  ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
-    // const log = logger.for(this.create);
-    let data: Buffer;
-    try {
-      data = Buffer.from(JSON.stringify(model));
-    } catch (e: unknown) {
-      throw new SerializationError(
-        `Failed to serialize record with id ${id} for table ${tableName}: ${e}`
-      );
-    }
-
-    // log.info(`adding entry to ${tableName} table with pk ${id}`);
-    id = stub.createCompositeKey(tableName, [id.toString()]);
-    try {
-      await stub.putState(id.toString(), data);
-    } catch (e: unknown) {
-      throw this.parseError(e as Error);
-    }
-
-    return model;
   }
 
   /**
@@ -608,6 +569,90 @@ export class FabricContractAdapter extends CouchDBAdapter<
         onCreate(pkFabricOnCreate, NumericSequence)
       )
       .apply();
+  }
+
+  /**
+   * @description Creates a record in the state database
+   * @summary Serializes a model and stores it in the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier
+   * @param {Record<string, any>} model - The record data
+   * @param {Record<string, any>} transient - Transient data (not used in this implementation)
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the created record
+   */
+  @debug(true)
+  async create(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>,
+    transient: Record<string, any>,
+    ...args: any[]
+  ): Promise<Record<string, any>> {
+    const { stub, logger } = args.pop();
+    const log = logger.for(this.create);
+    let data: Buffer;
+    try {
+      data = Buffer.from(JSON.stringify(model));
+    } catch (e: unknown) {
+      throw new SerializationError(
+        `Failed to serialize record with id ${id} for table ${tableName}: ${e}`
+      );
+    }
+
+    log.info(`adding entry to ${tableName} table with pk ${id}`);
+
+    try {
+      await stub.putState(id.toString(), data);
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+
+    return model;
+  }
+
+  override prepare<M extends Model>(
+    model: M,
+    pk: keyof M,
+    ...args: any[]
+  ): {
+    record: Record<string, any>;
+    id: string;
+    transient?: Record<string, any>;
+  } {
+    const { stub, logger } = args.pop();
+    const tableName = args.shift();
+    const log = logger.for(this.prepare);
+
+    const split = modelToTransient(model);
+    const result = Object.entries(split.model).reduce(
+      (accum: Record<string, any>, [key, val]) => {
+        if (typeof val === "undefined") return accum;
+        const mappedProp = Repository.column(model, key);
+        if (this.isReserved(mappedProp))
+          throw new InternalError(`Property name ${mappedProp} is reserved`);
+        accum[mappedProp] = val;
+        return accum;
+      },
+      {}
+    );
+    if ((model as any)[PersistenceKeys.METADATA]) {
+      log.silly(
+        `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
+      );
+      Object.defineProperty(result, PersistenceKeys.METADATA, {
+        enumerable: false,
+        writable: false,
+        configurable: true,
+        value: (model as any)[PersistenceKeys.METADATA],
+      });
+    }
+
+    return {
+      record: result,
+      id: stub.createCompositeKey(tableName, [model[pk] as string]),
+      transient: split.transient,
+    };
   }
 }
 

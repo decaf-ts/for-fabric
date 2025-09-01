@@ -11,18 +11,6 @@ export class SerializedCrudContract<
   }
 
   @Transaction()
-  override async create(ctx: Ctx, model: string): Promise<string> {
-    const log = SerializedCrudContract.adapter.logFor(ctx);
-
-    log.info(`[Serialized] - Creating model: ${model}`);
-
-    const m = this.deserialize<M>(model);
-
-    log.info(`[Serialized] - Model deserialized: ${JSON.stringify(m)}`);
-    return this.serialize((await super.create(ctx, m)) as M);
-  }
-
-  @Transaction()
   override async createAll(ctx: Ctx, models: string): Promise<string> {
     const ms = (JSON.parse(models) as []).map((m) => new this.clazz(m));
     return JSON.stringify(
@@ -87,5 +75,27 @@ export class SerializedCrudContract<
   ): Promise<any> {
     const parsedInput: MangoQuery = JSON.parse(rawInput);
     return super.raw(ctx, parsedInput, docsOnly);
+  }
+
+  @Transaction()
+  override async init(ctx: Ctx): Promise<void> {
+    await super.init(ctx);
+  }
+
+  @Transaction(false)
+  override async healthcheck(ctx: Ctx): Promise<string> {
+    //TODO: TRIM NOT WORKING CHECK LATER
+    return `${await super.healthcheck(ctx)}`.trim();
+  }
+
+  @Transaction()
+  override async create(ctx: Ctx, model: string): Promise<string> {
+    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.create);
+    log.info(`Creating model: ${model}`);
+
+    const m = this.deserialize<M>(model);
+
+    log.info(`Model deserialized: ${JSON.stringify(m)}`);
+    return this.serialize((await super.create(ctx, m)) as M);
   }
 }

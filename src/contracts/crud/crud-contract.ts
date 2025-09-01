@@ -83,28 +83,6 @@ export abstract class FabricCrudContract<M extends Model>
   ) {
     super(name);
     this.repo = Repository.forModel(clazz, FabricCrudContract.adapter.alias);
-    this.initialized = true;
-  }
-
-  /**
-   * @description Creates a single model in the state database
-   * @summary Delegates to the repository's create method
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @param {M} model - The model to create
-   * @param {...any[]} args - Additional arguments
-   * @return {Promise<M>} Promise resolving to the created model
-   */
-  async create(
-    ctx: Ctx,
-    model: string | M,
-    ...args: any[]
-  ): Promise<string | M> {
-    const log = FabricCrudContract.adapter.logFor(ctx);
-
-    if (typeof model === "string") model = this.deserialize<M>(model) as any;
-
-    log.info(`[CRUD] - Creating model: ${JSON.stringify(model)}`);
-    return this.repo.create(model as unknown as M, ctx, ...args);
   }
 
   /**
@@ -226,11 +204,6 @@ export abstract class FabricCrudContract<M extends Model>
     return this.repo.updateAll(models as unknown as M[], ctx, ...args);
   }
 
-  async healthcheck(ctx: Ctx): Promise<string | boolean> {
-    ctx.logging.getLogger().info(`Running Healthcheck: ${this.initialized}...`);
-    return this.initialized;
-  }
-
   /**
    * @description Executes a raw query against the state database
    * @summary Delegates to the repository's raw method
@@ -259,5 +232,39 @@ export abstract class FabricCrudContract<M extends Model>
     return (
       FabricCrudContract.serializer as unknown as Serializer<M>
     ).deserialize(str);
+  }
+
+  protected async init(ctx: Ctx): Promise<void> {
+    const log = FabricCrudContract.adapter.logFor(ctx).for(this.init);
+    log.info(`Running contract initialization...`);
+    this.initialized = true;
+    log.info(`Contract initialization completed.`);
+  }
+
+  async healthcheck(ctx: Ctx): Promise<string | boolean> {
+    const log = FabricCrudContract.adapter.logFor(ctx).for(this.healthcheck);
+    log.info(`Running Healthcheck: ${this.initialized}...`);
+    return this.initialized;
+  }
+
+  /**
+   * @description Creates a single model in the state database
+   * @summary Delegates to the repository's create method
+   * @param {Ctx} ctx - The Fabric chaincode context
+   * @param {M} model - The model to create
+   * @param {...any[]} args - Additional arguments
+   * @return {Promise<M>} Promise resolving to the created model
+   */
+  async create(
+    ctx: Ctx,
+    model: string | M,
+    ...args: any[]
+  ): Promise<string | M> {
+    const log = FabricCrudContract.adapter.logFor(ctx).for(this.create);
+
+    if (typeof model === "string") model = this.deserialize<M>(model) as any;
+
+    log.info(`Creating model: ${JSON.stringify(model)}`);
+    return this.repo.create(model as unknown as M, ctx, ...args);
   }
 }
