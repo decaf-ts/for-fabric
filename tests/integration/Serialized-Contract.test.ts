@@ -122,8 +122,6 @@ describe("Test Serialized Crud Contract", () => {
   const modelTableName = "tst_user";
   const sequenceId = "TestModel_pk";
 
-  let cachedModel: any;
-
   it("Boosts infrastructure", async () => {
     console.log("Booting infrastructure...");
     const ready = await ensureReadiness();
@@ -205,7 +203,6 @@ describe("Test Serialized Crud Contract", () => {
     console.log("Retrieved model: ", record);
 
     record = JSON.parse(record);
-    cachedModel = record;
 
     expect(record["tst_name"]).toBe(model.name);
     expect(record["tst_nif"]).toBe(model.nif);
@@ -216,15 +213,202 @@ describe("Test Serialized Crud Contract", () => {
 
     expect(trim(ready)).toBe("true");
 
-    let record;
+    const data = { name: randomName(6), nif: randomNif(9) };
+    const model = new TestModel(data);
+
+    console.log("Using model: ", model.serialize());
+
     try {
-      record = await readBlockChain("read", [
-        createCompositeKey(modelTableName, [String(cachedModel.id)]),
+      await invokeChaincode("create", [model.serialize()]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let sequence1;
+
+    try {
+      sequence1 = await readBlockChain("readByPass", [
+        createCompositeKey(sequenceTableName, [sequenceId]),
       ]);
     } catch (error) {
       expect(error).toBeUndefined();
     }
 
+    console.log("Model created successfully: ", sequence1);
+
+    sequence1 = JSON.parse(sequence1);
+
+    expect(sequence1.id).toBe(sequenceId);
+    expect(sequence1.current).toBeGreaterThan(0);
+
+    let record;
+    try {
+      record = await readBlockChain("read", [String(sequence1.current)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
     console.log("Retrieved model: ", record);
+
+    record = JSON.parse(record);
+
+    expect(record.name).toBe(model.name);
+    expect(record.nif).toBe(model.nif);
+  });
+
+  it("Should update model", async () => {
+    const ready = await ensureReadiness();
+
+    expect(trim(ready)).toBe("true");
+
+    const data = { name: randomName(6), nif: randomNif(9) };
+    const model = new TestModel(data);
+
+    console.log("Using model: ", model.serialize());
+
+    try {
+      await invokeChaincode("create", [model.serialize()]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let sequence1;
+
+    try {
+      sequence1 = await readBlockChain("readByPass", [
+        createCompositeKey(sequenceTableName, [sequenceId]),
+      ]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Model created successfully: ", sequence1);
+
+    sequence1 = JSON.parse(sequence1);
+
+    expect(sequence1.id).toBe(sequenceId);
+    expect(sequence1.current).toBeGreaterThan(0);
+
+    let record;
+    try {
+      record = await readBlockChain("read", [String(sequence1.current)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record);
+
+    record = JSON.parse(record);
+
+    expect(record.name).toBe(model.name);
+    expect(record.nif).toBe(model.nif);
+
+    model.name = randomName(6);
+    model.nif = randomNif(9);
+    model.id = sequence1.current;
+
+    console.log("Using model: ", model.serialize());
+
+    try {
+      await invokeChaincode("update", [model.serialize()]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let record1;
+    try {
+      record1 = await readBlockChain("read", [String(sequence1.current)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record1);
+
+    record1 = JSON.parse(record1);
+
+    expect(record1.name).toBe(model.name);
+    expect(record1.nif).toBe(model.nif);
+    expect(record1.name).not.toBe(record.name);
+    expect(record1.nif).not.toBe(record.nif);
+  });
+
+  it("Should delete model", async () => {
+    const ready = await ensureReadiness();
+
+    expect(trim(ready)).toBe("true");
+
+    const data = { name: randomName(6), nif: randomNif(9) };
+    const model = new TestModel(data);
+
+    console.log("Using model: ", model.serialize());
+
+    try {
+      await invokeChaincode("create", [model.serialize()]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let sequence1;
+
+    try {
+      sequence1 = await readBlockChain("readByPass", [
+        createCompositeKey(sequenceTableName, [sequenceId]),
+      ]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Model created successfully: ", sequence1);
+
+    sequence1 = JSON.parse(sequence1);
+
+    expect(sequence1.id).toBe(sequenceId);
+    expect(sequence1.current).toBeGreaterThan(0);
+
+    let record;
+    try {
+      record = await readBlockChain("read", [String(sequence1.current)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record);
+
+    record = JSON.parse(record);
+
+    expect(record.name).toBe(model.name);
+    expect(record.nif).toBe(model.nif);
+
+    try {
+      await invokeChaincode("delete", [String(sequence1.current)]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let record1;
+    try {
+      record1 = await readBlockChain("read", [String(sequence1.current)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record1);
+
+    expect(record1).toBe("");
   });
 });

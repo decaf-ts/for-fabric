@@ -257,34 +257,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   /**
-   * @description Deletes a record from the state database
-   * @summary Retrieves a record and then removes it from the Fabric state database
-   * @param {string} tableName - The name of the table/collection
-   * @param {string | number} id - The record identifier to delete
-   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
-   * @return {Promise<Record<string, any>>} Promise resolving to the deleted record
-   */
-  async delete(
-    tableName: string,
-    id: string | number,
-    ...args: any[]
-  ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
-    const log = logger.for(this.delete);
-
-    let model: Record<string, any>;
-    try {
-      model = JSON.parse(await stub.getState(id.toString()));
-      log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
-      await stub.deleteState(id.toString());
-    } catch (e: unknown) {
-      throw this.parseError(e as Error);
-    }
-
-    return model;
-  }
-
-  /**
    * @description Creates an index for a model
    * @summary This method is not implemented for Fabric contracts and returns a resolved promise
    * @template M - Type extending Model
@@ -294,45 +266,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected index<M>(models: Constructor<M>): Promise<void> {
     return Promise.resolve(undefined);
-  }
-
-  /**
-   * @description Updates a record in the state database
-   * @summary Serializes a model and updates it in the Fabric state database
-   * @param {string} tableName - The name of the table/collection
-   * @param {string | number} id - The record identifier
-   * @param {Record<string, any>} model - The updated record data
-   * @param {Record<string, any>} transient - Transient data (not used in this implementation)
-   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
-   * @return {Promise<Record<string, any>>} Promise resolving to the updated record
-   */
-  async update(
-    tableName: string,
-    id: string | number,
-    model: Record<string, any>,
-    transient: Record<string, any>,
-    ...args: any[]
-  ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
-    const log = logger.for(this.create);
-    let data: Buffer;
-    try {
-      data = Buffer.from(JSON.stringify(model));
-    } catch (e: unknown) {
-      throw new SerializationError(
-        `Failed to serialize record with id ${id} for table ${tableName}: ${e}`
-      );
-    }
-
-    log.info(`adding entry to ${tableName} table with pk ${id}`);
-
-    try {
-      await stub.putState(id.toString(), data);
-    } catch (e: unknown) {
-      throw this.parseError(e as Error);
-    }
-
-    return model;
   }
 
   /**
@@ -462,20 +395,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
       `${Array.isArray(results) ? results.length : 1}`
     );
     return results;
-  }
-
-  override updatePrefix(
-    tableName: string,
-    id: string | number,
-    model: Record<string, any>,
-    ...args: any[]
-  ): (string | number | Record<string, any>)[] {
-    const ctx: FabricContractContext = args.pop();
-    const record: Record<string, any> = {};
-    record[CouchDBKeys.TABLE] = tableName;
-    record[CouchDBKeys.ID] = this.generateId(tableName, id);
-    Object.assign(record, model);
-    return [tableName, id, record, {}, ctx];
   }
 
   override Statement<M extends Model>(
@@ -614,6 +533,74 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
+  /**
+   * @description Updates a record in the state database
+   * @summary Serializes a model and updates it in the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier
+   * @param {Record<string, any>} model - The updated record data
+   * @param {Record<string, any>} transient - Transient data (not used in this implementation)
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the updated record
+   */
+  async update(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>,
+    transient: Record<string, any>,
+    ...args: any[]
+  ): Promise<Record<string, any>> {
+    const { stub, logger } = args.pop();
+    const log = logger.for(this.update);
+    let data: Buffer;
+    try {
+      data = Buffer.from(JSON.stringify(model));
+    } catch (e: unknown) {
+      throw new SerializationError(
+        `Failed to serialize record with id ${id} for table ${tableName}: ${e}`
+      );
+    }
+
+    log.info(`updating entry to ${tableName} table with pk ${id}`);
+
+    try {
+      await stub.putState(id.toString(), data);
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+
+    return model;
+  }
+
+  /**
+   * @description Deletes a record from the state database
+   * @summary Retrieves a record and then removes it from the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier to delete
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the deleted record
+   */
+  async delete(
+    tableName: string,
+    id: string | number,
+    ...args: any[]
+  ): Promise<Record<string, any>> {
+    const { stub, logger } = args.pop();
+    const log = logger.for(this.delete);
+
+    let model: Record<string, any>;
+    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+    try {
+      model = JSON.parse(await stub.getState(composedKey));
+      log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
+      await stub.deleteState(composedKey);
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+
+    return model;
+  }
+
   override prepare<M extends Model>(
     model: M,
     pk: keyof M,
@@ -630,7 +617,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const split = modelToTransient(model);
     const result = Object.entries(split.model).reduce(
       (accum: Record<string, any>, [key, val]) => {
-        if (key === "_id") return accum;
         if (typeof val === "undefined") return accum;
         const mappedProp = Repository.column(model, key);
         if (this.isReserved(mappedProp))
@@ -659,6 +645,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
       id: stub.createCompositeKey(tableName, [String(model[pk])]),
       transient: split.transient,
     };
+  }
+
+  override updatePrefix(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>,
+    ...args: any[]
+  ): (string | number | Record<string, any>)[] {
+    const ctx: FabricContractContext = args.pop();
+    const record: Record<string, any> = {};
+    record[CouchDBKeys.TABLE] = tableName;
+    // record[CouchDBKeys.ID] = this.generateId(tableName, id);
+    Object.assign(record, model);
+    return [tableName, id, record, {}, ctx];
   }
 }
 
