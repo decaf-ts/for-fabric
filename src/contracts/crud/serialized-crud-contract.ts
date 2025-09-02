@@ -34,9 +34,15 @@ export class SerializedCrudContract<
 
   @Transaction()
   override async updateAll(ctx: Ctx, models: string): Promise<string> {
-    const ms = (JSON.parse(models) as []).map((m) => new this.clazz(m));
+    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.updateAll);
+    const list: string[] = JSON.parse(models);
+    const modelList: M[] = list
+      .map((m) => this.deserialize(m))
+      .map((m) => new this.clazz(m));
+
+    log.info(`Updating ${modelList.length} entries to the table`);
     return JSON.stringify(
-      ((await super.updateAll(ctx, ms)) as M[]).map(
+      ((await super.updateAll(ctx, modelList)) as M[]).map(
         (m) => this.serialize(m) as string
       )
     );

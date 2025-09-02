@@ -10,6 +10,7 @@ import { FabricContractFlavour } from "./constants";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
+  ConflictError,
   Context,
   DBKeys,
   InternalError,
@@ -469,7 +470,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: string,
     id: string | number,
     model: Record<string, any>,
-    transient: Record<string, any>,
     ...args: any[]
   ): Promise<Record<string, any>> {
     const { stub, logger } = args.pop();
@@ -483,9 +483,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
     }
 
-    log.info(`adding entry to ${tableName} table with pk ${id}`);
-
     try {
+      log.info(
+        `Checking if entry with id ${id} already exists in ${tableName} table`
+      );
+      const res = await stub.getState(id.toString());
+      if (res.toString() !== "") {
+        log.info(`Entry with id ${id} already exists in ${tableName} table`);
+        throw new ConflictError(
+          `Entry with id ${id} already exists in ${tableName} table`
+        );
+      }
+      log.info(`adding entry to ${tableName} table with pk ${id}`);
       await stub.putState(id.toString(), data);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
@@ -510,7 +519,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     return Promise.all(
       id.map(async (i, index) => {
-        return this.create(tableName, i, model[index], {}, ...args);
+        return this.create(tableName, i, model[index], ...args);
       })
     );
   }
@@ -564,11 +573,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
    * @return {Promise<Record<string, any>>} Promise resolving to the updated record
    */
-  async update(
+  override async update(
     tableName: string,
     id: string | number,
     model: Record<string, any>,
-    transient: Record<string, any>,
     ...args: any[]
   ): Promise<Record<string, any>> {
     const { stub, logger } = args.pop();
@@ -582,15 +590,44 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
     }
 
-    log.info(`updating entry to ${tableName} table with pk ${id}`);
-
     try {
+      log.info(`Checking if entry with id ${id} exists in ${tableName} table`);
+      const res = await stub.getState(id.toString());
+      if (res.toString() === "") {
+        log.info(`Entry with id ${id} already exists in ${tableName} table`);
+        throw new ConflictError(
+          `Entry with id ${id} doesn't exist in ${tableName} table`
+        );
+      }
+      log.info(`updating entry to ${tableName} table with pk ${id}`);
       await stub.putState(id.toString(), data);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
 
     return model;
+  }
+
+  override async updateAll(
+    tableName: string,
+    id: string[] | number[],
+    model: Record<string, any>[],
+    ...args: any[]
+  ): Promise<Record<string, any>[]> {
+    if (id.length !== model.length)
+      throw new InternalError("Ids and models must have the same length");
+
+    const { logger } = args[args.length - 1] as FabricContractContext;
+
+    const log = logger.for(this.createAll);
+    log.info(`Updating ${id.length} entries ${tableName} table`);
+    log.debug(`pks: ${id}`);
+
+    return Promise.all(
+      id.map(async (i, index) => {
+        return this.update(tableName, i, model[index], ...args);
+      })
+    );
   }
 
   /**
@@ -679,7 +716,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     record[CouchDBKeys.TABLE] = tableName;
     // record[CouchDBKeys.ID] = this.generateId(tableName, id);
     Object.assign(record, model);
-    return [tableName, id, record, {}, ctx];
+    return [tableName, id, record, ctx];
   }
 
   protected override createAllPrefix(
@@ -697,6 +734,26 @@ export class FabricContractAdapter extends CouchDBAdapter<
       const record: Record<string, any> = {};
       record[CouchDBKeys.TABLE] = tableName;
       // record[CouchDBKeys.ID] = this.generateId(tableName, id);
+      Object.assign(record, models[count]);
+      return record;
+    });
+    return [tableName, ids, records, ctx as any];
+  }
+
+  protected override updateAllPrefix(
+    tableName: string,
+    ids: string[] | number[],
+    models: Record<string, any>[],
+    ...args: any[]
+  ) {
+    if (ids.length !== models.length)
+      throw new InternalError("Ids and models must have the same length");
+
+    const ctx: FabricContractContext = args.pop();
+
+    const records = ids.map((id, count) => {
+      const record: Record<string, any> = {};
+      record[CouchDBKeys.TABLE] = tableName;
       Object.assign(record, models[count]);
       return record;
     });

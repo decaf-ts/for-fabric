@@ -129,7 +129,6 @@ export class FabricContractRepository<M extends Model> extends Repository<
       this.tableName,
       ids,
       records,
-      transients,
       ...args
     );
     return records.map((r, i) =>
@@ -163,7 +162,6 @@ export class FabricContractRepository<M extends Model> extends Repository<
       this.tableName,
       records.map((r) => r.id),
       records.map((r) => r.record),
-      transients,
       ...args
     );
     return updated.map((u, i) =>
@@ -247,13 +245,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
       ...args
     );
     log.info(`Creating model: ${JSON.stringify(model)}`);
-    record = await this.adapter.create(
-      this.tableName,
-      id,
-      record,
-      transient || {},
-      ...args
-    );
+    record = await this.adapter.create(this.tableName, id, record, ...args);
     let c: FabricContractContext | undefined = undefined;
     if (args.length) c = args[args.length - 1] as FabricContractContext;
     log.info(`Reverting model: ${JSON.stringify(model)}`);
@@ -285,13 +277,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
       ...args
     );
     log.info(`Updating model: ${JSON.stringify(model)}`);
-    record = await this.adapter.update(
-      this.tableName,
-      id,
-      record,
-      transient || {},
-      ...args
-    );
+    record = await this.adapter.update(this.tableName, id, record, ...args);
     let c: FabricContractContext | undefined = undefined;
     if (args.length) c = args[args.length - 1] as FabricContractContext;
     log.info(`Reverting model: ${JSON.stringify(model)}`);

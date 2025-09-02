@@ -132,8 +132,13 @@ export abstract class FabricCrudContract<M extends Model>
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
+    const log = FabricCrudContract.adapter.logFor(ctx).for(this.updateAll);
     if (typeof models === "string")
-      models = (JSON.parse(models) as []).map((m) => new this.clazz(m)) as any;
+      models = (JSON.parse(models) as [])
+        .map((m) => this.deserialize(m))
+        .map((m) => new this.clazz(m)) as any;
+
+    log.info(`updating ${models.length} entries to the table`);
     return this.repo.updateAll(models as unknown as M[], ctx, ...args);
   }
 

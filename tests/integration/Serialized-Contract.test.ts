@@ -208,6 +208,28 @@ describe("Test Serialized Crud Contract", () => {
     expect(record["tst_nif"]).toBe(model.nif);
   });
 
+  it("Should fail to create model", async () => {
+    const ready = await ensureReadiness();
+
+    expect(trim(ready)).toBe("true");
+
+    const data = { name: randomName(6), nif: randomNif(9), id: 1 };
+    const model = new TestModel(data);
+
+    console.log("Using model: ", model.serialize());
+
+    let err = false;
+
+    try {
+      await invokeChaincode("create", [model.serialize()]);
+    } catch (e) {
+      expect(e).toBeDefined();
+      err = true;
+    }
+
+    expect(err).toBe(true);
+  });
+
   it("Should read model", async () => {
     const ready = await ensureReadiness();
 
@@ -339,6 +361,48 @@ describe("Test Serialized Crud Contract", () => {
     expect(record1.nif).toBe(model.nif);
     expect(record1.name).not.toBe(record.name);
     expect(record1.nif).not.toBe(record.nif);
+  });
+
+  it("Should fail update model", async () => {
+    const ready = await ensureReadiness();
+
+    expect(trim(ready)).toBe("true");
+
+    let sequence1;
+
+    try {
+      sequence1 = await readBlockChain("readByPass", [
+        createCompositeKey(sequenceTableName, [sequenceId]),
+      ]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Model created successfully: ", sequence1);
+
+    sequence1 = JSON.parse(sequence1);
+
+    expect(sequence1.id).toBe(sequenceId);
+    expect(sequence1.current).toBeGreaterThan(0);
+
+    const data = {
+      name: randomName(6),
+      nif: randomNif(9),
+      id: sequence1.current + 10,
+    };
+    const model = new TestModel(data);
+
+    console.log("Using model: ", model.serialize());
+
+    let err = false;
+    try {
+      await invokeChaincode("update", [model.serialize()]);
+    } catch (e) {
+      expect(e).toBeDefined();
+      err = true;
+    }
+
+    expect(err).toBe(true);
   });
 
   it("Should delete model", async () => {
@@ -509,5 +573,183 @@ describe("Test Serialized Crud Contract", () => {
     expect(filter3.length).toBe(1);
     expect(filter3[0].nif).toBe(record3.nif);
     expect(filter3[0].name).toBe(record3.name);
+  });
+
+  it("Should readAll models", async () => {
+    const ready = await ensureReadiness();
+
+    expect(trim(ready)).toBe("true");
+
+    const data = [
+      { name: randomName(6), nif: randomNif(9) },
+      { name: randomName(6), nif: randomNif(9) },
+      { name: randomName(6), nif: randomNif(9) },
+    ];
+    const models = data.map((d) => new TestModel(d));
+    const serializedModels = models.map((m) => m.serialize());
+
+    console.log("Using models: ", models.map((m) => m.serialize()).join(", "));
+
+    try {
+      await invokeChaincode("createAll", [JSON.stringify(serializedModels)]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let sequence1;
+
+    try {
+      sequence1 = await readBlockChain("readByPass", [
+        createCompositeKey(sequenceTableName, [sequenceId]),
+      ]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Model created successfully: ", sequence1);
+
+    sequence1 = JSON.parse(sequence1);
+
+    expect(sequence1.id).toBe(sequenceId);
+    expect(sequence1.current).toBeGreaterThan(0);
+
+    const id1 = sequence1.current;
+    const id2 = sequence1.current - 1;
+    const id3 = sequence1.current - 2;
+
+    const ids = JSON.stringify([id1, id2, id3]);
+
+    let records;
+    try {
+      records = await readBlockChain("readAll", [ids]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    records = JSON.parse(records).map((r) => new TestModel(JSON.parse(r)));
+
+    expect(records.length).toBe(3);
+
+    for (const record of records) {
+      const filter1 = data.filter((m) => m.name === record.name);
+      expect(record).not.toBeNull();
+      expect(record).not.toBeUndefined();
+      expect(filter1.length).toBe(1);
+      expect(filter1[0].nif).toBe(record.nif);
+      expect(filter1[0].name).toBe(record.name);
+    }
+  });
+
+  it("Should updateAll models", async () => {
+    const ready = await ensureReadiness();
+
+    expect(trim(ready)).toBe("true");
+
+    const data = [
+      { name: randomName(6), nif: randomNif(9) },
+      { name: randomName(6), nif: randomNif(9) },
+      { name: randomName(6), nif: randomNif(9) },
+    ];
+    const models = data.map((d) => new TestModel(d));
+    const serializedModels = models.map((m) => m.serialize());
+
+    console.log("Using models: ", models.map((m) => m.serialize()).join(", "));
+
+    try {
+      await invokeChaincode("createAll", [JSON.stringify(serializedModels)]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let sequence1;
+
+    try {
+      sequence1 = await readBlockChain("readByPass", [
+        createCompositeKey(sequenceTableName, [sequenceId]),
+      ]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Model created successfully: ", sequence1);
+
+    sequence1 = JSON.parse(sequence1);
+
+    expect(sequence1.id).toBe(sequenceId);
+    expect(sequence1.current).toBeGreaterThan(0);
+
+    const id1 = sequence1.current;
+    const id2 = sequence1.current - 1;
+    const id3 = sequence1.current - 2;
+
+    const ids = JSON.stringify([id1, id2, id3]);
+
+    let records;
+    try {
+      records = await readBlockChain("readAll", [ids]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    records = JSON.parse(records).map((r) => new TestModel(JSON.parse(r)));
+
+    expect(records.length).toBe(3);
+
+    for (const record of records) {
+      const filter1 = data.filter((m) => m.name === record.name);
+      expect(record).not.toBeNull();
+      expect(record).not.toBeUndefined();
+      expect(filter1.length).toBe(1);
+      expect(filter1[0].nif).toBe(record.nif);
+      expect(filter1[0].name).toBe(record.name);
+    }
+
+    records = records.map((m) => new TestModel({ ...m, name: randomName(6) }));
+
+    records.forEach((record) => {
+      console.log("Updating model: ", record.serialize());
+    });
+
+    const preparedRecords = records.map((m) => m.serialize());
+
+    try {
+      await invokeChaincode("updateAll", [JSON.stringify(preparedRecords)]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let records1;
+    try {
+      records1 = await readBlockChain("readAll", [ids]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    records1 = JSON.parse(records1).map((r) => new TestModel(JSON.parse(r)));
+
+    expect(records1.length).toBe(3);
+
+    for (const record of records1) {
+      const filter1 = records.filter((m) => m.name === record.name);
+      expect(record).not.toBeNull();
+      expect(record).not.toBeUndefined();
+      expect(filter1.length).toBe(1);
+      expect(filter1[0].nif).toBe(record.nif);
+      expect(filter1[0].name).toBe(record.name);
+
+      const filter2 = data.filter((m) => m.nif === record.nif);
+      expect(filter2.length).toBe(1);
+      expect(filter2[0].nif).toBe(record.nif);
+      expect(filter2[0].name).not.toBe(record.name);
+    }
   });
 });
