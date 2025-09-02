@@ -8,10 +8,17 @@ import { FabricContractAdapter } from "./ContractAdapter";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import { Constructor, Model } from "@decaf-ts/decorator-validation";
+import {
+  Context as Ctx,
+  enforceDBDecorators,
+  InternalError,
+  ValidationError,
+} from "@decaf-ts/db-decorators";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
 import { Context } from "fabric-contract-api";
+import { FabricContractDBSequence } from "./FabricContractSequence";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -295,5 +302,76 @@ export class FabricContractRepository<M extends Model> extends Repository<
       id,
       c && c.get("rebuildWithTransient") ? transient : undefined
     );
+  }
+
+  /**
+   * @description Prepares multiple models for creation.
+   * @summary Validates multiple models and prepares them for creation in the database.
+   * @param {M[]} models - The models to create.
+   * @param {...any[]} args - Additional arguments.
+   * @return The prepared models and context arguments.
+   * @throws {ValidationError} If any model fails validation.
+   */
+  protected override async createAllPrefix(models: M[], ...args: any[]) {
+    const ctx = args[args.length - 1] as Context;
+
+    const contextArgs = await Ctx.args(
+      OperationKeys.CREATE,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    if (!models.length) return [models, ...contextArgs.args];
+    const opts = Repository.getSequenceOptions(models[0]);
+    let ids: (string | number | bigint | undefined)[] = [];
+    if (opts.type) {
+      if (!opts.name) opts.name = FabricContractDBSequence.pk(models[0]);
+      ids = await (
+        (await this.adapter.Sequence(opts)) as FabricContractDBSequence
+      ).range(models.length, ctx as unknown as FabricContractContext);
+    } else {
+      ids = models.map((m, i) => {
+        if (typeof m[this.pk] === "undefined")
+          throw new InternalError(
+            `Primary key is not defined for model in position ${i}`
+          );
+        return m[this.pk] as string;
+      });
+    }
+
+    models = await Promise.all(
+      models.map(async (m, i) => {
+        m = new this.class(m);
+        if (opts.type) m[this.pk] = ids[i] as M[keyof M];
+        await enforceDBDecorators(
+          this,
+          contextArgs.context,
+          m,
+          OperationKeys.CREATE,
+          OperationKeys.ON
+        );
+        return m;
+      })
+    );
+
+    const ignoredProps =
+      contextArgs.context.get("ignoredValidationProperties") || [];
+
+    const errors = await Promise.all(
+      models.map((m) => Promise.resolve(m.hasErrors(...ignoredProps)))
+    );
+
+    const errorMessages = errors.reduce((accum: string | undefined, e, i) => {
+      if (e)
+        accum =
+          typeof accum === "string"
+            ? accum + `\n - ${i}: ${e.toString()}`
+            : ` - ${i}: ${e.toString()}`;
+      return accum;
+    }, undefined);
+
+    if (errorMessages) throw new ValidationError(errorMessages);
+    return [models, ...contextArgs.args];
   }
 }

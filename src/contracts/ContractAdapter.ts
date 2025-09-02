@@ -494,6 +494,27 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
+  override async createAll(
+    tableName: string,
+    id: (string | number)[],
+    model: Record<string, any>[],
+    ...args: any[]
+  ): Promise<Record<string, any>[]> {
+    if (id.length !== model.length)
+      throw new InternalError("Ids and models must have the same length");
+
+    const { logger } = args[args.length - 1] as FabricContractContext;
+    const log = logger.for(this.createAll);
+    log.info(`Creating ${id.length} entries ${tableName} table`);
+    log.debug(`pks: ${id}`);
+
+    return Promise.all(
+      id.map(async (i, index) => {
+        return this.create(tableName, i, model[index], {}, ...args);
+      })
+    );
+  }
+
   /**
    * @description Reads a record from the state database
    * @summary Retrieves and deserializes a record from the Fabric state database
@@ -659,6 +680,27 @@ export class FabricContractAdapter extends CouchDBAdapter<
     // record[CouchDBKeys.ID] = this.generateId(tableName, id);
     Object.assign(record, model);
     return [tableName, id, record, {}, ctx];
+  }
+
+  protected override createAllPrefix(
+    tableName: string,
+    ids: string[] | number[],
+    models: Record<string, any>[],
+    ...args: any[]
+  ): (string | string[] | number[] | Record<string, any>[])[] {
+    if (ids.length !== models.length)
+      throw new InternalError("Ids and models must have the same length");
+
+    const ctx: FabricContractContext = args.pop();
+
+    const records = ids.map((id, count) => {
+      const record: Record<string, any> = {};
+      record[CouchDBKeys.TABLE] = tableName;
+      // record[CouchDBKeys.ID] = this.generateId(tableName, id);
+      Object.assign(record, models[count]);
+      return record;
+    });
+    return [tableName, ids, records, ctx as any];
   }
 }
 

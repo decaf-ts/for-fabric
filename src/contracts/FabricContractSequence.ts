@@ -135,7 +135,8 @@ export class FabricContractDBSequence extends Sequence {
     const incrementBy = this.parse(this.options.incrementBy) as number;
     const next: string | number | bigint = await this.increment(
       current,
-      (this.parse(count) as number) * incrementBy
+      (this.parse(count) as number) * incrementBy,
+      ctx
     );
     const range: (number | string | bigint)[] = [];
     for (let i: number = 1; i <= count; i++) {

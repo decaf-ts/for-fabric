@@ -161,7 +161,7 @@ export abstract class FabricCrudContract<M extends Model>
     return FabricCrudContract.serializer.serialize(model);
   }
 
-  protected deserialize<M extends Model>(str: string) {
+  protected deserialize<M extends Model>(str: string): M {
     return (
       FabricCrudContract.serializer as unknown as Serializer<M>
     ).deserialize(str);
@@ -217,7 +217,9 @@ export abstract class FabricCrudContract<M extends Model>
     const log = FabricCrudContract.adapter.logFor(ctx).for(this.createAll);
 
     if (typeof models === "string")
-      models = (JSON.parse(models) as []).map((m) => new this.clazz(m)) as any;
+      models = (JSON.parse(models) as [])
+        .map((m) => this.deserialize(m))
+        .map((m) => new this.clazz(m)) as any;
 
     log.info(`adding ${models.length} entries to the table`);
     return this.repo.createAll(models as unknown as M[], ctx, ...args);

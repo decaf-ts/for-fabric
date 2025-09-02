@@ -78,7 +78,9 @@ export class SerializedCrudContract<
   override async createAll(ctx: Ctx, models: string): Promise<string> {
     const log = SerializedCrudContract.adapter.logFor(ctx).for(this.createAll);
     const list: string[] = JSON.parse(models);
-    const modelList: M[] = list.map((m) => new this.clazz(m));
+    const modelList: M[] = list
+      .map((m) => this.deserialize(m))
+      .map((m) => new this.clazz(m));
 
     log.info(`Adding ${modelList.length} entries to the table`);
     return JSON.stringify(
