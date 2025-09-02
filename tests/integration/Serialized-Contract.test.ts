@@ -752,4 +752,147 @@ describe("Test Serialized Crud Contract", () => {
       expect(filter2[0].name).not.toBe(record.name);
     }
   });
+
+  it("Should deleteAll models", async () => {
+    const ready = await ensureReadiness();
+
+    expect(trim(ready)).toBe("true");
+
+    const data = [
+      { name: randomName(6), nif: randomNif(9) },
+      { name: randomName(6), nif: randomNif(9) },
+      { name: randomName(6), nif: randomNif(9) },
+    ];
+    const models = data.map((d) => new TestModel(d));
+    const serializedModels = models.map((m) => m.serialize());
+
+    console.log("Using models: ", models.map((m) => m.serialize()).join(", "));
+
+    try {
+      await invokeChaincode("createAll", [JSON.stringify(serializedModels)]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let sequence1;
+
+    try {
+      sequence1 = await readBlockChain("readByPass", [
+        createCompositeKey(sequenceTableName, [sequenceId]),
+      ]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Model created successfully: ", sequence1);
+
+    sequence1 = JSON.parse(sequence1);
+
+    expect(sequence1.id).toBe(sequenceId);
+    expect(sequence1.current).toBeGreaterThan(0);
+
+    const id1 = sequence1.current;
+    const id2 = sequence1.current - 1;
+    const id3 = sequence1.current - 2;
+
+    let record1;
+    try {
+      record1 = await readBlockChain("read", [String(id1)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record1);
+    record1 = JSON.parse(record1);
+
+    const filter1 = data.filter((m) => {
+      console.log(m.name, record1.name); // Debugging
+      return m.name === record1.name;
+    });
+
+    expect(filter1.length).toBe(1);
+    expect(filter1[0].nif).toBe(record1.nif);
+    expect(filter1[0].name).toBe(record1.name);
+
+    let record2;
+    try {
+      record2 = await readBlockChain("read", [String(id2)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record2);
+
+    record2 = JSON.parse(record2);
+
+    const filter2 = data.filter((m) => m.name === record2.name);
+
+    expect(filter2.length).toBe(1);
+    expect(filter2[0].nif).toBe(record2.nif);
+    expect(filter2[0].name).toBe(record2.name);
+
+    let record3;
+    try {
+      record3 = await readBlockChain("read", [String(id3)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record3);
+
+    record3 = JSON.parse(record3);
+
+    const filter3 = data.filter((m) => m.name === record3.name);
+
+    expect(filter3.length).toBe(1);
+    expect(filter3[0].nif).toBe(record3.nif);
+    expect(filter3[0].name).toBe(record3.name);
+
+    const ids = JSON.stringify([id1, id2, id3]);
+
+    try {
+      await invokeChaincode("deleteAll", [ids]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    let record4;
+    try {
+      record4 = await readBlockChain("read", [String(id1)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record4);
+
+    expect(record4).toBe("");
+
+    let record5;
+    try {
+      record5 = await readBlockChain("read", [String(id2)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record5);
+
+    expect(record5).toBe("");
+
+    let record6;
+    try {
+      record6 = await readBlockChain("read", [String(id3)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record6);
+
+    expect(record6).toBe("");
+  });
 });

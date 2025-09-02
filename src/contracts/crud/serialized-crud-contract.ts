@@ -13,6 +13,9 @@ export class SerializedCrudContract<
   @Transaction()
   override async deleteAll(ctx: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
+    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.deleteAll);
+
+    log.info(`deleting ${parsedKeys.length} entries from the table`);
 
     return JSON.stringify(
       ((await super.deleteAll(ctx, parsedKeys)) as M[]).map(
@@ -24,6 +27,9 @@ export class SerializedCrudContract<
   @Transaction(false)
   override async readAll(ctx: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
+
+    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.readAll);
+    log.info(`reading ${parsedKeys.length} entries from the table`);
 
     return JSON.stringify(
       ((await super.readAll(ctx, parsedKeys)) as M[]).map((m) =>
