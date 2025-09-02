@@ -411,4 +411,29 @@ describe("Test Serialized Crud Contract", () => {
 
     expect(record1).toBe("");
   });
+
+  it("Should createAll models", async () => {
+    const ready = await ensureReadiness();
+
+    expect(trim(ready)).toBe("true");
+
+    const data = [
+      { name: randomName(6), nif: randomNif(9) },
+      { name: randomName(6), nif: randomNif(9) },
+      { name: randomName(6), nif: randomNif(9) },
+    ];
+    const models = data.map((d) => new TestModel(d));
+    const serializedModels = models.map((m) => m.serialize());
+
+    console.log("Using models: ", models.map((m) => m.serialize()).join(", "));
+
+    try {
+      await invokeChaincode("createAll", [JSON.stringify(serializedModels)]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+  });
 });
