@@ -86,40 +86,6 @@ export abstract class FabricCrudContract<M extends Model>
   }
 
   /**
-   * @description Creates multiple models in the state database
-   * @summary Delegates to the repository's createAll method
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @param {M[]} models - The models to create
-   * @param {...any[]} args - Additional arguments
-   * @return {Promise<M[]>} Promise resolving to the created models
-   */
-  async createAll(
-    ctx: Ctx,
-    models: string | M[],
-    ...args: any[]
-  ): Promise<string | M[]> {
-    if (typeof models === "string")
-      models = (JSON.parse(models) as []).map((m) => new this.clazz(m)) as any;
-    return this.repo.createAll(models as unknown as M[], ctx, ...args);
-  }
-
-  /**
-   * @description Deletes a single model from the state database
-   * @summary Delegates to the repository's delete method
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @param {string | number} key - The key of the model to delete
-   * @param {...any[]} args - Additional arguments
-   * @return {Promise<M>} Promise resolving to the deleted model
-   */
-  async delete(
-    ctx: Ctx,
-    key: string | number,
-    ...args: any[]
-  ): Promise<M | string> {
-    return this.repo.delete(key, ctx, ...args);
-  }
-
-  /**
    * @description Deletes multiple models from the state database
    * @summary Delegates to the repository's deleteAll method
    * @param {string[] | number[]} keys - The keys of the models to delete
@@ -137,22 +103,6 @@ export abstract class FabricCrudContract<M extends Model>
   }
 
   /**
-   * @description Reads a single model from the state database
-   * @summary Delegates to the repository's read method
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @param {string | number} key - The key of the model to read
-   * @param {...any[]} args - Additional arguments
-   * @return {Promise<M>} Promise resolving to the retrieved model
-   */
-  async read(
-    ctx: Ctx,
-    key: string | number,
-    ...args: any[]
-  ): Promise<M | string> {
-    return this.repo.read(key, ctx, ...args);
-  }
-
-  /**
    * @description Reads multiple models from the state database
    * @summary Delegates to the repository's readAll method
    * @param {Ctx} ctx - The Fabric chaincode context
@@ -167,23 +117,6 @@ export abstract class FabricCrudContract<M extends Model>
   ): Promise<M[] | string> {
     if (typeof keys === "string") keys = JSON.parse(keys) as string[];
     return this.repo.readAll(keys, ctx, ...args);
-  }
-
-  /**
-   * @description Updates a single model in the state database
-   * @summary Delegates to the repository's update method
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @param {M} model - The model to update
-   * @param {...any[]} args - Additional arguments
-   * @return {Promise<M>} Promise resolving to the updated model
-   */
-  async update(
-    ctx: Ctx,
-    model: string | M,
-    ...args: any[]
-  ): Promise<string | M> {
-    if (typeof model === "string") model = this.deserialize<M>(model) as any;
-    return this.repo.update(model as unknown as M, ctx, ...args);
   }
 
   /**
@@ -266,5 +199,86 @@ export abstract class FabricCrudContract<M extends Model>
 
     log.info(`Creating model: ${JSON.stringify(model)}`);
     return this.repo.create(model as unknown as M, ctx, ...args);
+  }
+
+  /**
+   * @description Creates multiple models in the state database
+   * @summary Delegates to the repository's createAll method
+   * @param {Ctx} ctx - The Fabric chaincode context
+   * @param {M[]} models - The models to create
+   * @param {...any[]} args - Additional arguments
+   * @return {Promise<M[]>} Promise resolving to the created models
+   */
+  async createAll(
+    ctx: Ctx,
+    models: string | M[],
+    ...args: any[]
+  ): Promise<string | M[]> {
+    const log = FabricCrudContract.adapter.logFor(ctx).for(this.createAll);
+
+    if (typeof models === "string")
+      models = (JSON.parse(models) as []).map((m) => new this.clazz(m)) as any;
+
+    log.info(`adding ${models.length} entries to the table`);
+    return this.repo.createAll(models as unknown as M[], ctx, ...args);
+  }
+
+  /**
+   * @description Reads a single model from the state database
+   * @summary Delegates to the repository's read method
+   * @param {Ctx} ctx - The Fabric chaincode context
+   * @param {string | number} key - The key of the model to read
+   * @param {...any[]} args - Additional arguments
+   * @return {Promise<M>} Promise resolving to the retrieved model
+   */
+  async read(
+    ctx: Ctx,
+    key: string | number,
+    ...args: any[]
+  ): Promise<M | string> {
+    const log = FabricCrudContract.adapter.logFor(ctx).for(this.read);
+
+    log.info(`reading entry with pk ${key} `);
+
+    return this.repo.read(key, ctx, ...args);
+  }
+
+  /**
+   * @description Updates a single model in the state database
+   * @summary Delegates to the repository's update method
+   * @param {Ctx} ctx - The Fabric chaincode context
+   * @param {M} model - The model to update
+   * @param {...any[]} args - Additional arguments
+   * @return {Promise<M>} Promise resolving to the updated model
+   */
+  async update(
+    ctx: Ctx,
+    model: string | M,
+    ...args: any[]
+  ): Promise<string | M> {
+    const log = FabricCrudContract.adapter.logFor(ctx).for(this.update);
+
+    if (typeof model === "string") model = this.deserialize<M>(model) as any;
+
+    log.info(`Updating model: ${JSON.stringify(model)}`);
+    return this.repo.update(model as unknown as M, ctx, ...args);
+  }
+
+  /**
+   * @description Deletes a single model from the state database
+   * @summary Delegates to the repository's delete method
+   * @param {Ctx} ctx - The Fabric chaincode context
+   * @param {string | number} key - The key of the model to delete
+   * @param {...any[]} args - Additional arguments
+   * @return {Promise<M>} Promise resolving to the deleted model
+   */
+  async delete(
+    ctx: Ctx,
+    key: string | number,
+    ...args: any[]
+  ): Promise<M | string> {
+    const log = FabricCrudContract.adapter.logFor(ctx).for(this.delete);
+    log.info(`deleting entry with pk ${key} `);
+    return this.repo.delete(key, ctx, ...args);
   }
 }

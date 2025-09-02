@@ -11,25 +11,6 @@ export class SerializedCrudContract<
   }
 
   @Transaction()
-  override async createAll(ctx: Ctx, models: string): Promise<string> {
-    const list: string[] = JSON.parse(models);
-    const modelList: M[] = list.map((m) => new this.clazz(m));
-
-    return JSON.stringify(
-      ((await super.createAll(ctx, modelList)) as M[]).map(
-        (m) => this.serialize(m) as string
-      )
-    );
-  }
-
-  @Transaction()
-  override async delete(ctx: Ctx, key: string): Promise<string> {
-    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.delete);
-    log.info(`Deleting id: ${key}`);
-    return this.serialize((await super.delete(ctx, key)) as M);
-  }
-
-  @Transaction()
   override async deleteAll(ctx: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
 
@@ -41,13 +22,6 @@ export class SerializedCrudContract<
   }
 
   @Transaction(false)
-  override async read(ctx: Ctx, key: string): Promise<string> {
-    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.read);
-    log.info(`Reading id: ${key}`);
-    return this.serialize((await super.read(ctx, key)) as M);
-  }
-
-  @Transaction(false)
   override async readAll(ctx: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
 
@@ -56,13 +30,6 @@ export class SerializedCrudContract<
         this.serialize(m)
       )
     );
-  }
-
-  @Transaction()
-  override async update(ctx: Ctx, model: string): Promise<string> {
-    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.update);
-    log.info(`Updating model: ${model}`);
-    return this.serialize((await super.update(ctx, model)) as M);
   }
 
   @Transaction()
@@ -105,5 +72,40 @@ export class SerializedCrudContract<
 
     log.info(`Model deserialized: ${JSON.stringify(m)}`);
     return this.serialize((await super.create(ctx, m)) as M);
+  }
+
+  @Transaction()
+  override async createAll(ctx: Ctx, models: string): Promise<string> {
+    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.createAll);
+    const list: string[] = JSON.parse(models);
+    const modelList: M[] = list.map((m) => new this.clazz(m));
+
+    log.info(`Adding ${modelList.length} entries to the table`);
+    return JSON.stringify(
+      ((await super.createAll(ctx, modelList)) as M[]).map(
+        (m) => this.serialize(m) as string
+      )
+    );
+  }
+
+  @Transaction(false)
+  override async read(ctx: Ctx, key: string): Promise<string> {
+    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.read);
+    log.info(`Reading id: ${key}`);
+    return this.serialize((await super.read(ctx, key)) as M);
+  }
+
+  @Transaction()
+  override async update(ctx: Ctx, model: string): Promise<string> {
+    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.update);
+    log.info(`Updating model: ${model}`);
+    return this.serialize((await super.update(ctx, model)) as M);
+  }
+
+  @Transaction()
+  override async delete(ctx: Ctx, key: string): Promise<string> {
+    const log = SerializedCrudContract.adapter.logFor(ctx).for(this.delete);
+    log.info(`Deleting id: ${key}`);
+    return this.serialize((await super.delete(ctx, key)) as M);
   }
 }
