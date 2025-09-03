@@ -42,8 +42,8 @@
     "drawings": "for FILE in workdocs/drawings/*.drawio; do echo \"converting $FILE to image...\" && docker run --rm -v $(pwd):/data rlespinasse/drawio-export --format png $FILE; done && cp -rf workdocs/drawings/export/* workdocs/resources/",
     "uml": "cd workdocs/uml && for FILE in ./*.puml; do docker run --rm -v $(pwd):/work -w /work miy4/plantuml -DPLANTUML_LIMIT_SIZE=8192 -tpng $FILE; done && cd ../.. && cp -fr workdocs/uml/*.png workdocs/resources/",
     "docs": "npx rimraf ./docs && mkdir docs && npx build-scripts --docs",
-    "infrastructure:up": "docker compose -f ./docker/infrastructure/docker-compose.yaml up -d",
-    "infrastructure:down": "docker compose -f ./docker/infrastructure/docker-compose.yaml down --rmi local -v",
+    "infrastructure:up": "docker compose -f ./docker/infrastructure/docker-compose.yaml up -d && sudo cp -R docker/infrastructure/storage docker/docker-data/ && sudo chmod -R 755 docker/docker-data",
+    "infrastructure:down": "docker compose -f ./docker/infrastructure/docker-compose.yaml down --rmi local -v && sudo rm -rf docker/docker-data/*",
     "publish-docs": "docker run -it --rm --user $(id -u):$(id -g) -v \"$(pwd)/workdocs/confluence:/content\" -e ATLASSIAN_API_TOKEN=$(cat .confluence-token) ghcr.io/markdown-confluence/publish:latest"
   },
   "repository": {
