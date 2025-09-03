@@ -8,24 +8,24 @@ import {
   TLSOptions,
 } from "fabric-ca-client";
 import { User } from "fabric-common";
-import { CAConfig, Credentials } from "../types";
-import { Identity } from "../model/Identity";
+import { CAConfig, Credentials } from "../../shared/types";
+import { Identity } from "../../shared/model/Identity";
 import { AuthorizationError } from "@decaf-ts/core";
 import {
   ConflictError,
   InternalError,
   NotFoundError,
 } from "@decaf-ts/db-decorators";
-import { CoreUtils } from "../utils";
+import { CoreUtils } from "../../shared/utils";
 import { CA_ROLE } from "./constants";
-import { CryptoUtils } from "../crypto";
+import { CryptoUtils } from "../../shared/crypto";
 import {
   CertificateResponse,
   FabricIdentity,
   GetCertificatesRequest,
   IdentityResponse,
-} from "../fabric-shims";
-import { RegistrationError } from "../errors";
+} from "../../shared/fabric-shims";
+import { RegistrationError } from "../../shared/errors";
 import { LoggedService } from "./LoggedService";
 
 export enum HFCAIdentityType {

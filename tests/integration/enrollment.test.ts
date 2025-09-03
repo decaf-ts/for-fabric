@@ -1,5 +1,5 @@
 import { Credentials, CAConfig } from "../../src/shared/types";
-import { FabricEnrollmentService } from "../../src/shared/services";
+import { FabricEnrollmentService } from "../../src/client/services";
 import { Identity } from "../../src/shared/model/Identity";
 import { execSync } from "child_process";
 import fs from "fs";
