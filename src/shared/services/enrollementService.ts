@@ -28,6 +28,7 @@ import {
   IdentityResponse,
 } from "../fabric-shims";
 import { RegistrationError } from "../errors";
+import { LoggedService } from "./LoggedService";
 
 export enum HFCAIdentityType {
   PEER = "peer",
@@ -52,7 +53,7 @@ export enum HFCAIdentityAttributes {
   HFGENCRL = "hf.GenCRL",
 }
 
-export class FabricEnrollmentService {
+export class FabricEnrollmentService extends LoggedService {
   private ca?: FabricCAServices;
 
   private certificateService?: any;
@@ -65,34 +66,27 @@ export class FabricEnrollmentService {
 
   private user?: User;
 
-  constructor(private caConfig: CAConfig) {}
-
-  protected get logger(): Logger {
-    return this.logger
-      ? this.logger
-      : new MiniLogger(FabricEnrollmentService.name);
+  constructor(private caConfig: CAConfig) {
+    super();
   }
 
   protected async User(): Promise<User> {
     if (this.user) return this.user;
     const { caName, caCert, caKey, url } = this.caConfig;
-    // this.logger.debug(
-    //   stringFormat("Creating CA user for {0} at {1}", caName, url)
-    // );
-    // this.logger.debug(
-    //   stringFormat("Retrieving CA certificate from {0}", caCert)
-    // );
+    const log = this.log.for(this.User);
+    log.debug(`Creating CA user for ${caName} at ${url}`);
+    log.debug(`Retrieving CA certificate from ${caCert}`);
     const certificate = await CoreUtils.getFirstDirFileNameContent(caCert);
-    // this.logger.debug(stringFormat("Retrieving CA key from {0}", caKey));
+    log.debug(`Retrieving CA key from ${caKey}`);
     const key = await CoreUtils.getFirstDirFileNameContent(caKey);
-
-    // this.logger.debug(stringFormat("Loading Admin user for ca {0}", caName));
+    log.debug(`Loading Admin user for ca ${caName}`);
     this.user = await CoreUtils.getCAUser("admin", key, certificate, caName);
     return this.user;
   }
 
   protected async CA(): Promise<FabricCAServices> {
     if (this.ca) return this.ca;
+    const log = this.log.for(this.CA);
     const { url, tls, caName } = this.caConfig;
 
     // FOR Some Reason the verification fails need to investigate this works for now
@@ -102,13 +96,10 @@ export class FabricEnrollmentService {
     verify = false;
 
     const root = (trustedRoots as string[]).shift() as string;
-    // this.logger.debug(stringFormat("Retrieving CA certificate from {0}", root));
-    console.log(process.cwd());
+    log.debug(`Retrieving CA certificate from ${root}. cwd: ${process.cwd()}`);
 
     const certificate = await CoreUtils.getFirstDirFileNameContent(root);
-    // this.logger.debug(
-    //   stringFormat("Creating CA Client for CA {0} under {1}", caName, url)
-    // );
+    log.debug(`Creating CA Client for CA ${caName} under ${url}`);
     this.ca = new FabricCAServices(
       url,
       {
@@ -151,41 +142,29 @@ export class FabricEnrollmentService {
   ): Promise<string[] | CertificateResponse> {
     const certificateService = await this.Certificate();
     const user = await this.User();
-    // this.logger.debug(
-    //   stringFormat(
-    //     "Retrieving certificates {0} for CA {1}",
-    //     request ? stringFormat("for {0}", request.id as string) : "",
-    //     this.caConfig.caName
-    //   )
-    // );
+    const log = this.log.for(this.getCertificates);
+    log.debug(
+      `Retrieving certificates${request ? ` for ${request.id}` : ""} for CA ${this.caConfig.caName}`
+    );
     const response: CertificateResponse = (
       await certificateService.getCertificates(request || {}, user)
     ).result;
-    // this.logger.debug(
-    //   stringFormat(
-    //     "Found {0} certificates: {1}",
-    //     response.certs.length + "",
-    //     JSON.stringify(response)
-    //   )
-    // );
+    log.debug(
+      `Found ${response.certs.length} certificates: ${JSON.stringify(response)}`
+    );
     return doMap ? response.certs.map((c) => c.PEM) : response;
   }
 
   async getIdentities(): Promise<FabricIdentity[]> {
     const identitiesService = await this.Identities();
-    // this.logger.debug(
-    //   stringFormat("Retrieving Identities under CA {0}", this.caConfig.caName)
-    // );
+    const log = this.log.for(this.getIdentities);
+    log.debug(`Retrieving Identities under CA ${this.caConfig.caName}`);
     const response: IdentityResponse = (
       await identitiesService.getAll(await this.User())
     ).result;
-    // this.logger.debug(
-    //   stringFormat(
-    //     "Found {0} Identities: {1}",
-    //     response.identities.length + "",
-    //     JSON.stringify(response)
-    //   )
-    // );
+    log.debug(
+      `Found ${response.identities.length} Identities: ${JSON.stringify(response)}`
+    );
     return response.identities;
   }
 
@@ -207,18 +186,13 @@ export class FabricEnrollmentService {
 
   async getAffiliations() {
     const affiliationService = await this.Affiliations();
-    // this.logger.debug(
-    //   stringFormat("Retrieving Affiliations under CA {0}", this.caConfig.caName)
-    // );
+    const log = this.log.for(this.getAffiliations);
+    log.debug(`Retrieving Affiliations under CA ${this.caConfig.caName}`);
     const response = (await affiliationService.getAll(await this.User()))
       .result;
-    // this.logger.debug(
-    //   stringFormat(
-    //     "Found {0} Affiliations: {1}",
-    //     response.a.length + "",
-    //     JSON.stringify(response)
-    //   )
-    // );
+    log.debug(
+      `Found ${response.a.length} Affiliations: ${JSON.stringify(response)}`
+    );
     return response;
   }
 
@@ -230,17 +204,13 @@ export class FabricEnrollmentService {
       result = await ca.newIdentityService().getOne(enrollmentId, user);
     } catch (e: any) {
       throw new NotFoundError(
-        stringFormat("Could not find enrollment with id {0}", enrollmentId)
+        `Couldn't find enrollment with id ${enrollmentId}`
       );
     }
 
     if (!result.success)
       throw new NotFoundError(
-        stringFormat(
-          "Could not find enrollment with id {0}:\n{1}",
-          enrollmentId,
-          result.errors.join("\n")
-        )
+        `Couldn't find enrollment with id ${enrollmentId}: ${result.errors.join("\n")}`
       );
 
     return result.result as FabricIdentity;
@@ -255,7 +225,7 @@ export class FabricEnrollmentService {
     maxEnrollments?: number
   ): Promise<string> {
     let registration: string;
-
+    const log = this.log.for(this.register);
     try {
       const { userName, password } = model;
       const ca = await this.CA();
@@ -270,13 +240,9 @@ export class FabricEnrollmentService {
         // maxEnrollments: (role === CA_ROLE.ADMIN || isSuperUser) ? -1 : 1
       } as IRegisterRequest;
       registration = await ca.register(props, user);
-      // this.logger.info(
-      //   stringFormat(
-      //     `Registration for {0} created with user type {1} ${isSuperUser ? "as super user" : ""} `,
-      //     model.userName as string,
-      //     userRole ?? "Undefined Role"
-      //   )
-      // );
+      log.info(
+        `Registration for ${userName} created with user type ${userRole ?? "Undefined Role"} ${isSuperUser ? "as super user" : ""}`
+      );
     } catch (e: any) {
       throw this.parseError(e);
     }
@@ -288,17 +254,13 @@ export class FabricEnrollmentService {
     mspId: string
   ): Identity {
     const { certificate, key, rootCertificate } = enrollment;
-    const logger = Logging.for(FabricEnrollmentService);
-    // logger.debug(
-    //   stringFormat(
-    //     "Generating Identity from certificate {0} in msp {1}",
-    //     certificate,
-    //     mspId
-    //   )
-    // );
+    const log = this.log.for(this.identityFromEnrollment);
+    log.debug(
+      `Generating Identity from certificate ${certificate} in msp ${mspId}`
+    );
     const clientId = CryptoUtils.fabricIdFromCertificate(certificate);
     const id = CryptoUtils.encode(clientId);
-    // logger.debug(stringFormat("Identity {0} and encodedId {1}", clientId, id));
+    log.debug(`Identity ${clientId} and encodedId ${id}`);
     const now = new Date();
     return new Identity({
       id: id,
@@ -318,9 +280,10 @@ export class FabricEnrollmentService {
 
   async enroll(enrollmentId: string, registration: string) {
     let identity: Identity;
+    const log = this.log.for(this.enroll);
     try {
       const ca = await this.CA();
-      // this.logger.debug(stringFormat("Enrolling {0}", enrollmentId));
+      log.debug(`Enrolling ${enrollmentId}`);
       const enrollment: IEnrollResponse = await ca.enroll({
         enrollmentID: enrollmentId,
         enrollmentSecret: registration,
@@ -329,14 +292,9 @@ export class FabricEnrollmentService {
         enrollment,
         this.caConfig.caName
       );
-      // this.logger.info(
-      //   stringFormat(
-      //     "Successfully enrolled {0} under {1} as {2}",
-      //     enrollmentId,
-      //     this.caConfig.caName,
-      //     identity.id as string
-      //   )
-      // );
+      log.info(
+        `Successfully enrolled ${enrollmentId} under ${this.caConfig.caName} as ${identity.id}`
+      );
     } catch (e: any) {
       throw this.parseError(e);
     }
@@ -386,7 +344,7 @@ export class FabricEnrollmentService {
     const identity = await this.read(enrollmentId);
     if (!identity)
       throw new NotFoundError(
-        stringFormat("Could not find enrollment with id {0}", enrollmentId)
+        `Could not find enrollment with id ${enrollmentId}`
       );
     let result: IServiceResponse;
     try {
@@ -394,18 +352,14 @@ export class FabricEnrollmentService {
         { enrollmentID: identity.id, reason: "User Deletation" },
         user
       );
-    } catch (e: any) {
+    } catch (e: unknown) {
       throw new InternalError(
-        stringFormat("Could not revoke enrollment with id {0}", enrollmentId)
+        `Could not revoke enrollment with id ${enrollmentId}`
       );
     }
     if (!result.success)
       throw new InternalError(
-        stringFormat(
-          "Could not revoke enrollment with id {0}:\n{1}",
-          enrollmentId,
-          result.errors.join("\n")
-        )
+        `Could not revoke enrollment with id ${enrollmentId}: ${result.errors.join("\n")}`
       );
     return result;
   }
