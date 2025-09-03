@@ -1,7 +1,7 @@
 import { Dispatch } from "@decaf-ts/core";
 import { PeerConfig } from "../shared/types";
 import { Client } from "@grpc/grpc-js";
-import { FabricAdapter } from "./FabricAdapter";
+import { FabricClientAdapter } from "./FabricClientAdapter";
 import { InternalError } from "@decaf-ts/db-decorators";
 import {
   ChaincodeEvent,
@@ -14,7 +14,7 @@ import { parseEventName } from "../shared/events";
  * @summary Listens for and processes events emitted by Fabric chaincode, dispatching them to registered observers
  * @template PeerConfig - Configuration type for connecting to a Fabric peer
  * @param client - gRPC client for connecting to the Fabric network
- * @class FabricDispatch
+ * @class FabricClientDispatch
  * @example
  * ```typescript
  * // Create a new FabricDispatch instance
@@ -57,7 +57,7 @@ import { parseEventName } from "../shared/events";
  *     FabricDispatch-->>Client: callback(id)
  *   end
  */
-export class FabricDispatch extends Dispatch<PeerConfig> {
+export class FabricClientDispatch extends Dispatch<PeerConfig> {
   /**
    * @description Event listening stack for chaincode events
    */
@@ -157,7 +157,10 @@ export class FabricDispatch extends Dispatch<PeerConfig> {
   protected override async initialize(): Promise<void> {
     if (!this.native || this.adapter)
       throw new InternalError(`No adapter or config observed for dispatch`);
-    const gateway = await FabricAdapter.getGateway(this.native, this.client);
+    const gateway = await FabricClientAdapter.getGateway(
+      this.native,
+      this.client
+    );
     const network = gateway.getNetwork(this.native.channel);
     if (!this.adapter)
       throw new InternalError(`No adapter observed for dispatch`);
