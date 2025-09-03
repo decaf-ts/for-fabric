@@ -1,4 +1,4 @@
-import FabricCAClient from "fabric-ca-client";
+import FabricCAServices from "fabric-ca-client";
 import {
   AffiliationService,
   IdentityService,
@@ -13,8 +13,11 @@ import { Identity } from "../../shared/model/Identity";
 import { stringFormat } from "@decaf-ts/decorator-validation";
 import { Logger, Logging, MiniLogger } from "@decaf-ts/logging";
 import { AuthorizationError } from "@decaf-ts/core";
-import { ConflictError, NotFoundError } from "@decaf-ts/db-decorators";
-import { DLTError, RegistrationError } from "../errors";
+import {
+  ConflictError,
+  InternalError,
+  NotFoundError,
+} from "@decaf-ts/db-decorators";
 import { CoreUtils } from "../utils";
 import { CA_ROLE } from "./constants";
 import { CryptoUtils } from "../crypto";
@@ -24,6 +27,7 @@ import {
   GetCertificatesRequest,
   IdentityResponse,
 } from "../fabric-shims";
+import { RegistrationError } from "../errors";
 
 export enum HFCAIdentityType {
   PEER = "peer",
@@ -32,7 +36,6 @@ export enum HFCAIdentityType {
   USER = "user",
   ADMIN = "admin",
 }
-
 export interface IKeyValueAttribute {
   name: string;
   value: string;
@@ -50,7 +53,7 @@ export enum HFCAIdentityAttributes {
 }
 
 export class FabricEnrollmentService {
-  private ca?: FabricCAClient;
+  private ca?: FabricCAServices;
 
   private certificateService?: any;
 
@@ -73,22 +76,22 @@ export class FabricEnrollmentService {
   protected async User(): Promise<User> {
     if (this.user) return this.user;
     const { caName, caCert, caKey, url } = this.caConfig;
-    this.logger.debug(
-      stringFormat("Creating CA user for {0} at {1}", caName, url)
-    );
-    this.logger.debug(
-      stringFormat("Retrieving CA certificate from {0}", caCert)
-    );
+    // this.logger.debug(
+    //   stringFormat("Creating CA user for {0} at {1}", caName, url)
+    // );
+    // this.logger.debug(
+    //   stringFormat("Retrieving CA certificate from {0}", caCert)
+    // );
     const certificate = await CoreUtils.getFirstDirFileNameContent(caCert);
-    this.logger.debug(stringFormat("Retrieving CA key from {0}", caKey));
+    // this.logger.debug(stringFormat("Retrieving CA key from {0}", caKey));
     const key = await CoreUtils.getFirstDirFileNameContent(caKey);
 
-    this.logger.debug(stringFormat("Loading Admin user for ca {0}", caName));
+    // this.logger.debug(stringFormat("Loading Admin user for ca {0}", caName));
     this.user = await CoreUtils.getCAUser("admin", key, certificate, caName);
     return this.user;
   }
 
-  protected async CA(): Promise<FabricCAClient> {
+  protected async CA(): Promise<FabricCAServices> {
     if (this.ca) return this.ca;
     const { url, tls, caName } = this.caConfig;
 
@@ -106,7 +109,7 @@ export class FabricEnrollmentService {
     // this.logger.debug(
     //   stringFormat("Creating CA Client for CA {0} under {1}", caName, url)
     // );
-    this.ca = new FabricCAClient(
+    this.ca = new FabricCAServices(
       url,
       {
         trustedRoots: Buffer.from(certificate),
@@ -120,7 +123,7 @@ export class FabricEnrollmentService {
   protected async Client(): Promise<{ newCertificateService: Function }> {
     if (this.client) return this.client;
     const ca = await this.CA();
-    this.client = (ca as any)["_fabricCAClient"];
+    this.client = (ca as any)["_FabricCAServices"];
     return this.client;
   }
 
@@ -148,41 +151,41 @@ export class FabricEnrollmentService {
   ): Promise<string[] | CertificateResponse> {
     const certificateService = await this.Certificate();
     const user = await this.User();
-    this.logger.debug(
-      stringFormat(
-        "Retrieving certificates {0} for CA {1}",
-        request ? stringFormat("for {0}", request.id as string) : "",
-        this.caConfig.caName
-      )
-    );
+    // this.logger.debug(
+    //   stringFormat(
+    //     "Retrieving certificates {0} for CA {1}",
+    //     request ? stringFormat("for {0}", request.id as string) : "",
+    //     this.caConfig.caName
+    //   )
+    // );
     const response: CertificateResponse = (
       await certificateService.getCertificates(request || {}, user)
     ).result;
-    this.logger.debug(
-      stringFormat(
-        "Found {0} certificates: {1}",
-        response.certs.length + "",
-        JSON.stringify(response)
-      )
-    );
+    // this.logger.debug(
+    //   stringFormat(
+    //     "Found {0} certificates: {1}",
+    //     response.certs.length + "",
+    //     JSON.stringify(response)
+    //   )
+    // );
     return doMap ? response.certs.map((c) => c.PEM) : response;
   }
 
   async getIdentities(): Promise<FabricIdentity[]> {
     const identitiesService = await this.Identities();
-    this.logger.debug(
-      stringFormat("Retrieving Identities under CA {0}", this.caConfig.caName)
-    );
+    // this.logger.debug(
+    //   stringFormat("Retrieving Identities under CA {0}", this.caConfig.caName)
+    // );
     const response: IdentityResponse = (
       await identitiesService.getAll(await this.User())
     ).result;
-    this.logger.debug(
-      stringFormat(
-        "Found {0} Identities: {1}",
-        response.identities.length + "",
-        JSON.stringify(response)
-      )
-    );
+    // this.logger.debug(
+    //   stringFormat(
+    //     "Found {0} Identities: {1}",
+    //     response.identities.length + "",
+    //     JSON.stringify(response)
+    //   )
+    // );
     return response.identities;
   }
 
@@ -204,18 +207,18 @@ export class FabricEnrollmentService {
 
   async getAffiliations() {
     const affiliationService = await this.Affiliations();
-    this.logger.debug(
-      stringFormat("Retrieving Affiliations under CA {0}", this.caConfig.caName)
-    );
+    // this.logger.debug(
+    //   stringFormat("Retrieving Affiliations under CA {0}", this.caConfig.caName)
+    // );
     const response = (await affiliationService.getAll(await this.User()))
       .result;
-    this.logger.debug(
-      stringFormat(
-        "Found {0} Affiliations: {1}",
-        response.a.length + "",
-        JSON.stringify(response)
-      )
-    );
+    // this.logger.debug(
+    //   stringFormat(
+    //     "Found {0} Affiliations: {1}",
+    //     response.a.length + "",
+    //     JSON.stringify(response)
+    //   )
+    // );
     return response;
   }
 
@@ -261,19 +264,19 @@ export class FabricEnrollmentService {
         enrollmentID: userName as string,
         enrollmentSecret: password,
         affiliation: affiliation,
-        userRole,
-        attrs: attrs,
-        maxEnrollments: maxEnrollments,
+        // userRole,
+        // attrs: attrs,
+        // maxEnrollments: maxEnrollments,
         // maxEnrollments: (role === CA_ROLE.ADMIN || isSuperUser) ? -1 : 1
       } as IRegisterRequest;
       registration = await ca.register(props, user);
-      this.logger.info(
-        stringFormat(
-          `Registration for {0} created with user type {1} ${isSuperUser ? "as super user" : ""} `,
-          model.userName as string,
-          userRole ?? "Undefined Role"
-        )
-      );
+      // this.logger.info(
+      //   stringFormat(
+      //     `Registration for {0} created with user type {1} ${isSuperUser ? "as super user" : ""} `,
+      //     model.userName as string,
+      //     userRole ?? "Undefined Role"
+      //   )
+      // );
     } catch (e: any) {
       throw this.parseError(e);
     }
@@ -286,16 +289,16 @@ export class FabricEnrollmentService {
   ): Identity {
     const { certificate, key, rootCertificate } = enrollment;
     const logger = Logging.for(FabricEnrollmentService);
-    logger.debug(
-      stringFormat(
-        "Generating Identity from certificate {0} in msp {1}",
-        certificate,
-        mspId
-      )
-    );
+    // logger.debug(
+    //   stringFormat(
+    //     "Generating Identity from certificate {0} in msp {1}",
+    //     certificate,
+    //     mspId
+    //   )
+    // );
     const clientId = CryptoUtils.fabricIdFromCertificate(certificate);
     const id = CryptoUtils.encode(clientId);
-    logger.debug(stringFormat("Identity {0} and encodedId {1}", clientId, id));
+    // logger.debug(stringFormat("Identity {0} and encodedId {1}", clientId, id));
     const now = new Date();
     return new Identity({
       id: id,
@@ -317,7 +320,7 @@ export class FabricEnrollmentService {
     let identity: Identity;
     try {
       const ca = await this.CA();
-      this.logger.debug(stringFormat("Enrolling {0}", enrollmentId));
+      // this.logger.debug(stringFormat("Enrolling {0}", enrollmentId));
       const enrollment: IEnrollResponse = await ca.enroll({
         enrollmentID: enrollmentId,
         enrollmentSecret: registration,
@@ -326,20 +329,37 @@ export class FabricEnrollmentService {
         enrollment,
         this.caConfig.caName
       );
-      this.logger.info(
-        stringFormat(
-          "Successfully enrolled {0} under {1} as {2}",
-          enrollmentId,
-          this.caConfig.caName,
-          identity.id as string
-        )
-      );
+      // this.logger.info(
+      //   stringFormat(
+      //     "Successfully enrolled {0} under {1} as {2}",
+      //     enrollmentId,
+      //     this.caConfig.caName,
+      //     identity.id as string
+      //   )
+      // );
     } catch (e: any) {
       throw this.parseError(e);
     }
     return identity;
   }
 
+  /**
+   * Registers a new identity with the CA and enrolls it.
+   *
+   * @param model - The credentials for the new identity.
+   * @param isSuperUser - Indicates if the new identity should be a super user. Default is false.
+   * @param affiliation - The affiliation of the new identity. Default is an empty string.
+   * @param userRole - The role of the new identity. It can be a CA_ROLE or a custom string.
+   * @param attrs - Additional attributes for the new identity.
+   * @param maxEnrollments - The maximum number of enrollments for the new identity.
+   *
+   * @returns A Promise that resolves to the newly enrolled identity.
+   *
+   * @throws {RegistrationError} If there is an error during the registration process.
+   * @throws {ConflictError} If the enrollment ID already exists.
+   * @throws {AuthorizationError} If the user does not have the necessary permissions.
+   * @throws {DLTError} If there is an error during the enrollment process.
+   */
   async registerAndEnroll(
     model: Credentials,
     isSuperUser: boolean = false,
@@ -375,12 +395,12 @@ export class FabricEnrollmentService {
         user
       );
     } catch (e: any) {
-      throw new DLTError(
+      throw new InternalError(
         stringFormat("Could not revoke enrollment with id {0}", enrollmentId)
       );
     }
     if (!result.success)
-      throw new DLTError(
+      throw new InternalError(
         stringFormat(
           "Could not revoke enrollment with id {0}:\n{1}",
           enrollmentId,
