@@ -9,6 +9,7 @@ import { Sequence } from "@decaf-ts/core";
 import { MangoQuery, Sequence as Seq } from "@decaf-ts/for-couchdb";
 import { FabricContractContext } from "./ContractContext";
 import { FabricContractRepository } from "./FabricContractRepository";
+import { MissingContextError } from "../shared/errors";
 
 /**
  * @summary Abstract implementation of a Sequence
@@ -37,7 +38,7 @@ export class FabricContractDBSequence extends Sequence {
   async current(
     ctx?: Context<RepositoryFlags>
   ): Promise<string | number | bigint> {
-    if (!ctx) throw new Error("Context is required");
+    if (!ctx) throw new MissingContextError("Context is required");
     const { name, startWith } = this.options;
     try {
       const sequence: Seq = await this.repo.read(name as string, ctx);
@@ -85,7 +86,7 @@ export class FabricContractDBSequence extends Sequence {
     count?: number,
     ctx?: FabricContractContext
   ): Promise<string | number | bigint> {
-    if (!ctx) throw new Error("Context is required");
+    if (!ctx) throw new MissingContextError("Context is required");
     const { type, incrementBy, name } = this.options;
     let next: string | number | bigint;
     const toIncrementBy = count || incrementBy;
@@ -121,7 +122,7 @@ export class FabricContractDBSequence extends Sequence {
    *
    */
   async next(ctx?: FabricContractContext): Promise<number | string | bigint> {
-    if (!ctx) throw new Error("Context is required");
+    if (!ctx) throw new MissingContextError("Context is required");
     const current = await this.current(ctx);
     return this.increment(current, undefined, ctx);
   }
@@ -130,12 +131,13 @@ export class FabricContractDBSequence extends Sequence {
     count: number,
     ctx?: FabricContractContext
   ): Promise<(number | string | bigint)[]> {
-    if (!ctx) throw new Error("Context is required");
+    if (!ctx) throw new MissingContextError("Context is required");
     const current = (await this.current(ctx)) as number;
     const incrementBy = this.parse(this.options.incrementBy) as number;
     const next: string | number | bigint = await this.increment(
       current,
-      (this.parse(count) as number) * incrementBy
+      (this.parse(count) as number) * incrementBy,
+      ctx
     );
     const range: (number | string | bigint)[] = [];
     for (let i: number = 1; i <= count; i++) {

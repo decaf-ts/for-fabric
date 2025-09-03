@@ -9,5 +9,4 @@ export * from "./events";
 export * from "./utils";
 export * from "./types";
 export * from "./services";
-export * from "./model"
-
+export * from "./model";

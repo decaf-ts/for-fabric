@@ -1,6 +1,5 @@
-import { JSONSerializer, model, Model } from "@decaf-ts/decorator-validation";
-import stringify from "json-stringify-deterministic";
-import sortKeysRecursive from "sort-keys-recursive";
+/* eslint-disable @typescript-eslint/no-require-imports */
+import { JSONSerializer, Model } from "@decaf-ts/decorator-validation";
 
 export class DeterministicSerializer<
   M extends Model,
@@ -14,6 +13,8 @@ export class DeterministicSerializer<
   }
 
   override serialize(model: M): string {
+    const stringify = require("json-stringify-deterministic");
+    const sortKeysRecursive = require("sort-keys-recursive");
     return stringify(sortKeysRecursive(this.preSerialize(model)));
   }
 }

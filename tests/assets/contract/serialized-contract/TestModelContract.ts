@@ -327,31 +327,6 @@ export class TestModelContract extends SerializedCrudContract<TestModel> {
     super(TestModelContract.name, TestModel);
   }
 
-  @Transaction(false)
-  public async readData(ctx: Context, id: string): Promise<string | null> {
-    const bytes = await ctx.stub.getState(id);
-    if (!bytes || bytes.length === 0) {
-      ctx.logging
-        .getLogger()
-        .info(`Transaction readData called with id: ${id}: No data found`);
-      return null;
-    }
-    const m1 = JSON.parse(bytes.toString());
-
-    ctx.logging
-      .getLogger()
-      .info(
-        `Transaction readData called with id: ${id}: data: ${JSON.stringify(m1)}`
-      );
-
-    return JSON.stringify(m1);
-  }
-
-  @Transaction(false)
-  public async healthcheck(ctx: Context): Promise<string> {
-    return "ready";
-  }
-
   public getContext(context) {
     return {
       f: context.context,
@@ -388,5 +363,25 @@ export class TestModelContract extends SerializedCrudContract<TestModel> {
         );
       return { [currentId]: err };
     }
+  }
+
+  @Transaction(false)
+  public async readByPass(ctx: Context, id: string): Promise<string | null> {
+    const bytes = await ctx.stub.getState(id);
+    if (!bytes || bytes.length === 0) {
+      ctx.logging
+        .getLogger()
+        .info(`Transaction readData called with id: ${id}: No data found`);
+      return null;
+    }
+    const m1 = JSON.parse(bytes.toString());
+
+    ctx.logging
+      .getLogger()
+      .info(
+        `Transaction readData called with id: ${id}: data: ${JSON.stringify(m1)}`
+      );
+
+    return JSON.stringify(m1);
   }
 }
