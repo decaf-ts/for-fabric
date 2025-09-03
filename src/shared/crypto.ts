@@ -190,7 +190,7 @@ export class CryptoUtils {
         issuer
       )
     );
-    return `x509::/${subject.replaceAll(", ", "\/")}::/${issuer.replaceAll(", ", "\/")}`;
+    return `x509::/${subject.replaceAll(", ", "/")}::/${issuer.replaceAll(", ", "/")}`;
   }
 
   static encode(str: string): string {
@@ -309,7 +309,9 @@ export class CryptoUtils {
   }
 
   private static getSubtleCrypto() {
-    return isBrowser() ? globalThis.window.crypto.subtle : crypto.subtle;
+    return isBrowser()
+      ? (globalThis as any).window.crypto.subtle
+      : crypto.subtle;
   }
 
   static async decrypt(privateKey: string, data: string | Buffer) {
