@@ -87,18 +87,6 @@ export class FabricClientRepository<M extends Model> extends Repository<
       this.adapter,
       this._overrides || {}
     );
-    const pk = model[this.pk] as string;
-    if (!pk)
-      throw new InternalError(
-        `No value for the Id is defined under the property ${this.pk as string}`
-      );
-    const oldModel = await this.read(pk, ...contextArgs.args);
-    model = this.merge(oldModel, model);
-
-    if (Repository.getMetadata(oldModel)) {
-      if (!Repository.getMetadata(model))
-        Repository.setMetadata(model, Repository.getMetadata(oldModel));
-    }
     return [model, ...contextArgs.args];
   }
 
@@ -113,27 +101,6 @@ export class FabricClientRepository<M extends Model> extends Repository<
       this.adapter,
       this._overrides || {}
     );
-    const ids = models.map((m) => {
-      const id = m[this.pk] as string;
-      if (!id) throw new InternalError("missing id on update operation");
-      return id;
-    });
-    const oldModels = await this.readAll(ids, ...contextArgs.args);
-    models = models.map((m, i) => {
-      m = this.merge(oldModels[i], m);
-      if (Repository.getMetadata(oldModels[i])) {
-        if (!Repository.getMetadata(m))
-          Repository.setMetadata(m, Repository.getMetadata(oldModels[i]));
-      }
-      return m;
-    });
-
-    models.forEach((m, i) => {
-      if (Repository.getMetadata(oldModels[i])) {
-        if (!Repository.getMetadata(m))
-          Repository.setMetadata(m, Repository.getMetadata(oldModels[i]));
-      }
-    });
     return [models, ...contextArgs.args];
   }
 
