@@ -1,12 +1,14 @@
 import { FabricContractAdapter } from "../ContractAdapter";
 const adapter = new FabricContractAdapter();
-import { Contract, Context as Ctx } from "fabric-contract-api";
+import { Context, Contract, Context as Ctx } from "fabric-contract-api";
 import { Constructor, Model, Serializer } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "../FabricContractRepository";
 import { DeterministicSerializer } from "../../shared/DeterministicSerializer";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { Checkable } from "../../shared/interfaces/Checkable";
+import { ContractLogger } from "../logging";
+import { Logging } from "@decaf-ts/logging";
 
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode
@@ -86,6 +88,16 @@ export abstract class FabricCrudContract<M extends Model>
   }
 
   /**
+   * @description Creates a logger for a specific chaincode context
+   * @summary Returns a ContractLogger instance configured for the current context
+   * @param {Ctx} ctx - The Fabric chaincode context
+   * @return {ContractLogger} The logger instance
+   */
+  public logFor(ctx: Context): ContractLogger {
+    return Logging.for(FabricCrudContract.name, {}, ctx) as ContractLogger;
+  }
+
+  /**
    * @description Deletes multiple models from the state database
    * @summary Delegates to the repository's deleteAll method
    * @param {string[] | number[]} keys - The keys of the models to delete
@@ -132,7 +144,7 @@ export abstract class FabricCrudContract<M extends Model>
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    const log = FabricCrudContract.adapter.logFor(ctx).for(this.updateAll);
+    const log = this.logFor(ctx).for(this.updateAll);
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
         .map((m) => this.deserialize(m))
@@ -173,14 +185,14 @@ export abstract class FabricCrudContract<M extends Model>
   }
 
   protected async init(ctx: Ctx): Promise<void> {
-    const log = FabricCrudContract.adapter.logFor(ctx).for(this.init);
+    const log = this.logFor(ctx).for(this.init);
     log.info(`Running contract initialization...`);
     this.initialized = true;
     log.info(`Contract initialization completed.`);
   }
 
   async healthcheck(ctx: Ctx): Promise<string | boolean> {
-    const log = FabricCrudContract.adapter.logFor(ctx).for(this.healthcheck);
+    const log = this.logFor(ctx).for(this.healthcheck);
     log.info(`Running Healthcheck: ${this.initialized}...`);
     return this.initialized;
   }
@@ -198,7 +210,7 @@ export abstract class FabricCrudContract<M extends Model>
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
-    const log = FabricCrudContract.adapter.logFor(ctx).for(this.create);
+    const log = this.logFor(ctx).for(this.create);
 
     if (typeof model === "string") model = this.deserialize<M>(model) as any;
 
@@ -219,7 +231,7 @@ export abstract class FabricCrudContract<M extends Model>
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    const log = FabricCrudContract.adapter.logFor(ctx).for(this.createAll);
+    const log = this.logFor(ctx).for(this.createAll);
 
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
@@ -243,7 +255,7 @@ export abstract class FabricCrudContract<M extends Model>
     key: string | number,
     ...args: any[]
   ): Promise<M | string> {
-    const log = FabricCrudContract.adapter.logFor(ctx).for(this.read);
+    const log = this.logFor(ctx).for(this.read);
 
     log.info(`reading entry with pk ${key} `);
 
@@ -263,7 +275,7 @@ export abstract class FabricCrudContract<M extends Model>
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
-    const log = FabricCrudContract.adapter.logFor(ctx).for(this.update);
+    const log = this.logFor(ctx).for(this.update);
 
     if (typeof model === "string") model = this.deserialize<M>(model) as any;
 
@@ -284,7 +296,7 @@ export abstract class FabricCrudContract<M extends Model>
     key: string | number,
     ...args: any[]
   ): Promise<M | string> {
-    const log = FabricCrudContract.adapter.logFor(ctx).for(this.delete);
+    const log = this.logFor(ctx).for(this.delete);
     log.info(`deleting entry with pk ${key} `);
     return this.repo.delete(key, ctx, ...args);
   }

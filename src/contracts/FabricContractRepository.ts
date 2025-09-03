@@ -19,6 +19,8 @@ import { FabricContractRepositoryObservableHandler } from "./FabricContractRepos
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
 import { Context } from "fabric-contract-api";
 import { FabricContractDBSequence } from "./FabricContractSequence";
+import { ContractLogger } from "./logging";
+import { Logging } from "@decaf-ts/logging";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -97,6 +99,16 @@ export class FabricContractRepository<M extends Model> extends Repository<
     protected trackedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
   ) {
     super(adapter, clazz);
+  }
+
+  /**
+   * @description Creates a logger for a specific chaincode context
+   * @summary Returns a ContractLogger instance configured for the current context
+   * @param {Ctx} ctx - The Fabric chaincode context
+   * @return {ContractLogger} The logger instance
+   */
+  public logFor(ctx: Context): ContractLogger {
+    return Logging.for(FabricContractRepository, {}, ctx) as ContractLogger;
   }
 
   /**
@@ -235,7 +247,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
    */
   override async create(model: M, ...args: any[]): Promise<M> {
     const ctx = args[args.length - 1] as Context;
-    const log = this.adapter.logFor(ctx).for(this.create);
+    const log = this.logFor(ctx).for(this.create);
     log.info(`Preparing model: ${JSON.stringify(model)}`);
     // eslint-disable-next-line prefer-const
     let { record, id, transient } = this.adapter.prepare(
@@ -267,7 +279,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
    */
   override async update(model: M, ...args: any[]): Promise<M> {
     const ctx = args[args.length - 1] as Context;
-    const log = this.adapter.logFor(ctx).for(this.update);
+    const log = this.logFor(ctx).for(this.update);
     log.info(`Preparing model: ${JSON.stringify(model)}`);
     // eslint-disable-next-line prefer-const
     let { record, id, transient } = this.adapter.prepare(
