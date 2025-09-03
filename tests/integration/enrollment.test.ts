@@ -1,28 +1,31 @@
 import { Credentials, CAConfig } from "../../src/shared/types";
 import { FabricEnrollmentService } from "../../src/shared/services";
-import { CA_ROLE } from "../../src/shared/services/constants";
 import { Identity } from "../../src/shared/model/Identity";
 
 jest.setTimeout(5000000);
 
-describe.skip("Test enrollement", () => {
+describe("Test enrollement", () => {
   const user: Credentials = {
     userName: "TestUser",
     password: "TestUserPSW",
   };
 
+  // const admin: Credentials = {
+  //   userName: "admin",
+  //   password: "admin",
+  // };
+
   const caConfig: CAConfig = {
-    url: "https://org-a:7011",
+    url: "https://localhost:7011",
     tls: {
       trustedRoots: [
-        "docker/infrastructure/storage/org-a-peer-0-vol/client/tls-msp/tlscacerts",
+        "for-fabric/tests/docker-data/org-a-peer-0-vol/msp/tlscacerts",
       ],
-      verify: false,
+      verify: true,
     },
-    caName: "org-a ",
-    caCert: "docker/infrastructure/storage/org-a-server-vol",
-    caKey:
-      "docker/infrastructure/storage/org-a-server-vol/msp/keystore/70e1827a1525139e8a02e304bd020ff89742a492cc94864fafbdf3593db0b604_sk",
+    caName: "org-a",
+    caCert: "for-fabric/tests/docker-data/org-a-peer-0-vol/msp/cacerts",
+    caKey: "for-fabric/tests/docker-data/org-a-peer-0-vol/msp/keystore",
   };
 
   beforeAll(async () => {});
