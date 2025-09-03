@@ -20,4 +20,4 @@
 /.confluence-token
 /node_modules
 !.gitkeep
-tests/docker-data/*
+/docker/docker-data
