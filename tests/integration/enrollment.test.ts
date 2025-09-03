@@ -19,13 +19,15 @@ describe("Test enrollement", () => {
     url: "https://localhost:7011",
     tls: {
       trustedRoots: [
-        "for-fabric/tests/docker-data/org-a-peer-0-vol/msp/tlscacerts",
+        "for-fabric/tests/docker-data/storage/org-a-client-vol/tls-ca-cert.pem",
       ],
       verify: true,
     },
     caName: "org-a",
-    caCert: "for-fabric/tests/docker-data/org-a-peer-0-vol/msp/cacerts",
-    caKey: "for-fabric/tests/docker-data/org-a-peer-0-vol/msp/keystore",
+    caCert:
+      "for-fabric/tests/docker-data/storage/org-a-client-vol/admin/msp/signcerts",
+    caKey:
+      "for-fabric/tests/docker-data/storage/org-a-client-vol/admin/msp/keystore",
   };
 
   beforeAll(async () => {});

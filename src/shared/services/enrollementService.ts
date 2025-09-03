@@ -101,7 +101,7 @@ export class FabricEnrollmentService {
     // this.logger.debug(stringFormat("Retrieving CA certificate from {0}", root));
     console.log(process.cwd());
 
-    const certificate = await CoreUtils.getFirstDirFileNameContent(root);
+    const certificate = await CoreUtils.getFileContent(root);
     // this.logger.debug(
     //   stringFormat("Creating CA Client for CA {0} under {1}", caName, url)
     // );

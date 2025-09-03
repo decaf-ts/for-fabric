@@ -89,6 +89,11 @@ export class CoreUtils {
     return (await promises.readFile(join(dirPath, files[0]))).toString();
   }
 
+  static async getFileContent(filePath: string): Promise<string> {
+    const { promises } = await normalizeImport(import("fs"));
+    return (await promises.readFile(filePath)).toString();
+  }
+
   static async getSigner(keyDirectoryPath: string): Promise<Signer> {
     let privateKey;
 
