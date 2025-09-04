@@ -210,9 +210,6 @@ export function privateData(collection?: string) {
 
   const key: string = getFabricModelKey(FabricModelKeys.PRIVATE);
 
-  // //TODO: Adjust to support multiple collections maybe comma separated colleciton names
-  // // Get metadata and add new collection to the metadata everytime the de
-
   return function privateData(model: any, attribute?: string) {
     const target = !attribute ? model.constructor : model;
     const propertyKey = attribute || undefined;
