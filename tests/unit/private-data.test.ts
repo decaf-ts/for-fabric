@@ -1,0 +1,219 @@
+import { FabricCrudContract } from "../../src/contracts";
+console.log(FabricCrudContract);
+import {
+  maxlength,
+  minlength,
+  model,
+  Model,
+  ModelArg,
+  required,
+} from "@decaf-ts/decorator-validation";
+import {
+  getFabricModelKey,
+  isPrivateData,
+  modelToPrivate,
+  privateData,
+} from "../../src";
+import { FabricModelKeys } from "../../src/shared/constants";
+import { SerializedCrudContract } from "../../src/contracts";
+import { BaseModel, column, pk, table } from "@decaf-ts/core";
+import { Context, Object as FabricObject, Property } from "fabric-contract-api";
+import { randomName, randomNif } from "../utils";
+
+jest.setTimeout(5000000);
+
+const logger = {
+  info: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  warn: jest.fn(),
+  trace: jest.fn(),
+  log: jest.fn(),
+};
+const state: Record<string, any> = {};
+
+const ctx = {
+  stub: {
+    getMspID: () => {
+      return "Aeon";
+    },
+    setEvent: (name: string, payload: any): void => {
+      console.info(
+        `Event "${name}" triggered with payload of length ${payload.length}`
+      );
+    },
+    getDateTimestamp: () => {
+      return new Date();
+    },
+    createCompositeKey: (objectType: string, attributes: string[]) => {
+      return objectType + "_" + attributes.join("_");
+    },
+    getState: async (key: string) => {
+      if (key in state) return state[key];
+      return "";
+    },
+    putState: async (key: string, value: any) => {
+      state[key] = value;
+    },
+    deleteState: async (key: string) => {
+      if (key in state) {
+        delete state[key];
+        return;
+      }
+      throw new Error("Missing");
+    },
+    getQueryResultWithPagination: async (
+      query: string,
+      pageSize: number,
+      bookmark: string
+    ) => {
+      const keys = Object.keys(state);
+
+      let startIndex = 0;
+      if (bookmark) {
+        const index = keys.indexOf(bookmark);
+        startIndex = index >= 0 ? index + 1 : 0;
+      }
+
+      const paginatedKeys = keys.slice(startIndex, startIndex + pageSize);
+      let currentIndex = 0;
+
+      return {
+        iterator: {
+          async next() {
+            if (currentIndex < paginatedKeys.length) {
+              const key = paginatedKeys[currentIndex++];
+              return {
+                value: { key, value: state[key] },
+                done: false,
+              };
+            }
+            return { done: true };
+          },
+          async close() {
+            // No-op for mock
+          },
+        },
+      };
+    },
+  },
+  logging: {
+    getLogger: (_str: string) => {
+      console.log(_str);
+      return logger;
+    },
+  },
+  identity: {
+    getID: () => "id",
+    getMSPID: () => "Aeon",
+  },
+  logger: {
+    ...logger,
+  },
+};
+
+const ORGA = "OrganizationA";
+const ORGB = "OrganizationB";
+
+describe("Tests private data decorator", () => {
+  class TestModel1 extends Model {
+    @required()
+    @privateData(ORGA)
+    name!: string;
+    constructor(arg?: ModelArg<Model>) {
+      super(arg);
+    }
+  }
+
+  @privateData(ORGB)
+  class TestModel2 extends Model {
+    @required()
+    name!: string;
+    constructor(arg?: ModelArg<Model>) {
+      super(arg);
+    }
+  }
+
+  it("Tests private data decorator on property", () => {
+    const c = new TestModel1({ name: "John Doe" });
+    console.log(c);
+    const metadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      c,
+      "name"
+    );
+    console.log(metadata);
+    expect(metadata.collection).toBe(ORGA);
+
+    const isPrivate = isPrivateData(c);
+
+    const privateModel = modelToPrivate(c);
+
+    console.log(isPrivate);
+    console.log(privateModel);
+  });
+
+  it("Tests private data decorator on class", () => {
+    const metadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestModel2
+    );
+    console.log(metadata);
+    expect(metadata.collection).toBe(ORGB);
+  });
+});
+
+describe("Tests private data decorator in contract context", () => {
+  @table("tst_user")
+  @model()
+  @FabricObject()
+  class TestModel extends BaseModel {
+    @pk({ type: "Number" })
+    id!: number;
+
+    @column("tst_name")
+    @required()
+    @Property()
+    name!: string;
+
+    @column("tst_nif")
+    // @unique()
+    @minlength(9)
+    @maxlength(9)
+    @required()
+    @Property()
+    @privateData(ORGA)
+    nif!: string;
+
+    constructor(arg?: ModelArg<TestModel>) {
+      super(arg);
+    }
+  }
+
+  class TestContract extends SerializedCrudContract<TestModel> {
+    constructor() {
+      super(TestContract.name, TestModel);
+    }
+  }
+
+  let contract: TestContract;
+
+  beforeAll(async () => {
+    console.log("Initializing contract");
+    contract = new TestContract();
+  });
+
+  it("Should create", async () => {
+    const m = new TestModel({
+      name: randomName(6),
+      nif: randomNif(9),
+    }).serialize();
+
+    await contract.create(ctx as unknown as Context, m);
+
+    const keys = Object.keys(state);
+    keys.forEach((key) => {
+      console.log(state[key].toString());
+    });
+  });
+});

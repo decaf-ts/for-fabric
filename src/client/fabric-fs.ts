@@ -3,6 +3,7 @@ import { Logging } from "@decaf-ts/logging";
 import { User } from "fabric-common";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
 import { isBrowser } from "@decaf-ts/utils";
+import { InternalError } from "@decaf-ts/db-decorators";
 
 const log = Logging.for("fabric-fs");
 
@@ -217,6 +218,7 @@ export async function extractPrivateKey(pem: Buffer) {
     .replace("-----END PRIVATE KEY-----", "");
   const decoded = Buffer.from(str, "base64").toString("binary");
   const binaryDer = str2ab(decoded);
+
   try {
     const key = await subtle.importKey(
       "pkcs8",
@@ -231,6 +233,6 @@ export async function extractPrivateKey(pem: Buffer) {
 
     return key;
   } catch (e: any) {
-    throw e;
+    throw new InternalError(e);
   }
 }

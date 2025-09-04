@@ -1,18 +1,18 @@
-import { AuthorizationError, Condition, Repository } from "@decaf-ts/core";
+import { AuthorizationError, Condition } from "@decaf-ts/core";
 import { Transaction } from "fabric-contract-api";
 import { add, sub } from "../../shared/math";
-import {
-  BalanceError,
-  DLTError,
-  NotFoundError,
-  ValidationError,
-} from "../../shared/errors";
+import { BalanceError } from "../../shared/errors";
 import { FabricContractAdapter } from "../ContractAdapter";
 import { Allowance, ERC20Token, ERC20Wallet } from "./models";
 import { FabricContractContext } from "../ContractContext";
 import { FabricCrudContract } from "../crud";
 import { Owner } from "../../shared/decorators";
 import { FabricContractRepository } from "../FabricContractRepository";
+import {
+  InternalError,
+  NotFoundError,
+  ValidationError,
+} from "@decaf-ts/db-decorators";
 
 export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet> {
   private tokenRepository: FabricContractRepository<ERC20Token>;
@@ -156,7 +156,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     const transferResp = await this._transfer(ctx, from, to, value);
     if (!transferResp) {
-      throw new DLTError("Failed to transfer");
+      throw new InternalError("Failed to transfer");
     }
 
     // Emit the Transfer event
@@ -216,7 +216,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     const transferResp = await this._transfer(ctx, from, to, value);
     if (!transferResp) {
-      throw new DLTError("Failed to transfer");
+      throw new InternalError("Failed to transfer");
     }
 
     // Decrease the allowance
@@ -413,7 +413,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
   async CheckInitialized(ctx: FabricContractContext) {
     const tokens = await this.tokenRepository.select(undefined, ctx).execute();
     if (tokens.length == 0) {
-      throw new DLTError(
+      throw new InternalError(
         "contract options need to be set before calling any function, call Initialize() to initialize contract"
       );
     }

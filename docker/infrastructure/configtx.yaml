@@ -26,7 +26,7 @@ Organizations:
     # Name is the key by which this org will be referenced in channel
     # configuration transactions.
     # Name can include alphanumeric characters as well as dots and dashes.
-    Name: Orderer0OrgaMSP
+    Name: Orderer0Orga
 
     # SkipAsForeign can be set to true for org definitions which are to be
     # inherited from the orderer system channel during channel creation.  This
@@ -77,7 +77,7 @@ Organizations:
     # Name is the key by which this org will be referenced in channel
     # configuration transactions.
     # Name can include alphanumeric characters as well as dots and dashes.
-    Name: Peer0OrgaMSP
+    Name: Peer0Orga
 
     # ID is the key by which this org's MSP definition will be referenced.
     # ID can include alphanumeric characters as well as dots and dashes.
@@ -116,7 +116,7 @@ Organizations:
     # Name is the key by which this org will be referenced in channel
     # configuration transactions.
     # Name can include alphanumeric characters as well as dots and dashes.
-    Name: Peer0OrgbMSP
+    Name: Peer0Orgb
 
     # ID is the key by which this org's MSP definition will be referenced.
     # ID can include alphanumeric characters as well as dots and dashes.
@@ -155,7 +155,7 @@ Organizations:
     # Name is the key by which this org will be referenced in channel
     # configuration transactions.
     # Name can include alphanumeric characters as well as dots and dashes.
-    Name: Peer0OrgcMSP
+    Name: Peer0Orgc
 
     # ID is the key by which this org's MSP definition will be referenced.
     # ID can include alphanumeric characters as well as dots and dashes.
