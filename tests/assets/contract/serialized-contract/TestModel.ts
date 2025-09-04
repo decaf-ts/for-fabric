@@ -6,18 +6,15 @@ import {
   ModelArg,
   required,
 } from "@decaf-ts/decorator-validation";
-import { Object as FabricObject, Property } from "fabric-contract-api";
 
 @table("tst_user")
 @model()
-@FabricObject()
 export class TestModel extends BaseModel {
   @pk({ type: "Number" })
   id!: number;
 
   @column("tst_name")
   @required()
-  @Property()
   name!: string;
 
   @column("tst_nif")
@@ -25,7 +22,6 @@ export class TestModel extends BaseModel {
   @minlength(9)
   @maxlength(9)
   @required()
-  @Property()
   nif!: string;
 
   constructor(arg?: ModelArg<TestModel>) {

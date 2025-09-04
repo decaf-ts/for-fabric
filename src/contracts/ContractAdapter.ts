@@ -470,7 +470,22 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableKey = Adapter.key(PersistenceKeys.TABLE);
     Decoration.flavouredAs(FabricContractFlavour)
       .for(tableKey)
-      .extend(FabricObject())
+      .extend(function table(obj: any) {
+        const models = [];
+        let current;
+
+        do {
+          current = Object.getPrototypeOf(obj);
+          if (current) models.push(current);
+        } while (current);
+
+        do {
+          current = models.pop();
+          if (current) FabricObject()(current);
+        } while (models.length > 0);
+
+        return FabricObject()(obj);
+      })
       .apply();
   }
 

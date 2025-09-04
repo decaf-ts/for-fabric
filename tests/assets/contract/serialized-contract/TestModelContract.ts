@@ -17,9 +17,6 @@ import { SerializedCrudContract } from "../../../../src/contracts/crud/serialize
 import { args } from "./mock-context";
 import { OperationKeys } from "@decaf-ts/db-decorators";
 
-FabricObject()(Model);
-FabricObject()(BaseModel);
-
 @Info({
   title: "TestContract",
   description: "Test implementation of serialized crud contract",

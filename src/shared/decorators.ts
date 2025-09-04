@@ -1,11 +1,7 @@
 import { AuthorizationError } from "@decaf-ts/core";
 import { FabricContractContext, FabricERC20Contract } from "../contracts";
 import { NotFoundError } from "@decaf-ts/db-decorators";
-import {
-  Decoration,
-  Model,
-  propMetadata,
-} from "@decaf-ts/decorator-validation";
+import { Model, propMetadata } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
 
 export function Owner() {
