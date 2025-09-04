@@ -1,5 +1,5 @@
 import { BaseModel, pk } from "@decaf-ts/core";
-import { model, ModelArg, required } from "@decaf-ts/decorator-validation";
+import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
 
 /**
  * @summary Identity Credential Class

@@ -196,7 +196,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @description Context constructor for this adapter
    * @summary Overrides the base Context constructor with FabricContractContext
    */
-  override Context: Constructor<FabricContractContext> = FabricContractContext;
+  override Context = FabricContractContext;
 
   /**
    * @description Gets the repository constructor for this adapter
@@ -208,7 +208,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     Repository<
       M,
       MangoQuery,
-      FabricContractAdapter,
+      Adapter<any, MangoQuery, FabricContractFlags, FabricContractContext>,
       FabricContractFlags,
       FabricContractContext
     >

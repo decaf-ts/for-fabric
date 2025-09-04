@@ -118,7 +118,7 @@ const factory: LoggerFactory = (
   config: Partial<LoggingConfig> | undefined,
   ctx: Ctx
 ) => {
-  return new ContractLogger(object, config || {}, ctx);
+  return new ContractLogger(object, config || {}, ctx as any);
 };
 
 // Set the factory as the default logger factory
