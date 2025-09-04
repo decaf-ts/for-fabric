@@ -156,7 +156,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     const transferResp = await this._transfer(ctx, from, to, value);
     if (!transferResp) {
-      throw new DLTError("Failed to transfer");
+      throw new InternalError("Failed to transfer");
     }
 
     // Emit the Transfer event
@@ -216,7 +216,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     const transferResp = await this._transfer(ctx, from, to, value);
     if (!transferResp) {
-      throw new DLTError("Failed to transfer");
+      throw new InternalError("Failed to transfer");
     }
 
     // Decrease the allowance
