@@ -2,6 +2,7 @@ import { CouchDBAdapter, type MangoQuery } from "@decaf-ts/for-couchdb";
 import grpc, { Client } from "@grpc/grpc-js";
 import {
   type Constructor,
+  model,
   Model,
   type Serializer,
   stringFormat,
@@ -25,8 +26,11 @@ import {
   SerializationError,
   BulkCrudOperationKeys,
 } from "@decaf-ts/db-decorators";
-import { final } from "@decaf-ts/core";
+import { Adapter, final, Repository } from "@decaf-ts/core";
 import { FabricClientFlavour } from "./constants";
+import { FabricClientRepository } from "./FabricClientRepository";
+import { Object } from "fabric-contract-api";
+import { args } from "../../tests/assets/contract/serialized-contract/mock-context";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -37,7 +41,7 @@ import { FabricClientFlavour } from "./constants";
  * @template Context<FabricFlags> - Context type containing Fabric-specific flags
  * @param config - Configuration for connecting to a Fabric peer
  * @param alias - Optional alias for the adapter instance
- * @class FabricAdapter
+ * @class FabricClientAdapter
  * @example
  * ```typescript
  * // Create a new FabricAdapter instance
@@ -79,7 +83,7 @@ import { FabricClientFlavour } from "./constants";
  *   FabricAdapter->>FabricAdapter: serializer.deserialize(decodedResult)
  *   FabricAdapter-->>Client: deserializedResult
  */
-export class FabricAdapter extends CouchDBAdapter<
+export class FabricClientAdapter extends CouchDBAdapter<
   PeerConfig,
   FabricFlags,
   Context<FabricFlags>
@@ -92,7 +96,7 @@ export class FabricAdapter extends CouchDBAdapter<
   /**
    * @description Static logger instance for the FabricAdapter class
    */
-  private static log: Logger = Logging.for(FabricAdapter);
+  private static log: Logger = Logging.for(FabricClientAdapter);
 
   /**
    * @description gRPC client instance for connecting to the Fabric peer
@@ -105,7 +109,7 @@ export class FabricAdapter extends CouchDBAdapter<
    * @return {Logger} The logger instance
    */
   protected override get log(): Logger {
-    return FabricAdapter.log;
+    return FabricClientAdapter.log;
   }
 
   /**
@@ -125,7 +129,19 @@ export class FabricAdapter extends CouchDBAdapter<
    * @return {string} The decoded string
    */
   protected decode(data: Uint8Array): string {
-    return FabricAdapter.decoder.decode(data);
+    return FabricClientAdapter.decoder.decode(data);
+  }
+
+  override repository<M extends Model<boolean>>(): Constructor<
+    Repository<
+      M,
+      MangoQuery,
+      Adapter<PeerConfig, MangoQuery, FabricFlags, Context<FabricFlags>>,
+      FabricFlags,
+      Context<FabricFlags>
+    >
+  > {
+    return FabricClientRepository;
   }
 
   /**
@@ -198,7 +214,7 @@ export class FabricAdapter extends CouchDBAdapter<
     log.info(`reading ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
-      BulkCrudOperationKeys.DELETE_ALL,
+      BulkCrudOperationKeys.READ_ALL,
       [ids]
     );
     return serializer.deserialize(
@@ -231,7 +247,7 @@ export class FabricAdapter extends CouchDBAdapter<
     log.info(`updating ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
-      BulkCrudOperationKeys.CREATE_ALL,
+      BulkCrudOperationKeys.UPDATE_ALL,
       [ids, models.map((m) => serializer.serialize(m))],
       transient
     );
@@ -462,7 +478,8 @@ export class FabricAdapter extends CouchDBAdapter<
    * @return {Promise<Client>} Promise resolving to the gRPC client
    */
   protected async Client(): Promise<Client> {
-    if (!this.client) this.client = await FabricAdapter.getClient(this.native);
+    if (!this.client)
+      this.client = await FabricClientAdapter.getClient(this.native);
     return this.client;
   }
 
@@ -472,7 +489,7 @@ export class FabricAdapter extends CouchDBAdapter<
    * @return {Promise<Gateway>} Promise resolving to the Gateway instance
    */
   protected async Gateway(): Promise<Gateway> {
-    return FabricAdapter.getGateway(this.native, await this.Client());
+    return FabricClientAdapter.getGateway(this.native, await this.Client());
   }
 
   /**
@@ -481,7 +498,7 @@ export class FabricAdapter extends CouchDBAdapter<
    * @return {Promise<Contrakt>} Promise resolving to the Contract instance
    */
   protected async Contract(): Promise<Contrakt> {
-    return FabricAdapter.getContract(await this.Gateway(), this.native);
+    return FabricClientAdapter.getContract(await this.Gateway(), this.native);
   }
 
   /**
@@ -556,7 +573,7 @@ export class FabricAdapter extends CouchDBAdapter<
    * @return {BaseError} The parsed error
    */
   override parseError(err: Error | string, reason?: string): BaseError {
-    return FabricAdapter.parseError(err, reason);
+    return FabricClientAdapter.parseError(err, reason);
   }
 
   /**
