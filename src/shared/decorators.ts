@@ -1,18 +1,11 @@
 import { AuthorizationError } from "@decaf-ts/core";
+import { FabricContractContext, FabricERC20Contract } from "../contracts";
+import { NotFoundError } from "@decaf-ts/db-decorators";
 import {
-  FabricContractContext,
-  FabricContractRepository,
-  FabricERC20Contract,
-} from "../contracts";
-import {
-  afterDelete,
-  afterRead,
-  NotFoundError,
-  onCreateUpdate,
-  RepositoryFlags,
-} from "@decaf-ts/db-decorators";
-import { apply, metadata } from "@decaf-ts/reflection";
-import { Model, propMetadata } from "@decaf-ts/decorator-validation";
+  Decoration,
+  Model,
+  propMetadata,
+} from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
 
 export function Owner() {
@@ -210,19 +203,27 @@ export function getFabricModelKey(key: string) {
 //   // }
 // }
 
-export function privateData(collect?: string) {
-  if (!collect) {
+export function privateData(collection?: string) {
+  if (!collection) {
     throw new Error("Collection name is required");
   }
 
-  const collections = {
-    collection: collect as string,
-  };
+  const key: string = getFabricModelKey(FabricModelKeys.PRIVATE);
 
-  //TODO: Adjust to support multiple collections maybe comma separated colleciton names
-  // Get metadata and add new collection to the metadata
+  // //TODO: Adjust to support multiple collections maybe comma separated colleciton names
+  // // Get metadata and add new collection to the metadata everytime the de
 
-  return apply(
-    propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), collections)
-  );
+  return Decoration.for(key)
+    .define(function transient(model: any, attribute?: string) {
+      propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
+        ...(attribute && { collections: collection }),
+        isPrivate: !attribute,
+      })(model.constructor);
+
+      if (attribute)
+        propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
+          collections: collection, // array
+        })(model, attribute);
+    })
+    .apply();
 }

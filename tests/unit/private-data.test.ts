@@ -136,30 +136,38 @@ describe("Tests private data decorator", () => {
 
   it("Tests private data decorator on property", () => {
     const c = new TestModel1({ name: "John Doe" });
-    console.log(c);
-    const metadata = Reflect.getMetadata(
+
+    const propMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
       c,
       "name"
     );
-    console.log(metadata);
-    expect(metadata.collection).toBe(ORGA);
+    console.log(propMetadata);
+    expect(propMetadata.collections).toBe(ORGA);
+    expect(Object.keys(propMetadata).length).toBe(1);
 
-    const isPrivate = isPrivateData(c);
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestModel1
+    );
 
-    const privateModel = modelToPrivate(c);
+    console.log(modelMetadata);
 
-    console.log(isPrivate);
-    console.log(privateModel);
+    expect(Object.keys(modelMetadata).length).toBe(2);
+    // expect(modelMetadata.collections).toEqual(propMetadata.collections);
+    expect(modelMetadata.collections).toEqual(ORGA);
+    expect(modelMetadata.isPrivate).toBe(false);
   });
 
   it("Tests private data decorator on class", () => {
-    const metadata = Reflect.getMetadata(
+    const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      TestModel2
+      TestModel2.constructor
     );
-    console.log(metadata);
-    expect(metadata.collection).toBe(ORGB);
+    console.log(modelMetadata);
+    expect(Object.keys(modelMetadata).length).toBe(2);
+    expect(modelMetadata.collections).toEqual(ORGB);
+    expect(modelMetadata.isPrivate).toBe(true);
   });
 });
 
