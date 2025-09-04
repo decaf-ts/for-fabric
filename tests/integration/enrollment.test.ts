@@ -117,17 +117,17 @@ describe("Test enrollement", () => {
   });
 
   it("Creates new Gateway connection ", async () => {
-    clientAdapter = new FabricClientAdapter(peerConfig, "ola");
+    peerConfig.keyDirectoryPath = userID.credentials!.privateKey!;
+    peerConfig.certDirectoryPath = userID.credentials!.certificate!;
+    peerConfig.tlsCertPath = userID.credentials!.rootCertificate!;
+    clientAdapter = new FabricClientAdapter(peerConfig);
 
     const clientUser = new TestModel({
       name: userID.id,
       nif: "123456789",
     });
 
-    const TestModelRepository = FabricClientRepository.forModel(
-      TestModel,
-      "ola"
-    );
+    const TestModelRepository = FabricClientRepository.forModel(TestModel);
 
     const clientUserCreated: TestModel =
       await TestModelRepository.create(clientUser);
