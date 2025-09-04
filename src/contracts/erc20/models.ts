@@ -1,5 +1,5 @@
 import { BaseModel, Cascade, oneToMany, pk } from "@decaf-ts/core";
-import { model, ModelArg, required } from "@decaf-ts/decorator-validation";
+import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
 
 @model()
 export class ERC20Token extends BaseModel {
