@@ -29,8 +29,6 @@ import {
 import { Adapter, final, Repository } from "@decaf-ts/core";
 import { FabricClientFlavour } from "./constants";
 import { FabricClientRepository } from "./FabricClientRepository";
-import { Object } from "fabric-contract-api";
-import { args } from "../../tests/assets/contract/serialized-contract/mock-context";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
