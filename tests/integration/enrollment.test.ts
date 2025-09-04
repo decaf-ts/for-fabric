@@ -2,11 +2,7 @@ import { Credentials, CAConfig, PeerConfig } from "../../src/shared/types";
 import { FabricEnrollmentService } from "../../src/client/services";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { Identity } from "../../src/shared/model/Identity";
-import { execSync } from "child_process";
-import fs from "fs";
-import path from "path";
 import { BaseModel, pk } from "@decaf-ts/core";
-import { Property } from "fabric-contract-api";
 import {
   maxlength,
   minlength,
@@ -35,36 +31,6 @@ class TestModel extends BaseModel {
 }
 
 describe("Test enrollement", () => {
-  // This ensures the infrastructure is up and running before running the tests.
-  beforeAll(async () => {
-    // Compile/Transpile the contract to JavaScript
-    execSync(
-      `npx weaver compile-contract -d --contract-file ./tests/assets/contract/serialized-contract/index.ts --output-dir ./docker/infrastructure/chaincode`
-    );
-
-    // Copy necessary files to the chaincode directory
-    fs.copyFileSync(
-      path.join(
-        process.cwd(),
-        "./tests/assets/contract/serialized-contract/package.json"
-      ),
-      path.join(process.cwd(), "./docker/infrastructure/chaincode/package.json")
-    );
-    fs.copyFileSync(
-      path.join(
-        process.cwd(),
-        "./tests/assets/contract/serialized-contract/npm-shrinkwrap.json"
-      ),
-      path.join(
-        process.cwd(),
-        "./docker/infrastructure/chaincode/npm-shrinkwrap.json"
-      )
-    );
-
-    //Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`);
-  });
-
   const user: Credentials = {
     userName: "TestUser" + Date.now(),
     password: "TestUserPSW",

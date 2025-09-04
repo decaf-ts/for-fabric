@@ -2,7 +2,6 @@ import { CouchDBAdapter, type MangoQuery } from "@decaf-ts/for-couchdb";
 import grpc, { Client } from "@grpc/grpc-js";
 import {
   type Constructor,
-  model,
   Model,
   type Serializer,
   stringFormat,
@@ -27,8 +26,8 @@ import {
   BulkCrudOperationKeys,
 } from "@decaf-ts/db-decorators";
 import { Adapter, final, Repository } from "@decaf-ts/core";
-import { FabricClientFlavour } from "./constants";
 import { FabricClientRepository } from "./FabricClientRepository";
+import { FabricFlavour } from "../shared/constants";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -117,7 +116,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string} [alias] - Optional alias for the adapter instance
    */
   constructor(config: PeerConfig, alias?: string) {
-    super(config, FabricClientFlavour, alias);
+    super(config, FabricFlavour, alias);
   }
 
   /**
@@ -777,3 +776,6 @@ export class FabricClientAdapter extends CouchDBAdapter<
     return super.parseError(err, reason);
   }
 }
+
+FabricClientAdapter.decoration();
+Adapter.setCurrent(FabricFlavour);

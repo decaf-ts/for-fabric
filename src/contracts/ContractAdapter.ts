@@ -6,7 +6,6 @@ import {
   propMetadata,
   required,
 } from "@decaf-ts/decorator-validation";
-import { FabricContractFlavour } from "./constants";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
@@ -43,7 +42,7 @@ import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
 import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
 import { MissingContextError } from "../shared/errors";
-import { collapseTextChangeRangesAcrossMultipleVersions } from "typescript";
+import { FabricFlavour } from "../shared/constants";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -223,7 +222,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {string} [alias] - Optional alias for the adapter instance
    */
   constructor(scope: void, alias?: string) {
-    super(scope, FabricContractFlavour, alias);
+    super(scope, FabricFlavour, alias);
   }
 
   /**
@@ -429,7 +428,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     super.decoration();
     const createdByKey = Repository.key(PersistenceKeys.CREATED_BY);
     const updatedByKey = Repository.key(PersistenceKeys.UPDATED_BY);
-    Decoration.flavouredAs(FabricContractFlavour)
+    Decoration.flavouredAs(FabricFlavour)
       .for(createdByKey)
       .define(
         onCreate(createdByOnFabricCreateUpdate),
@@ -437,7 +436,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       )
       .apply();
 
-    Decoration.flavouredAs(FabricContractFlavour)
+    Decoration.flavouredAs(FabricFlavour)
       .for(updatedByKey)
       .define(
         onCreateUpdate(createdByOnFabricCreateUpdate),
@@ -446,7 +445,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       .apply();
 
     const pkKey = Repository.key(DBKeys.ID);
-    Decoration.flavouredAs(FabricContractFlavour)
+    Decoration.flavouredAs(FabricFlavour)
       .for(pkKey)
       .define(
         index([OrderDirection.ASC, OrderDirection.DSC]),
@@ -766,4 +765,4 @@ export class FabricContractAdapter extends CouchDBAdapter<
 }
 
 FabricContractAdapter.decoration();
-Adapter.setCurrent(FabricContractFlavour);
+Adapter.setCurrent(FabricFlavour);

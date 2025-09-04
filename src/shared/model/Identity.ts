@@ -1,7 +1,7 @@
 import { BaseModel, Cascade, oneToOne, pk } from "@decaf-ts/core";
 import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
-import { IdentityType } from "../../contracts";
 import { IdentityCredentials } from "./IdentityCredentials";
+import { IdentityType } from "../constants";
 
 /**
  * @summary Identity Class
