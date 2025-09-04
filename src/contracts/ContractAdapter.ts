@@ -43,6 +43,7 @@ import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
 import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
 import { MissingContextError } from "../shared/errors";
+import { collapseTextChangeRangesAcrossMultipleVersions } from "typescript";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context

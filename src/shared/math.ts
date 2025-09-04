@@ -1,5 +1,6 @@
 import { stringFormat } from "@decaf-ts/decorator-validation";
-import { OverflowError, ValidationError } from "./errors";
+import { OverflowError } from "./errors";
+import { ValidationError } from "@decaf-ts/db-decorators";
 
 /**
  * @summary Overflow safe Addition operation
