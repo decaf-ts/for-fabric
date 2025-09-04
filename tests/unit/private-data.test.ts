@@ -116,25 +116,16 @@ const ORGA = "OrganizationA";
 const ORGB = "OrganizationB";
 
 describe("Tests private data decorator", () => {
-  class TestModel1 extends Model {
-    @required()
-    @privateData(ORGA)
-    name!: string;
-    constructor(arg?: ModelArg<Model>) {
-      super(arg);
-    }
-  }
-
-  @privateData(ORGB)
-  class TestModel2 extends Model {
-    @required()
-    name!: string;
-    constructor(arg?: ModelArg<Model>) {
-      super(arg);
-    }
-  }
-
   it("Tests private data decorator on property", () => {
+    class TestModel1 extends Model {
+      @required()
+      @privateData(ORGA)
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
     const c = new TestModel1({ name: "John Doe" });
 
     const propMetadata = Reflect.getMetadata(
@@ -143,7 +134,8 @@ describe("Tests private data decorator", () => {
       "name"
     );
     console.log(propMetadata);
-    expect(propMetadata.collections).toBe(ORGA);
+    expect(propMetadata.collections.length).toBe(1);
+    expect(propMetadata.collections[0]).toBe(ORGA);
     expect(Object.keys(propMetadata).length).toBe(1);
 
     const modelMetadata = Reflect.getMetadata(
@@ -153,20 +145,29 @@ describe("Tests private data decorator", () => {
 
     console.log(modelMetadata);
 
-    expect(Object.keys(modelMetadata).length).toBe(2);
-    // expect(modelMetadata.collections).toEqual(propMetadata.collections);
-    expect(modelMetadata.collections).toEqual(ORGA);
+    expect(Object.keys(modelMetadata).length).toBe(1);
     expect(modelMetadata.isPrivate).toBe(false);
   });
 
   it("Tests private data decorator on class", () => {
+    @privateData(ORGB)
+    class TestModel2 extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
     const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
       TestModel2.constructor
     );
+
     console.log(modelMetadata);
     expect(Object.keys(modelMetadata).length).toBe(2);
-    expect(modelMetadata.collections).toEqual(ORGB);
+    expect(modelMetadata.collections.length).toEqual(1);
+    expect(modelMetadata.collections[0]).toEqual(ORGB);
     expect(modelMetadata.isPrivate).toBe(true);
   });
 });

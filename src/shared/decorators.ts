@@ -216,13 +216,13 @@ export function privateData(collection?: string) {
   return Decoration.for(key)
     .define(function transient(model: any, attribute?: string) {
       propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
-        ...(attribute && { collections: collection }),
+        ...(!attribute && { collections: [collection] }),
         isPrivate: !attribute,
       })(model.constructor);
 
       if (attribute)
         propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
-          collections: collection, // array
+          collections: [collection], // array
         })(model, attribute);
     })
     .apply();
