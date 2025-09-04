@@ -95,8 +95,6 @@ export class CoreUtils {
   }
 
   static async getSigner(keyDirectoryPath: string): Promise<Signer> {
-    let privateKey;
-
     const signerFileReader = async (path: string) => {
       const { promises } = await normalizeImport(import("fs"));
       const keyPath = await this.getFirstDirFileName(path);
@@ -112,7 +110,7 @@ export class CoreUtils {
     // --
 
     // web based implementation
-    privateKey = await this.extractPrivateKey(privateKeyPem);
+    const privateKey = await this.extractPrivateKey(privateKeyPem);
     const keys = Object.getOwnPropertySymbols(privateKey);
     const k = (privateKey as any)[keys[0]];
     // --
@@ -123,8 +121,11 @@ export class CoreUtils {
   private static async extractPrivateKey(pem: Buffer) {
     const libName = "crypto";
     let subtle: any;
-    if (globalThis.window && (globalThis.window as { Crypto: any }).Crypto) {
-      subtle = (globalThis.Crypto as any).subtle;
+    if (
+      (globalThis as any).window &&
+      ((globalThis as any).window as { Crypto: any }).Crypto
+    ) {
+      subtle = ((globalThis as any).Crypto as any).subtle;
     } else {
       const lib = (await normalizeImport(import(libName))) as any;
       subtle = lib.subtle || lib.webcrypto.subtle;
