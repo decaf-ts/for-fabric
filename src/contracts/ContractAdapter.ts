@@ -22,7 +22,11 @@ import {
   readonly,
   SerializationError,
 } from "@decaf-ts/db-decorators";
-import { Context as Ctx } from "fabric-contract-api";
+import {
+  Context as Ctx,
+  Property as FabricProperty,
+  Object as FabricObject,
+} from "fabric-contract-api";
 import { debug, Logger, Logging } from "@decaf-ts/logging";
 import { ContractLogger } from "./logging";
 import {
@@ -43,7 +47,6 @@ import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
 import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
 import { MissingContextError } from "../shared/errors";
-import { collapseTextChangeRangesAcrossMultipleVersions } from "typescript";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -456,6 +459,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
         propMetadata(pkKey, NumericSequence),
         onCreate(pkFabricOnCreate, NumericSequence)
       )
+      .apply();
+
+    const columnKey = Adapter.key(PersistenceKeys.COLUMN);
+    Decoration.flavouredAs(FabricContractFlavour)
+      .for(columnKey)
+      .extend(FabricProperty())
+      .apply();
+
+    const tableKey = Adapter.key(PersistenceKeys.TABLE);
+    Decoration.flavouredAs(FabricContractFlavour)
+      .for(tableKey)
+      .extend(FabricObject())
       .apply();
   }
 

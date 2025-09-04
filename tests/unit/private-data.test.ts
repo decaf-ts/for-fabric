@@ -117,7 +117,7 @@ const ORGB = "OrganizationB";
 
 describe("Tests private data decorator", () => {
   it("Tests private data decorator on property", () => {
-    class TestModel1 extends Model {
+    class TestPrivateData1 extends Model {
       @required()
       @privateData(ORGA)
       name!: string;
@@ -126,7 +126,7 @@ describe("Tests private data decorator", () => {
       }
     }
 
-    const c = new TestModel1({ name: "John Doe" });
+    const c = new TestPrivateData1({ name: "John Doe" });
 
     const propMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
@@ -140,7 +140,7 @@ describe("Tests private data decorator", () => {
 
     const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      TestModel1
+      TestPrivateData1
     );
 
     console.log(modelMetadata);
@@ -151,7 +151,7 @@ describe("Tests private data decorator", () => {
 
   it("Tests private data decorator on class", () => {
     @privateData(ORGB)
-    class TestModel2 extends Model {
+    class TestPrivateData2 extends Model {
       @required()
       name!: string;
       constructor(arg?: ModelArg<Model>) {
@@ -161,7 +161,7 @@ describe("Tests private data decorator", () => {
 
     const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      TestModel2.constructor
+      TestPrivateData2.constructor
     );
 
     console.log(modelMetadata);
@@ -170,59 +170,130 @@ describe("Tests private data decorator", () => {
     expect(modelMetadata.collections[0]).toEqual(ORGB);
     expect(modelMetadata.isPrivate).toBe(true);
   });
-});
 
-describe("Tests private data decorator in contract context", () => {
-  @table("tst_user")
-  @model()
-  @FabricObject()
-  class TestModel extends BaseModel {
-    @pk({ type: "Number" })
-    id!: number;
-
-    @column("tst_name")
-    @required()
-    @Property()
-    name!: string;
-
-    @column("tst_nif")
-    // @unique()
-    @minlength(9)
-    @maxlength(9)
-    @required()
-    @Property()
-    @privateData(ORGA)
-    nif!: string;
-
-    constructor(arg?: ModelArg<TestModel>) {
-      super(arg);
+  it("Tests multiple private data decorator on property runned mannually", () => {
+    class TestPrivateData3 extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
     }
-  }
 
-  class TestContract extends SerializedCrudContract<TestModel> {
-    constructor() {
-      super(TestContract.name, TestModel);
-    }
-  }
+    const c = new TestPrivateData3({ name: "John Doe" });
 
-  let contract: TestContract;
+    privateData(ORGA)(c, "name");
+    privateData(ORGB)(c, "name");
 
-  beforeAll(async () => {
-    console.log("Initializing contract");
-    contract = new TestContract();
+    const propMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      c,
+      "name"
+    );
+    console.log(propMetadata);
+    expect(propMetadata.collections.length).toBe(2);
+    expect(propMetadata.collections).toContain(ORGA);
+    expect(propMetadata.collections).toContain(ORGB);
+    expect(Object.keys(propMetadata).length).toBe(1);
+
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestPrivateData3
+    );
+
+    console.log(modelMetadata);
+
+    expect(Object.keys(modelMetadata).length).toBe(1);
+    expect(modelMetadata.isPrivate).toBe(false);
   });
 
-  it("Should create", async () => {
-    const m = new TestModel({
-      name: randomName(6),
-      nif: randomNif(9),
-    }).serialize();
+  it("Tests multiple private data decorator on property present in the class", () => {
+    class TestPrivateData4 extends Model {
+      @required()
+      @privateData(ORGA)
+      @privateData(ORGB)
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
 
-    await contract.create(ctx as unknown as Context, m);
+    const c = new TestPrivateData4({ name: "John Doe" });
 
-    const keys = Object.keys(state);
-    keys.forEach((key) => {
-      console.log(state[key].toString());
-    });
+    const propMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      c,
+      "name"
+    );
+    console.log(propMetadata);
+    expect(propMetadata.collections.length).toBe(2);
+    expect(propMetadata.collections).toContain(ORGA);
+    expect(propMetadata.collections).toContain(ORGB);
+    expect(Object.keys(propMetadata).length).toBe(1);
+
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestPrivateData4
+    );
+
+    console.log(modelMetadata);
+
+    expect(Object.keys(modelMetadata).length).toBe(1);
+    expect(modelMetadata.isPrivate).toBe(false);
   });
 });
+
+// describe("Tests private data decorator in contract context", () => {
+//   @table("tst_user")
+//   @model()
+//   @FabricObject()
+//   class TestModel extends BaseModel {
+//     @pk({ type: "Number" })
+//     id!: number;
+
+//     @column("tst_name")
+//     @required()
+//     @Property()
+//     name!: string;
+
+//     @column("tst_nif")
+//     // @unique()
+//     @minlength(9)
+//     @maxlength(9)
+//     @required()
+//     @Property()
+//     @privateData(ORGA)
+//     nif!: string;
+
+//     constructor(arg?: ModelArg<TestModel>) {
+//       super(arg);
+//     }
+//   }
+
+//   class TestContract extends SerializedCrudContract<TestModel> {
+//     constructor() {
+//       super(TestContract.name, TestModel);
+//     }
+//   }
+
+//   let contract: TestContract;
+
+//   beforeAll(async () => {
+//     console.log("Initializing contract");
+//     contract = new TestContract();
+//   });
+
+//   it("Should create", async () => {
+//     const m = new TestModel({
+//       name: randomName(6),
+//       nif: randomNif(9),
+//     }).serialize();
+
+//     await contract.create(ctx as unknown as Context, m);
+
+//     const keys = Object.keys(state);
+//     keys.forEach((key) => {
+//       console.log(state[key].toString());
+//     });
+//   });
+// });

@@ -213,17 +213,23 @@ export function privateData(collection?: string) {
   // //TODO: Adjust to support multiple collections maybe comma separated colleciton names
   // // Get metadata and add new collection to the metadata everytime the de
 
-  return Decoration.for(key)
-    .define(function transient(model: any, attribute?: string) {
-      propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
-        ...(!attribute && { collections: [collection] }),
-        isPrivate: !attribute,
-      })(model.constructor);
+  return function privateData(model: any, attribute?: string) {
+    const target = !attribute ? model.constructor : model;
+    const propertyKey = attribute || undefined;
 
-      if (attribute)
-        propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
-          collections: [collection], // array
-        })(model, attribute);
-    })
-    .apply();
+    const meta = Reflect.getMetadata(key, target, propertyKey as string);
+    const data = meta?.collections || [];
+
+    propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
+      ...(!attribute && {
+        collections: data ? [...new Set([...data, collection])] : [collection],
+      }),
+      isPrivate: !attribute,
+    })(model.constructor);
+
+    if (attribute)
+      propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
+        collections: data ? [...new Set([...data, collection])] : [collection],
+      })(model, attribute);
+  };
 }
