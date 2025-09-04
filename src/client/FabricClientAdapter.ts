@@ -585,7 +585,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {Array<string>} [endorsingOrganizations] - Organizations that must endorse the transaction
    * @return {Promise<Uint8Array>} Promise resolving to the transaction result
    */
-  protected async submitTransaction(
+  async submitTransaction(
     api: string,
     args?: any[],
     transientData?: Record<string, string>,
@@ -609,7 +609,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {Array<string>} [endorsingOrganizations] - Organizations that must endorse the transaction
    * @return {Promise<Uint8Array>} Promise resolving to the transaction result
    */
-  protected async evaluateTransaction(
+  async evaluateTransaction(
     api: string,
     args?: any[],
     transientData?: Record<string, string>,

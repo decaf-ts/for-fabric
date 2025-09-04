@@ -1,11 +1,38 @@
-import { Credentials, CAConfig } from "../../src/shared/types";
+import { Credentials, CAConfig, PeerConfig } from "../../src/shared/types";
 import { FabricEnrollmentService } from "../../src/client/services";
+import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { Identity } from "../../src/shared/model/Identity";
 import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import { BaseModel, pk } from "@decaf-ts/core";
+import { Property } from "fabric-contract-api";
+import {
+  maxlength,
+  minlength,
+  ModelArg,
+  required,
+} from "@decaf-ts/decorator-validation";
+import { FabricClientRepository } from "../../src/client/FabricClientRepository";
 
 jest.setTimeout(5000000);
+
+class TestModel extends BaseModel {
+  @pk({ type: "Number" })
+  id!: number;
+
+  @required()
+  name!: string;
+
+  @minlength(9)
+  @maxlength(9)
+  @required()
+  nif!: string;
+
+  constructor(arg?: ModelArg<TestModel>) {
+    super(arg);
+  }
+}
 
 describe("Test enrollement", () => {
   // This ensures the infrastructure is up and running before running the tests.
@@ -37,6 +64,7 @@ describe("Test enrollement", () => {
     //Boot infrastructure for testing
     execSync(`npm run infrastructure:up`);
   });
+
   const user: Credentials = {
     userName: "TestUser" + Date.now(),
     password: "TestUserPSW",
@@ -55,23 +83,58 @@ describe("Test enrollement", () => {
     caKey: "./docker/docker-data/storage/org-a-client-vol/admin/msp/keystore",
   };
 
+  const peerConfig: PeerConfig = {
+    cryptoPath: "./docker/infrastructure/crypto-config",
+    keyDirectoryPath:
+      "./docker/docker-data/storage/org-a-peer-0-vol/msp/keystore",
+    certDirectoryPath:
+      "./docker/docker-data/storage/org-a-peer-0-vol/msp/signcerts",
+    tlsCertPath: "./docker/docker-data/storage/org-a-peer-0-vol/msp/cacerts",
+    peerEndpoint: "org-a-peer-0:7031",
+    peerHostAlias: "localhost",
+    caEndpoint: "localhost:7054",
+    caTlsCertificate:
+      "./docker/docker-data/storage/org-a-peer-0-vol/msp/tlscacerts",
+    caCert: "./docker/docker-data/storage/org-a-peer-0-vol/msp/signcerts",
+    caKey: "./docker/docker-data/storage/org-a-peer-0-vol/msp/keystore",
+    chaincodeName: "simple",
+    ca: "org-a",
+    mspId: "org-a",
+    channel: "simple-channel",
+  };
+
+  let userID: Identity;
+  let clientAdapter: FabricClientAdapter;
+  let enrollmentService: FabricEnrollmentService;
+
   beforeAll(async () => {});
 
-  it("register and enroll ", async () => {
-    let enrollmentService: FabricEnrollmentService;
-    let userID: Identity;
-    try {
-      enrollmentService = new FabricEnrollmentService(caConfig);
-      userID = await enrollmentService.registerAndEnroll(
-        user,
-        false,
-        "",
-        "user"
-      );
-      console.log("User registered and enrolled successfully", userID);
-      expect(userID.id).toBeDefined();
-    } catch (e: any) {
-      console.log(e);
-    }
+  it("register and enroll new user ", async () => {
+    enrollmentService = new FabricEnrollmentService(caConfig);
+    userID = await enrollmentService.registerAndEnroll(user, false, "", "user");
+    console.log("User registered and enrolled successfully", userID);
+    expect(userID.id).toBeDefined();
+  });
+
+  it("Creates new Gateway connection ", async () => {
+    clientAdapter = new FabricClientAdapter(peerConfig, "ola");
+
+    const clientUser = new TestModel({
+      name: userID.id,
+      nif: "123456789",
+    });
+
+    const TestModelRepository = FabricClientRepository.forModel(
+      TestModel,
+      "ola"
+    );
+
+    const clientUserCreated: TestModel =
+      await TestModelRepository.create(clientUser);
+
+    const clientUserRead: TestModel = await TestModelRepository.read(
+      clientUserCreated.id
+    );
+    expect(clientUserRead).toEqual(clientUser);
   });
 });
