@@ -6,6 +6,7 @@ import { BaseModel, pk } from "@decaf-ts/core";
 import {
   maxlength,
   minlength,
+  model,
   ModelArg,
   required,
 } from "@decaf-ts/decorator-validation";
@@ -13,6 +14,7 @@ import { FabricClientRepository } from "../../src/client/FabricClientRepository"
 
 jest.setTimeout(5000000);
 
+@model()
 class TestModel extends BaseModel {
   @pk({ type: "Number" })
   id!: number;

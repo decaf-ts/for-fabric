@@ -28,6 +28,7 @@ import {
 import { Adapter, final, Repository } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
+import { ClientSerializer } from "../shared/ClientSerializer";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -90,6 +91,8 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   private static decoder = new TextDecoder("utf8");
 
+  private static serializer = new ClientSerializer();
+
   /**
    * @description Static logger instance for the FabricAdapter class
    */
@@ -108,6 +111,9 @@ export class FabricClientAdapter extends CouchDBAdapter<
   protected override get log(): Logger {
     return FabricClientAdapter.log;
   }
+
+  protected readonly serializer: Serializer<any> =
+    FabricClientAdapter.serializer;
 
   /**
    * @description Creates a new FabricAdapter instance
@@ -167,15 +173,13 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string[] | number[]} ids - Array of record identifiers
    * @param {Array<Record<string, any>>} models - Array of record data
    * @param {Record<string, any>} transient - Transient data for the transaction
-   * @param {Serializer<any>} serializer - Serializer for the model data
    * @return {Promise<Array<Record<string, any>>>} Promise resolving to the created records
    */
   override async createAll(
     tableName: string,
     ids: string[] | number[],
     models: Record<string, any>[],
-    transient: Record<string, any>,
-    serializer: Serializer<any>
+    transient: Record<string, any>
   ): Promise<Record<string, any>[]> {
     const log = this.log.for(this.createAll);
     if (ids.length !== models.length)
@@ -186,11 +190,13 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.CREATE_ALL,
-      [ids, models.map((m) => serializer.serialize(m))],
+      [ids, models.map((m) => this.serializer.serialize(m, tableName))],
       transient
     );
-    return serializer.deserialize(
-      (this.decode(result) as any).map((r: any) => serializer.deserialize(r))
+    return this.serializer.deserialize(
+      (this.decode(result) as any).map((r: any) =>
+        this.serializer.deserialize(r)
+      )
     );
   }
 
@@ -204,8 +210,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   override async readAll(
     tableName: string,
-    ids: string[] | number[],
-    serializer: Serializer<any>
+    ids: string[] | number[]
   ): Promise<Record<string, any>[]> {
     const log = this.log.for(this.readAll);
     log.info(`reading ${ids.length} entries to ${tableName} table`);
@@ -214,8 +219,10 @@ export class FabricClientAdapter extends CouchDBAdapter<
       BulkCrudOperationKeys.READ_ALL,
       [ids]
     );
-    return serializer.deserialize(
-      (this.decode(result) as any).map((r: any) => serializer.deserialize(r))
+    return this.serializer.deserialize(
+      (this.decode(result) as any).map((r: any) =>
+        this.serializer.deserialize(r)
+      )
     );
   }
 
@@ -233,8 +240,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     tableName: string,
     ids: string[] | number[],
     models: Record<string, any>[],
-    transient: Record<string, any>,
-    serializer: Serializer<any>
+    transient: Record<string, any>
   ): Promise<Record<string, any>[]> {
     const log = this.log.for(this.updateAll);
     if (ids.length !== models.length)
@@ -245,11 +251,13 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.UPDATE_ALL,
-      [ids, models.map((m) => serializer.serialize(m))],
+      [ids, models.map((m) => this.serializer.serialize(m, tableName))],
       transient
     );
-    return serializer.deserialize(
-      (this.decode(result) as any).map((r: any) => serializer.deserialize(r))
+    return this.serializer.deserialize(
+      (this.decode(result) as any).map((r: any) =>
+        this.serializer.deserialize(r)
+      )
     );
   }
 
@@ -263,8 +271,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   override async deleteAll(
     tableName: string,
-    ids: (string | number | bigint)[],
-    serializer: Serializer<any>
+    ids: (string | number | bigint)[]
   ): Promise<Record<string, any>[]> {
     const log = this.log.for(this.deleteAll);
     log.info(`deleting ${ids.length} entries to ${tableName} table`);
@@ -273,8 +280,10 @@ export class FabricClientAdapter extends CouchDBAdapter<
       BulkCrudOperationKeys.DELETE_ALL,
       [ids]
     );
-    return serializer.deserialize(
-      (this.decode(result) as any).map((r: any) => serializer.deserialize(r))
+    return this.serializer.deserialize(
+      (this.decode(result) as any).map((r: any) =>
+        this.serializer.deserialize(r)
+      )
     );
   }
 
@@ -298,7 +307,6 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string | number} id - The record identifier
    * @param {Record<string, any>} model - The record data
    * @param {Record<string, any>} transient - Transient data for the transaction
-   * @param {Serializer<any>} serializer - Serializer for the model data
    * @return {Promise<Record<string, any>>} Promise resolving to the created record
    */
   @debug(true)
@@ -307,18 +315,17 @@ export class FabricClientAdapter extends CouchDBAdapter<
     tableName: string,
     id: string | number,
     model: Record<string, any>,
-    transient: Record<string, any>,
-    serializer: Serializer<any>
+    transient: Record<string, any>
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.create);
     log.verbose(`adding entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
       OperationKeys.CREATE,
-      [serializer.serialize(model)],
+      [this.serializer.serialize(model, tableName)],
       transient
     );
-    return serializer.deserialize(this.decode(result));
+    return this.serializer.deserialize(this.decode(result));
   }
 
   /**
@@ -326,21 +333,19 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @summary Evaluates a transaction to read a record from the Fabric ledger
    * @param {string} tableName - The name of the table/collection
    * @param {string | number} id - The record identifier
-   * @param {Serializer<any>} serializer - Serializer for the model data
    * @return {Promise<Record<string, any>>} Promise resolving to the retrieved record
    */
   @debug(true)
   @final()
   async read(
     tableName: string,
-    id: string | number,
-    serializer: Serializer<any>
+    id: string | number
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.read);
     log.verbose(`reading entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.evaluateTransaction(OperationKeys.READ, [id]);
-    return serializer.deserialize(this.decode(result));
+    return this.serializer.deserialize(this.decode(result));
   }
 
   /**
@@ -350,7 +355,6 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string | number} id - The record identifier
    * @param {Record<string, any>} model - The updated record data
    * @param {Record<string, any>} transient - Transient data for the transaction
-   * @param {Serializer<any>} serializer - Serializer for the model data
    * @return {Promise<Record<string, any>>} Promise resolving to the updated record
    */
   @debug(true)
@@ -359,18 +363,17 @@ export class FabricClientAdapter extends CouchDBAdapter<
     tableName: string,
     id: string | number,
     model: Record<string, any>,
-    transient: Record<string, any>,
-    serializer: Serializer<any>
+    transient: Record<string, any>
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.update);
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
       OperationKeys.UPDATE,
-      [serializer.serialize(model)],
+      [this.serializer.serialize(model, tableName)],
       transient
     );
-    return serializer.deserialize(this.decode(result));
+    return this.serializer.deserialize(this.decode(result));
   }
 
   /**
@@ -378,15 +381,13 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @summary Submits a transaction to delete a record from the Fabric ledger
    * @param {string} tableName - The name of the table/collection
    * @param {string | number} id - The record identifier to delete
-   * @param {Serializer<any>} serializer - Serializer for the model data
    * @return {Promise<Record<string, any>>} Promise resolving to the deleted record
    */
   @debug(true)
   @final()
   async delete(
     tableName: string,
-    id: string | number,
-    serializer: Serializer<any>
+    id: string | number
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.delete);
     log.verbose(`deleting entry from ${tableName} table`);
@@ -395,7 +396,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
       tableName,
       id,
     ]);
-    return serializer.deserialize(this.decode(result));
+    return this.serializer.deserialize(this.decode(result));
   }
 
   /**
