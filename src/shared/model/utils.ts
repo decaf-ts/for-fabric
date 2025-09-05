@@ -12,7 +12,7 @@ export function isPrivateData<M extends Model>(model: M) {
   return true;
 }
 
-export function getPrivateDataMetadata<M extends Model>(
+export function getClassPrivateDataMetadata<M extends Model>(
   model: M
 ): Record<string, any> {
   let metadata = Reflect.getMetadata(
