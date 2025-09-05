@@ -54,11 +54,12 @@ describe("Test enrollement", () => {
   const peerConfig: PeerConfig = {
     cryptoPath: "./docker/infrastructure/crypto-config",
     keyDirectoryPath:
-      "./docker/docker-data/storage/org-a-peer-0-vol/msp/keystore",
+      "./docker/docker-data/storage/org-a-client-vol/admin/msp/keystore",
     certDirectoryPath:
-      "./docker/docker-data/storage/org-a-peer-0-vol/msp/signcerts",
-    tlsCertPath: "./docker/docker-data/storage/org-a-peer-0-vol/msp/cacerts",
-    peerEndpoint: "org-a-peer-0:7031",
+      "./docker/docker-data/storage/org-a-client-vol/admin/msp/signcerts",
+    tlsCertPath:
+      "./docker/docker-data/storage/org-a-client-vol/tls-ca-cert.pem",
+    peerEndpoint: "localhost:7031",
     peerHostAlias: "localhost",
     caEndpoint: "localhost:7054",
     caTlsCertificate:
@@ -67,7 +68,7 @@ describe("Test enrollement", () => {
     caKey: "./docker/docker-data/storage/org-a-peer-0-vol/msp/keystore",
     chaincodeName: "simple",
     ca: "org-a",
-    mspId: "org-a",
+    mspId: "Peer0OrgaMSP",
     channel: "simple-channel",
   };
 
@@ -85,9 +86,9 @@ describe("Test enrollement", () => {
   });
 
   it("Creates new Gateway connection ", async () => {
-    peerConfig.keyDirectoryPath = userID.credentials!.privateKey!;
-    peerConfig.certDirectoryPath = userID.credentials!.certificate!;
-    peerConfig.tlsCertPath = userID.credentials!.rootCertificate!;
+    // peerConfig.keyDirectoryPath = userID.credentials!.privateKey!;
+    // peerConfig.certDirectoryPath = userID.credentials!.certificate!;
+    // peerConfig.tlsCertPath = userID.credentials!.rootCertificate!;
     clientAdapter = new FabricClientAdapter(peerConfig);
 
     const clientUser = new TestModel({

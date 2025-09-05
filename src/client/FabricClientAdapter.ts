@@ -1,5 +1,7 @@
 import { CouchDBAdapter, type MangoQuery } from "@decaf-ts/for-couchdb";
-import grpc, { Client } from "@grpc/grpc-js";
+import { Client } from "@grpc/grpc-js";
+import * as grpc from "@grpc/grpc-js";
+
 import {
   type Constructor,
   Model,
@@ -25,7 +27,7 @@ import {
   SerializationError,
   BulkCrudOperationKeys,
 } from "@decaf-ts/db-decorators";
-import { Adapter, final, Repository } from "@decaf-ts/core";
+import { Adapter, final, PersistenceKeys, Repository } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
@@ -285,6 +287,66 @@ export class FabricClientAdapter extends CouchDBAdapter<
         this.serializer.deserialize(r)
       )
     );
+  }
+
+  /**
+   * @description Converts database data back into a model instance
+   * @summary Reconstructs a model instance from database data, handling column mapping
+   * and reattaching transient properties
+   * @template M - The model type
+   * @param obj - The database record
+   * @param {string|Constructor<M>} clazz - The model class or name
+   * @param pk - The primary key property name
+   * @param {string|number|bigint} id - The primary key value
+   * @param [transient] - Transient properties to reattach
+   * @return {M} The reconstructed model instance
+   */
+  override revert<M extends Model>(
+    obj: Record<string, any>,
+    clazz: string | Constructor<M>,
+    pk: keyof M,
+    id: string | number | bigint,
+    transient?: Record<string, any>
+  ): M {
+    const log = this.log.for(this.revert);
+    const ob: Record<string, any> = {};
+    ob[pk as string] = id;
+    const m = (
+      typeof clazz === "string" ? Model.build(ob, clazz) : new clazz(ob)
+    ) as M;
+    log.silly(`Rebuilding model ${m.constructor.name} id ${id}`);
+    const metadata = obj[PersistenceKeys.METADATA];
+    const result = Object.keys(m).reduce((accum: M, key) => {
+      (accum as Record<string, any>)[key] = obj[Repository.column(accum, key)];
+      return accum;
+    }, m);
+
+    if (transient) {
+      log.verbose(
+        `re-adding transient properties: ${Object.keys(transient).join(", ")}`
+      );
+      Object.entries(transient).forEach(([key, val]) => {
+        if (key in result)
+          throw new InternalError(
+            `Transient property ${key} already exists on model ${m.constructor.name}. should be impossible`
+          );
+        result[key as keyof M] = val;
+      });
+    }
+
+    if (metadata) {
+      log.silly(
+        `Passing along ${this.flavour} persistence metadata for ${m.constructor.name} id ${id}: ${metadata}`
+      );
+      Object.defineProperty(result, PersistenceKeys.METADATA, {
+        enumerable: false,
+        configurable: false,
+        writable: false,
+        value: metadata,
+      });
+    }
+
+    return result;
   }
 
   /**
