@@ -8,11 +8,8 @@ import {
   required,
 } from "@decaf-ts/decorator-validation";
 
-import { Object as FabricObject } from "fabric-contract-api";
-
 @table("tst_user")
 @model()
-@FabricObject()
 export class TestModel extends Model {
   @pk({ type: "Number" })
   id!: number;
