@@ -461,32 +461,31 @@ export class FabricContractAdapter extends CouchDBAdapter<
       )
       .apply();
 
-    const columnKey = Adapter.key(PersistenceKeys.COLUMN);
-    Decoration.flavouredAs(FabricContractFlavour)
-      .for(columnKey)
-      .extend(FabricProperty())
-      .apply();
+    // const columnKey = Adapter.key(PersistenceKeys.COLUMN);
+    // Decoration.flavouredAs(FabricContractFlavour)
+    //   .for(columnKey)
+    //   .extend(FabricProperty())
+    //   .apply();
 
-    const tableKey = Adapter.key(PersistenceKeys.TABLE);
-    Decoration.flavouredAs(FabricContractFlavour)
-      .for(tableKey)
-      .extend(function table(obj: any) {
-        const models = [];
-        let current;
+    // const tableKey = Adapter.key(PersistenceKeys.TABLE);
+    // Decoration.flavouredAs(FabricContractFlavour)
+    //   .for(tableKey)
+    //   .extend(function table(obj: any) {
+    //     const chain: any[] = [];
 
-        do {
-          current = Object.getPrototypeOf(obj);
-          if (current) models.push(current);
-        } while (current);
+    //     // Collect prototype chain up to Function
+    //     let current = obj;
+    //     while (current && current !== Function.prototype) {
+    //       chain.unshift(current); // push to front, so base class is first
+    //       current = Object.getPrototypeOf(current);
+    //     }
 
-        do {
-          current = models.pop();
-          if (current) FabricObject()(current);
-        } while (models.length > 0);
-
-        return FabricObject()(obj);
-      })
-      .apply();
+    //     // Apply @Object() from base -> derived
+    //     for (const cls of chain) {
+    //       FabricObject()(cls);
+    //     }
+    //   })
+    //   .apply();
   }
 
   /**

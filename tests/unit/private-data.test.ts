@@ -241,6 +241,44 @@ describe("Tests private data decorator", () => {
     expect(Object.keys(modelMetadata).length).toBe(1);
     expect(modelMetadata.isPrivate).toBe(false);
   });
+
+  it("stuff", async () => {
+    class TestPrivateData4 extends Model {
+      @required()
+      @privateData(ORGA)
+      @privateData(ORGB)
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData4({ name: "John Doe" });
+
+    const FabricObject = () => {
+      return (model: any) => {
+        console.log("FabricObject", model);
+      };
+    };
+
+    const recursiveProto = (model: any, models: any[] = []) => {
+      if (model === Object.prototype) {
+        return models;
+      }
+      models.push(model);
+      return recursiveProto(Object.getPrototypeOf(model), models);
+    };
+
+    const recursiveFabricObject = (models: any[]) => {
+      const current = models.pop();
+
+      if (models.length < 1) return FabricObject()(current);
+      FabricObject()(current);
+      return recursiveFabricObject(models);
+    };
+
+    return recursiveFabricObject(recursiveProto(TestPrivateData4));
+  });
 });
 
 // describe("Tests private data decorator in contract context", () => {
