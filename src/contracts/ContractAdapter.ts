@@ -461,11 +461,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
       )
       .apply();
 
-    // const columnKey = Adapter.key(PersistenceKeys.COLUMN);
-    // Decoration.flavouredAs(FabricContractFlavour)
-    //   .for(columnKey)
-    //   .extend(FabricProperty())
-    //   .apply();
+    const columnKey = Adapter.key(PersistenceKeys.COLUMN);
+    Decoration.flavouredAs(FabricFlavour)
+      .for(columnKey)
+      .extend(FabricProperty())
+      .apply();
 
     // const tableKey = Adapter.key(PersistenceKeys.TABLE);
     // Decoration.flavouredAs(FabricContractFlavour)
