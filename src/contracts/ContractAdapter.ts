@@ -478,12 +478,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
         do {
           chain.push(current);
           console.log(`Found class: ${current}`);
-          current = Object.getPrototypeOf(current);
         } while (current && current !== Object.prototype);
 
         do {
           current = chain.pop();
           console.log(`Applying @Object() to class: ${current}`);
+          //TODO: THIS IS NOT WORKING AND THROWS ERROR
+          // FabricObject()(current);
         } while (chain.length > 1);
 
         return FabricObject()(obj);
