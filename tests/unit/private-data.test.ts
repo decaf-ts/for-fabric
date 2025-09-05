@@ -1,24 +1,8 @@
 import { FabricCrudContract } from "../../src/contracts";
 console.log(FabricCrudContract);
-import {
-  maxlength,
-  minlength,
-  model,
-  Model,
-  ModelArg,
-  required,
-} from "@decaf-ts/decorator-validation";
-import {
-  getFabricModelKey,
-  isPrivateData,
-  modelToPrivate,
-  privateData,
-} from "../../src";
+import { Model, ModelArg, required } from "@decaf-ts/decorator-validation";
+import { getFabricModelKey, privateData } from "../../src";
 import { FabricModelKeys } from "../../src/shared/constants";
-import { SerializedCrudContract } from "../../src/contracts";
-import { BaseModel, column, pk, table } from "@decaf-ts/core";
-import { Context, Object as FabricObject, Property } from "fabric-contract-api";
-import { randomName, randomNif } from "../utils";
 
 jest.setTimeout(5000000);
 
@@ -242,42 +226,53 @@ describe("Tests private data decorator", () => {
     expect(modelMetadata.isPrivate).toBe(false);
   });
 
-  it("stuff", async () => {
-    class TestPrivateData4 extends Model {
+  it("Tests multiple private data decorator on class runned mannually", () => {
+    class TestPrivateData5 extends Model {
       @required()
-      @privateData(ORGA)
-      @privateData(ORGB)
       name!: string;
       constructor(arg?: ModelArg<Model>) {
         super(arg);
       }
     }
 
-    const c = new TestPrivateData4({ name: "John Doe" });
+    privateData(ORGA)(TestPrivateData5);
+    privateData(ORGB)(TestPrivateData5);
 
-    const FabricObject = () => {
-      return (model: any) => {
-        console.log("FabricObject", model);
-      };
-    };
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestPrivateData5.constructor
+    );
 
-    const recursiveProto = (model: any, models: any[] = []) => {
-      if (model === Object.prototype) {
-        return models;
+    console.log(modelMetadata);
+    expect(Object.keys(modelMetadata).length).toBe(2);
+    expect(modelMetadata.collections.length).toEqual(2);
+    expect(modelMetadata.collections).toContain(ORGB);
+    expect(modelMetadata.collections).toContain(ORGA);
+    expect(modelMetadata.isPrivate).toBe(true);
+  });
+
+  it("Tests multiple private data decorator on class present in the class", () => {
+    @privateData(ORGA)
+    @privateData(ORGB)
+    class TestPrivateData5 extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
       }
-      models.push(model);
-      return recursiveProto(Object.getPrototypeOf(model), models);
-    };
+    }
 
-    const recursiveFabricObject = (models: any[]) => {
-      const current = models.pop();
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestPrivateData5.constructor
+    );
 
-      if (models.length < 1) return FabricObject()(current);
-      FabricObject()(current);
-      return recursiveFabricObject(models);
-    };
-
-    return recursiveFabricObject(recursiveProto(TestPrivateData4));
+    console.log(modelMetadata);
+    expect(Object.keys(modelMetadata).length).toBe(2);
+    expect(modelMetadata.collections.length).toEqual(2);
+    expect(modelMetadata.collections).toContain(ORGB);
+    expect(modelMetadata.collections).toContain(ORGA);
+    expect(modelMetadata.isPrivate).toBe(true);
   });
 });
 
