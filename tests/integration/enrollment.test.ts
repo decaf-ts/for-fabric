@@ -2,14 +2,11 @@ import { Credentials, CAConfig, PeerConfig } from "../../src/shared/types";
 import { FabricEnrollmentService } from "../../src/client/services";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { Identity } from "../../src/shared/model/Identity";
-import { execSync } from "child_process";
-import fs from "fs";
-import path from "path";
 import { BaseModel, pk } from "@decaf-ts/core";
-import { Property } from "fabric-contract-api";
 import {
   maxlength,
   minlength,
+  model,
   ModelArg,
   required,
 } from "@decaf-ts/decorator-validation";
@@ -17,6 +14,7 @@ import { FabricClientRepository } from "../../src/client/FabricClientRepository"
 
 jest.setTimeout(5000000);
 
+@model()
 class TestModel extends BaseModel {
   @pk({ type: "Number" })
   id!: number;
@@ -35,36 +33,6 @@ class TestModel extends BaseModel {
 }
 
 describe("Test enrollement", () => {
-  // This ensures the infrastructure is up and running before running the tests.
-  beforeAll(async () => {
-    // Compile/Transpile the contract to JavaScript
-    execSync(
-      `npx weaver compile-contract -d --contract-file ./tests/assets/contract/serialized-contract/index.ts --output-dir ./docker/infrastructure/chaincode`
-    );
-
-    // Copy necessary files to the chaincode directory
-    fs.copyFileSync(
-      path.join(
-        process.cwd(),
-        "./tests/assets/contract/serialized-contract/package.json"
-      ),
-      path.join(process.cwd(), "./docker/infrastructure/chaincode/package.json")
-    );
-    fs.copyFileSync(
-      path.join(
-        process.cwd(),
-        "./tests/assets/contract/serialized-contract/npm-shrinkwrap.json"
-      ),
-      path.join(
-        process.cwd(),
-        "./docker/infrastructure/chaincode/npm-shrinkwrap.json"
-      )
-    );
-
-    //Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`);
-  });
-
   const user: Credentials = {
     userName: "TestUser" + Date.now(),
     password: "TestUserPSW",
@@ -86,11 +54,12 @@ describe("Test enrollement", () => {
   const peerConfig: PeerConfig = {
     cryptoPath: "./docker/infrastructure/crypto-config",
     keyDirectoryPath:
-      "./docker/docker-data/storage/org-a-peer-0-vol/msp/keystore",
+      "./docker/docker-data/storage/org-a-client-vol/admin/msp/keystore",
     certDirectoryPath:
-      "./docker/docker-data/storage/org-a-peer-0-vol/msp/signcerts",
-    tlsCertPath: "./docker/docker-data/storage/org-a-peer-0-vol/msp/cacerts",
-    peerEndpoint: "org-a-peer-0:7031",
+      "./docker/docker-data/storage/org-a-client-vol/admin/msp/signcerts",
+    tlsCertPath:
+      "./docker/docker-data/storage/org-a-client-vol/tls-ca-cert.pem",
+    peerEndpoint: "localhost:7031",
     peerHostAlias: "localhost",
     caEndpoint: "localhost:7054",
     caTlsCertificate:
@@ -99,7 +68,7 @@ describe("Test enrollement", () => {
     caKey: "./docker/docker-data/storage/org-a-peer-0-vol/msp/keystore",
     chaincodeName: "simple",
     ca: "org-a",
-    mspId: "org-a",
+    mspId: "Peer0OrgaMSP",
     channel: "simple-channel",
   };
 
@@ -117,9 +86,9 @@ describe("Test enrollement", () => {
   });
 
   it("Creates new Gateway connection ", async () => {
-    peerConfig.keyDirectoryPath = userID.credentials!.privateKey!;
-    peerConfig.certDirectoryPath = userID.credentials!.certificate!;
-    peerConfig.tlsCertPath = userID.credentials!.rootCertificate!;
+    // peerConfig.keyDirectoryPath = userID.credentials!.privateKey!;
+    // peerConfig.certDirectoryPath = userID.credentials!.certificate!;
+    // peerConfig.tlsCertPath = userID.credentials!.rootCertificate!;
     clientAdapter = new FabricClientAdapter(peerConfig);
 
     const clientUser = new TestModel({

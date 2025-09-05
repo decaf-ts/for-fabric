@@ -3,7 +3,6 @@ import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import {
   Context,
-  InternalError,
   OperationKeys,
   RepositoryFlags,
 } from "@decaf-ts/db-decorators";
