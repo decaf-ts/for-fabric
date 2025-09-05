@@ -3,6 +3,8 @@ import {
   FabricModelKeys,
   getClassPrivateDataMetadata,
   getFabricModelKey,
+  hasPrivateData,
+  isModelPrivate,
   privateData,
 } from "../../src/shared";
 
@@ -406,6 +408,106 @@ describe("Tests private data utility function", () => {
     expect(modelMetadata.collections).toContain(ORGB);
     expect(modelMetadata.collections).toContain(ORGA);
     expect(modelMetadata.isPrivate).toBe(true);
+  });
+
+  it("Tests hasPrivateData function on class decorated with privateData", () => {
+    @privateData(ORGA)
+    class TestPrivateData extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({ name: "John Doe" });
+
+    const hasPrivate = hasPrivateData(c);
+    console.log(hasPrivate);
+    expect(hasPrivate).toBe(true);
+  });
+
+  it("Tests hasPrivateData function on class not decorated", () => {
+    class TestPrivateData extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({ name: "John Doe" });
+
+    const hasPrivate = hasPrivateData(c);
+    console.log(hasPrivate);
+    expect(hasPrivate).toBe(false);
+  });
+
+  it("Tests hasPrivateData function on class with property decorated with privateData", () => {
+    class TestPrivateData extends Model {
+      @required()
+      @privateData(ORGA)
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({ name: "John Doe" });
+
+    const hasPrivate = hasPrivateData(c);
+    console.log(hasPrivate);
+    expect(hasPrivate).toBe(true);
+  });
+
+  it("Tests isModelPrivate function on class decorated with privateData", () => {
+    @privateData(ORGA)
+    class TestPrivateData extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({ name: "John Doe" });
+
+    const isPrivate = isModelPrivate(c);
+    console.log(isPrivate);
+    expect(isPrivate).toBe(true);
+  });
+
+  it("Tests isModelPrivate function on class with property decorated with privateData", () => {
+    class TestPrivateData extends Model {
+      @required()
+      @privateData(ORGA)
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({ name: "John Doe" });
+
+    const isPrivate = isModelPrivate(c);
+    console.log(isPrivate);
+    expect(isPrivate).toBe(false);
+  });
+
+  it("Tests isModelPrivate function on class with no private data decorators", () => {
+    class TestPrivateData extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({ name: "John Doe" });
+
+    const isPrivate = isModelPrivate(c);
+    console.log(isPrivate);
+    expect(isPrivate).toBe(false);
   });
 });
 

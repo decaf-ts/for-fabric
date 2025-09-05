@@ -6,8 +6,8 @@ import {
   SerializationError,
 } from "@decaf-ts/db-decorators";
 
-export function isPrivateData<M extends Model>(model: M) {
-  const metadata = getPrivateDataMetadata(model);
+export function hasPrivateData<M extends Model>(model: M) {
+  const metadata = getClassPrivateDataMetadata(model);
   if (!metadata) return false;
   return true;
 }
@@ -31,14 +31,15 @@ export function getClassPrivateDataMetadata<M extends Model>(
 }
 
 export function isModelPrivate<M extends Model>(model: M): boolean {
-  const metadata = getPrivateDataMetadata(model);
+  const metadata = getClassPrivateDataMetadata(model);
+  if (!metadata || metadata.isPrivate === undefined) return false;
   return metadata.isPrivate;
 }
 
 export function modelToPrivate<M extends Model>(
   model: M
 ): { model: M; private?: Record<string, any> } {
-  if (!isPrivateData(model)) return { model: model };
+  if (!hasPrivateData(model)) return { model: model };
   const decs: Record<string, any[]> = getAllPropertyDecoratorsRecursive(
     model,
     undefined,
