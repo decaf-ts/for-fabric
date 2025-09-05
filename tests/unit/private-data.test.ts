@@ -1,8 +1,10 @@
-import { FabricCrudContract } from "../../src/contracts";
-console.log(FabricCrudContract);
 import { Model, ModelArg, required } from "@decaf-ts/decorator-validation";
-import { getFabricModelKey, privateData } from "../../src";
-import { FabricModelKeys } from "../../src/shared/constants";
+import {
+  FabricModelKeys,
+  getFabricModelKey,
+  getPrivateDataMetadata,
+  privateData,
+} from "../../src/shared";
 
 jest.setTimeout(5000000);
 
@@ -145,8 +147,171 @@ describe("Tests private data decorator", () => {
 
     const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      TestPrivateData2.constructor
+      TestPrivateData2
     );
+
+    console.log(modelMetadata);
+    expect(Object.keys(modelMetadata).length).toBe(2);
+    expect(modelMetadata.collections.length).toEqual(1);
+    expect(modelMetadata.collections[0]).toEqual(ORGB);
+    expect(modelMetadata.isPrivate).toBe(true);
+  });
+
+  it("Tests multiple private data decorator on property runned mannually", () => {
+    class TestPrivateData3 extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData3({ name: "John Doe" });
+
+    privateData(ORGA)(c, "name");
+    privateData(ORGB)(c, "name");
+
+    const propMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      c,
+      "name"
+    );
+    console.log(propMetadata);
+    expect(propMetadata.collections.length).toBe(2);
+    expect(propMetadata.collections).toContain(ORGA);
+    expect(propMetadata.collections).toContain(ORGB);
+    expect(Object.keys(propMetadata).length).toBe(1);
+
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      c.constructor
+    );
+
+    console.log(modelMetadata);
+
+    expect(Object.keys(modelMetadata).length).toBe(1);
+    expect(modelMetadata.isPrivate).toBe(false);
+  });
+
+  it("Tests multiple private data decorator on property present in the class", () => {
+    class TestPrivateData4 extends Model {
+      @required()
+      @privateData(ORGA)
+      @privateData(ORGB)
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData4({ name: "John Doe" });
+
+    const propMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      c,
+      "name"
+    );
+    console.log(propMetadata);
+    expect(propMetadata.collections.length).toBe(2);
+    expect(propMetadata.collections).toContain(ORGA);
+    expect(propMetadata.collections).toContain(ORGB);
+    expect(Object.keys(propMetadata).length).toBe(1);
+
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      c.constructor
+    );
+
+    console.log(modelMetadata);
+
+    expect(Object.keys(modelMetadata).length).toBe(1);
+    expect(modelMetadata.isPrivate).toBe(false);
+  });
+
+  it("Tests multiple private data decorator on class runned mannually", () => {
+    class TestPrivateData5 extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    privateData(ORGA)(TestPrivateData5);
+    privateData(ORGB)(TestPrivateData5);
+
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestPrivateData5
+    );
+
+    console.log(modelMetadata);
+    expect(Object.keys(modelMetadata).length).toBe(2);
+    expect(modelMetadata.collections.length).toEqual(2);
+    expect(modelMetadata.collections).toContain(ORGB);
+    expect(modelMetadata.collections).toContain(ORGA);
+    expect(modelMetadata.isPrivate).toBe(true);
+  });
+
+  it("Tests multiple private data decorator on class present in the class", () => {
+    @privateData(ORGA)
+    @privateData(ORGB)
+    class TestPrivateData5 extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestPrivateData5
+    );
+
+    console.log(modelMetadata);
+    expect(Object.keys(modelMetadata).length).toBe(2);
+    expect(modelMetadata.collections.length).toEqual(2);
+    expect(modelMetadata.collections).toContain(ORGB);
+    expect(modelMetadata.collections).toContain(ORGA);
+    expect(modelMetadata.isPrivate).toBe(true);
+  });
+});
+
+describe("Tests private data utility function", () => {
+  it("Tests getPrivateDataMetadata on class with property decorated with privateData", () => {
+    class TestPrivateData1 extends Model {
+      @required()
+      @privateData(ORGA)
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData1({ name: "John Doe" });
+
+    const modelMetadata = getPrivateDataMetadata(c);
+
+    console.log(modelMetadata);
+
+    expect(Object.keys(modelMetadata).length).toBe(1);
+    expect(modelMetadata.isPrivate).toBe(false);
+  });
+
+  it("Tests getPrivateDataMetadata on class with class decorated with privateData", () => {
+    @privateData(ORGB)
+    class TestPrivateData2 extends Model {
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData2({ name: "John Doe" });
+
+    const modelMetadata = getPrivateDataMetadata(c);
 
     console.log(modelMetadata);
     expect(Object.keys(modelMetadata).length).toBe(2);

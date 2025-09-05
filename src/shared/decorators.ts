@@ -207,10 +207,9 @@ export function privateData(collection?: string) {
   const key: string = getFabricModelKey(FabricModelKeys.PRIVATE);
 
   return function privateData(model: any, attribute?: string) {
-    const target = !attribute ? model.constructor : model;
     const propertyKey = attribute || undefined;
 
-    const meta = Reflect.getMetadata(key, target, propertyKey as string);
+    const meta = Reflect.getMetadata(key, model, propertyKey as string);
     const data = meta?.collections || [];
 
     propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
@@ -218,7 +217,7 @@ export function privateData(collection?: string) {
         collections: data ? [...new Set([...data, collection])] : [collection],
       }),
       isPrivate: !attribute,
-    })(model.constructor);
+    })(attribute ? model.constructor : model);
 
     if (attribute)
       propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {

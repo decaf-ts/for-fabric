@@ -7,21 +7,32 @@ import {
 } from "@decaf-ts/db-decorators";
 
 export function isPrivateData<M extends Model>(model: M) {
-  const one = Reflect.getMetadata(
+  const metadata = getPrivateDataMetadata(model);
+  if (!metadata) return false;
+  return true;
+}
+
+export function getPrivateDataMetadata<M extends Model>(
+  model: M
+): Record<string, any> {
+  let metadata = Reflect.getMetadata(
     getFabricModelKey(FabricModelKeys.PRIVATE),
-    model.constructor
+    model
   );
 
-  console.log(one);
+  metadata =
+    metadata ||
+    Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      model.constructor
+    );
 
-  const two = Reflect.getMetadata(
-    getFabricModelKey(FabricModelKeys.PRIVATE),
-    Model.get(model.constructor.name) as any
-  );
+  return metadata;
+}
 
-  console.log(two);
-
-  return !!(one || two);
+export function isModelPrivate<M extends Model>(model: M): boolean {
+  const metadata = getPrivateDataMetadata(model);
+  return metadata.isPrivate;
 }
 
 export function modelToPrivate<M extends Model>(
