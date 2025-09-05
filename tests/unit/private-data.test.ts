@@ -1,10 +1,16 @@
-import { Model, ModelArg, required } from "@decaf-ts/decorator-validation";
+import {
+  model,
+  Model,
+  ModelArg,
+  required,
+} from "@decaf-ts/decorator-validation";
 import {
   FabricModelKeys,
   getClassPrivateDataMetadata,
   getFabricModelKey,
   hasPrivateData,
   isModelPrivate,
+  modelToPrivate,
   privateData,
 } from "../../src/shared";
 
@@ -102,6 +108,7 @@ const ctx = {
 
 const ORGA = "OrganizationA";
 const ORGB = "OrganizationB";
+const ORGExample = "_implicit_org_Org1MSP";
 
 describe("Tests private data decorator", () => {
   it("Tests private data decorator on property", () => {
@@ -508,6 +515,250 @@ describe("Tests private data utility function", () => {
     const isPrivate = isModelPrivate(c);
     console.log(isPrivate);
     expect(isPrivate).toBe(false);
+  });
+
+  it("Tests modelToPrivate function on class not decorated with privateData", () => {
+    @model()
+    class TestPrivateData extends Model {
+      @required()
+      name!: string;
+
+      @required()
+      age!: string;
+
+      @required()
+      size!: string;
+
+      @required()
+      description!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({
+      name: "John Doe",
+      age: "25",
+      size: "medium",
+      description: "A test model",
+    });
+
+    const isPrivate = isModelPrivate(c);
+    console.log(isPrivate);
+    expect(isPrivate).toBe(false);
+
+    const res = modelToPrivate(c);
+
+    expect(res.model.name).toBe(c.name);
+    expect(res.model.age).toBe(c.age);
+    expect(res.model.size).toBe(c.size);
+    expect(res.model.description).toBe(c.description);
+    expect(res.private).toBeUndefined();
+  });
+
+  it("Tests modelToPrivate function on class decorated with privateData", () => {
+    @model()
+    @privateData(ORGA)
+    class TestPrivateData extends Model {
+      @required()
+      name!: string;
+
+      @required()
+      age!: string;
+
+      @required()
+      size!: string;
+
+      @required()
+      description!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({
+      name: "John Doe",
+      age: "25",
+      size: "medium",
+      description: "A test model",
+    });
+
+    const isPrivate = isModelPrivate(c);
+    console.log(isPrivate);
+    expect(isPrivate).toBe(true);
+
+    const res = modelToPrivate(c);
+    console.log(res);
+
+    expect(res.private).toBeDefined();
+    expect(res.private![ORGA].name).toBe(c.name);
+    expect(res.private![ORGA].age).toBe(c.age);
+    expect(res.private![ORGA].size).toBe(c.size);
+    expect(res.private![ORGA].description).toBe(c.description);
+    expect(res.model.name).toBeUndefined();
+    expect(res.model.age).toBeUndefined();
+    expect(res.model.size).toBeUndefined();
+    expect(res.model.description).toBeUndefined();
+  });
+
+  it("Tests modelToPrivate function on class decorated with multiple privateData", () => {
+    @model()
+    @privateData(ORGA)
+    @privateData(ORGB)
+    class TestPrivateData extends Model {
+      @required()
+      name!: string;
+
+      @required()
+      age!: string;
+
+      @required()
+      size!: string;
+
+      @required()
+      description!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({
+      name: "John Doe",
+      age: "25",
+      size: "medium",
+      description: "A test model",
+    });
+
+    const isPrivate = isModelPrivate(c);
+    console.log(isPrivate);
+    expect(isPrivate).toBe(true);
+
+    const res = modelToPrivate(c);
+    console.log(res);
+
+    expect(res.private).toBeDefined();
+    expect(res.private![ORGA].name).toBe(c.name);
+    expect(res.private![ORGA].age).toBe(c.age);
+    expect(res.private![ORGA].size).toBe(c.size);
+    expect(res.private![ORGA].description).toBe(c.description);
+    expect(res.private![ORGB].name).toBe(c.name);
+    expect(res.private![ORGB].age).toBe(c.age);
+    expect(res.private![ORGB].size).toBe(c.size);
+    expect(res.private![ORGB].description).toBe(c.description);
+    expect(res.model.name).toBeUndefined();
+    expect(res.model.age).toBeUndefined();
+    expect(res.model.size).toBeUndefined();
+    expect(res.model.description).toBeUndefined();
+  });
+
+  it("Tests modelToPrivate function on class decorated with privateData", () => {
+    @model()
+    class TestPrivateData extends Model {
+      @required()
+      @privateData(ORGA)
+      name!: string;
+
+      @required()
+      @privateData(ORGA)
+      age!: string;
+
+      @required()
+      size!: string;
+
+      @required()
+      description!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({
+      name: "John Doe",
+      age: "25",
+      size: "medium",
+      description: "A test model",
+    });
+
+    const isPrivate = isModelPrivate(c);
+    console.log(isPrivate);
+    expect(isPrivate).toBe(false);
+
+    const res = modelToPrivate(c);
+    console.log(res);
+
+    expect(res.private).toBeDefined();
+    expect(res.model).toBeDefined();
+    expect(res.private![ORGA].name).toBe(c.name);
+    expect(res.private![ORGA].age).toBe(c.age);
+    expect(res.model.size).toBe(c.size);
+    expect(res.model.description).toBe(c.description);
+    expect(res.model.name).toBeUndefined();
+    expect(res.model.age).toBeUndefined();
+    expect(res.private![ORGA].size).toBeUndefined();
+    expect(res.private![ORGA].description).toBeUndefined();
+  });
+
+  it("Tests modelToPrivate function on class decorated with multiple privateData in the properties", () => {
+    @model()
+    class TestPrivateData extends Model {
+      @required()
+      @privateData(ORGA)
+      name!: string;
+
+      @required()
+      @privateData(ORGB)
+      @privateData(ORGA)
+      age!: string;
+
+      @required()
+      @privateData(ORGA)
+      @privateData(ORGB)
+      size!: string;
+
+      @required()
+      @privateData(ORGB)
+      @privateData(ORGExample)
+      description!: string;
+
+      @required()
+      test!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const c = new TestPrivateData({
+      name: "John Doe",
+      age: "25",
+      size: "medium",
+      description: "A test model",
+      test: "something",
+    });
+
+    const isPrivate = isModelPrivate(c);
+    console.log(isPrivate);
+    expect(isPrivate).toBe(false);
+
+    const res = modelToPrivate(c);
+    console.log(res);
+
+    expect(res.private).toBeDefined();
+    expect(res.model).toBeDefined();
+    expect(res.private![ORGA].name).toBe(c.name);
+    expect(res.private![ORGB].name).toBeUndefined();
+    expect(res.private![ORGA].age).toBe(c.age);
+    expect(res.private![ORGB].age).toBe(c.age);
+    expect(res.private![ORGA].size).toBe(c.size);
+    expect(res.private![ORGB].size).toBe(c.size);
+    expect(res.private![ORGB].description).toBe(c.description);
+    expect(res.private![ORGA].description).toBeUndefined();
+    expect(res.private![ORGB].test).toBeUndefined();
+    expect(res.private![ORGA].test).toBeUndefined();
+    expect(res.model.name).toBeUndefined();
+    expect(res.model.age).toBeUndefined();
+    expect(res.model.size).toBeUndefined();
+    expect(res.model.description).toBeUndefined();
+    expect(res.model.test).toBe(c.test);
   });
 });
 

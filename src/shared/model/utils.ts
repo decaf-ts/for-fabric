@@ -38,7 +38,7 @@ export function isModelPrivate<M extends Model>(model: M): boolean {
 
 export function modelToPrivate<M extends Model>(
   model: M
-): { model: M; private?: Record<string, any> } {
+): { model: M; private?: Record<string, Record<string, any>> } {
   if (!hasPrivateData(model)) return { model: model };
   const decs: Record<string, any[]> = getAllPropertyDecoratorsRecursive(
     model,
@@ -46,20 +46,32 @@ export function modelToPrivate<M extends Model>(
     getFabricModelKey(FabricModelKeys.PRIVATE)
   ) as Record<string, any[]>;
 
+  const isPrivate = isModelPrivate(model);
+  const modelCollections: Record<string, any> =
+    getClassPrivateDataMetadata(model);
+
   const result = Object.entries(decs).reduce(
     (
       accum: { model: Record<string, any>; private?: Record<string, any> },
       [k, val]
     ) => {
       const privateData = val.find((el) => el.key === "");
-      if (privateData) {
+
+      if (privateData || isPrivate) {
+        const collections = isPrivate
+          ? modelCollections.collections
+          : privateData.props.collections;
         accum.private = accum.private || {};
-        try {
-          accum.private[k] = model[k as keyof M];
-        } catch (e: unknown) {
-          throw new SerializationError(
-            `Failed to serialize private property ${k}: ${e}`
-          );
+
+        for (const collection of collections) {
+          try {
+            accum.private[collection] = accum.private[collection] || {};
+            accum.private[collection][k] = model[k as keyof M];
+          } catch (e: unknown) {
+            throw new SerializationError(
+              `Failed to serialize private property ${k}: ${e}`
+            );
+          }
         }
       } else {
         accum.model = accum.model || {};
@@ -70,5 +82,5 @@ export function modelToPrivate<M extends Model>(
     {} as { model: Record<string, any>; private?: Record<string, any> }
   );
   result.model = Model.build(result.model, model.constructor.name);
-  return result as { model: M; private?: Record<string, any> };
+  return result as { model: M; private?: Record<string, Record<string, any>> };
 }
