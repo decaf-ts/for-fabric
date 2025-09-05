@@ -488,21 +488,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
         return FabricObject()(obj);
       })
-      // .extend(function table(obj: any) {
-      //   const chain: any[] = [];
-
-      //   // Collect prototype chain up to Function
-      //   let current = obj;
-      //   while (current && current !== Function.prototype) {
-      //     chain.unshift(current); // push to front, so base class is first
-      //     current = Object.getPrototypeOf(current);
-      //   }
-
-      //   // Apply @Object() from base -> derived
-      //   for (const cls of chain) {
-      //     FabricObject()(cls);
-      //   }
-      // })
       .apply();
   }
 
