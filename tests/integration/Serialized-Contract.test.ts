@@ -1,6 +1,6 @@
 import { execSync } from "child_process";
-import fs from "fs";
-import path from "path";
+import * as fs from "fs";
+import * as path from "path";
 import { TestModel } from "../assets/contract/serialized-contract/TestModel";
 import { createCompositeKey, randomName, randomNif } from "../utils";
 
@@ -55,6 +55,7 @@ describe("Test Serialized Crud Contract", () => {
       );
 
       return res.toString();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e: unknown) {
       console.log("Chaincode not ready. Retrying...");
       await new Promise((r) => setTimeout(r, 5000)); // Wait for 5 seconds before retrying
@@ -112,6 +113,7 @@ describe("Test Serialized Crud Contract", () => {
       console.log("Blockchain read:", processed);
 
       return processed;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e: unknown) {
       console.log("Failed to read blockchain");
       return "";

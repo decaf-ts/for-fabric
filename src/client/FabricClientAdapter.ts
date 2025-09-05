@@ -195,11 +195,11 @@ export class FabricClientAdapter extends CouchDBAdapter<
       [ids, models.map((m) => this.serializer.serialize(m, tableName))],
       transient
     );
-    return this.serializer.deserialize(
-      (this.decode(result) as any).map((r: any) =>
-        this.serializer.deserialize(r)
-      )
-    );
+    try {
+      return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
+    } catch (e: unknown) {
+      throw new SerializationError(e as Error);
+    }
   }
 
   /**
@@ -207,7 +207,6 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @summary Submits a transaction to read multiple records from the Fabric ledger
    * @param {string} tableName - The name of the table/collection
    * @param {string[] | number[]} ids - Array of record identifiers to read
-   * @param {Serializer<any>} serializer - Serializer for the model data
    * @return {Promise<Array<Record<string, any>>>} Promise resolving to the retrieved records
    */
   override async readAll(
@@ -221,11 +220,11 @@ export class FabricClientAdapter extends CouchDBAdapter<
       BulkCrudOperationKeys.READ_ALL,
       [ids]
     );
-    return this.serializer.deserialize(
-      (this.decode(result) as any).map((r: any) =>
-        this.serializer.deserialize(r)
-      )
-    );
+    try {
+      return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
+    } catch (e: unknown) {
+      throw new SerializationError(e as Error);
+    }
   }
 
   /**
@@ -235,7 +234,6 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string[] | number[]} ids - Array of record identifiers
    * @param {Array<Record<string, any>>} models - Array of updated record data
    * @param {Record<string, any>} transient - Transient data for the transaction
-   * @param {Serializer<any>} serializer - Serializer for the model data
    * @return {Promise<Array<Record<string, any>>>} Promise resolving to the updated records
    */
   override async updateAll(
@@ -256,11 +254,11 @@ export class FabricClientAdapter extends CouchDBAdapter<
       [ids, models.map((m) => this.serializer.serialize(m, tableName))],
       transient
     );
-    return this.serializer.deserialize(
-      (this.decode(result) as any).map((r: any) =>
-        this.serializer.deserialize(r)
-      )
-    );
+    try {
+      return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
+    } catch (e: unknown) {
+      throw new SerializationError(e as Error);
+    }
   }
 
   /**
@@ -282,11 +280,11 @@ export class FabricClientAdapter extends CouchDBAdapter<
       BulkCrudOperationKeys.DELETE_ALL,
       [ids]
     );
-    return this.serializer.deserialize(
-      (this.decode(result) as any).map((r: any) =>
-        this.serializer.deserialize(r)
-      )
-    );
+    try {
+      return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
+    } catch (e: unknown) {
+      throw new SerializationError(e as Error);
+    }
   }
 
   /**
@@ -510,9 +508,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     try {
       result = JSON.parse(this.decode(transactionResult));
     } catch (e: any) {
-      throw new SerializationError(
-        stringFormat("Failed to process result: {0}", e.message)
-      );
+      throw new SerializationError(`Failed to process result: ${e}`);
     }
 
     const parseRecord = (record: Record<any, any>) => {
