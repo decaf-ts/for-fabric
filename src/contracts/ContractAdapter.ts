@@ -47,7 +47,7 @@ import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
 import { MissingContextError } from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
-import { isModelPrivate, modelToPrivate } from "../shared";
+import { isModelPrivate, modelToPrivate } from "../shared/model/utils";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -621,7 +621,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     return Promise.all(
       id.map(async (i, index) => {
-        return this.create(tableName, i, model[index], ...args);
+        return this.create(
+          tableName,
+          i,
+          model[index],
+          {},
+          { model: model[index] },
+          ...args
+        );
       })
     );
   }
