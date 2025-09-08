@@ -47,6 +47,7 @@ import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
 import { MissingContextError } from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
+import { isModelPrivate, modelToPrivate } from "../shared";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -507,6 +508,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: string,
     id: string | number,
     model: Record<string, any>,
+    transient: Record<string, any>,
+    privateData: {
+      model: Record<string, any>;
+      private?: Record<string, Record<string, any>> | undefined;
+    },
     ...args: any[]
   ): Promise<Record<string, any>> {
     const { stub, logger } = args.pop();
@@ -520,7 +526,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
     }
 
-    try {
+    const putState = async (
+      log: Logger,
+      stub: any,
+      tableName: string,
+      id: string
+    ) => {
       log.info(
         `Checking if entry with id ${id} already exists in ${tableName} table`
       );
@@ -533,6 +544,60 @@ export class FabricContractAdapter extends CouchDBAdapter<
       }
       log.info(`adding entry to ${tableName} table with pk ${id}`);
       await stub.putState(id.toString(), data);
+    };
+
+    const putPrivateState = async (
+      log: Logger,
+      stub: any,
+      tableName: string,
+      id: string,
+      privateData: {
+        model: Record<string, any>;
+        private?: Record<string, Record<string, any>> | undefined;
+      }
+    ) => {
+      if (!privateData.private) return;
+
+      const collections = Object.keys(privateData.private);
+
+      for (const collection of collections) {
+        let data: Buffer;
+        try {
+          data = Buffer.from(JSON.stringify(privateData.private[collection]));
+        } catch (e: unknown) {
+          throw new SerializationError(
+            `Failed to serialize record with id ${id} for table ${tableName} and collection: ${collection}: ${e}`
+          );
+        }
+
+        try {
+          const res = await stub.getPrivateData(collection, id.toString());
+
+          if (res.toString() !== "") {
+            throw new ConflictError(
+              `Entry with id ${id} already exists in collection: ${collection}  table: ${tableName}`
+            );
+          }
+
+          log.info(`adding entry to ${tableName} table with pk ${id}`);
+          await stub.putPrivateData(collection, id.toString(), data);
+        } catch (e: unknown) {
+          log.error(
+            `Failed to create private data for table ${tableName} and id ${id} for collection ${collection}: ${e}`
+          );
+        }
+      }
+    };
+
+    try {
+      // Checking if model is private
+      if (isModelPrivate(model as any)) {
+        log.info("Creating a private record");
+        putPrivateState(log, stub, tableName, id as string, privateData);
+      } else {
+        putState(log, stub, tableName, id as string);
+        putPrivateState(log, stub, tableName, id as string, privateData);
+      }
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -703,13 +768,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ): {
     record: Record<string, any>;
     id: string;
-    transient?: Record<string, any>;
+    transient: Record<string, any>;
+    privateData: {
+      model: M;
+      private?: Record<string, Record<string, any>> | undefined;
+    };
   } {
     const { stub, logger } = args.pop();
     const tableName = args.shift();
     const log = logger.for(this.prepare);
 
     const split = modelToTransient(model);
+    const priv = modelToPrivate(model);
     const result = Object.entries(split.model).reduce(
       (accum: Record<string, any>, [key, val]) => {
         if (typeof val === "undefined") return accum;
@@ -738,7 +808,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return {
       record: result,
       id: stub.createCompositeKey(tableName, [String(model[pk])]),
-      transient: split.transient,
+      transient: split.transient || {},
+      privateData: priv,
     };
   }
 

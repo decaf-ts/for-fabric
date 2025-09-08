@@ -250,14 +250,21 @@ export class FabricContractRepository<M extends Model> extends Repository<
     const log = this.logFor(ctx).for(this.create);
     log.info(`Preparing model: ${JSON.stringify(model)}`);
     // eslint-disable-next-line prefer-const
-    let { record, id, transient } = this.adapter.prepare(
+    let { record, id, transient, privateData } = this.adapter.prepare(
       model,
       this.pk,
       this.tableName,
       ...args
     );
     log.info(`Creating model: ${JSON.stringify(model)}`);
-    record = await this.adapter.create(this.tableName, id, record, ...args);
+    record = await this.adapter.create(
+      this.tableName,
+      id,
+      record,
+      transient || {},
+      privateData,
+      ...args
+    );
     let c: FabricContractContext | undefined = undefined;
     if (args.length) c = args[args.length - 1] as FabricContractContext;
     log.info(`Reverting model: ${JSON.stringify(model)}`);
@@ -282,7 +289,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
     const log = this.logFor(ctx).for(this.update);
     log.info(`Preparing model: ${JSON.stringify(model)}`);
     // eslint-disable-next-line prefer-const
-    let { record, id, transient } = this.adapter.prepare(
+    let { record, id, transient, privateData } = this.adapter.prepare(
       model,
       this.pk,
       this.tableName,
