@@ -603,8 +603,8 @@ describe("Tests private data utility function", () => {
 
   it("Tests modelToPrivate function on class decorated with multiple privateData", () => {
     @model()
-    @privateData(ORGA)
     @privateData(ORGB)
+    @privateData(ORGA)
     class TestPrivateData extends Model {
       @required()
       name!: string;

@@ -1,7 +1,7 @@
 import { AuthorizationError } from "@decaf-ts/core";
 import { FabricContractContext, FabricERC20Contract } from "../contracts";
 import { NotFoundError } from "@decaf-ts/db-decorators";
-import { Model, propMetadata } from "@decaf-ts/decorator-validation";
+import { Model, ModelKeys, propMetadata } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
 
 export function Owner() {
@@ -209,7 +209,11 @@ export function privateData(collection?: string) {
   return function privateData(model: any, attribute?: string) {
     const propertyKey = attribute || undefined;
 
-    const meta = Reflect.getMetadata(key, model, propertyKey as string);
+    const meta = Reflect.getMetadata(
+      key,
+      model[ModelKeys.ANCHOR] || model,
+      propertyKey as string
+    );
     const data = meta?.collections || [];
 
     propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
@@ -217,7 +221,7 @@ export function privateData(collection?: string) {
         collections: data ? [...new Set([...data, collection])] : [collection],
       }),
       isPrivate: !attribute,
-    })(attribute ? model.constructor : model);
+    })(attribute ? model.constructor : model[ModelKeys.ANCHOR] || model);
 
     if (attribute)
       propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
