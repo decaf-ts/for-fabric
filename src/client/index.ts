@@ -6,7 +6,6 @@
  * @memberOf module:fabric
  */
 
-export * from "./constants";
 export * from "./fabric-fs";
 export * from "./FabricClientAdapter";
 export * from "./FabricClientDispatch";
