@@ -461,31 +461,35 @@ export class FabricContractAdapter extends CouchDBAdapter<
       )
       .apply();
 
-    // const columnKey = Adapter.key(PersistenceKeys.COLUMN);
-    // Decoration.flavouredAs(FabricContractFlavour)
-    //   .for(columnKey)
-    //   .extend(FabricProperty())
-    //   .apply();
+    const columnKey = Adapter.key(PersistenceKeys.COLUMN);
+    Decoration.flavouredAs(FabricFlavour)
+      .for(columnKey)
+      .extend(FabricProperty())
+      .apply();
 
-    // const tableKey = Adapter.key(PersistenceKeys.TABLE);
-    // Decoration.flavouredAs(FabricContractFlavour)
-    //   .for(tableKey)
-    //   .extend(function table(obj: any) {
-    //     const chain: any[] = [];
+    const tableKey = Adapter.key(PersistenceKeys.TABLE);
+    Decoration.flavouredAs(FabricFlavour)
+      .for(tableKey)
+      .extend(function table(obj: any) {
+        // const chain: any[] = [];
 
-    //     // Collect prototype chain up to Function
-    //     let current = obj;
-    //     while (current && current !== Function.prototype) {
-    //       chain.unshift(current); // push to front, so base class is first
-    //       current = Object.getPrototypeOf(current);
-    //     }
+        // let current = obj;
 
-    //     // Apply @Object() from base -> derived
-    //     for (const cls of chain) {
-    //       FabricObject()(cls);
-    //     }
-    //   })
-    //   .apply();
+        // do {
+        //   chain.push(current);
+        //   console.log(`Found class: ${current}`);
+        // } while (current && current !== Object.prototype);
+
+        // do {
+        //   current = chain.pop();
+        //   console.log(`Applying @Object() to class: ${current}`);
+        //   //TODO: THIS IS NOT WORKING AND THROWS ERROR
+        //   // FabricObject()(current);
+        // } while (chain.length > 1);
+
+        return FabricObject()(obj);
+      })
+      .apply();
   }
 
   /**

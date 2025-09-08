@@ -1,4 +1,4 @@
-import { column, pk, table, unique } from "@decaf-ts/core";
+import { column, pk, table } from "@decaf-ts/core";
 import {
   maxlength,
   minlength,
@@ -8,18 +8,14 @@ import {
   required,
 } from "@decaf-ts/decorator-validation";
 
-import { Object as FabricObject, Property } from "fabric-contract-api";
-
 @table("tst_user")
 @model()
-@FabricObject()
 export class TestModel extends Model {
   @pk({ type: "Number" })
   id!: number;
 
   @column("tst_name")
   @required()
-  @Property()
   name!: string;
 
   @column("tst_nif")
@@ -27,7 +23,6 @@ export class TestModel extends Model {
   @minlength(9)
   @maxlength(9)
   @required()
-  @Property()
   nif!: string;
 
   constructor(arg?: ModelArg<TestModel>) {

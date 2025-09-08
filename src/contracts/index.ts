@@ -7,7 +7,6 @@
 
 export * from "./crud";
 export * from "./erc20";
-export * from "./constants";
 export * from "./ContractAdapter";
 export * from "./ContractContext";
 export * from "./FabricContractRepository";
