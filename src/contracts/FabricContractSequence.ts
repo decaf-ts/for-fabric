@@ -10,6 +10,8 @@ import { MangoQuery, Sequence as Seq } from "@decaf-ts/for-couchdb";
 import { FabricContractContext } from "./ContractContext";
 import { FabricContractRepository } from "./FabricContractRepository";
 import { MissingContextError } from "../shared/errors";
+import { privateData } from "../shared/decorators";
+import { Constructor, ModelArg } from "@decaf-ts/decorator-validation";
 
 /**
  * @summary Abstract implementation of a Sequence
@@ -20,15 +22,44 @@ import { MissingContextError } from "../shared/errors";
  * @class CouchDBSequence
  * @implements Sequence
  */
-export class FabricContractDBSequence extends Sequence {
-  protected repo: FabricContractRepository<Seq>;
+export class FabricContractDBSequence<M extends Seq> extends Sequence {
+  protected repo: FabricContractRepository<M>;
 
   constructor(
     options: SequenceOptions,
-    adapter: Adapter<any, MangoQuery, any, any>
+    adapter: Adapter<any, MangoQuery, any, any>,
+    collections: string[] = []
   ) {
     super(options);
-    this.repo = Repository.forModel(Seq, adapter.alias);
+    const clazz = this.createSequence(collections) ?? Seq;
+    this.repo = Repository.forModel(
+      clazz,
+      adapter.alias
+    ) as FabricContractRepository<M>;
+  }
+
+  createSequence(collections: string[] = []): Constructor<M> | undefined {
+    if (collections.length < 1) return undefined;
+    class PrivateSequence extends Seq {
+      constructor(arg?: ModelArg<PrivateSequence>) {
+        super(arg);
+      }
+    }
+
+    //LOGICA DINAMICA
+    //TODO: mexer decorador fazer logica com nome do modelo a qual a chave pertence e coleçoes
+
+    Object.defineProperty(PrivateSequence, "name", {
+      writable: false,
+      configurable: false,
+      value: "something",
+    });
+
+    for (const collection of collections) {
+      privateData(collection)(PrivateSequence);
+    }
+
+    return PrivateSequence as unknown as Constructor<M>;
   }
 
   /**
