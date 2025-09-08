@@ -11,3 +11,4 @@ export * from "./types";
 export * from "../client/services";
 export * from "./model";
 export * from "./decorators";
+export * from "./constants";

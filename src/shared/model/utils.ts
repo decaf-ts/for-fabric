@@ -6,33 +6,49 @@ import {
   SerializationError,
 } from "@decaf-ts/db-decorators";
 
-export function isPrivateData<M extends Model>(model: M) {
-  const one = Reflect.getMetadata(
+export function hasPrivateData<M extends Model>(model: M) {
+  const metadata = getClassPrivateDataMetadata(model);
+  if (!metadata) return false;
+  return true;
+}
+
+export function getClassPrivateDataMetadata<M extends Model>(
+  model: M
+): Record<string, any> {
+  let metadata = Reflect.getMetadata(
     getFabricModelKey(FabricModelKeys.PRIVATE),
-    model.constructor
+    model
   );
 
-  console.log(one);
+  metadata =
+    metadata ||
+    Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      model.constructor
+    );
 
-  const two = Reflect.getMetadata(
-    getFabricModelKey(FabricModelKeys.PRIVATE),
-    Model.get(model.constructor.name) as any
-  );
+  return metadata;
+}
 
-  console.log(two);
-
-  return !!(one || two);
+export function isModelPrivate<M extends Model>(model: M): boolean {
+  const metadata = getClassPrivateDataMetadata(model);
+  if (!metadata || metadata.isPrivate === undefined) return false;
+  return metadata.isPrivate;
 }
 
 export function modelToPrivate<M extends Model>(
   model: M
-): { model: M; private?: Record<string, any> } {
-  if (!isPrivateData(model)) return { model: model };
+): { model: M; private?: Record<string, Record<string, any>> } {
+  if (!hasPrivateData(model)) return { model: model };
   const decs: Record<string, any[]> = getAllPropertyDecoratorsRecursive(
     model,
     undefined,
     getFabricModelKey(FabricModelKeys.PRIVATE)
   ) as Record<string, any[]>;
+
+  const isPrivate = isModelPrivate(model);
+  const modelCollections: Record<string, any> =
+    getClassPrivateDataMetadata(model);
 
   const result = Object.entries(decs).reduce(
     (
@@ -40,14 +56,22 @@ export function modelToPrivate<M extends Model>(
       [k, val]
     ) => {
       const privateData = val.find((el) => el.key === "");
-      if (privateData) {
+
+      if (privateData || isPrivate) {
+        const collections = isPrivate
+          ? modelCollections.collections
+          : privateData.props.collections;
         accum.private = accum.private || {};
-        try {
-          accum.private[k] = model[k as keyof M];
-        } catch (e: unknown) {
-          throw new SerializationError(
-            `Failed to serialize private property ${k}: ${e}`
-          );
+
+        for (const collection of collections) {
+          try {
+            accum.private[collection] = accum.private[collection] || {};
+            accum.private[collection][k] = model[k as keyof M];
+          } catch (e: unknown) {
+            throw new SerializationError(
+              `Failed to serialize private property ${k}: ${e}`
+            );
+          }
         }
       } else {
         accum.model = accum.model || {};
@@ -58,5 +82,5 @@ export function modelToPrivate<M extends Model>(
     {} as { model: Record<string, any>; private?: Record<string, any> }
   );
   result.model = Model.build(result.model, model.constructor.name);
-  return result as { model: M; private?: Record<string, any> };
+  return result as { model: M; private?: Record<string, Record<string, any>> };
 }
