@@ -404,7 +404,9 @@ export class FabricClientAdapter extends CouchDBAdapter<
     const log = this.log.for(this.read);
     log.verbose(`reading entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
-    const result = await this.evaluateTransaction(OperationKeys.READ, [id]);
+    const result = await this.evaluateTransaction(OperationKeys.READ, [
+      id.toString(),
+    ]);
     return this.serializer.deserialize(this.decode(result));
   }
 

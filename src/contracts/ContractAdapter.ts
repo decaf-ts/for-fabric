@@ -738,6 +738,66 @@ export class FabricContractAdapter extends CouchDBAdapter<
     };
   }
 
+  override revert<M extends Model>(
+    obj: Record<string, any>,
+    clazz: string | Constructor<M>,
+    pk: keyof M,
+    id: string | number,
+    transient?: Record<string, any>
+  ): M {
+    const log = this.log.for(this.revert);
+    const ob: Record<string, any> = {};
+    ob[pk as string] = id;
+    const m = (
+      typeof clazz === "string" ? Model.build(ob, clazz) : new clazz(ob)
+    ) as M;
+    log.silly(`Rebuilding model ${m.constructor.name} id ${id}`);
+    const metadata = obj[PersistenceKeys.METADATA];
+    const result = Object.keys(m).reduce((accum: M, key) => {
+      (accum as Record<string, any>)[key] = obj[Repository.column(accum, key)];
+      return accum;
+    }, m);
+
+    if (transient) {
+      log.verbose(
+        `re-adding transient properties: ${Object.keys(transient).join(", ")}`
+      );
+      Object.entries(transient).forEach(([key, val]) => {
+        if (key in result)
+          throw new InternalError(
+            `Transient property ${key} already exists on model ${m.constructor.name}. should be impossible`
+          );
+        result[key as keyof M] = val;
+      });
+    }
+
+    if (metadata) {
+      log.silly(
+        `Passing along ${this.flavour} persistence metadata for ${m.constructor.name} id ${id}: ${metadata}`
+      );
+      Object.defineProperty(result, PersistenceKeys.METADATA, {
+        enumerable: false,
+        configurable: false,
+        writable: false,
+        value: metadata,
+      });
+    }
+
+    return result;
+  }
+
+  override createPrefix(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>
+  ) {
+    const record: Record<string, any> = {};
+    record[CouchDBKeys.TABLE] = tableName;
+    // record[CouchDBKeys.ID] = this.generateId(tableName, id);
+    Object.assign(record, model);
+    return [tableName, id, record];
+  }
+
   override updatePrefix(
     tableName: string,
     id: string | number,

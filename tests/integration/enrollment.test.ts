@@ -104,6 +104,6 @@ describe("Test enrollement", () => {
     const clientUserRead: TestModel = await TestModelRepository.read(
       clientUserCreated.id
     );
-    expect(clientUserRead).toEqual(clientUser);
+    expect(clientUserRead).toEqual(clientUserCreated);
   });
 });
