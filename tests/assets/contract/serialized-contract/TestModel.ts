@@ -8,6 +8,8 @@ import {
   required,
 } from "@decaf-ts/decorator-validation";
 
+import { privateData } from "../../../../src/shared/decorators";
+
 @table("tst_user")
 @model()
 export class TestModel extends Model {
@@ -24,6 +26,11 @@ export class TestModel extends Model {
   @maxlength(9)
   @required()
   nif!: string;
+
+  @column("tst_email")
+  @required()
+  @privateData("_implicit_org_Peer0OrgaMSP")
+  email!: string;
 
   constructor(arg?: ModelArg<TestModel>) {
     super(arg);
