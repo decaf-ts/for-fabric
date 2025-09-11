@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { TestModel } from "../assets/contract/serialized-contract/TestModel";
 import { createCompositeKey, randomName, randomNif } from "../utils";
-import { modelToTransient, transient } from "@decaf-ts/db-decorators";
+import { modelToTransient } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
 
 jest.setTimeout(5000000);
@@ -148,6 +148,7 @@ describe("Test Serialized Crud Contract", () => {
     return {
       name: randomName(6),
       nif: randomNif(9),
+      email: `${randomName(6)}@example.com`,
     };
   };
 
@@ -235,6 +236,10 @@ describe("Test Serialized Crud Contract", () => {
 
     expect(record["tst_name"]).toBe(model.name);
     expect(record["tst_nif"]).toBe(model.nif);
+
+    const privateRecord = await readByPass(id, true);
+
+    expect(privateRecord["tst_email"]).toBe(transientData.transient!.email);
   });
 
   // it("Should fail to create model", async () => {
