@@ -7,3 +7,5 @@ export enum IdentityType {
 }
 
 export const FabricFlavour = "hlf-fabric";
+
+export const VERSION = "##VERSION##";
