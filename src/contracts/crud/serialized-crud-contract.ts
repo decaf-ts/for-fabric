@@ -23,6 +23,17 @@ export class SerializedCrudContract<
   }
 
   @Transaction()
+  override async create(ctx: Ctx, model: string): Promise<string> {
+    const log = this.logFor(ctx).for(this.create);
+    log.info(`Creating model: ${model}`);
+
+    const m = this.deserialize<M>(model);
+
+    log.info(`Model deserialized: ${JSON.stringify(m)}`);
+    return this.serialize((await super.create(ctx, m)) as M);
+  }
+
+  @Transaction()
   override async deleteAll(ctx: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
     const log = this.logFor(ctx).for(this.deleteAll);
@@ -85,17 +96,6 @@ export class SerializedCrudContract<
   override async healthcheck(ctx: Ctx): Promise<string> {
     //TODO: TRIM NOT WORKING CHECK LATER
     return String(await super.healthcheck(ctx)).trim();
-  }
-
-  @Transaction()
-  override async create(ctx: Ctx, model: string): Promise<string> {
-    const log = this.logFor(ctx).for(this.create);
-    log.info(`Creating model: ${model}`);
-
-    const m = this.deserialize<M>(model);
-
-    log.info(`Model deserialized: ${JSON.stringify(m)}`);
-    return this.serialize((await super.create(ctx, m)) as M);
   }
 
   @Transaction()

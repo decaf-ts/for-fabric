@@ -98,6 +98,42 @@ export abstract class FabricCrudContract<M extends Model>
   }
 
   /**
+   * @description Creates a single model in the state database
+   * @summary Delegates to the repository's create method
+   * @param {Ctx} ctx - The Fabric chaincode context
+   * @param {M} model - The model to create
+   * @param {...any[]} args - Additional arguments
+   * @return {Promise<M>} Promise resolving to the created model
+   */
+  async create(
+    ctx: Ctx,
+    model: string | M,
+    ...args: any[]
+  ): Promise<string | M> {
+    const log = this.logFor(ctx).for(this.create);
+
+    if (typeof model === "string") model = this.deserialize<M>(model) as any;
+
+    log.info(`Creating model: ${JSON.stringify(model)}`);
+
+    const transientMap = ctx.stub.getTransient();
+    let transient: any = {};
+
+    if (transientMap.has((this.repo as any).tableName)) {
+      transient = JSON.parse(
+        (transientMap.get((this.repo as any).tableName) as Buffer)?.toString(
+          "utf8"
+        ) as string
+      );
+    }
+
+    log.info(`Merging transient data...`);
+    model = (this.repo as any).merge(model as M, transient);
+
+    return this.repo.create(model as unknown as M, ctx, ...args);
+  }
+
+  /**
    * @description Deletes multiple models from the state database
    * @summary Delegates to the repository's deleteAll method
    * @param {string[] | number[]} keys - The keys of the models to delete
@@ -195,27 +231,6 @@ export abstract class FabricCrudContract<M extends Model>
     const log = this.logFor(ctx).for(this.healthcheck);
     log.info(`Running Healthcheck: ${this.initialized}...`);
     return this.initialized;
-  }
-
-  /**
-   * @description Creates a single model in the state database
-   * @summary Delegates to the repository's create method
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @param {M} model - The model to create
-   * @param {...any[]} args - Additional arguments
-   * @return {Promise<M>} Promise resolving to the created model
-   */
-  async create(
-    ctx: Ctx,
-    model: string | M,
-    ...args: any[]
-  ): Promise<string | M> {
-    const log = this.logFor(ctx).for(this.create);
-
-    if (typeof model === "string") model = this.deserialize<M>(model) as any;
-
-    log.info(`Creating model: ${JSON.stringify(model)}`);
-    return this.repo.create(model as unknown as M, ctx, ...args);
   }
 
   /**
