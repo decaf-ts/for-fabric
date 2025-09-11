@@ -221,10 +221,12 @@ export class FabricContractRepository<M extends Model> extends Repository<
       return await super.updateObservers(table, event, id, ctx, ...args);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   override select<S extends readonly (keyof M)[]>(): WhereOption<M, M[]>;
   override select<S extends readonly (keyof M)[]>(
     selector: readonly [...S]
   ): WhereOption<M, Pick<M, S[number]>[]>;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   override select<S extends readonly (keyof M)[]>(
     selector: undefined,
     ctx: FabricContractContext
