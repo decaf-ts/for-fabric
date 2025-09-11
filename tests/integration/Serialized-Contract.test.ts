@@ -129,6 +129,21 @@ describe("Test Serialized Crud Contract", () => {
     }
   };
 
+  const readByPass = async (id: string, privatedata: boolean = false) => {
+    let record;
+    try {
+      record = await readBlockChain(
+        privatedata ? "readPrivateByPass" : "readByPass",
+        [createCompositeKey(modelTableName, [String(id)])]
+      );
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+    console.log("Retrieved model: ", record);
+    record = JSON.parse(record);
+    return record;
+  };
+
   const getData = async () => {
     return {
       name: randomName(6),
@@ -215,21 +230,11 @@ describe("Test Serialized Crud Contract", () => {
     await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
 
     const id = await getCurrentId();
-    // it("Should create model", async () => {
 
-    //   let record;
-    //   try {
-    //     record = await readBlockChain("readByPass", [
-    //       createCompositeKey(modelTableName, [String(sequence1.current)]),
-    //     ]);
-    //   } catch (error) {
-    //     expect(error).toBeUndefined();
-    //   }
-    //   console.log("Retrieved model: ", record);
-    //   record = JSON.parse(record);
-    //   expect(record["tst_name"]).toBe(model.name);
-    //   expect(record["tst_nif"]).toBe(model.nif);
-    // });
+    const record = await readByPass(id);
+
+    expect(record["tst_name"]).toBe(model.name);
+    expect(record["tst_nif"]).toBe(model.nif);
   });
 
   // it("Should fail to create model", async () => {
