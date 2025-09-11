@@ -3,6 +3,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { TestModel } from "../assets/contract/serialized-contract/TestModel";
 import { createCompositeKey, randomName, randomNif } from "../utils";
+import { modelToTransient, transient } from "@decaf-ts/db-decorators";
+import { Model } from "@decaf-ts/decorator-validation";
 
 jest.setTimeout(5000000);
 
@@ -68,12 +70,18 @@ describe("Test Serialized Crud Contract", () => {
     return str.trim();
   };
 
-  const invokeChaincode = async (functionName: string, args: any[]) => {
+  const invokeChaincode = async (
+    functionName: string,
+    args: any[],
+    transient: any = {}
+  ) => {
     // Prepare the JSON argument for the chaincode
     const chaincodeArgs = JSON.stringify({
       function: functionName,
       Args: args,
     });
+
+    const transientData = JSON.stringify(transient);
 
     // Invoke the chaincode
     return execSync(
@@ -88,7 +96,8 @@ describe("Test Serialized Crud Contract", () => {
       --peerAddresses org-c-peer-0:7033 \
       --tlsRootCertFiles /weaver/peer/org-c-tls-ca-cert.pem \
       -o org-a-orderer-0:7021 \
-      --tls --cafile /weaver/peer/tls-ca-cert.pem`
+      --tls --cafile /weaver/peer/tls-ca-cert.pem \
+      --transient '${transientData}'`
     );
   };
 
@@ -120,6 +129,29 @@ describe("Test Serialized Crud Contract", () => {
     }
   };
 
+  const getData = async () => {
+    return {
+      name: randomName(6),
+      nif: randomNif(9),
+    };
+  };
+
+  const getCurrentId = async () => {
+    let sequence;
+    try {
+      sequence = await readBlockChain("readByPass", [
+        createCompositeKey(sequenceTableName, [sequenceId]),
+      ]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+    console.log("Model created successfully: ", sequence);
+    sequence = JSON.parse(sequence);
+    expect(sequence.id).toBe(sequenceId);
+    expect(sequence.current).toBeGreaterThan(0);
+    return sequence.current;
+  };
+
   const sequenceTableName = "??sequence";
   const modelTableName = "tst_user";
   const sequenceId = "TestModel_pk";
@@ -149,58 +181,56 @@ describe("Test Serialized Crud Contract", () => {
     expect(trim(ready)).toBe("true");
   });
 
-  // it("Should create model", async () => {
-  //   const ready = await ensureReadiness();
+  it("Should create model", async () => {
+    // Ensure contract is initialized
+    const ready = await ensureReadiness();
+    expect(trim(ready)).toBe("true");
 
-  //   expect(trim(ready)).toBe("true");
+    const model = new TestModel(await getData());
+    console.log("Using model: ", model.serialize());
 
-  //   const data = { name: randomName(6), nif: randomNif(9) };
-  //   const model = new TestModel(data);
+    const transientData = modelToTransient(model);
+    const encoded = Buffer.from(
+      Model.build(
+        transientData.transient,
+        transientData.model.constructor.name
+      ).serialize()
+    ).toString("base64");
 
-  //   console.log("Using model: ", model.serialize());
+    const transient = {
+      [modelTableName]: encoded,
+    };
 
-  //   try {
-  //     await invokeChaincode("create", [model.serialize()]);
-  //   } catch (e) {
-  //     expect(e).toBeUndefined();
-  //   }
+    try {
+      await invokeChaincode(
+        "create",
+        [transientData.model.serialize()],
+        transient
+      );
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
 
-  //   //Giving some time for the transaction to be committed
-  //   await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
 
-  //   let sequence1;
+    const id = await getCurrentId();
+    // it("Should create model", async () => {
 
-  //   try {
-  //     sequence1 = await readBlockChain("readByPass", [
-  //       createCompositeKey(sequenceTableName, [sequenceId]),
-  //     ]);
-  //   } catch (error) {
-  //     expect(error).toBeUndefined();
-  //   }
-
-  //   console.log("Model created successfully: ", sequence1);
-
-  //   sequence1 = JSON.parse(sequence1);
-
-  //   expect(sequence1.id).toBe(sequenceId);
-  //   expect(sequence1.current).toBeGreaterThan(0);
-
-  //   let record;
-  //   try {
-  //     record = await readBlockChain("readByPass", [
-  //       createCompositeKey(modelTableName, [String(sequence1.current)]),
-  //     ]);
-  //   } catch (error) {
-  //     expect(error).toBeUndefined();
-  //   }
-
-  //   console.log("Retrieved model: ", record);
-
-  //   record = JSON.parse(record);
-
-  //   expect(record["tst_name"]).toBe(model.name);
-  //   expect(record["tst_nif"]).toBe(model.nif);
-  // });
+    //   let record;
+    //   try {
+    //     record = await readBlockChain("readByPass", [
+    //       createCompositeKey(modelTableName, [String(sequence1.current)]),
+    //     ]);
+    //   } catch (error) {
+    //     expect(error).toBeUndefined();
+    //   }
+    //   console.log("Retrieved model: ", record);
+    //   record = JSON.parse(record);
+    //   expect(record["tst_name"]).toBe(model.name);
+    //   expect(record["tst_nif"]).toBe(model.nif);
+    // });
+  });
 
   // it("Should fail to create model", async () => {
   //   const ready = await ensureReadiness();
