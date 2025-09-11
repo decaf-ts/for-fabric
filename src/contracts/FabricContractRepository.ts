@@ -21,6 +21,7 @@ import { Context } from "fabric-contract-api";
 import { FabricContractDBSequence } from "./FabricContractSequence";
 import { ContractLogger } from "./logging";
 import { Logging } from "@decaf-ts/logging";
+import { PeerConfig } from "../shared";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -371,5 +372,17 @@ export class FabricContractRepository<M extends Model> extends Repository<
 
     if (errorMessages) throw new ValidationError(errorMessages);
     return [models, ...contextArgs.args];
+  }
+
+  override for(
+    config: PeerConfig
+  ): Repository<
+    M,
+    MangoQuery,
+    FabricContractAdapter,
+    FabricContractFlags,
+    FabricContractContext
+  > {
+    return super.for(config);
   }
 }
