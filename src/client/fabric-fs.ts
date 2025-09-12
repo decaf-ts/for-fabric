@@ -14,7 +14,7 @@ const log = Logging.for("fabric-fs");
  * @param {Function} fileReader - Function to read the file if contentOrPath is a path
  * @return {Promise<string | Uint8Array | Buffer>} The content
  * @function contentOfLoadFile
- * @memberOf module:fabric.client
+ * @memberOf module:client
  */
 export async function contentOfLoadFile(
   contentOrPath: string | Uint8Array,
@@ -36,7 +36,7 @@ export async function contentOfLoadFile(
  * @param {string | Buffer} contentOrPath - The content or path to load
  * @return {Promise<Buffer>} The file content as a Buffer
  * @function readFile
- * @memberOf module:fabric.client
+ * @memberOf module:client
  */
 export async function readFile(contentOrPath: string | Buffer) {
   if (typeof contentOrPath !== "string") return contentOrPath;
@@ -58,7 +58,7 @@ export async function readFile(contentOrPath: string | Buffer) {
  * @param {string} mspId - The Membership Service Provider ID
  * @return {Promise<User>} Promise resolving to the created user
  * @function getCAUser
- * @memberOf module:fabric.client
+ * @memberOf module:client
  */
 export async function getCAUser(
   userName: string,
@@ -84,7 +84,7 @@ export async function getCAUser(
  * @param {string} certDirectoryPath - Path to the directory containing the certificate
  * @return {Promise<Identity>} Promise resolving to the identity
  * @function getIdentity
- * @memberOf module:fabric.client
+ * @memberOf module:client
  */
 export async function getIdentity(
   mspId: string,
@@ -111,7 +111,7 @@ export async function getIdentity(
  * @param {string} dirPath - Path to the directory
  * @return {Promise<string>} Promise resolving to the full path of the first file
  * @function getFirstDirFileName
- * @memberOf module:fabric.client
+ * @memberOf module:client
  */
 export async function getFirstDirFileName(dirPath: string): Promise<string> {
   const { promises } = await normalizeImport(import("fs"));
@@ -126,7 +126,7 @@ export async function getFirstDirFileName(dirPath: string): Promise<string> {
  * @param {string} dirPath - Path to the directory
  * @return {Promise<string>} Promise resolving to the content of the first file
  * @function getFirstDirFileNameContent
- * @memberOf module:fabric.client
+ * @memberOf module:client
  */
 export async function getFirstDirFileNameContent(
   dirPath: string
@@ -143,7 +143,7 @@ export async function getFirstDirFileNameContent(
  * @param {string} keyDirectoryPath - Path to the directory containing the private key
  * @return {Promise<Signer>} Promise resolving to the signer
  * @function getSigner
- * @memberOf module:fabric.client
+ * @memberOf module:client
  */
 export async function getSigner(keyDirectoryPath: string): Promise<Signer> {
   const signerFileReader = async (path: string) => {
@@ -175,7 +175,7 @@ export async function getSigner(keyDirectoryPath: string): Promise<Signer> {
  * @param {Buffer} pem - The PEM-encoded private key
  * @return {Promise<CryptoKey>} Promise resolving to the CryptoKey
  * @function extractPrivateKey
- * @memberOf module:fabric.client
+ * @memberOf module:client
  * @mermaid
  * sequenceDiagram
  *   participant Caller

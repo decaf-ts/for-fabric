@@ -10,32 +10,31 @@ import {
 import { LoggingConfig } from "@decaf-ts/logging";
 
 /**
- * @description Logger implementation for Fabric API
- * @summary Adapts the standard logging interface to work with Fabric API
- *
- * @param {string} context - The logging context name
- * @param {Partial<LoggingConfig> | undefined} conf - Optional logging configuration
- *
+ * @description Logger implementation tailored for Hyperledger Fabric clients.
+ * @summary Adapts the decaf-ts MiniLogger to route messages through a per-context Fabric logger, honoring configured log levels and formatting.
+ * @param {string} context - The logging context name used to scope the logger instance.
+ * @param {Partial<LoggingConfig> | undefined} conf - Optional logging configuration to override defaults for this context.
  * @class FabricLogger
- * @extends {MiniLogger}
  * @example
  * ```typescript
- * // In a Fabric chaincode contract
- * import { ContractLogger } from '@decaf-ts/for-fabric';
- *
- * export class MyFabricService {
- *   async myFunction(): Promise<void> {
- *     const logger = new FabricLogger('MyFabricService', { level: 'info' });
- *
- *     logger.info('Processing transaction');
- *     logger.debug('Transaction details:', { ... });
- *
- *     // Do something
- *
- *     logger.info('Transaction complete');
- *   }
- * }
+ * // In a Fabric client/service
+ * const logger = new FabricLogger('MyFabricService', { level: 'info' });
+ * logger.info('Processing transaction');
+ * logger.debug('Transaction details', { txId: '123' });
+ * logger.error('Something went wrong');
  * ```
+ * @mermaid
+ * sequenceDiagram
+ *   autonumber
+ *   participant C as Caller
+ *   participant FL as FabricLogger
+ *   participant ML as MiniLogger (delegate)
+ *   C->>FL: info('Processing transaction')
+ *   FL->>FL: createLog(level,msg,stack)
+ *   FL->>ML: info(log)
+ *   C->>FL: error(new Error('x'))
+ *   FL->>FL: createLog(level,msg,stack)
+ *   FL->>ML: error(log)
  */
 export class FabricLogger extends MiniLogger {
   /**
@@ -49,12 +48,27 @@ export class FabricLogger extends MiniLogger {
   }
 
   /**
-   * @description Logs a message at the specified level
-   * @summary Overrides the base log method to use the Fabric context's logger
-   * @param {LogLevel} level - The log level
-   * @param {StringLike | Error} msg - The message to log
-   * @param {string} [stack] - Optional stack trace for errors
+   * @description Logs a message at the specified level.
+   * @summary Overrides the base MiniLogger.log to forward to the internal Fabric-aware logger, enforcing configured thresholds.
+   * @param {LogLevel} level - The log level to use for this message.
+   * @param {StringLike | Error} msg - The message or error to log.
+   * @param {string} [stack] - Optional stack trace string for errors.
    * @return {void}
+   * @mermaid
+   * sequenceDiagram
+   *   autonumber
+   *   participant C as Caller
+   *   participant FL as FabricLogger
+   *   participant ML as MiniLogger (delegate)
+   *   C->>FL: log(level, msg, stack?)
+   *   FL->>FL: check configured level
+   *   alt below threshold
+   *     FL-->>C: return
+   *   else above threshold
+   *     FL->>FL: createLog(level, msg, stack)
+   *     FL->>ML: method.call(logger, log)
+   *     ML-->>FL: void
+   *   end
    */
   protected override log(
     level: LogLevel,
@@ -92,11 +106,11 @@ export class FabricLogger extends MiniLogger {
 }
 
 /**
- * @description Factory function for creating FabricLogger instances
- * @summary Produces a new FabricLogger bound to the provided context name and configuration
- * @param {string} object - The logging context name
- * @param {Partial<LoggingConfig> | undefined} config - Optional logging configuration
- * @return {FabricLogger} A new FabricLogger instance
+ * @description Factory function for creating FabricLogger instances.
+ * @summary Produces a new FabricLogger bound to the provided context name and configuration.
+ * @param {string} object - The logging context name.
+ * @param {Partial<LoggingConfig> | undefined} config - Optional logging configuration.
+ * @return {FabricLogger} A new FabricLogger instance.
  * @function factory
  * @memberOf module:client
  */

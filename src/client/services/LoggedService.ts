@@ -1,10 +1,9 @@
 import { Logger, Logging } from "@decaf-ts/logging";
 
 /**
- * @description Base service with logging utilities
+ * @description Base service with logging utilities.
  * @summary Provides a lightweight abstract class that equips inheriting services with per-instance and static logger accessors using the decaf-ts logging facility. Intended to standardize logging across client-side services.
- * @param {void} constructor - No constructor parameters; inheritors should call super()
- * @return {void}
+ * @param {void} constructor - No constructor parameters; inheritors should call super().
  * @class LoggedService
  * @example
  * // Extend LoggedService to gain logging helpers

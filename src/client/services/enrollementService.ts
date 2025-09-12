@@ -28,6 +28,13 @@ import {
 import { RegistrationError } from "../../shared/errors";
 import { LoggedService } from "./LoggedService";
 
+/**
+ * @description Hyperledger Fabric CA identity types.
+ * @summary Enumerates the supported identity types recognized by Fabric CA for registration and identity management.
+ * @enum {string}
+ * @readonly
+ * @memberOf module:client
+ */
 export enum HFCAIdentityType {
   PEER = "peer",
   ORDERER = "orderer",
@@ -35,12 +42,29 @@ export enum HFCAIdentityType {
   USER = "user",
   ADMIN = "admin",
 }
+/**
+ * @description Key/value attribute used during CA registration.
+ * @summary Represents an attribute entry that can be attached to a Fabric CA identity during registration, optionally marking it for inclusion in ecert.
+ * @interface IKeyValueAttribute
+ * @template T
+ * @param {string} name - Attribute name.
+ * @param {string} value - Attribute value.
+ * @param {boolean} [ecert] - Whether the attribute should be included in the enrollment certificate (ECert).
+ * @memberOf module:client
+ */
 export interface IKeyValueAttribute {
   name: string;
   value: string;
   ecert?: boolean;
 }
 
+/**
+ * @description Standard Fabric CA identity attribute keys.
+ * @summary Enumerates well-known Fabric CA attribute keys that can be assigned to identities for delegations and permissions.
+ * @enum {string}
+ * @readonly
+ * @memberOf module:client
+ */
 export enum HFCAIdentityAttributes {
   HFREGISTRARROLES = "hf.Registrar.Roles",
   HFREGISTRARDELEGATEROLES = "hf.Registrar.DelegateRoles",
@@ -51,6 +75,37 @@ export enum HFCAIdentityAttributes {
   HFGENCRL = "hf.GenCRL",
 }
 
+/**
+ * @description Service wrapper for interacting with a Fabric CA.
+ * @summary Provides high-level operations for managing identities against a Hyperledger Fabric Certificate Authority, including registration, enrollment, revocation, and administrative queries. Encapsulates lower-level Fabric CA client calls with consistent logging and error mapping.
+ * @param {CAConfig} caConfig - Connection and TLS configuration for the target CA.
+ * @class FabricEnrollmentService
+ * @example
+ * // Register and enroll a new user
+ * const svc = new FabricEnrollmentService({
+ *   url: 'https://localhost:7054',
+ *   caName: 'Org1CA',
+ *   tls: { trustedRoots: ['/path/to/ca.pem'], verify: false },
+ *   caCert: '/path/to/admin/certDir',
+ *   caKey: '/path/to/admin/keyDir'
+ * });
+ * await svc.register({ userName: 'alice', password: 's3cr3t' }, false, 'org1.department1', CA_ROLE.USER);
+ * const id = await svc.enroll('alice', 's3cr3t');
+ * @mermaid
+ * sequenceDiagram
+ *   autonumber
+ *   participant App
+ *   participant Svc as FabricEnrollmentService
+ *   participant CA as Fabric CA
+ *   App->>Svc: register(credentials, ...)
+ *   Svc->>CA: register(request, adminUser)
+ *   CA-->>Svc: enrollmentSecret
+ *   Svc-->>App: secret
+ *   App->>Svc: enroll(enrollmentId, secret)
+ *   Svc->>CA: enroll({enrollmentID, secret})
+ *   CA-->>Svc: certificates
+ *   Svc-->>App: Identity
+ */
 export class FabricEnrollmentService extends LoggedService {
   private ca?: FabricCAServices;
 
@@ -109,7 +164,7 @@ export class FabricEnrollmentService extends LoggedService {
     return this.ca;
   }
 
-  protected async Client(): Promise<{ newCertificateService: Function }> {
+  protected async Client(): Promise<{ newCertificateService: any }> {
     if (this.client) return this.client;
     const ca = await this.CA();
     this.client = (ca as any)["_FabricCAServices"];
@@ -134,6 +189,13 @@ export class FabricEnrollmentService extends LoggedService {
     return this.identityService;
   }
 
+  /**
+   * @description Retrieve certificates from the CA.
+   * @summary Calls the CA certificate service to list certificates, optionally mapping to PEM strings only.
+   * @param {GetCertificatesRequest} [request] - Optional filter request for certificate lookup.
+   * @param {boolean} [doMap=true] - When true, returns array of PEM strings; otherwise returns full response object.
+   * @return {Promise<string[] | CertificateResponse>} Array of PEM strings or the full certificate response.
+   */
   async getCertificates(
     request?: GetCertificatesRequest,
     doMap = true
@@ -153,6 +215,11 @@ export class FabricEnrollmentService extends LoggedService {
     return doMap ? response.certs.map((c) => c.PEM) : response;
   }
 
+  /**
+   * @description List identities registered in the CA.
+   * @summary Queries the CA identity service to fetch all identities and returns the list as FabricIdentity objects.
+   * @return {Promise<FabricIdentity[]>} The list of identities registered in the CA.
+   */
   async getIdentities(): Promise<FabricIdentity[]> {
     const identitiesService = await this.Identities();
     const log = this.log.for(this.getIdentities);
@@ -182,6 +249,11 @@ export class FabricEnrollmentService extends LoggedService {
     }
   }
 
+  /**
+   * @description Retrieve affiliations from the CA.
+   * @summary Queries the CA for the list of affiliations available under the configured CA.
+   * @return {string} The affiliations result payload.
+   */
   async getAffiliations() {
     const affiliationService = await this.Affiliations();
     const log = this.log.for(this.getAffiliations);
@@ -194,6 +266,12 @@ export class FabricEnrollmentService extends LoggedService {
     return response;
   }
 
+  /**
+   * @description Read identity details from the CA by enrollment ID.
+   * @summary Retrieves and validates a single identity, throwing NotFoundError when missing.
+   * @param {string} enrollmentId - Enrollment ID to lookup.
+   * @return {Promise<FabricIdentity>} The identity details stored in the CA.
+   */
   async read(enrollmentId: string) {
     const ca = await this.CA();
     const user = await this.User();
@@ -202,7 +280,7 @@ export class FabricEnrollmentService extends LoggedService {
       result = await ca.newIdentityService().getOne(enrollmentId, user);
     } catch (e: any) {
       throw new NotFoundError(
-        `Couldn't find enrollment with id ${enrollmentId}`
+        `Couldn't find enrollment with id ${enrollmentId}: ${e}`
       );
     }
 
@@ -214,6 +292,17 @@ export class FabricEnrollmentService extends LoggedService {
     return result.result as FabricIdentity;
   }
 
+  /**
+   * @description Register a new identity with the CA.
+   * @summary Submits a registration request for a new enrollment ID, returning the enrollment secret upon success.
+   * @param {Credentials} model - Credentials containing userName and password for the new identity.
+   * @param {boolean} [isSuperUser=false] - Whether to register the identity as a super user.
+   * @param {string} [affiliation=""] - Affiliation string (e.g., org1.department1).
+   * @param {CA_ROLE | string} [userRole] - Role to assign to the identity.
+   * @param {IKeyValueAttribute} [attrs] - Optional attributes to attach to the identity.
+   * @param {number} [maxEnrollments] - Maximum number of enrollments allowed for the identity.
+   * @return {Promise<string>} The enrollment secret for the registered identity.
+   */
   async register(
     model: Credentials,
     isSuperUser: boolean = false,
@@ -275,6 +364,13 @@ export class FabricEnrollmentService extends LoggedService {
     });
   }
 
+  /**
+   * @description Enroll an identity with the CA using a registration secret.
+   * @summary Exchanges the enrollment ID and secret for certificates, returning a constructed Identity model.
+   * @param {string} enrollmentId - Enrollment ID to enroll.
+   * @param {string} registration - Enrollment secret returned at registration time.
+   * @return {Promise<Identity>} The enrolled identity object with credentials.
+   */
   async enroll(enrollmentId: string, registration: string) {
     let identity: Identity;
     const log = this.log.for(this.enroll);
@@ -299,21 +395,15 @@ export class FabricEnrollmentService extends LoggedService {
   }
 
   /**
-   * Registers a new identity with the CA and enrolls it.
-   *
-   * @param model - The credentials for the new identity.
-   * @param isSuperUser - Indicates if the new identity should be a super user. Default is false.
-   * @param affiliation - The affiliation of the new identity. Default is an empty string.
-   * @param userRole - The role of the new identity. It can be a CA_ROLE or a custom string.
-   * @param attrs - Additional attributes for the new identity.
-   * @param maxEnrollments - The maximum number of enrollments for the new identity.
-   *
-   * @returns A Promise that resolves to the newly enrolled identity.
-   *
-   * @throws {RegistrationError} If there is an error during the registration process.
-   * @throws {ConflictError} If the enrollment ID already exists.
-   * @throws {AuthorizationError} If the user does not have the necessary permissions.
-   * @throws {DLTError} If there is an error during the enrollment process.
+   * @description Register and enroll a new identity in one step.
+   * @summary Registers a new enrollment ID with the CA and immediately exchanges the secret to enroll, returning the created Identity.
+   * @param {Credentials} model - Credentials for the new identity containing userName and password.
+   * @param {boolean} [isSuperUser=false] - Whether to register the identity as a super user.
+   * @param {string} [affiliation=""] - Affiliation string (e.g., org1.department1).
+   * @param {CA_ROLE | string} [userRole] - Role to assign to the identity.
+   * @param {IKeyValueAttribute} [attrs] - Optional attributes to attach to the identity.
+   * @param {number} [maxEnrollments] - Maximum number of enrollments allowed for the identity.
+   * @return {Promise<Identity>} The enrolled identity.
    */
   async registerAndEnroll(
     model: Credentials,
@@ -361,7 +451,7 @@ export class FabricEnrollmentService extends LoggedService {
       );
     } catch (e: unknown) {
       throw new InternalError(
-        `Could not revoke enrollment with id ${enrollmentId}`
+        `Could not revoke enrollment with id ${enrollmentId}: ${e}`
       );
     }
     if (!result.success)

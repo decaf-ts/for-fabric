@@ -1,6 +1,6 @@
 /**
- * @description Certificate Authority role types used during enrollment and registration
- * @summary Enumerates the standard Hyperledger Fabric CA roles that can be assigned to identities when registering with the CA service
+ * @description Certificate Authority role types used during enrollment and registration.
+ * @summary Enumerates the standard Hyperledger Fabric CA roles that can be assigned to identities when registering with the CA service.
  * @enum {string}
  * @readonly
  * @memberOf module:for-fabric.client
