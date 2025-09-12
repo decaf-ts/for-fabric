@@ -279,3 +279,253 @@ function handleEvent(eventName: string, payload: Buffer) {
 ```
 
 For more detailed examples and API documentation, refer to the [API Reference](./docs/api/index.html).
+
+
+## Contracts APIs (Chaincode)
+
+The following examples are based on the contracts in for-fabric/src/contracts and reflect the patterns used by the unit/integration tests.
+
+### FabricCrudContract<M>
+
+Description: Base contract exposing CRUD endpoints for a model class. It uses Repository and DeterministicSerializer under the hood.
+
+```typescript
+import { Context, Transaction, Contract } from 'fabric-contract-api';
+import { model, ModelArg, required } from '@decaf-ts/decorator-validation';
+import { BaseModel, pk } from '@decaf-ts/core';
+import { FabricCrudContract } from '@decaf-ts/for-fabric/contracts';
+
+@model()
+class Person extends BaseModel {
+  @pk({ type: 'Number' })
+  id!: number;
+  @required() name!: string;
+  constructor(arg?: ModelArg<Person>) { super(arg); }
+}
+
+export class PersonContract extends FabricCrudContract<Person> {
+  constructor() {
+    super('PersonContract', Person);
+  }
+
+  @Transaction(false)
+  async ping(ctx: Context): Promise<string> {
+    // Uses FabricCrudContract.logFor
+    this.logFor(ctx).info('ping');
+    return 'pong';
+  }
+}
+```
+
+Usage in tests: see tests/unit/contracts.test.ts pattern where a SerializedCrudContract subclass is exercised; FabricCrudContract is similar but takes/returns objects instead of JSON strings.
+
+### SerializedCrudContract<M>
+
+Description: Same endpoints as FabricCrudContract but takes and returns JSON strings. Useful for simple clients. Based on tests/unit/contracts.test.ts.
+
+```typescript
+import { Context } from 'fabric-contract-api';
+import { model, ModelArg, required } from '@decaf-ts/decorator-validation';
+import { BaseModel, pk } from '@decaf-ts/core';
+import { SerializedCrudContract } from '@decaf-ts/for-fabric/contracts';
+
+@model()
+class TestModel extends BaseModel {
+  @pk({ type: 'Number' }) id!: number;
+  @required() name!: string;
+  @required() nif!: string;
+  constructor(arg?: ModelArg<TestModel>) { super(arg); }
+}
+
+export class TestModelContract extends SerializedCrudContract<TestModel> {
+  constructor() {
+    super('TestModelContract', TestModel);
+  }
+}
+
+// Example invocation (mirrors unit test usage)
+async function createExample(contract: TestModelContract, ctx: Context) {
+  const payload = new TestModel({ name: 'Alice', nif: '123456789' }).serialize();
+  const resultJson = await contract.create(ctx, payload);
+  const created = new TestModel(JSON.parse(resultJson));
+  return created;
+}
+```
+
+### FabricContractRepository<M>
+
+Description: Chaincode-side repository used inside contract methods to persist and query models.
+
+```typescript
+import { Context } from 'fabric-contract-api';
+import { Repo } from '@decaf-ts/core';
+import { model, required, ModelArg } from '@decaf-ts/decorator-validation';
+import { BaseModel, pk } from '@decaf-ts/core';
+import { FabricContractRepository } from '@decaf-ts/for-fabric/contracts';
+
+@model()
+class Asset extends BaseModel {
+  @pk() id!: string;
+  @required() owner!: string;
+  constructor(arg?: ModelArg<Asset>) { super(arg); }
+}
+
+export class AssetContract extends Contract {
+  private repo: Repo<Asset, any, any, any, any>;
+  constructor() {
+    super('AssetContract');
+    this.repo = new FabricContractRepository<Asset>(new (require('@decaf-ts/for-fabric').contracts.FabricContractAdapter)(), Asset);
+  }
+
+  @Transaction()
+  async Create(ctx: Context, id: string, owner: string): Promise<void> {
+    const m = new Asset({ id, owner });
+    await this.repo.create(m, ctx as any);
+  }
+
+  @Transaction(false)
+  async Read(ctx: Context, id: string): Promise<Asset> {
+    return this.repo.read(id, ctx as any);
+  }
+
+  @Transaction(false)
+  async QueryByOwner(ctx: Context, owner: string): Promise<Asset[]> {
+    return this.repo.raw({ selector: { owner } } as any, true, ctx as any);
+  }
+}
+```
+
+### FabricContractDBSequence
+
+Description: World-state backed sequences for generating incremental values.
+
+```typescript
+import { Context } from 'fabric-contract-api';
+import { FabricContractDBSequence } from '@decaf-ts/for-fabric/contracts';
+import { FabricContractAdapter } from '@decaf-ts/for-fabric/contracts';
+
+const adapter = new FabricContractAdapter();
+
+export class OrderContract extends Contract {
+  private orderSeq = new FabricContractDBSequence({
+    name: 'orderSeq',
+    type: 'Number',
+    startWith: 1,
+    incrementBy: 1,
+  }, adapter);
+
+  @Transaction()
+  async CreateOrder(ctx: Context): Promise<number> {
+    const next = await this.orderSeq.next(ctx as any);
+    // use next as order id
+    return next as number;
+  }
+
+  @Transaction(false)
+  async NextRange(ctx: Context, count: number): Promise<number[]> {
+    return (await this.orderSeq.range(count, ctx as any)) as number[];
+  }
+}
+```
+
+### FabricStatement<M,R>
+
+Description: Bridge to run Mango queries through the Fabric adapter and get typed models back; used internally by repositories and also directly in advanced cases. See tests/unit/erc20conttract.test.ts mocking CouchDBStatement processing.
+
+```typescript
+import { FabricStatement } from '@decaf-ts/for-fabric/contracts';
+import { FabricContractAdapter } from '@decaf-ts/for-fabric/contracts';
+import { FabricContractContext } from '@decaf-ts/for-fabric/contracts';
+import { MangoQuery } from '@decaf-ts/for-couchdb';
+import { Model } from '@decaf-ts/decorator-validation';
+
+class MyModel extends Model {}
+
+const adapter = new FabricContractAdapter();
+
+async function query(ctx: FabricContractContext) {
+  const stmt = new FabricStatement<MyModel, MyModel[]>(adapter, ctx);
+  const models = await stmt.raw<MyModel[]>({ selector: { type: 'MyModel' } } as MangoQuery);
+  return models;
+}
+```
+
+### ContractLogger
+
+Description: Context-aware logger bound to Fabric’s Context, honoring log levels.
+
+```typescript
+import { Context, Transaction } from 'fabric-contract-api';
+import { Contract } from 'fabric-contract-api';
+import { ContractLogger } from '@decaf-ts/for-fabric/contracts';
+
+export class LoggableContract extends Contract {
+  @Transaction()
+  async DoWork(ctx: Context): Promise<void> {
+    const log = new ContractLogger('LoggableContract', { level: 'info' }, ctx as any);
+    log.info('Starting work');
+    // ... work ...
+    log.debug('Finished');
+  }
+}
+```
+
+### FabricContractRepositoryObservableHandler
+
+Description: Emits Fabric events for repository operations. You can also use it directly to emit a custom event.
+
+```typescript
+import { FabricContractRepositoryObservableHandler } from '@decaf-ts/for-fabric/contracts';
+import { OperationKeys } from '@decaf-ts/db-decorators';
+import { FabricContractContext } from '@decaf-ts/for-fabric/contracts';
+import { MiniLogger } from '@decaf-ts/logging';
+
+async function emitExample(ctx: FabricContractContext) {
+  const handler = new FabricContractRepositoryObservableHandler();
+  const log = new MiniLogger('obs');
+  await handler.updateObservers(log as any, 'assets', OperationKeys.CREATE, 'asset1', ctx);
+}
+```
+
+### FabricContractContext
+
+Description: Access Fabric-specific context inside contracts.
+
+```typescript
+import { FabricContractContext } from '@decaf-ts/for-fabric/contracts';
+
+function readContext(ctx: FabricContractContext) {
+  const ts = ctx.timestamp; // Date from stub.getDateTimestamp()
+  const id = ctx.identity.getID();
+  ctx.logger.info(`Tx by ${id} at ${ts.toISOString()}`);
+}
+```
+
+### FabricERC20Contract (sample)
+
+Description: Full ERC20 implementation used in tests (see tests/unit/erc20conttract.test.ts).
+
+```typescript
+import { FabricERC20Contract } from '@decaf-ts/for-fabric/contracts';
+import { FabricContractContext } from '@decaf-ts/for-fabric/contracts';
+
+const contract = new FabricERC20Contract('TestToken');
+
+async function initAndRead(ctx: FabricContractContext) {
+  const created = await contract.Initialize(ctx, 'TestToken', 'TT', 18);
+  if (created) {
+    const name = await contract.TokenName(ctx);
+    const decimals = await contract.Decimals(ctx);
+    return { name, decimals };
+  }
+  throw new Error('Init failed');
+}
+```
+
+### Notes on tests as examples
+
+- tests/unit/contracts.test.ts shows creating a SerializedCrudContract and calling create(ctx, jsonPayload) with a mocked Fabric Context.
+- tests/unit/erc20conttract.test.ts demonstrates initializing the ERC20 contract and reading TokenName.
+- tests/integration/Serialized-Contract.test.ts shows end-to-end JSON-based CRUD flows via the serialized contract, including create, read, update and rich queries.
+
+These patterns are mirrored in the examples above to ensure correctness and consistency with the repository’s test suite.
