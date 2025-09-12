@@ -2,7 +2,7 @@ import { Credentials, CAConfig, PeerConfig } from "../../src/shared/types";
 import { FabricEnrollmentService } from "../../src/client/services";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { Identity } from "../../src/shared/model/Identity";
-import { BaseModel, pk } from "@decaf-ts/core";
+import { BaseModel, pk, Repo } from "@decaf-ts/core";
 import {
   maxlength,
   minlength,
@@ -75,33 +75,56 @@ describe("Test enrollement", () => {
   let userID: Identity;
   let clientAdapter: FabricClientAdapter;
   let enrollmentService: FabricEnrollmentService;
+  let TestModelRepository: Repo<TestModel, any, any, any, any>;
 
-  beforeAll(async () => {});
+  beforeAll(async () => {
+    clientAdapter = new FabricClientAdapter(peerConfig);
+    TestModelRepository = FabricClientRepository.forModel(TestModel);
+  });
 
   it("register and enroll new user ", async () => {
     enrollmentService = new FabricEnrollmentService(caConfig);
-    userID = await enrollmentService.registerAndEnroll(user, false, "", "user");
-    console.log("User registered and enrolled successfully", userID);
+    userID = await enrollmentService.registerAndEnroll(
+      user,
+      false,
+      "",
+      "client"
+    );
     expect(userID.id).toBeDefined();
   });
 
   it("Creates new Gateway connection ", async () => {
-    // peerConfig.keyDirectoryPath = userID.credentials!.privateKey!;
-    // peerConfig.certDirectoryPath = userID.credentials!.certificate!;
-    // peerConfig.tlsCertPath = userID.credentials!.rootCertificate!;
-    clientAdapter = new FabricClientAdapter(peerConfig);
-
     const clientUser = new TestModel({
       name: userID.id,
       nif: "123456789",
     });
 
-    const TestModelRepository = FabricClientRepository.forModel(TestModel);
-
     const clientUserCreated: TestModel =
       await TestModelRepository.create(clientUser);
 
     const clientUserRead: TestModel = await TestModelRepository.read(
+      clientUserCreated.id
+    );
+    expect(clientUserRead).toEqual(clientUserCreated);
+  });
+
+  it("Creates new Gateway connection with new user", async () => {
+    const clientUser = new TestModel({
+      name: "user" + userID.id,
+      nif: "123456789",
+    });
+
+    const clientConfig = {
+      keyDirectoryPath: Buffer.from(userID.credentials!.privateKey!),
+      certDirectoryPath: Buffer.from(userID.credentials!.certificate!),
+    };
+
+    const clientTestModelRepository = TestModelRepository.for(clientConfig);
+
+    const clientUserCreated: TestModel =
+      await clientTestModelRepository.create(clientUser);
+
+    const clientUserRead: TestModel = await clientTestModelRepository.read(
       clientUserCreated.id
     );
     expect(clientUserRead).toEqual(clientUserCreated);

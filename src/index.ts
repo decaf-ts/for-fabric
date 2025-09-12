@@ -3,3 +3,7 @@
  * @summary This module provides logic to the client and contract sides of Hyperledger Fabric
  * @module fabric
  */
+
+export * from "./client";
+export * from "./contracts";
+export * from "./shared";

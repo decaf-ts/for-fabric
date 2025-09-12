@@ -137,7 +137,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     return FabricClientAdapter.decoder.decode(data);
   }
 
-  override repository<M extends Model<boolean>>(): Constructor<
+  override repository<M extends Model<true | false>>(): Constructor<
     Repository<
       M,
       MangoQuery,
@@ -835,6 +835,41 @@ export class FabricClientAdapter extends CouchDBAdapter<
     reason?: string
   ): BaseError {
     return super.parseError(err, reason);
+  }
+
+  /**
+   * Creates a new instance of FabricClientAdapter with the provided configuration.
+   * This method overrides the `for` method of the parent class to allow for dynamic configuration.
+   *
+   * @param config - A record containing the configuration parameters for the new instance.
+   * @returns A new instance of FabricClientAdapter with the provided configuration.
+   *
+   * @remarks
+   * The `for` method uses a Proxy to dynamically modify the `native` and `client` properties of the new instance.
+   * The `native` property is updated by merging the original `native` configuration with the provided `config`.
+   * The `client` property is left unchanged.
+   */
+  override for(config: Record<string, string>): FabricClientAdapter {
+    let client: any;
+    return new Proxy(this, {
+      get: (target: typeof this, p: string | symbol, receiver: any) => {
+        if (p === "native") {
+          const originalNative: PeerConfig = Reflect.get(target, p, receiver);
+          return Object.assign({}, originalNative, config);
+        }
+        if (p === "client") {
+          return client;
+        }
+        return Reflect.get(target, p, receiver);
+      },
+      set: (target: any, p: string | symbol, value: any, receiver: any) => {
+        if (p === "client") {
+          client = value;
+          return true;
+        }
+        return Reflect.set(target, p, value, receiver);
+      },
+    });
   }
 }
 

@@ -232,10 +232,9 @@ export class FabricEnrollmentService extends LoggedService {
         enrollmentID: userName as string,
         enrollmentSecret: password,
         affiliation: affiliation,
-        // userRole,
-        // attrs: attrs,
-        // maxEnrollments: maxEnrollments,
-        // maxEnrollments: (role === CA_ROLE.ADMIN || isSuperUser) ? -1 : 1
+        userRole: userRole,
+        attrs: attrs,
+        maxEnrollments: maxEnrollments,
       } as IRegisterRequest;
       registration = await ca.register(props, user);
       log.info(
@@ -336,6 +335,16 @@ export class FabricEnrollmentService extends LoggedService {
     return this.enroll(userName as string, registration);
   }
 
+  /**
+   * Revokes the enrollment of an identity with the specified enrollment ID.
+   *
+   * @param enrollmentId - The enrollment ID of the identity to be revoked.
+   *
+   * @returns A Promise that resolves to the result of the revocation operation.
+   *
+   * @throws {NotFoundError} If the enrollment with the specified ID does not exist.
+   * @throws {InternalError} If there is an error during the revocation process.
+   */
   async revoke(enrollmentId: string) {
     const ca = await this.CA();
     const user = await this.User();
