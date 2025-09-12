@@ -6,7 +6,9 @@
  * @memberOf module:for-fabric.shared
  */
 export enum FabricModelKeys {
+  /** Private data marker used to tag properties or models for Fabric private collections */
   PRIVATE = "private",
+  /** Namespace prefix used for Fabric-specific metadata keys */
   FABRIC = "fabric.",
 }
 /**
@@ -17,6 +19,7 @@ export enum FabricModelKeys {
  * @memberOf module:for-fabric.shared
  */
 export enum IdentityType {
+  /** Standard X.509 identity format used by Hyperledger Fabric */
   X509 = "X.509",
 }
 

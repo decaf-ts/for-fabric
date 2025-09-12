@@ -28,9 +28,20 @@ export function generateFabricEventName(
  * @description Parses a Fabric event name into its components
  * @summary Splits an event name by underscores and extracts table, event, and optional owner
  * @param {string} name - The event name to parse
- * @return The parsed components
+ * @return {{table: string, event: OperationKeys | BulkCrudOperationKeys | string, owner?: string}} The parsed components as a structured object
  * @throws {InternalError} If the event name format is invalid
  * @function parseEventName
+ * @mermaid
+ * sequenceDiagram
+ *   participant Caller
+ *   participant Parser as parseEventName
+ *   Caller->>Parser: parseEventName(name)
+ *   Parser->>Parser: split name by "_"
+ *   alt parts length invalid
+ *     Parser-->>Caller: throw InternalError
+ *   else
+ *     Parser-->>Caller: { table, event, owner? }
+ *   end
  * @memberOf module:for-fabric.shared
  */
 export function parseEventName(name: string) {

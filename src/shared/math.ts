@@ -3,15 +3,13 @@ import { OverflowError } from "./errors";
 import { ValidationError } from "@decaf-ts/db-decorators";
 
 /**
- * @summary Overflow safe Addition operation
- *
- * @param {number} a
- * @param {number} b
- *
+ * @description Overflow-safe addition operation
+ * @summary Adds two numbers and verifies no overflow by reverse-checking the operands
+ * @param {number} a - First operand
+ * @param {number} b - Second operand
+ * @return {number} The sum of a and b
  * @function add
- *
  * @throws {OverflowError} on addition overflow
- *
  * @memberOf module:for-fabric.shared
  */
 export function add(a: number, b: number): number {
@@ -23,15 +21,13 @@ export function add(a: number, b: number): number {
 }
 
 /**
- * @summary Overflow safe Subtraction operation
- *
- * @param {number} a
- * @param {number} b
- *
+ * @description Overflow-safe subtraction operation
+ * @summary Subtracts b from a and validates no overflow by reverse-checking the operands
+ * @param {number} a - Minuend
+ * @param {number} b - Subtrahend
+ * @return {number} The difference a - b
  * @function sub
- *
  * @throws {OverflowError} on subtaction overflow
- *
  * @memberOf module:for-fabric.shared
  */
 export function sub(a: number, b: number): number {
