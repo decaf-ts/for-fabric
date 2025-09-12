@@ -4,22 +4,33 @@ import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
 
 /**
  * @description Context class for Fabric chaincode operations
- * @summary Provides access to Fabric-specific context elements like stub, identity, and logger
- * @template FabricContractFlags - Flags specific to Fabric contract operations
+ * @summary Provides access to Fabric-specific context elements like stub, identity, and logger to be used by repositories and adapters during contract execution.
+ * @template F - Flags specific to Fabric contract operations
+ * @param {object} [args] - Optional initialization arguments passed to the base Context
+ * @return {void}
  * @class FabricContractContext
  * @example
  * ```typescript
  * // In a Fabric chaincode contract method
- * const context = new FabricContractContext({
- *   stub: ctx.stub,
- *   identity: ctx.clientIdentity,
- *   logger: contractLogger
- * });
+ * const context = new FabricContractContext();
+ * // Optionally set values via the base Context API
+ * context.set('stub', ctx.stub);
+ * context.set('clientIdentity', ctx.clientIdentity);
+ * context.set('logger', contractLogger);
  *
  * // Access context properties
  * const timestamp = context.timestamp;
  * const creator = context.identity.getID();
  * ```
+ * @mermaid
+ * sequenceDiagram
+ *   participant Contract
+ *   participant Context
+ *   participant Ledger
+ *   Contract->>Context: new FabricContractContext()
+ *   Contract->>Context: set('stub'|'clientIdentity'|'logger', ...)
+ *   Context-->>Contract: timestamp, identity, logger
+ *   Contract->>Ledger: Interact via stub
  */
 export class FabricContractContext extends Context<FabricContractFlags> {
   /**

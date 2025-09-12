@@ -5,6 +5,18 @@ import { Context, Context as Ctx, Transaction } from "fabric-contract-api";
 import { ContractLogger } from "../logging";
 import { Logging } from "@decaf-ts/logging";
 
+/**
+ * @description CRUD contract variant that serializes/deserializes payloads
+ * @summary Exposes the same CRUD operations as FabricCrudContract but takes and returns JSON strings to facilitate simple client interactions.
+ * @template M - Model type handled by this contract
+ * @param {string} name - The contract name
+ * @param {Constructor<M>} clazz - The model constructor used to instantiate models from JSON
+ * @return {void}
+ * @class SerializedCrudContract
+ * @example
+ * const contract = new SerializedCrudContract<MyModel>('MyModelContract', MyModel);
+ * // Client submits JSON string payloads and receives JSON string responses
+ */
 export class SerializedCrudContract<
   M extends Model,
 > extends FabricCrudContract<M> {

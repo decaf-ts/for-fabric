@@ -14,6 +14,30 @@ import {
   ValidationError,
 } from "@decaf-ts/db-decorators";
 
+/**
+ * @description ERC20 token contract base for Hyperledger Fabric
+ * @summary Implements ERC20-like token logic using repositories and adapters, providing standard token operations such as balance queries, transfers, approvals, minting and burning.
+ * @param {string} name - The contract name used to scope token identity
+ * @return {void}
+ * @class FabricERC20Contract
+ * @example
+ * class MyTokenContract extends FabricERC20Contract {
+ *   constructor() { super('MyToken'); }
+ * }
+ * // The contract exposes methods like Transfer, Approve, Mint, Burn, etc.
+ * @mermaid
+ * sequenceDiagram
+ *   participant Client
+ *   participant Contract
+ *   participant WalletRepo
+ *   participant TokenRepo
+ *   participant Ledger
+ *   Client->>Contract: Transfer(ctx, to, value)
+ *   Contract->>WalletRepo: read(from)
+ *   Contract->>WalletRepo: read(to)
+ *   Contract->>Ledger: putState(updated balances)
+ *   Contract-->>Client: success
+ */
 export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet> {
   private walletRepository: FabricContractRepository<ERC20Wallet>;
 
@@ -21,7 +45,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
   private allowanceRepository: FabricContractRepository<Allowance>;
 
-  constructor(name: string) {
+  protected constructor(name: string) {
     super(name, ERC20Wallet);
 
     FabricERC20Contract.adapter =

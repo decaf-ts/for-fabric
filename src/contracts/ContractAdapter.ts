@@ -62,7 +62,7 @@ import { FabricFlavour } from "../shared/constants";
  * @param {M} model - The model instance being created or updated
  * @return {Promise<void>} A promise that resolves when the operation is complete
  * @function createdByOnFabricCreateUpdate
- * @memberOf module:for-fabric.contracts
+ * @memberOf module:fabric.contracts
  * @mermaid
  * sequenceDiagram
  *   participant F as createdByOnNanoCreateUpdate

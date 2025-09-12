@@ -12,13 +12,26 @@ import { FabricContractRepository } from "./FabricContractRepository";
 import { MissingContextError } from "../shared/errors";
 
 /**
- * @summary Abstract implementation of a Sequence
- * @description provides the basic functionality for {@link Sequence}s
- *
- * @param {SequenceOptions} options
- *
- * @class CouchDBSequence
- * @implements Sequence
+ * @description Abstract implementation of a Sequence for Fabric contracts
+ * @summary Provides the basic functionality for sequences backed by the FabricContractRepository storing values in CouchDB-like state, including current, next and range operations.
+ * @param {SequenceOptions} options - Sequence configuration such as name, type, startWith and incrementBy
+ * @return {void}
+ * @class FabricContractDBSequence
+ * @example
+ * const seq = new FabricContractDBSequence({ name: 'orderSeq', type: 'Number', incrementBy: 1, startWith: 1 }, adapter);
+ * const next = await seq.next(ctx); // 1
+ * const [a,b,c] = await seq.range(3, ctx); // [2,3,4]
+ * @mermaid
+ * sequenceDiagram
+ *   participant App
+ *   participant Sequence
+ *   participant Repo
+ *   App->>Sequence: next(ctx)
+ *   Sequence->>Repo: read(name, ctx)
+ *   Repo-->>Sequence: current
+ *   Sequence->>Repo: update(current+inc)
+ *   Repo-->>Sequence: saved
+ *   Sequence-->>App: next value
  */
 export class FabricContractDBSequence extends Sequence {
   protected repo: FabricContractRepository<Seq>;

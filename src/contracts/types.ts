@@ -4,9 +4,11 @@ import { Logger } from "@decaf-ts/logging";
 
 /**
  * @description Flags for Fabric chaincode contract operations
- * @summary Extends repository flags with Fabric-specific context elements
+ * @summary Extends repository flags with Fabric-specific context elements available during Fabric chaincode execution, such as the ChaincodeStub, ClientIdentity and a request-scoped Logger.
+ * @template T
+ * @param {RepositoryFlags} [base] - Base repository flags that these Fabric-specific flags extend
+ * @return {void}
  * @interface FabricContractFlags
- * @extends {RepositoryFlags}
  * @memberOf module:fabric.contracts
  */
 export interface FabricContractFlags extends RepositoryFlags {
