@@ -68,7 +68,7 @@ export function isModelPrivate<M extends Model>(model: M): boolean {
  * @summary Iterates over property decorators to collect attributes destined for private data collections while keeping public fields, returning a structure containing the rebuilt public model and a map of collection-name to private attributes
  * @template M extends Model
  * @param {M} model - The model instance to transform into public and private parts
- * @return {{ model: M; private?: Record<string, Record<string, any>> }} An object with the rebuilt public model and optional private collection maps
+ * @return {{ model: M, private: Record<string, Record<string, any>> }} An object with the rebuilt public model and optional private collection maps
  * @function modelToPrivate
  * @mermaid
  * sequenceDiagram

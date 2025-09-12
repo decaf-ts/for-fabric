@@ -24,7 +24,7 @@ export class CoreUtils {
    * @description Resolve file content from a path or return provided raw content
    * @summary If the input is a Uint8Array or PEM content, returns it as-is; otherwise uses a provided async fileReader to load the content from disk.
    * @param {string|Uint8Array} contentOrPath - Either a raw content buffer/string or a filesystem path
-   * @param {(path: string) => Promise<string|Uint8Array|Buffer>} fileReader - Async function to read file content when a path is provided
+   * @param {function(string): Promise<string|Uint8Array|Buffer>} fileReader - Async function to read file content when a path is provided
    * @return {Promise<string|Uint8Array|Buffer>} The content to be used downstream
    */
   private static async contentOfLoadFile(
