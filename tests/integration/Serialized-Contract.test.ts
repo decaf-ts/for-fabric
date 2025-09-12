@@ -254,27 +254,41 @@ describe("Test Serialized Crud Contract", () => {
     }
   });
 
-  // it("Should fail to create model", async () => {
-  //   const ready = await ensureReadiness();
+  it("Should fail to create model", async () => {
+    // Ensure contract is initialized
+    const ready = await ensureReadiness();
+    expect(trim(ready)).toBe("true");
 
-  //   expect(trim(ready)).toBe("true");
+    const model = new TestModel({ ...(await getData()), id: 1 });
+    console.log("Using model: ", model.serialize());
 
-  //   const data = { name: randomName(6), nif: randomNif(9), id: 1 };
-  //   const model = new TestModel(data);
+    const transientData = modelToTransient(model);
+    const encoded = Buffer.from(
+      Model.build(
+        transientData.transient,
+        transientData.model.constructor.name
+      ).serialize()
+    ).toString("base64");
 
-  //   console.log("Using model: ", model.serialize());
+    const transient = {
+      [modelTableName]: encoded,
+    };
 
-  //   let err = false;
+    let err = false;
 
-  //   try {
-  //     await invokeChaincode("create", [model.serialize()]);
-  //   } catch (e) {
-  //     expect(e).toBeDefined();
-  //     err = true;
-  //   }
+    try {
+      await invokeChaincode(
+        "create",
+        [transientData.model.serialize()],
+        transient
+      );
+    } catch (e) {
+      err = true;
+      expect(e).toBeDefined();
+    }
 
-  //   expect(err).toBe(true);
-  // });
+    expect(err).toBe(true);
+  });
 
   // it("Should read model", async () => {
   //   const ready = await ensureReadiness();

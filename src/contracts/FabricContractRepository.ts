@@ -9,6 +9,7 @@ import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import {
+  ConflictError,
   Context as Ctx,
   enforceDBDecorators,
   InternalError,
@@ -118,6 +119,31 @@ export class FabricContractRepository<M extends Model> extends Repository<
    */
   override ObserverHandler(): ObserverHandler {
     return new FabricContractRepositoryObservableHandler();
+  }
+
+  protected override async createPrefix(
+    model: M,
+    ...args: any[]
+  ): Promise<[M, ...any[]]> {
+    const result = await super.createPrefix(model, ...args);
+    const id = result[0][this.pk];
+    try {
+      const res = await this.read(String(id), ...args);
+      if (res) {
+        throw new ConflictError(
+          `Conflict detected while creating model with id: ${id} already exists`
+        );
+      }
+    } catch (e) {
+      if ((e as any).code === 404) {
+        this.logFor(args[args.length - 1]).info(
+          `Record entry with pk ${id} does not exist, creating it now...`
+        );
+      } else {
+        throw e;
+      }
+    }
+    return result;
   }
 
   /**

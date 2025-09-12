@@ -14,8 +14,6 @@ import {
 } from "fabric-contract-api";
 import { BaseModel } from "@decaf-ts/core";
 import { SerializedCrudContract } from "../../../../src/contracts/crud/serialized-crud-contract";
-import { args } from "./mock-context";
-import { OperationKeys } from "@decaf-ts/db-decorators";
 
 FabricObject()(Model);
 FabricObject()(BaseModel);
