@@ -92,14 +92,13 @@ export class FabricLogger extends MiniLogger {
 }
 
 /**
- * @description Factory function for creating ContractLogger instances
- * @summary Creates a new ContractLogger with the given context, config, and Fabric context
+ * @description Factory function for creating FabricLogger instances
+ * @summary Produces a new FabricLogger bound to the provided context name and configuration
  * @param {string} object - The logging context name
  * @param {Partial<LoggingConfig> | undefined} config - Optional logging configuration
- * @param {Ctx} ctx - The Fabric chaincode context
- * @return {ContractLogger} A new ContractLogger instance
+ * @return {FabricLogger} A new FabricLogger instance
  * @function factory
- * @memberOf module:fabric.contracts
+ * @memberOf module:client
  */
 const factory: LoggerFactory = (
   object: string,
