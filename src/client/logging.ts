@@ -112,7 +112,7 @@ export class FabricLogger extends MiniLogger {
  * @param {Partial<LoggingConfig> | undefined} config - Optional logging configuration.
  * @return {FabricLogger} A new FabricLogger instance.
  * @function factory
- * @memberOf module:client
+ * @memberOf module:for-fabric.client
  */
 const factory: LoggerFactory = (
   object: string,

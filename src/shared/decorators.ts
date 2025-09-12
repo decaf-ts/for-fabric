@@ -81,7 +81,7 @@ export function Owner() {
  * @param {string} key - The metadata key suffix to be namespaced
  * @return {string} The computed namespaced metadata key
  * @function getFabricModelKey
- * @category Decorators
+ * @memberOf module:for-fabric.shared
  */
 export function getFabricModelKey(key: string) {
   return Model.key(FabricModelKeys.FABRIC + key);

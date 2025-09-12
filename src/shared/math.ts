@@ -12,7 +12,7 @@ import { ValidationError } from "@decaf-ts/db-decorators";
  *
  * @throws {OverflowError} on addition overflow
  *
- * @memberOf module:aeon-toolkit.SmartContracts
+ * @memberOf module:for-fabric.shared
  */
 export function add(a: number, b: number): number {
   const c = a + b;
@@ -32,7 +32,7 @@ export function add(a: number, b: number): number {
  *
  * @throws {OverflowError} on subtaction overflow
  *
- * @memberOf module:aeon-toolkit.SmartContracts
+ * @memberOf module:for-fabric.shared
  */
 export function sub(a: number, b: number): number {
   const c = a - b;
@@ -51,7 +51,7 @@ export function sub(a: number, b: number): number {
  *
  * @throws {ValidationError} if parseInt returns NaN
  *
- * @memberOf module:aeon-toolkit.SmartContracts
+ * @memberOf module:for-fabric.shared
  */
 export function safeParseInt(string: string): number {
   // Regular expression to check if string only have digits

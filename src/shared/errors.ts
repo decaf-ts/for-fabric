@@ -7,7 +7,7 @@ import { BaseError } from "@decaf-ts/db-decorators";
  * @class OverflowError
  * @extends BaseDLTError
  *
- * @memberOf module:aeon-toolkit.SmartContracts
+ * @memberOf module:for-fabric.shared
  */
 export class OverflowError extends BaseError {
   constructor(msg: string | Error) {
@@ -23,7 +23,7 @@ export class OverflowError extends BaseError {
  * @class BalanceError
  * @extends Error
  *
- * @memberOf module:aeon-toolkit.SmartContracts
+ * @memberOf module:for-fabric.shared
  */
 export class BalanceError extends BaseError {
   constructor(msg: string | Error) {
@@ -39,7 +39,7 @@ export class BalanceError extends BaseError {
  * @class RegistrationError
  * @extends BaseDLTError
  *
- * @memberOf module:aeon-toolkit.SmartContracts
+ * @memberOf module:for-fabric.shared
  */
 export class RegistrationError extends BaseError {
   constructor(msg: string | Error) {

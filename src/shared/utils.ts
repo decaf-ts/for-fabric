@@ -4,11 +4,29 @@ import { normalizeImport } from "@decaf-ts/utils";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
 import { User } from "fabric-common";
 
+/**
+ * @description Core utilities for interacting with files, crypto identities, and Fabric SDK helpers
+ * @summary Provides static helper methods to read credentials and keys from disk or raw content, construct Fabric gateway Identities and Signers, and perform common filesystem operations used by the Fabric client tooling.
+ * @class CoreUtils
+ * @example
+ * // Read an identity and signer from directories
+ * const identity = await CoreUtils.getIdentity('Org1MSP', '/msp/signcerts');
+ * const signer = await CoreUtils.getSigner('/msp/keystore');
+ * // Build a CA user
+ * const user = await CoreUtils.getCAUser('appUser', pemKey, pemCert, 'Org1MSP');
+ */
 export class CoreUtils {
   private static logger: Logger = Logging.for(CoreUtils.name);
 
   private constructor() {}
 
+  /**
+   * @description Resolve file content from a path or return provided raw content
+   * @summary If the input is a Uint8Array or PEM content, returns it as-is; otherwise uses a provided async fileReader to load the content from disk.
+   * @param {string|Uint8Array} contentOrPath - Either a raw content buffer/string or a filesystem path
+   * @param {(path: string) => Promise<string|Uint8Array|Buffer>} fileReader - Async function to read file content when a path is provided
+   * @return {Promise<string|Uint8Array|Buffer>} The content to be used downstream
+   */
   private static async contentOfLoadFile(
     contentOrPath: string | Uint8Array,
     fileReader: (path: string) => Promise<string | Uint8Array | Buffer>
@@ -23,6 +41,12 @@ export class CoreUtils {
     return await fileReader(contentOrPath);
   }
 
+  /**
+   * @description Read file content from a path or return provided Buffer
+   * @summary Convenience wrapper that loads a file using fs.promises when a path string is provided; otherwise returns the given Buffer directly.
+   * @param {string|Buffer} contentOrPath - Path to a file on disk or an already-loaded Buffer
+   * @return {Promise<string|Uint8Array|Buffer>} The file content as a Buffer/string depending on reader
+   */
   static async readFile(contentOrPath: string | Buffer) {
     if (typeof contentOrPath !== "string") return contentOrPath;
 
@@ -34,6 +58,15 @@ export class CoreUtils {
     return await fileReader(contentOrPath);
   }
 
+  /**
+   * @description Create a Fabric CA User object with enrollment
+   * @summary Constructs a fabric-common User, sets a crypto suite, imports the provided private key, and sets enrollment with certificate and MSP ID.
+   * @param {string} userName - The user name for the CA user
+   * @param {string} privateKey - PEM-encoded private key
+   * @param {string} certificate - PEM-encoded X.509 certificate
+   * @param {string} mspId - Membership Service Provider identifier
+   * @return {Promise<User>} The enrolled Fabric User instance
+   */
   static async getCAUser(
     userName: string,
     privateKey: string,
@@ -56,6 +89,13 @@ export class CoreUtils {
     return user;
   }
 
+  /**
+   * @description Build a Fabric Gateway Identity from an MSP ID and certificate
+   * @summary Reads a certificate from a directory path or accepts raw content and returns an Identity object suitable for the Fabric Gateway.
+   * @param {string} mspId - Membership Service Provider ID
+   * @param {string} certDirectoryPath - Path to a directory containing the certificate file, or PEM content
+   * @return {Promise<Identity>} The identity containing mspId and certificate credentials
+   */
   static async getIdentity(
     mspId: string,
     certDirectoryPath: string

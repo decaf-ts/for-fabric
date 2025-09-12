@@ -4,14 +4,10 @@ import { IdentityCredentials } from "./IdentityCredentials";
 import { IdentityType } from "../constants";
 
 /**
- * @summary Identity Class
- * @description Used to store Fabric Identities in the wallet
- *
- * @param {ModelArg} [arg]
- *
+ * @description Identity Class
+ * @summary Represents a Hyperledger Fabric identity stored in the wallet, including its MSP identifier and credential reference.
+ * @param {ModelArg<Identity>} [arg] - Optional initialization object used by BaseModel to populate fields
  * @class Identity
- * @extends BaseModel
- *
  * @category Model
  * @see model
  */

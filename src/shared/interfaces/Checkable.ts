@@ -6,7 +6,7 @@ import { Context } from "fabric-contract-api";
  * @param {Context} ctx - Fabric transaction context used for performing the health check
  * @return {Promise<string|boolean>} A message describing health or a boolean status
  * @interface Checkable
- * @memberOf module:fabric.shared
+ * @memberOf module:for-fabric.shared
  */
 export interface Checkable {
   /**

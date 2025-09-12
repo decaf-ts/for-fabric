@@ -33,7 +33,7 @@ import { LoggedService } from "./LoggedService";
  * @summary Enumerates the supported identity types recognized by Fabric CA for registration and identity management.
  * @enum {string}
  * @readonly
- * @memberOf module:client
+ * @memberOf module:for-fabric.client
  */
 export enum HFCAIdentityType {
   PEER = "peer",
@@ -50,7 +50,7 @@ export enum HFCAIdentityType {
  * @param {string} name - Attribute name.
  * @param {string} value - Attribute value.
  * @param {boolean} [ecert] - Whether the attribute should be included in the enrollment certificate (ECert).
- * @memberOf module:client
+ * @memberOf module:for-fabric.client
  */
 export interface IKeyValueAttribute {
   name: string;
@@ -63,7 +63,7 @@ export interface IKeyValueAttribute {
  * @summary Enumerates well-known Fabric CA attribute keys that can be assigned to identities for delegations and permissions.
  * @enum {string}
  * @readonly
- * @memberOf module:client
+ * @memberOf module:for-fabric.client
  */
 export enum HFCAIdentityAttributes {
   HFREGISTRARROLES = "hf.Registrar.Roles",

@@ -12,7 +12,7 @@ import {
  * @param {string} [owner] - Optional owner identifier
  * @return {string} The generated event name in format "table_event" or "table_event_owner"
  * @function generateFabricEventName
- * @memberOf module:fabric.shared
+ * @memberOf module:for-fabric.shared
  */
 export function generateFabricEventName(
   table: string,
@@ -31,7 +31,7 @@ export function generateFabricEventName(
  * @return The parsed components
  * @throws {InternalError} If the event name format is invalid
  * @function parseEventName
- * @memberOf module:fabric.shared
+ * @memberOf module:for-fabric.shared
  */
 export function parseEventName(name: string) {
   const parts = name.split("_");

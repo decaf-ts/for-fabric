@@ -21,7 +21,7 @@ import { TLSOptions } from "fabric-ca-client";
  * @property {string} [ca] - Optional certificate authority name
  * @property {string} mspId - Membership Service Provider ID
  * @property {string} channel - Channel name
- * @memberOf module:fabric.client
+ * @memberOf module:for-fabric.shared
  */
 export type PeerConfig = {
   cryptoPath: string;
@@ -52,7 +52,7 @@ export type PeerConfig = {
  * @property {string} chaincodeName - Name of the chaincode to interact with
  * @property {string} [contractName] - Optional name of the specific contract within the chaincode
  *
- * @memberOf module:fabric.client
+ * @memberOf module:for-fabric.shared
  */
 export type PeerConfigOverride = Pick<
   PeerConfig,
@@ -69,7 +69,7 @@ export type PeerConfigOverride = Pick<
  * @summary Extends the logging configuration for Fabric peer environments
  * @interface PeerEnvironment
  * @extends {LoggingConfig}
- * @memberOf module:fabric.client
+ * @memberOf module:for-fabric.shared
  */
 export interface PeerEnvironment extends LoggingConfig {}
 
@@ -79,7 +79,7 @@ export interface PeerEnvironment extends LoggingConfig {}
  * @interface FabricFlags
  * @extends {RepositoryFlags}
  * @extends {PeerConfigOverride}
- * @memberOf module:fabric.client
+ * @memberOf module:for-fabric.shared
  */
 export interface FabricFlags extends RepositoryFlags, PeerConfigOverride {}
 
@@ -93,7 +93,7 @@ export interface FabricFlags extends RepositoryFlags, PeerConfigOverride {}
  * @property {string} tlsCertPath - Path to the TLS certificate
  * @property {string} caCert - Endpoint URL for the peer
  * @property {string} caKey - Host alias for the peer
- * @memberOf module:fabric.client
+ * @memberOf module:for-fabric.shared
  */
 export type CAConfig = {
   url: string;
@@ -103,9 +103,15 @@ export type CAConfig = {
   caKey: string;
 };
 
+/**
+ * @description User credentials for CA enrollment or access
+ * @summary Optional username/password pair used when enrolling with a Fabric CA or authenticating in client utilities
+ * @interface Credentials
+ * @property {string} [userName] - Optional username
+ * @property {string} [password] - Optional password
+ * @memberOf module:for-fabric.shared
+ */
 export interface Credentials {
   userName?: string;
   password?: string;
 }
-
-
