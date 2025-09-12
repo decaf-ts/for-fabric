@@ -56,13 +56,13 @@ import { FabricFlavour } from "../shared/constants";
  * @template R - Type extending NanoRepository<M>
  * @template V - Type extending RelationsMetadata
  * @param {R} this - The repository instance
- * @param {Context<NanoFlags>} context - The operation context containing user information
+ * @param {FabricContractContext} context - The operation context containing user information
  * @param {V} data - The relation metadata
- * @param key - The property key to set with the username
+ * @param {string} key - The property key to set with the username
  * @param {M} model - The model instance being created or updated
  * @return {Promise<void>} A promise that resolves when the operation is complete
- * @function createdByOnNanoCreateUpdate
- * @memberOf module:for-nano
+ * @function createdByOnFabricCreateUpdate
+ * @memberOf module:for-fabric.contracts
  * @mermaid
  * sequenceDiagram
  *   participant F as createdByOnNanoCreateUpdate
@@ -96,6 +96,34 @@ export async function createdByOnFabricCreateUpdate<
   }
 }
 
+/**
+ * @description Primary key auto-assignment callback for Fabric models
+ * @summary Generates and assigns a primary key value to the specified model property using a Fabric-backed sequence when the model is created. If the sequence name is not provided in options, it is derived from the model via sequenceNameForModel. The assigned key is defined as non-writable and enumerable.
+ * @template M - Type extending Model for the target instance
+ * @template R - Type extending FabricContractRepository for repository context
+ * @template V - Type extending SequenceOptions to configure sequence behavior
+ * @template F - Type extending FabricContractFlags for contextual flags
+ * @param {R} this - The repository instance invoking the callback
+ * @param {FabricContractContext} context - Fabric contract context containing invocation metadata
+ * @param {V} data - Sequence options used to configure or locate the sequence
+ * @param {string} key - The primary key property name to assign on the model
+ * @param {M} model - The model instance to receive the generated primary key
+ * @return {Promise<void>} Resolves when the key is assigned or when no action is required
+ * @function pkFabricOnCreate
+ * @memberOf module:for-fabric.contracts
+ * @mermaid
+ * sequenceDiagram
+ *   participant R as Repository
+ *   participant C as Context<F>
+ *   participant S as FabricContractDBSequence
+ *   participant M as Model
+ *   R->>R: derive sequence name if missing
+ *   R->>S: adapter.Sequence(options)
+ *   S-->>R: sequence instance
+ *   R->>S: next(context)
+ *   S-->>R: next value
+ *   R->>M: define non-writable primary key
+ */
 export async function pkFabricOnCreate<
   M extends Model,
   R extends FabricContractRepository<M>,
@@ -425,8 +453,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   /**
-   * @description Static method for class decoration
-   * @summary Empty method used for class decoration purposes
+   * @description Static method for decoration overrides
+   * @summary Overrides/extends decaf decoration with Fabric-specific functionality
+   * @static
+   * @override
+   * @return {void}
    */
   static override decoration() {
     super.decoration();
@@ -696,6 +727,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
+  /**
+   *
+   * @param model
+   * @param {string} pk
+   * @param args
+   */
   override prepare<M extends Model>(
     model: M,
     pk: keyof M,

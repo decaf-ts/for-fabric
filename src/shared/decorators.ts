@@ -4,6 +4,37 @@ import { NotFoundError } from "@decaf-ts/db-decorators";
 import { Model, ModelKeys, propMetadata } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
 
+/**
+ * @description Method decorator enforcing token ownership in Fabric ERC20 contracts
+ * @summary Wraps a contract method to ensure the invoking identity matches the owner of the single available token. Throws NotFoundError if no or multiple tokens exist, and AuthorizationError if the caller is not the owner. Passes through to the original method upon successful validation.
+ * @param {any} target - The prototype of the class where the method is declared
+ * @param {string} propertyKey - The name of the decorated method
+ * @param {PropertyDescriptor} descriptor - The method descriptor being decorated
+ * @return {MethodDecorator} A method decorator that enforces ownership at runtime
+ * @function Owner
+ * @category Decorators
+ * @mermaid
+ * sequenceDiagram
+ *   participant D as Decorator
+ *   participant C as FabricERC20Contract
+ *   participant X as FabricContractContext
+ *   participant R as tokenRepository
+ *   D->>C: wrap method(propertyKey)
+ *   C->>X: read identity.getID()
+ *   C->>R: select().execute()
+ *   R-->>C: tokens[]
+ *   alt 0 tokens
+ *     C-->>D: throw NotFoundError
+ *   else >1 tokens
+ *     C-->>D: throw NotFoundError
+ *   else 1 token
+ *     alt caller != owner
+ *       C-->>D: throw AuthorizationError
+ *     else authorized
+ *       C->>C: call original method
+ *     end
+ *   end
+ */
 export function Owner() {
   return function (
     target: any,
@@ -44,6 +75,14 @@ export function Owner() {
   };
 }
 
+/**
+ * @description Builds a Fabric-specific metadata key for model properties
+ * @summary Prefixes the provided key with the Fabric model namespace, allowing decorators to store and retrieve metadata consistently across Fabric-integrated models.
+ * @param {string} key - The metadata key suffix to be namespaced
+ * @return {string} The computed namespaced metadata key
+ * @function getFabricModelKey
+ * @category Decorators
+ */
 export function getFabricModelKey(key: string) {
   return Model.key(FabricModelKeys.FABRIC + key);
 }
@@ -199,6 +238,26 @@ export function getFabricModelKey(key: string) {
 //   // }
 // }
 
+/**
+ * @description Decorator factory to mark models or attributes as private data in Fabric
+ * @summary Registers metadata indicating that a model or specific attributes belong to a given private data collection. When applied at class-level, marks the whole model as private and merges collections; when applied at property-level, attaches the collection list to the property.
+ * @param {string} [collection] - The private data collection name to associate with the model or property
+ * @return {function(any, string): void} A decorator function to apply at class or property level
+ * @function privateData
+ * @category Decorators
+ * @mermaid
+ * sequenceDiagram
+ *   participant F as Factory(privateData)
+ *   participant D as Decorator
+ *   participant M as Model/Prototype
+ *   F->>F: validate collection
+ *   F-->>D: return decorator
+ *   D->>M: read existing metadata
+ *   D->>M: write merged collections metadata
+ *   alt attribute-level
+ *     D->>M: set property-level metadata
+ *   end
+ */
 export function privateData(collection?: string) {
   if (!collection) {
     throw new Error("Collection name is required");

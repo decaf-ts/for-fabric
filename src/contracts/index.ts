@@ -1,8 +1,7 @@
 /**
- * @description Hyperledger Fabric Client Module for Decaf-ts
- * @summary This module provides a Fabric client adapter for Decaf-ts
- * @namespace contracts
- * @memberOf module:fabric
+ * @description Contracts submodule for Hyperledger Fabric integration
+ * @summary Aggregates chaincode-side building blocks including repositories, sequences, adapters, and ERC20 helpers. This entrypoint re-exports contract-related elements such as {@link FabricContractRepository}, {@link FabricContractSequence}, and CRUD/ERC20 utilities for composing Fabric contracts.
+ * @module fabric.contracts
  */
 
 export * from "./crud";
