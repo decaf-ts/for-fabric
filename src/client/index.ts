@@ -3,7 +3,7 @@
  * @summary This module provides a Fabric client adapter for Decaf-ts
  *
  * @namespace client
- * @memberOf module:fabric
+ * @memberOf module:for-fabric
  */
 
 export * from "./fabric-fs";
