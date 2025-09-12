@@ -12,4 +12,9 @@
 # This should make it easy to add new rules without breaking existing ones.
 
 # All files from the repository
-# *       @decaf-ts/quality @decaf-ts/reviewers
+*       @decaf-ts/quality @decaf-ts/Techlead
+
+.github/ @decaf-ts/CI-CD @decaf-ts/quality
+
+.github/CODEOWNERS @decaf-ts/owners
+LICENCE.md @decaf-ts/owners
