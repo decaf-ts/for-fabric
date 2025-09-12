@@ -13,7 +13,6 @@ import {
   Context,
   DBKeys,
   InternalError,
-  modelToTransient,
   NotFoundError,
   onCreate,
   onCreateUpdate,
@@ -47,6 +46,7 @@ import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
 import { MissingContextError } from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
+import { processModel, saveData } from "./private-data";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -276,6 +276,45 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   /**
+   * @description Creates a record in the state database
+   * @summary Serializes a model and stores it in the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier
+   * @param {Record<string, any>} model - The record data
+   * @param {Record<string, any>} transient - Transient data (not used in this implementation)
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the created record
+   */
+  @debug(true)
+  override async create(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>,
+    transient?: Record<string, any>,
+    privateData?: Record<string, any>,
+    instance?: any,
+    ...args: any[]
+  ): Promise<Record<string, any>> {
+    const { stub, logger } = args.pop();
+    const log = logger.for(this.create);
+
+    try {
+      log.info(`adding entry to ${tableName} table with pk ${id}`);
+      await saveData.call(
+        stub,
+        id.toString(),
+        model,
+        privateData || {},
+        instance
+      );
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+
+    return model;
+  }
+
+  /**
    * @description Processes results from a state query iterator
    * @summary Iterates through query results and converts them to a structured format
    * @param {Logger} log - Logger instance for debugging
@@ -336,6 +375,46 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.debug(`Closing iterator after ${allResults.length} results`);
     iterator.close(); // purposely not await. let iterator close on its own
     return allResults;
+  }
+
+  override prepare<M extends Model>(
+    model: M,
+    pk: keyof M,
+    tableName?: string,
+    ...args: any[]
+  ): {
+    record: Record<string, any>;
+    id: string;
+    transient: Record<string, any>;
+    privateData: Record<string, any>;
+    instance: M;
+  } {
+    const { stub, logger } = args.pop();
+    const log = logger.for(this.prepare);
+
+    const processedModel = processModel(this, model);
+
+    if ((model as any)[PersistenceKeys.METADATA]) {
+      log.silly(
+        `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
+      );
+      Object.defineProperty(processedModel.result, PersistenceKeys.METADATA, {
+        enumerable: false,
+        writable: false,
+        configurable: true,
+        value: (model as any)[PersistenceKeys.METADATA],
+      });
+    }
+
+    log.info(`Preparing record for ${tableName} table with pk ${model[pk]}`);
+
+    return {
+      record: processedModel.result,
+      id: stub.createCompositeKey(tableName, [String(model[pk])]),
+      transient: processedModel.transient || {},
+      privateData: processedModel.privateData || {},
+      instance: processedModel.model,
+    };
   }
 
   /**
@@ -492,54 +571,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
       .apply();
   }
 
-  /**
-   * @description Creates a record in the state database
-   * @summary Serializes a model and stores it in the Fabric state database
-   * @param {string} tableName - The name of the table/collection
-   * @param {string | number} id - The record identifier
-   * @param {Record<string, any>} model - The record data
-   * @param {Record<string, any>} transient - Transient data (not used in this implementation)
-   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
-   * @return {Promise<Record<string, any>>} Promise resolving to the created record
-   */
-  @debug(true)
-  override async create(
-    tableName: string,
-    id: string | number,
-    model: Record<string, any>,
-    ...args: any[]
-  ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
-    const log = logger.for(this.create);
-    let data: Buffer;
-    try {
-      data = Buffer.from(JSON.stringify(model));
-    } catch (e: unknown) {
-      throw new SerializationError(
-        `Failed to serialize record with id ${id} for table ${tableName}: ${e}`
-      );
-    }
-
-    try {
-      log.info(
-        `Checking if entry with id ${id} already exists in ${tableName} table`
-      );
-      const res = await stub.getState(id.toString());
-      if (res.toString() !== "") {
-        log.info(`Entry with id ${id} already exists in ${tableName} table`);
-        throw new ConflictError(
-          `Entry with id ${id} already exists in ${tableName} table`
-        );
-      }
-      log.info(`adding entry to ${tableName} table with pk ${id}`);
-      await stub.putState(id.toString(), data);
-    } catch (e: unknown) {
-      throw this.parseError(e as Error);
-    }
-
-    return model;
-  }
-
   override async createAll(
     tableName: string,
     id: (string | number)[],
@@ -694,52 +725,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
 
     return model;
-  }
-
-  override prepare<M extends Model>(
-    model: M,
-    pk: keyof M,
-    ...args: any[]
-  ): {
-    record: Record<string, any>;
-    id: string;
-    transient?: Record<string, any>;
-  } {
-    const { stub, logger } = args.pop();
-    const tableName = args.shift();
-    const log = logger.for(this.prepare);
-
-    const split = modelToTransient(model);
-    const result = Object.entries(split.model).reduce(
-      (accum: Record<string, any>, [key, val]) => {
-        if (typeof val === "undefined") return accum;
-        const mappedProp = Repository.column(model, key);
-        if (this.isReserved(mappedProp))
-          throw new InternalError(`Property name ${mappedProp} is reserved`);
-        accum[mappedProp] = val;
-        return accum;
-      },
-      {}
-    );
-    if ((model as any)[PersistenceKeys.METADATA]) {
-      log.silly(
-        `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
-      );
-      Object.defineProperty(result, PersistenceKeys.METADATA, {
-        enumerable: false,
-        writable: false,
-        configurable: true,
-        value: (model as any)[PersistenceKeys.METADATA],
-      });
-    }
-
-    log.info(`Preparing record for ${tableName} table with pk ${model[pk]}`);
-
-    return {
-      record: result,
-      id: stub.createCompositeKey(tableName, [String(model[pk])]),
-      transient: split.transient,
-    };
   }
 
   override revert<M extends Model>(

@@ -82,5 +82,53 @@ export function modelToPrivate<M extends Model>(
     {} as { model: Record<string, any>; private?: Record<string, any> }
   );
   result.model = Model.build(result.model, model.constructor.name);
+
+  if (result.private) {
+    const collections = Object.keys(result.private);
+
+    for (const collection of collections) {
+      result.private![collection] = Model.build(
+        result.private![collection],
+        model.constructor.name
+      );
+    }
+  }
   return result as { model: M; private?: Record<string, Record<string, any>> };
 }
+
+// export function reconstructModelFromStrings(
+//   models: string[]
+// ): Record<string, any> {
+//   function mergeModels(base: Record<string, any>, update: Record<string, any>) {
+//     for (const [key, value] of Object.entries(update)) {
+//       if (value === null || value === undefined) {
+//         continue;
+//       }
+//       if (
+//         typeof value === "object" &&
+//         !Array.isArray(value) &&
+//         typeof base[key] === "object" &&
+//         !Array.isArray(base[key])
+//       ) {
+//         mergeModels(base[key], value);
+//       } else {
+//         base[key] = value;
+//       }
+//     }
+//     return base;
+//   }
+
+//   return models.reduce((merged: object, str: string) => {
+//     try {
+//       const parsed = JSON.parse(str);
+//       if (typeof parsed !== "object" || Array.isArray(parsed)) {
+//         throw new Error("JSON must represent an object");
+//       }
+//       return mergeModels(merged, parsed);
+//       // eslint-disable-next-line @typescript-eslint/no-unused-vars
+//     } catch (e: unknown) {
+//       //Skipping invalid
+//       return merged;
+//     }
+//   }, {});
+// }

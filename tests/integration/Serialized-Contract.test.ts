@@ -9,6 +9,8 @@ import { Model } from "@decaf-ts/decorator-validation";
 jest.setTimeout(5000000);
 
 describe("Test Serialized Crud Contract", () => {
+  const PRIVATE_COLLECTION = "_implicit_org_Peer0OrgaMSP";
+
   // This ensures the infrastructure is up and running before running the tests.
   beforeAll(async () => {
     // Compile/Transpile the contract to JavaScript
@@ -131,10 +133,16 @@ describe("Test Serialized Crud Contract", () => {
 
   const readByPass = async (id: string, privatedata: boolean = false) => {
     let record;
+
+    const args = [
+      createCompositeKey(modelTableName, [String(id)]),
+      privatedata ? PRIVATE_COLLECTION : undefined,
+    ].filter((el) => el !== undefined);
+
     try {
       record = await readBlockChain(
         privatedata ? "readPrivateByPass" : "readByPass",
-        [createCompositeKey(modelTableName, [String(id)])]
+        args
       );
     } catch (error) {
       expect(error).toBeUndefined();
@@ -232,14 +240,18 @@ describe("Test Serialized Crud Contract", () => {
 
     const id = await getCurrentId();
 
-    const record = await readByPass(id);
+    try {
+      const record = await readByPass(id);
 
-    expect(record["tst_name"]).toBe(model.name);
-    expect(record["tst_nif"]).toBe(model.nif);
+      expect(record["tst_name"]).toBe(model.name);
+      expect(record["tst_nif"]).toBe(model.nif);
 
-    const privateRecord = await readByPass(id, true);
+      const privateRecord = await readByPass(id, true);
 
-    expect(privateRecord["tst_email"]).toBe(transientData.transient!.email);
+      expect(privateRecord["tst_email"]).toBe(transientData.transient!.email);
+    } catch (e: unknown) {
+      expect(e).toBeUndefined();
+    }
   });
 
   // it("Should fail to create model", async () => {
