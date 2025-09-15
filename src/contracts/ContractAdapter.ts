@@ -41,12 +41,23 @@ import {
   Adapter,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
-import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
+import {
+  ChaincodeStub,
+  ClientIdentity,
+  Iterators,
+  StateQueryResponse,
+} from "fabric-shim-api";
 import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
 import { MissingContextError } from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
-import { processModel, saveData } from "./private-data";
+import { processModel } from "./private-data";
+import {
+  hasPrivateData,
+  isModelPrivate,
+  modelToPrivate,
+} from "../shared/model/utils";
+import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -219,6 +230,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return FabricContractRepository;
   }
 
+  protected static readonly serializer = new SimpleDeterministicSerializer();
+
   /**
    * @description Creates a new FabricContractAdapter instance
    * @summary Initializes an adapter for interacting with the Fabric state database
@@ -300,7 +313,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
-      await saveData.call(
+      await this.saveData(
         stub,
         id.toString(),
         model,
@@ -312,6 +325,185 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
 
     return model;
+  }
+
+  /**
+   * @description Reads a record from the state database
+   * @summary Retrieves and deserializes a record from the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the retrieved record
+   */
+  override async read(
+    tableName: string,
+    id: string | number,
+    instance: Model,
+    ...args: any[]
+  ): Promise<Record<string, any>> {
+    const { stub, logger } = args.pop();
+    const log = logger.for(this.read);
+
+    let model: Record<string, any>;
+    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+    try {
+      const results = await this.readData(stub, composedKey, instance);
+
+      if (results.length < 1) {
+        log.debug(`No record found for id ${id} in ${tableName} table`);
+        throw new NotFoundError(
+          `No record found for id ${id} in ${tableName} table`
+        );
+      } else if (results.length < 2) {
+        log.debug(`No record found for id ${id} in ${tableName} table`);
+        model = results.pop() as Record<string, any>;
+      } else {
+        model = this.mergeResults(results);
+      }
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+
+    return model;
+  }
+
+  private mergeResults(results: Record<string, any>[]): Record<string, any> {
+    const extract = (model: Record<string, any>) =>
+      Object.entries(model).reduce((accum: Record<string, any>, [key, val]) => {
+        if (typeof val !== "undefined") accum[key] = val;
+        return accum;
+      }, {});
+
+    let finalModel: Record<string, any> = results.pop() as Record<string, any>;
+
+    for (const res of results) {
+      finalModel = Object.assign({}, extract(finalModel), extract(res));
+    }
+
+    return finalModel;
+  }
+
+  private async saveData(
+    stub: ChaincodeStub,
+    id: string,
+    model: Record<string, any>,
+    privateData: Record<string, any>,
+    instance: any
+  ) {
+    let data: Buffer;
+
+    const savePrivateData = async function (
+      stub: ChaincodeStub,
+      id: string,
+      privateData: Record<string, any>
+    ) {
+      const collections = Object.keys(privateData!);
+
+      let data: Buffer;
+
+      for (const collection of collections) {
+        try {
+          data = Buffer.from(
+            FabricContractAdapter.serializer.serialize(
+              privateData![collection] as Model
+            )
+          );
+        } catch (e: unknown) {
+          throw new SerializationError(
+            `Failed to serialize record with id ${id}: ${e}`
+          );
+        }
+        await stub.putPrivateData(collection, id.toString(), data);
+      }
+    };
+
+    if (isModelPrivate(instance)) {
+      await savePrivateData(stub, id, privateData);
+    } else {
+      try {
+        data = Buffer.from(
+          FabricContractAdapter.serializer.serialize(model as Model)
+        );
+      } catch (e: unknown) {
+        throw new SerializationError(
+          `Failed to serialize record with id ${id}: ${e}`
+        );
+      }
+      await stub.putState(id.toString(), data);
+
+      if (hasPrivateData(instance as Model))
+        await savePrivateData(stub, id.toString(), privateData!);
+    }
+  }
+
+  private async readData(
+    stub: ChaincodeStub,
+    id: string,
+    model: Model
+  ): Promise<Record<string, any>[]> {
+    const privateData = modelToPrivate(model).private;
+    let results: any[] = [];
+
+    const retrievePrivateData = async function (
+      stub: ChaincodeStub,
+      id: string,
+      privateData: Record<string, any>
+    ) {
+      const collections = Object.keys(privateData!);
+      const data: Record<string, any>[] = [];
+
+      for (const collection of collections) {
+        let res: Buffer | Record<string, any> = await stub.getPrivateData(
+          collection,
+          id.toString()
+        );
+        if (res.toString() === "") {
+          throw new NotFoundError(`Entry with id ${id} doesn't exist...`);
+        }
+
+        try {
+          res = FabricContractAdapter.serializer.deserialize(
+            res.toString(),
+            model.constructor.name
+          );
+        } catch (e: unknown) {
+          throw new SerializationError(`Failed to parse private data: ${e}`);
+        }
+
+        data.push(res);
+      }
+
+      return data;
+    };
+
+    if (isModelPrivate(model)) {
+      results = await retrievePrivateData(stub, id.toString(), privateData!);
+    } else {
+      let res: Buffer | Record<string, any> = await stub.getState(
+        id.toString()
+      );
+
+      if (res.toString() === "")
+        throw new NotFoundError(`Record with id ${id} not found`);
+
+      try {
+        res = FabricContractAdapter.serializer.deserialize(
+          res.toString(),
+          model.constructor.name
+        );
+      } catch (e: unknown) {
+        throw new SerializationError(`Failed to parse record: ${e}`);
+      }
+
+      results.push(res);
+
+      if (hasPrivateData(model)) {
+        results.concat(
+          await retrievePrivateData(stub, id.toString(), privateData!)
+        );
+      }
+    }
+    return results;
   }
 
   /**
@@ -590,45 +782,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
         return this.create(tableName, i, model[index], ...args);
       })
     );
-  }
-
-  /**
-   * @description Reads a record from the state database
-   * @summary Retrieves and deserializes a record from the Fabric state database
-   * @param {string} tableName - The name of the table/collection
-   * @param {string | number} id - The record identifier
-   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
-   * @return {Promise<Record<string, any>>} Promise resolving to the retrieved record
-   */
-  override async read(
-    tableName: string,
-    id: string | number,
-    ...args: any[]
-  ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
-    const log = logger.for(this.read);
-
-    let model: Record<string, any>;
-    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
-    try {
-      log.verbose(
-        `retrieving entry with pk ${composedKey} from ${tableName} table`
-      );
-      const res = await stub.getState(composedKey);
-      const resStr = res.toString();
-
-      if (resStr === "" || resStr === "null" || resStr === "undefined") {
-        throw new NotFoundError(
-          `The record with id ${id} does not exist in table ${tableName}`
-        );
-      }
-
-      model = JSON.parse(res.toString());
-    } catch (e: unknown) {
-      throw this.parseError(e as Error);
-    }
-
-    return model;
   }
 
   /**

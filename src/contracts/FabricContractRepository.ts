@@ -186,6 +186,19 @@ export class FabricContractRepository<M extends Model> extends Repository<
     );
   }
 
+  override async read(
+    id: string | number | bigint,
+    ...args: any[]
+  ): Promise<M> {
+    const m = await this.adapter.read(
+      this.tableName,
+      id as string,
+      new this.class(),
+      ...args
+    );
+    return this.adapter.revert<M>(m, this.class, this.pk, id as string);
+  }
+
   /**
    * @description Creates multiple models in the state database
    * @summary Prepares, creates, and reverts multiple models using the adapter
