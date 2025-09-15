@@ -1,17 +1,18 @@
-import { BaseError } from "@decaf-ts/db-decorators";
+import { InternalError } from "@decaf-ts/db-decorators";
+import { AuthorizationError } from "@decaf-ts/core";
 /**
  * @summary Represents an overflow error in arithmetic operations in Smart Contracts
  *
  * @param {string} msg the error message
  *
  * @class OverflowError
- * @extends BaseDLTError
+ * @extends InternalError
  *
- * @memberOf module:for-fabric.shared
+ * @category Errors
  */
-export class OverflowError extends BaseError {
+export class OverflowError extends InternalError {
   constructor(msg: string | Error) {
-    super(OverflowError.name, msg);
+    super(msg, OverflowError.name);
   }
 }
 
@@ -21,13 +22,13 @@ export class OverflowError extends BaseError {
  * @param {string} msg the error message
  *
  * @class BalanceError
- * @extends Error
+ * @extends InternalError
  *
- * @memberOf module:for-fabric.shared
+ * @category Errors
  */
-export class BalanceError extends BaseError {
+export class BalanceError extends InternalError {
   constructor(msg: string | Error) {
-    super(BalanceError.name, msg);
+    super(msg, BalanceError.name);
   }
 }
 
@@ -37,13 +38,12 @@ export class BalanceError extends BaseError {
  * @param {string} msg the error message
  *
  * @class RegistrationError
- * @extends BaseDLTError
  *
- * @memberOf module:for-fabric.shared
+ * @categort Errors
  */
-export class RegistrationError extends BaseError {
+export class RegistrationError extends AuthorizationError {
   constructor(msg: string | Error) {
-    super(RegistrationError.name, msg);
+    super(msg, RegistrationError.name);
   }
 }
 
@@ -69,9 +69,11 @@ export class RegistrationError extends BaseError {
  *   }
  * }
  * ```
+ *
+ * @category Errors
  */
-export class MissingContextError extends BaseError {
+export class MissingContextError extends InternalError {
   constructor(msg: string | Error) {
-    super(MissingContextError.name, msg, 500);
+    super(msg, MissingContextError.name, 500);
   }
 }

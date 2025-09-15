@@ -18,10 +18,9 @@ import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
 import { Context } from "fabric-contract-api";
-import { FabricContractDBSequence } from "./FabricContractSequence";
+import { FabricContractSequence } from "./FabricContractSequence";
 import { ContractLogger } from "./logging";
 import { Logging } from "@decaf-ts/logging";
-import { PeerConfig } from "../shared";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -327,9 +326,9 @@ export class FabricContractRepository<M extends Model> extends Repository<
     const opts = Repository.getSequenceOptions(models[0]);
     let ids: (string | number | bigint | undefined)[] = [];
     if (opts.type) {
-      if (!opts.name) opts.name = FabricContractDBSequence.pk(models[0]);
+      if (!opts.name) opts.name = FabricContractSequence.pk(models[0]);
       ids = await (
-        (await this.adapter.Sequence(opts)) as FabricContractDBSequence
+        (await this.adapter.Sequence(opts)) as FabricContractSequence
       ).range(models.length, ctx as unknown as FabricContractContext);
     } else {
       ids = models.map((m, i) => {
@@ -374,17 +373,5 @@ export class FabricContractRepository<M extends Model> extends Repository<
 
     if (errorMessages) throw new ValidationError(errorMessages);
     return [models, ...contextArgs.args];
-  }
-
-  override for(
-    config: PeerConfig
-  ): Repository<
-    M,
-    MangoQuery,
-    FabricContractAdapter,
-    FabricContractFlags,
-    FabricContractContext
-  > {
-    return super.for(config);
   }
 }

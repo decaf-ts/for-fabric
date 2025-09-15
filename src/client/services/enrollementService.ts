@@ -24,7 +24,7 @@ import {
   FabricIdentity,
   GetCertificatesRequest,
   IdentityResponse,
-} from "../../shared/fabric-shims";
+} from "../../shared/fabric-types";
 import { RegistrationError } from "../../shared/errors";
 import { LoggedService } from "./LoggedService";
 

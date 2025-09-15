@@ -6,7 +6,6 @@ import {
   type Constructor,
   Model,
   type Serializer,
-  stringFormat,
 } from "@decaf-ts/decorator-validation";
 import { debug, Logger, Logging } from "@decaf-ts/logging";
 import { FabricFlags, PeerConfig } from "../shared/types";
@@ -18,7 +17,7 @@ import {
   ProposalOptions,
   Contract as Contrakt,
 } from "@hyperledger/fabric-gateway";
-import { getIdentity, getSigner, readFile } from "./fabric-fs";
+import { getIdentity, getSigner } from "./fabric-fs";
 import {
   BaseError,
   Context,
@@ -85,6 +84,7 @@ import { ClientSerializer } from "../shared/ClientSerializer";
  */
 export class FabricClientAdapter extends CouchDBAdapter<
   PeerConfig,
+  Client,
   FabricFlags,
   Context<FabricFlags>
 > {
@@ -99,11 +99,6 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @description Static logger instance for the FabricAdapter class
    */
   private static log: Logger = Logging.for(FabricClientAdapter);
-
-  /**
-   * @description gRPC client instance for connecting to the Fabric peer
-   */
-  private client?: Client;
 
   /**
    * @description Gets the logger instance for this adapter
@@ -141,31 +136,18 @@ export class FabricClientAdapter extends CouchDBAdapter<
     Repository<
       M,
       MangoQuery,
-      Adapter<PeerConfig, MangoQuery, FabricFlags, Context<FabricFlags>>,
+      Adapter<
+        PeerConfig,
+        Client,
+        MangoQuery,
+        FabricFlags,
+        Context<FabricFlags>
+      >,
       FabricFlags,
       Context<FabricFlags>
     >
   > {
     return FabricClientRepository;
-  }
-
-  /**
-   * @description Creates operation flags for Fabric operations
-   * @summary Merges default flags with provided flags for a specific operation
-   * @template M - Type extending Model
-   * @param {OperationKeys} operation - The operation being performed
-   * @param {Constructor<M>} model - The model constructor
-   * @param {Partial<FabricFlags>} flags - Partial flags to merge with defaults
-   * @return {FabricFlags} The merged flags
-   */
-  protected override async flags<M extends Model>(
-    operation: OperationKeys,
-    model: Constructor<M>,
-    flags: Partial<FabricFlags>
-  ): Promise<FabricFlags> {
-    return Object.assign(
-      await super.flags(operation, model, Object.assign({}, this.native, flags))
-    ) as FabricFlags;
   }
 
   /**
@@ -535,10 +517,10 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @summary Returns a cached client or creates a new one if none exists
    * @return {Promise<Client>} Promise resolving to the gRPC client
    */
-  protected async Client(): Promise<Client> {
-    if (!this.client)
-      this.client = await FabricClientAdapter.getClient(this.native);
-    return this.client;
+  override getClient(): Client {
+    if (!this._client)
+      this._client = FabricClientAdapter.getClient(this.config);
+    return this._client;
   }
 
   /**
@@ -547,7 +529,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @return {Promise<Gateway>} Promise resolving to the Gateway instance
    */
   protected async Gateway(): Promise<Gateway> {
-    return FabricClientAdapter.getGateway(this.native, await this.Client());
+    return FabricClientAdapter.getGateway(this.config, this.client);
   }
 
   /**
@@ -556,7 +538,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @return {Promise<Contrakt>} Promise resolving to the Contract instance
    */
   protected async Contract(): Promise<Contrakt> {
-    return FabricClientAdapter.getContract(await this.Gateway(), this.native);
+    return FabricClientAdapter.getContract(await this.Gateway(), this.config);
   }
 
   /**
@@ -599,7 +581,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     try {
       const contract = await this.Contract();
       log.verbose(
-        `${submit ? "Submit" : "Evaluate"}ting transaction ${this.native.contractName}.${api}`
+        `${submit ? "Submit" : "Evaluate"}ting transaction ${this.config.contractName}.${api}`
       );
       log.debug(`args: ${args?.map((a) => a.toString()).join("\n") || "none"}`);
       const method = submit ? contract.submit : contract.evaluate;
@@ -618,7 +600,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     } catch (e: any) {
       throw this.parseError(e);
     } finally {
-      this.log.debug(`Closing ${this.native.mspId} gateway connection`);
+      this.log.debug(`Closing ${this.config.mspId} gateway connection`);
       gateway.close();
     }
   }
@@ -689,7 +671,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   async close(): Promise<void> {
     if (this.client) {
-      this.log.verbose(`Closing ${this.native.mspId} gateway client`);
+      this.log.verbose(`Closing ${this.config.mspId} gateway client`);
       this.client.close();
     }
   }
@@ -754,14 +736,16 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @description Creates a gRPC client for connecting to a Fabric peer
    * @summary Initializes a client with TLS credentials for secure communication
    * @param {PeerConfig} config - The peer configuration
-   * @return {Promise<Client>} Promise resolving to the gRPC client
+   * @return {Client} Promise resolving to the gRPC client
    */
-  static async getClient(config: PeerConfig) {
+  static getClient(config: PeerConfig): Client {
     const log = this.log.for(this.getClient);
-    log.debug(`Retrieving TLS cert from ${config.tlsCertPath}`);
-    const tlsRootCert = await readFile(config.tlsCertPath);
     log.debug(`generating TLS credentials for msp ${config.mspId}`);
-    const tlsCredentials = grpc.credentials.createSsl(tlsRootCert);
+    const tlsCredentials = grpc.credentials.createSsl(
+      typeof config.tlsCert === "string"
+        ? Buffer.from(config.tlsCert)
+        : config.tlsCert
+    );
     log.debug(`generating Gateway Client for url ${config.peerEndpoint}`);
     return new Client(config.peerEndpoint, tlsCredentials);
   }
@@ -793,12 +777,15 @@ export class FabricClientAdapter extends CouchDBAdapter<
   static async getConnection(client: Client, config: PeerConfig) {
     const log = this.log.for(this.getConnection);
     log.debug(
-      `Retrieving Peer Identity for ${config.mspId} under ${config.certDirectoryPath}`
+      `Retrieving Peer Identity for ${config.mspId} under ${config.certCertOrDirectoryPath}`
     );
-    const identity = await getIdentity(config.mspId, config.certDirectoryPath);
-    log.debug(`Retrieving signer key from ${config.keyDirectoryPath}`);
+    const identity = await getIdentity(
+      config.mspId,
+      config.certCertOrDirectoryPath
+    );
+    log.debug(`Retrieving signer key from ${config.keyCertOrDirectoryPath}`);
 
-    const signer = await getSigner(config.keyDirectoryPath);
+    const signer = await getSigner(config.keyCertOrDirectoryPath);
 
     const options = {
       client,
@@ -835,41 +822,6 @@ export class FabricClientAdapter extends CouchDBAdapter<
     reason?: string
   ): BaseError {
     return super.parseError(err, reason);
-  }
-
-  /**
-   * Creates a new instance of FabricClientAdapter with the provided configuration.
-   * This method overrides the `for` method of the parent class to allow for dynamic configuration.
-   *
-   * @param config - A record containing the configuration parameters for the new instance.
-   * @returns A new instance of FabricClientAdapter with the provided configuration.
-   *
-   * @remarks
-   * The `for` method uses a Proxy to dynamically modify the `native` and `client` properties of the new instance.
-   * The `native` property is updated by merging the original `native` configuration with the provided `config`.
-   * The `client` property is left unchanged.
-   */
-  override for(config: Record<string, string>): FabricClientAdapter {
-    let client: any;
-    return new Proxy(this, {
-      get: (target: typeof this, p: string | symbol, receiver: any) => {
-        if (p === "native") {
-          const originalNative: PeerConfig = Reflect.get(target, p, receiver);
-          return Object.assign({}, originalNative, config);
-        }
-        if (p === "client") {
-          return client;
-        }
-        return Reflect.get(target, p, receiver);
-      },
-      set: (target: any, p: string | symbol, value: any, receiver: any) => {
-        if (p === "client") {
-          client = value;
-          return true;
-        }
-        return Reflect.set(target, p, value, receiver);
-      },
-    });
   }
 }
 

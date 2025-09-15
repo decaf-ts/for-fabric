@@ -3,6 +3,7 @@ import {
   Constructor,
   Decoration,
   Model,
+  ModelKeys,
   propMetadata,
   required,
 } from "@decaf-ts/decorator-validation";
@@ -23,8 +24,8 @@ import {
 } from "@decaf-ts/db-decorators";
 import {
   Context as Ctx,
-  Property as FabricProperty,
   Object as FabricObject,
+  Property as FabricProperty,
 } from "fabric-contract-api";
 import { debug, Logger, Logging } from "@decaf-ts/logging";
 import { ContractLogger } from "./logging";
@@ -43,8 +44,8 @@ import {
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import { ClientIdentity, Iterators, StateQueryResponse } from "fabric-shim-api";
-import { FabricStatement } from "./erc20/Statement";
-import { FabricContractDBSequence } from "./FabricContractSequence";
+import { FabricStatement } from "./FabricContractStatement";
+import { FabricContractSequence } from "./FabricContractSequence";
 import { MissingContextError } from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
 
@@ -153,9 +154,9 @@ export async function pkFabricOnCreate<
     });
   };
   if (!data.name) data.name = sequenceNameForModel(model, "pk");
-  let sequence: FabricContractDBSequence;
+  let sequence: FabricContractSequence;
   try {
-    sequence = (await this.adapter.Sequence(data)) as FabricContractDBSequence;
+    sequence = (await this.adapter.Sequence(data)) as FabricContractSequence;
   } catch (e: any) {
     throw new InternalError(
       `Failed to instantiate Sequence ${data.name}: ${e}`
@@ -204,10 +205,14 @@ export async function pkFabricOnCreate<
  *   FabricContractAdapter-->>Contract: model
  */
 export class FabricContractAdapter extends CouchDBAdapter<
+  any,
   void,
   FabricContractFlags,
   FabricContractContext
 > {
+  protected override getClient(): void {
+    throw new UnsupportedError("Client is not supported in Fabric contracts");
+  }
   /**
    * @description Text decoder for converting binary data to strings
    */
@@ -239,7 +244,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     Repository<
       M,
       MangoQuery,
-      Adapter<any, MangoQuery, FabricContractFlags, FabricContractContext>,
+      Adapter<any, any, MangoQuery, FabricContractFlags, FabricContractContext>,
       FabricContractFlags,
       FabricContractContext
     >
@@ -255,6 +260,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
    */
   constructor(scope: void, alias?: string) {
     super(scope, FabricFlavour, alias);
+  }
+
+  override for(config: Partial<any>, ...args: any): typeof this {
+    return super.for(config, ...args);
   }
 
   /**
@@ -442,85 +451,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   override async Sequence(options: SequenceOptions): Promise<Sequence> {
-    return new FabricContractDBSequence(
-      options,
-      this as unknown as CouchDBAdapter<
-        void,
-        FabricContractFlags,
-        FabricContractContext
-      >
-    );
-  }
-
-  /**
-   * @description Static method for decoration overrides
-   * @summary Overrides/extends decaf decoration with Fabric-specific functionality
-   * @static
-   * @override
-   * @return {void}
-   */
-  static override decoration() {
-    super.decoration();
-    const createdByKey = Repository.key(PersistenceKeys.CREATED_BY);
-    const updatedByKey = Repository.key(PersistenceKeys.UPDATED_BY);
-    Decoration.flavouredAs(FabricFlavour)
-      .for(createdByKey)
-      .define(
-        onCreate(createdByOnFabricCreateUpdate),
-        propMetadata(createdByKey, {})
-      )
-      .apply();
-
-    Decoration.flavouredAs(FabricFlavour)
-      .for(updatedByKey)
-      .define(
-        onCreateUpdate(createdByOnFabricCreateUpdate),
-        propMetadata(updatedByKey, {})
-      )
-      .apply();
-
-    const pkKey = Repository.key(DBKeys.ID);
-    Decoration.flavouredAs(FabricFlavour)
-      .for(pkKey)
-      .define(
-        index([OrderDirection.ASC, OrderDirection.DSC]),
-        required(),
-        readonly(),
-        // type([String.name, Number.name, BigInt.name]),
-        propMetadata(pkKey, NumericSequence),
-        onCreate(pkFabricOnCreate, NumericSequence)
-      )
-      .apply();
-
-    const columnKey = Adapter.key(PersistenceKeys.COLUMN);
-    Decoration.flavouredAs(FabricFlavour)
-      .for(columnKey)
-      .extend(FabricProperty())
-      .apply();
-
-    const tableKey = Adapter.key(PersistenceKeys.TABLE);
-    Decoration.flavouredAs(FabricFlavour)
-      .for(tableKey)
-      .extend(function table(obj: any) {
-        // const chain: any[] = [];
-
-        // let current = obj;
-
-        // do {
-        //   chain.push(current);
-        //   console.log(`Found class: ${current}`);
-        // } while (current && current !== Object.prototype);
-
-        // do {
-        //   current = chain.pop();
-        //   console.log(`Applying @Object() to class: ${current}`);
-        //   //TODO: THIS IS NOT WORKING AND THROWS ERROR
-        //   // FabricObject()(current);
-        // } while (chain.length > 1);
-
-        return FabricObject()(obj);
-      })
-      .apply();
+    return new FabricContractSequence(options, this);
   }
 
   /**
@@ -892,6 +823,77 @@ export class FabricContractAdapter extends CouchDBAdapter<
       return record;
     });
     return [tableName, ids, records, ctx as any];
+  }
+
+  /**
+   * @description Static method for decoration overrides
+   * @summary Overrides/extends decaf decoration with Fabric-specific functionality
+   * @static
+   * @override
+   * @return {void}
+   */
+  static override decoration(): void {
+    super.decoration();
+    const createdByKey = Repository.key(PersistenceKeys.CREATED_BY);
+    const updatedByKey = Repository.key(PersistenceKeys.UPDATED_BY);
+    Decoration.flavouredAs(FabricFlavour)
+      .for(createdByKey)
+      .define(
+        onCreate(createdByOnFabricCreateUpdate),
+        propMetadata(createdByKey, {})
+      )
+      .apply();
+
+    Decoration.flavouredAs(FabricFlavour)
+      .for(updatedByKey)
+      .define(
+        onCreateUpdate(createdByOnFabricCreateUpdate),
+        propMetadata(updatedByKey, {})
+      )
+      .apply();
+
+    const pkKey = Repository.key(DBKeys.ID);
+    Decoration.flavouredAs(FabricFlavour)
+      .for(pkKey)
+      .define(
+        index([OrderDirection.ASC, OrderDirection.DSC]),
+        required(),
+        readonly(),
+        // type([String.name, Number.name, BigInt.name]),
+        propMetadata(pkKey, NumericSequence),
+        onCreate(pkFabricOnCreate, NumericSequence)
+      )
+      .apply();
+
+    const columnKey = Adapter.key(PersistenceKeys.COLUMN);
+    Decoration.flavouredAs(FabricFlavour)
+      .for(columnKey)
+      .extend(FabricProperty())
+      .apply();
+
+    const tableKey = Adapter.key(PersistenceKeys.TABLE);
+    Decoration.flavouredAs(FabricFlavour)
+      .for(tableKey)
+      .extend(function table(obj: any) {
+        // const chain: any[] = [];
+
+        // let current = obj;
+
+        // do {
+        //   chain.push(current);
+        //   console.log(`Found class: ${current}`);
+        // } while (current && current !== Object.prototype);
+
+        // do {
+        //   current = chain.pop();
+        //   console.log(`Applying @Object() to class: ${current}`);
+        //   //TODO: THIS IS NOT WORKING AND THROWS ERROR
+        //   // FabricObject()(current);
+        // } while (chain.length > 1);
+
+        return FabricObject()(obj);
+      })
+      .apply();
   }
 }
 

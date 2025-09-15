@@ -16,7 +16,7 @@ import { MissingContextError } from "../shared/errors";
  * @summary Provides the basic functionality for sequences backed by the FabricContractRepository storing values in CouchDB-like state, including current, next and range operations.
  * @param {SequenceOptions} options - Sequence configuration such as name, type, startWith and incrementBy
  * @return {void}
- * @class FabricContractDBSequence
+ * @class FabricContractSequence
  * @example
  * const seq = new FabricContractDBSequence({ name: 'orderSeq', type: 'Number', incrementBy: 1, startWith: 1 }, adapter);
  * const next = await seq.next(ctx); // 1
@@ -33,12 +33,12 @@ import { MissingContextError } from "../shared/errors";
  *   Repo-->>Sequence: saved
  *   Sequence-->>App: next value
  */
-export class FabricContractDBSequence extends Sequence {
+export class FabricContractSequence extends Sequence {
   protected repo: FabricContractRepository<Seq>;
 
   constructor(
     options: SequenceOptions,
-    adapter: Adapter<any, MangoQuery, any, any>
+    adapter: Adapter<any, any, MangoQuery, any, any>
   ) {
     super(options);
     this.repo = Repository.forModel(Seq, adapter.alias);

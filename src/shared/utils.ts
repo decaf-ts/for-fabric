@@ -145,11 +145,6 @@ export class CoreUtils {
       keyDirectoryPath,
       signerFileReader
     )) as Buffer;
-    // Node based implementation
-    // privateKey = createPrivateKey(privateKeyPem);
-    // --
-
-    // web based implementation
     const privateKey = await this.extractPrivateKey(privateKeyPem);
     const keys = Object.getOwnPropertySymbols(privateKey);
     const k = (privateKey as any)[keys[0]];

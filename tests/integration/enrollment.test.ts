@@ -11,6 +11,7 @@ import {
   required,
 } from "@decaf-ts/decorator-validation";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
+import { readFile } from "../../src/index";
 
 jest.setTimeout(5000000);
 
@@ -32,7 +33,7 @@ class TestModel extends BaseModel {
   }
 }
 
-describe("Test enrollement", () => {
+describe("Test enrollement", async () => {
   const user: Credentials = {
     userName: "TestUser" + Date.now(),
     password: "TestUserPSW",
@@ -53,12 +54,13 @@ describe("Test enrollement", () => {
 
   const peerConfig: PeerConfig = {
     cryptoPath: "./docker/infrastructure/crypto-config",
-    keyDirectoryPath:
+    keyCertOrDirectoryPath:
       "./docker/docker-data/storage/org-a-client-vol/admin/msp/keystore",
-    certDirectoryPath:
+    certCertOrDirectoryPath:
       "./docker/docker-data/storage/org-a-client-vol/admin/msp/signcerts",
-    tlsCertPath:
-      "./docker/docker-data/storage/org-a-client-vol/tls-ca-cert.pem",
+    tlsCert: await readFile(
+      "./docker/docker-data/storage/org-a-client-vol/tls-ca-cert.pem"
+    ),
     peerEndpoint: "localhost:7031",
     peerHostAlias: "localhost",
     caEndpoint: "localhost:7054",

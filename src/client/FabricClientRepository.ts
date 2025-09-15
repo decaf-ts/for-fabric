@@ -39,10 +39,10 @@ import { FabricFlags } from "../shared";
 export class FabricClientRepository<M extends Model> extends Repository<
   M,
   MangoQuery,
-  Adapter<any, MangoQuery, FabricFlags, Context<FabricFlags>>
+  Adapter<any, any, MangoQuery, FabricFlags, Context<FabricFlags>>
 > {
   constructor(
-    adapter?: Adapter<any, MangoQuery, FabricFlags, Context<FabricFlags>>,
+    adapter?: Adapter<any, any, MangoQuery, FabricFlags, Context<FabricFlags>>,
     clazz?: Constructor<M>
   ) {
     super(adapter, clazz);
