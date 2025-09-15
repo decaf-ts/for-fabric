@@ -498,9 +498,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
       results.push(res);
 
       if (hasPrivateData(model)) {
-        results.concat(
-          await retrievePrivateData(stub, id.toString(), privateData!)
+        const privResults = await retrievePrivateData(
+          stub,
+          id.toString(),
+          privateData!
         );
+        results = results.concat(privResults);
       }
     }
     return results;
@@ -896,7 +899,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.silly(`Rebuilding model ${m.constructor.name} id ${id}`);
     const metadata = obj[PersistenceKeys.METADATA];
     const result = Object.keys(m).reduce((accum: M, key) => {
-      (accum as Record<string, any>)[key] = obj[Repository.column(accum, key)];
+      (accum as Record<string, any>)[key] =
+        obj[Repository.column(accum, key)] || obj[key];
       return accum;
     }, m);
 
