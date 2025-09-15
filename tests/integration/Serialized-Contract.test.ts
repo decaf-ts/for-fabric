@@ -336,107 +336,112 @@ describe("Test Serialized Crud Contract", () => {
 
     record = JSON.parse(record!);
 
+    expect(record).toBeDefined();
+
     expect(record.name).toBe(model.name);
     expect(record.nif).toBe(model.nif);
     expect(record.email).toBe(transientData?.transient?.email);
   });
 
-  //   let record;
-  //   try {
-  //     record = await readBlockChain("read", [String(sequence1.current)]);
-  //   } catch (error) {
-  //     expect(error).toBeUndefined();
-  //   }
+  it("Should update model", async () => {
+    // Ensure contract is initialized
+    const ready = await ensureReadiness();
+    expect(trim(ready)).toBe("true");
 
-  //   console.log("Retrieved model: ", record);
+    const model = new TestModel(await getData());
+    console.log("Using model: ", model.serialize());
 
-  //   record = JSON.parse(record);
+    const transientData = modelToTransient(model);
+    const encoded = Buffer.from(
+      Model.build(
+        transientData.transient,
+        transientData.model.constructor.name
+      ).serialize()
+    ).toString("base64");
 
-  //   expect(record.name).toBe(model.name);
-  //   expect(record.nif).toBe(model.nif);
-  // });
+    const transient = {
+      [modelTableName]: encoded,
+    };
 
-  // it("Should update model", async () => {
-  //   const ready = await ensureReadiness();
+    try {
+      await invokeChaincode(
+        "create",
+        [transientData.model.serialize()],
+        transient
+      );
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
 
-  //   expect(trim(ready)).toBe("true");
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
 
-  //   const data = { name: randomName(6), nif: randomNif(9) };
-  //   const model = new TestModel(data);
+    const id = await getCurrentId();
 
-  //   console.log("Using model: ", model.serialize());
+    let record;
+    try {
+      record = await readBlockChain("read", [String(id)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
 
-  //   try {
-  //     await invokeChaincode("create", [model.serialize()]);
-  //   } catch (e) {
-  //     expect(e).toBeUndefined();
-  //   }
+    console.log("Retrieved model: ", record);
 
-  //   //Giving some time for the transaction to be committed
-  //   await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+    record = JSON.parse(record!);
 
-  //   let sequence1;
+    expect(record).toBeDefined();
 
-  //   try {
-  //     sequence1 = await readBlockChain("readByPass", [
-  //       createCompositeKey(sequenceTableName, [sequenceId]),
-  //     ]);
-  //   } catch (error) {
-  //     expect(error).toBeUndefined();
-  //   }
+    expect(record.name).toBe(model.name);
+    expect(record.nif).toBe(model.nif);
+    expect(record.email).toBe(transientData?.transient?.email);
 
-  //   console.log("Model created successfully: ", sequence1);
+    model.name = randomName(6);
+    model.nif = randomNif(9);
+    model.id = id;
+    model.email = "newEmail@example.com";
 
-  //   sequence1 = JSON.parse(sequence1);
+    const transientData1 = modelToTransient(model);
+    const encoded1 = Buffer.from(
+      Model.build(
+        transientData1.transient,
+        transientData1.model.constructor.name
+      ).serialize()
+    ).toString("base64");
 
-  //   expect(sequence1.id).toBe(sequenceId);
-  //   expect(sequence1.current).toBeGreaterThan(0);
+    const transient1 = {
+      [modelTableName]: encoded1,
+    };
 
-  //   let record;
-  //   try {
-  //     record = await readBlockChain("read", [String(sequence1.current)]);
-  //   } catch (error) {
-  //     expect(error).toBeUndefined();
-  //   }
+    try {
+      await invokeChaincode(
+        "update",
+        [transientData1.model.serialize()],
+        transient1
+      );
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
 
-  //   console.log("Retrieved model: ", record);
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
 
-  //   record = JSON.parse(record);
+    try {
+      record = await readBlockChain("read", [String(id)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
 
-  //   expect(record.name).toBe(model.name);
-  //   expect(record.nif).toBe(model.nif);
+    console.log("Retrieved model: ", record);
 
-  //   model.name = randomName(6);
-  //   model.nif = randomNif(9);
-  //   model.id = sequence1.current;
+    record = JSON.parse(record!);
 
-  //   console.log("Using model: ", model.serialize());
+    expect(record).toBeDefined();
 
-  //   try {
-  //     await invokeChaincode("update", [model.serialize()]);
-  //   } catch (e) {
-  //     expect(e).toBeUndefined();
-  //   }
-
-  //   //Giving some time for the transaction to be committed
-  //   await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
-
-  //   let record1;
-  //   try {
-  //     record1 = await readBlockChain("read", [String(sequence1.current)]);
-  //   } catch (error) {
-  //     expect(error).toBeUndefined();
-  //   }
-
-  //   console.log("Retrieved model: ", record1);
-
-  //   record1 = JSON.parse(record1);
-
-  //   expect(record1.name).toBe(model.name);
-  //   expect(record1.nif).toBe(model.nif);
-  //   expect(record1.name).not.toBe(record.name);
-  //   expect(record1.nif).not.toBe(record.nif);
-  // });
+    expect(record.name).toBe(model.name);
+    expect(record.nif).toBe(model.nif);
+    expect(record.email).toBe(transientData?.transient?.email);
+    expect(record.id).toBe(id);
+  });
 
   // it("Should fail update model", async () => {
   //   const ready = await ensureReadiness();
