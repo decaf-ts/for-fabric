@@ -33,6 +33,24 @@ export class SerializedCrudContract<
     return this.serialize((await super.create(ctx, m)) as M);
   }
 
+  @Transaction(false)
+  override async read(ctx: Ctx, key: string): Promise<string> {
+    const log = this.logFor(ctx).for(this.read);
+    log.info(`Reading id: ${key}`);
+    return this.serialize((await super.read(ctx, key)) as M);
+  }
+
+  @Transaction()
+  override async update(ctx: Ctx, model: string): Promise<string> {
+    const log = this.logFor(ctx).for(this.update);
+    log.info(`Updating model: ${model}`);
+
+    const m = this.deserialize<M>(model);
+
+    const result = await super.update(ctx, m);
+    return this.serialize(result as M);
+  }
+
   @Transaction()
   override async deleteAll(ctx: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
@@ -112,20 +130,6 @@ export class SerializedCrudContract<
         (m) => this.serialize(m) as string
       )
     );
-  }
-
-  @Transaction(false)
-  override async read(ctx: Ctx, key: string): Promise<string> {
-    const log = this.logFor(ctx).for(this.read);
-    log.info(`Reading id: ${key}`);
-    return this.serialize((await super.read(ctx, key)) as M);
-  }
-
-  @Transaction()
-  override async update(ctx: Ctx, model: string): Promise<string> {
-    const log = this.logFor(ctx).for(this.update);
-    log.info(`Updating model: ${model}`);
-    return this.serialize((await super.update(ctx, model)) as M);
   }
 
   @Transaction()

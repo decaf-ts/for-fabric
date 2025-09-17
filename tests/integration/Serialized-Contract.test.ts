@@ -85,6 +85,8 @@ describe("Test Serialized Crud Contract", () => {
 
     const transientData = JSON.stringify(transient);
 
+    const transientString = `--transient '${transientData}'`;
+
     // Invoke the chaincode
     return execSync(
       `docker exec org-a-peer-0 peer chaincode invoke \
@@ -99,7 +101,7 @@ describe("Test Serialized Crud Contract", () => {
       --tlsRootCertFiles /weaver/peer/org-c-tls-ca-cert.pem \
       -o org-a-orderer-0:7021 \
       --tls --cafile /weaver/peer/tls-ca-cert.pem \
-      --transient '${transientData}'`
+      ${transient ? transientString : ""}`
     );
   };
 
@@ -124,10 +126,9 @@ describe("Test Serialized Crud Contract", () => {
       console.log("Blockchain read:", processed);
 
       return processed;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e: unknown) {
       console.log("Failed to read blockchain");
-      return "";
+      throw e;
     }
   };
 
@@ -290,6 +291,37 @@ describe("Test Serialized Crud Contract", () => {
     expect(err).toBe(true);
   });
 
+  it("Should create model without transient data", async () => {
+    // Ensure contract is initialized
+    const ready = await ensureReadiness();
+    expect(trim(ready)).toBe("true");
+
+    const model = new TestModel(await getData());
+    console.log("Using model: ", model.serialize());
+
+    const transientData = modelToTransient(model);
+
+    try {
+      await invokeChaincode("create", [transientData.model.serialize()]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    const id = await getCurrentId();
+
+    try {
+      const record = await readByPass(id);
+
+      expect(record["tst_name"]).toBe(model.name);
+      expect(record["tst_nif"]).toBe(model.nif);
+    } catch (e: unknown) {
+      expect(e).toBeUndefined();
+    }
+  });
+
   it("Should read model with private data", async () => {
     // Ensure contract is initialized
     const ready = await ensureReadiness();
@@ -341,6 +373,64 @@ describe("Test Serialized Crud Contract", () => {
     expect(record.name).toBe(model.name);
     expect(record.nif).toBe(model.nif);
     expect(record.email).toBe(transientData?.transient?.email);
+  });
+
+  it("Should read model without transient data", async () => {
+    // Ensure contract is initialized
+    const ready = await ensureReadiness();
+    expect(trim(ready)).toBe("true");
+
+    const model = new TestModel(await getData());
+    console.log("Using model: ", model.serialize());
+
+    const transientData = modelToTransient(model);
+
+    try {
+      await invokeChaincode("create", [transientData.model.serialize()]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 5 seconds before retrying
+
+    const id = await getCurrentId();
+
+    let record;
+    try {
+      record = await readBlockChain("read", [String(id)]);
+    } catch (error) {
+      expect(error).toBeUndefined();
+    }
+
+    console.log("Retrieved model: ", record);
+
+    record = JSON.parse(record!);
+
+    expect(record).toBeDefined();
+
+    expect(record.name).toBe(model.name);
+    expect(record.nif).toBe(model.nif);
+    expect(record.email).toBe(undefined);
+  });
+
+  it("Should throw error when reading missing model", async () => {
+    // Ensure contract is initialized
+    const ready = await ensureReadiness();
+    expect(trim(ready)).toBe("true");
+
+    const id = 100000;
+
+    let record = undefined;
+    let error = false;
+    try {
+      record = await readBlockChain("read", [String(id)]);
+    } catch (err) {
+      error = true;
+      expect(err).toBeDefined();
+    }
+    expect(error).toBe(true);
+    expect(record).toBeUndefined();
   });
 
   it("Should update model", async () => {
@@ -439,7 +529,7 @@ describe("Test Serialized Crud Contract", () => {
 
     expect(record.name).toBe(model.name);
     expect(record.nif).toBe(model.nif);
-    expect(record.email).toBe(transientData?.transient?.email);
+    expect(record.email).toBe(transientData1?.transient?.email);
     expect(record.id).toBe(id);
   });
 

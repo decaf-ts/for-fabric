@@ -28,7 +28,6 @@ export class TestModel extends Model {
   nif!: string;
 
   @column("tst_email")
-  @required()
   @privateData("_implicit_org_Peer0OrgaMSP")
   email!: string;
 

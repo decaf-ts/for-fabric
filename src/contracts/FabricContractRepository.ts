@@ -17,7 +17,11 @@ import {
 } from "@decaf-ts/db-decorators";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
-import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
+import {
+  BulkCrudOperationKeys,
+  OperationKeys,
+  Context as CTX,
+} from "@decaf-ts/db-decorators";
 import { Context } from "fabric-contract-api";
 import { FabricContractDBSequence } from "./FabricContractSequence";
 import { ContractLogger } from "./logging";
@@ -200,6 +204,97 @@ export class FabricContractRepository<M extends Model> extends Repository<
   }
 
   /**
+   * @description Updates a single model in the state database
+   * @summary Prepares, updates, and reverts a model using the adapter
+   * @param {M} model - The model to update
+   * @param {...any[]} args - Additional arguments, including the chaincode context
+   * @return {Promise<M>} Promise resolving to the updated model
+   */
+  override async update(model: M, ...args: any[]): Promise<M> {
+    const ctx = args[args.length - 1] as Context;
+    const log = this.logFor(ctx).for(this.update);
+    log.info(`Preparing model: ${JSON.stringify(model)}`);
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient, privateData, instance } = this.adapter.prepare(
+      model,
+      this.pk,
+      this.tableName,
+      ...args
+    );
+    log.info(`Updating model: ${JSON.stringify(model)}`);
+    record = await this.adapter.update(
+      this.tableName,
+      id,
+      record,
+      transient,
+      privateData,
+      instance,
+      ...args
+    );
+    let c: FabricContractContext | undefined = undefined;
+    if (args.length) c = args[args.length - 1] as FabricContractContext;
+    log.info(`Reverting model: ${JSON.stringify(model)}`);
+    return this.adapter.revert<M>(
+      record,
+      this.class,
+      this.pk,
+      id,
+      c && c.get("rebuildWithTransient") ? transient : undefined
+    );
+  }
+
+  /**
+   * @description Prepares a model for update.
+   * @summary Validates the model and prepares it for update in the database.
+   * @param {M} model - The model to update.
+   * @param {...any[]} args - Additional arguments.
+   * @return The prepared model and context arguments.
+   * @throws {InternalError} If the model has no primary key value.
+   * @throws {ValidationError} If the model fails validation.
+   */
+  protected override async updatePrefix(
+    model: M,
+    ...args: any[]
+  ): Promise<[M, ...args: any[]]> {
+    const contextArgs = await CTX.args(
+      OperationKeys.UPDATE,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const pk = model[this.pk] as string;
+    if (!pk)
+      throw new InternalError(
+        `No value for the Id is defined under the property ${this.pk as string}`
+      );
+    const oldModel = await this.read(pk, ...contextArgs.args);
+    model = this.merge(oldModel, model);
+    await enforceDBDecorators(
+      this,
+      contextArgs.context,
+      model,
+      OperationKeys.UPDATE,
+      OperationKeys.ON,
+      oldModel
+    );
+
+    const errors = await Promise.resolve(
+      model.hasErrors(
+        oldModel,
+        ...Repository.relations(this.class),
+        ...(contextArgs.context.get("ignoredValidationProperties") || [])
+      )
+    );
+    if (errors) throw new ValidationError(errors.toString());
+    if (Repository.getMetadata(oldModel)) {
+      if (!Repository.getMetadata(model))
+        Repository.setMetadata(model, Repository.getMetadata(oldModel));
+    }
+    return [model, ...contextArgs.args];
+  }
+
+  /**
    * @description Creates multiple models in the state database
    * @summary Prepares, creates, and reverts multiple models using the adapter
    * @param {M[]} models - The models to create
@@ -315,38 +410,6 @@ export class FabricContractRepository<M extends Model> extends Repository<
       return this.adapter.Statement<M>(ctx).select().from(this.class);
     }
     return this.adapter.Statement<M>(ctx).select(selector).from(this.class);
-  }
-
-  /**
-   * @description Updates a single model in the state database
-   * @summary Prepares, updates, and reverts a model using the adapter
-   * @param {M} model - The model to update
-   * @param {...any[]} args - Additional arguments, including the chaincode context
-   * @return {Promise<M>} Promise resolving to the updated model
-   */
-  override async update(model: M, ...args: any[]): Promise<M> {
-    const ctx = args[args.length - 1] as Context;
-    const log = this.logFor(ctx).for(this.update);
-    log.info(`Preparing model: ${JSON.stringify(model)}`);
-    // eslint-disable-next-line prefer-const
-    let { record, id, transient } = this.adapter.prepare(
-      model,
-      this.pk,
-      this.tableName,
-      ...args
-    );
-    log.info(`Updating model: ${JSON.stringify(model)}`);
-    record = await this.adapter.update(this.tableName, id, record, ...args);
-    let c: FabricContractContext | undefined = undefined;
-    if (args.length) c = args[args.length - 1] as FabricContractContext;
-    log.info(`Reverting model: ${JSON.stringify(model)}`);
-    return this.adapter.revert<M>(
-      record,
-      this.class,
-      this.pk,
-      id,
-      c && c.get("rebuildWithTransient") ? transient : undefined
-    );
   }
 
   /**

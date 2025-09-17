@@ -9,7 +9,7 @@ import {
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
-  ConflictError,
+  BaseError,
   Context,
   DBKeys,
   InternalError,
@@ -49,9 +49,12 @@ import {
 } from "fabric-shim-api";
 import { FabricStatement } from "./erc20/Statement";
 import { FabricContractDBSequence } from "./FabricContractSequence";
-import { MissingContextError } from "../shared/errors";
+import {
+  MissingContextError,
+  UnauthorizedPrivateDataAccess,
+} from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
-import { processModel } from "./private-data";
+import { processModel, MISSING_PRIVATE_DATA_REGEX } from "./private-data";
 import {
   hasPrivateData,
   isModelPrivate,
@@ -347,7 +350,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     let model: Record<string, any>;
     const composedKey = stub.createCompositeKey(tableName, [String(id)]);
     try {
-      const results = await this.readData(stub, composedKey, instance);
+      const results = await this.readData(logger, stub, composedKey, instance);
 
       if (results.length < 1) {
         log.debug(`No record found for id ${id} in ${tableName} table`);
@@ -360,6 +363,44 @@ export class FabricContractAdapter extends CouchDBAdapter<
       } else {
         model = this.mergeResults(results);
       }
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+
+    return model;
+  }
+
+  /**
+   * @description Updates a record in the state database
+   * @summary Serializes a model and updates it in the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier
+   * @param {Record<string, any>} model - The updated record data
+   * @param {Record<string, any>} transient - Transient data (not used in this implementation)
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the updated record
+   */
+  override async update(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>,
+    transient?: Record<string, any>,
+    privateData?: Record<string, any>,
+    instance?: any,
+    ...args: any[]
+  ): Promise<Record<string, any>> {
+    const { stub, logger } = args.pop();
+    const log = logger.for(this.update);
+
+    try {
+      log.info(`updating entry to ${tableName} table with pk ${id}`);
+      await this.saveData(
+        stub,
+        id.toString(),
+        model,
+        privateData || {},
+        instance
+      );
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -437,6 +478,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   private async readData(
+    logger: Logger,
     stub: ChaincodeStub,
     id: string,
     model: Model
@@ -453,31 +495,42 @@ export class FabricContractAdapter extends CouchDBAdapter<
       const data: Record<string, any>[] = [];
 
       for (const collection of collections) {
-        let res: Buffer | Record<string, any> = await stub.getPrivateData(
-          collection,
-          id.toString()
-        );
-        if (res.toString() === "") {
-          throw new NotFoundError(`Entry with id ${id} doesn't exist...`);
-        }
-
         try {
-          res = FabricContractAdapter.serializer.deserialize(
-            res.toString(),
-            model.constructor.name
+          let res: Buffer | Record<string, any> = await stub.getPrivateData(
+            collection,
+            id.toString()
           );
-        } catch (e: unknown) {
-          throw new SerializationError(`Failed to parse private data: ${e}`);
-        }
+          if (res.toString() === "") {
+            throw new NotFoundError(`Entry with id ${id} doesn't exist...`);
+          }
 
-        data.push(res);
+          try {
+            res = FabricContractAdapter.serializer.deserialize(
+              res.toString(),
+              model.constructor.name
+            );
+          } catch (e: unknown) {
+            throw new SerializationError(`Failed to parse private data: ${e}`);
+          }
+
+          data.push(res);
+        } catch (e: unknown) {
+          if (MISSING_PRIVATE_DATA_REGEX.test((e as BaseError).message))
+            throw new UnauthorizedPrivateDataAccess(e as BaseError);
+
+          throw e;
+        }
       }
 
       return data;
     };
 
     if (isModelPrivate(model)) {
-      results = await retrievePrivateData(stub, id.toString(), privateData!);
+      try {
+        results = await retrievePrivateData(stub, id.toString(), privateData!);
+      } catch (e: unknown) {
+        console.log(e);
+      }
     } else {
       let res: Buffer | Record<string, any> = await stub.getState(
         id.toString()
@@ -498,12 +551,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
       results.push(res);
 
       if (hasPrivateData(model)) {
-        const privResults = await retrievePrivateData(
-          stub,
-          id.toString(),
-          privateData!
-        );
-        results = results.concat(privResults);
+        try {
+          const privResults = await retrievePrivateData(
+            stub,
+            id.toString(),
+            privateData!
+          );
+          results = results.concat(privResults);
+        } catch (e: unknown) {
+          if ((e as BaseError).code === 403) {
+            logger.info((e as BaseError).message);
+          } else {
+            throw e;
+          }
+        }
       }
     }
     return results;
@@ -787,51 +848,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     );
   }
 
-  /**
-   * @description Updates a record in the state database
-   * @summary Serializes a model and updates it in the Fabric state database
-   * @param {string} tableName - The name of the table/collection
-   * @param {string | number} id - The record identifier
-   * @param {Record<string, any>} model - The updated record data
-   * @param {Record<string, any>} transient - Transient data (not used in this implementation)
-   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
-   * @return {Promise<Record<string, any>>} Promise resolving to the updated record
-   */
-  override async update(
-    tableName: string,
-    id: string | number,
-    model: Record<string, any>,
-    ...args: any[]
-  ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
-    const log = logger.for(this.update);
-    let data: Buffer;
-    try {
-      data = Buffer.from(JSON.stringify(model));
-    } catch (e: unknown) {
-      throw new SerializationError(
-        `Failed to serialize record with id ${id} for table ${tableName}: ${e}`
-      );
-    }
-
-    try {
-      log.info(`Checking if entry with id ${id} exists in ${tableName} table`);
-      const res = await stub.getState(id.toString());
-      if (res.toString() === "") {
-        log.info(`Entry with id ${id} already exists in ${tableName} table`);
-        throw new ConflictError(
-          `Entry with id ${id} doesn't exist in ${tableName} table`
-        );
-      }
-      log.info(`updating entry to ${tableName} table with pk ${id}`);
-      await stub.putState(id.toString(), data);
-    } catch (e: unknown) {
-      throw this.parseError(e as Error);
-    }
-
-    return model;
-  }
-
   override async updateAll(
     tableName: string,
     id: string[] | number[],
@@ -904,18 +920,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
       return accum;
     }, m);
 
-    if (transient) {
-      log.verbose(
-        `re-adding transient properties: ${Object.keys(transient).join(", ")}`
-      );
-      Object.entries(transient).forEach(([key, val]) => {
-        if (key in result && (result as any)[key] !== undefined)
-          throw new InternalError(
-            `Transient property ${key} already exists on model ${m.constructor.name}. should be impossible`
-          );
-        result[key as keyof M] = val;
-      });
-    }
+    // if (transient) {
+    //   log.verbose(
+    //     `re-adding transient properties: ${Object.keys(transient).join(", ")}`
+    //   );
+    //   Object.entries(transient).forEach(([key, val]) => {
+    //     if (key in result && (result as any)[key] !== undefined)
+    //       throw new InternalError(
+    //         `Transient property ${key} already exists on model ${m.constructor.name}. should be impossible`
+    //       );
+    //     result[key as keyof M] = val;
+    //   });
+    // }
 
     if (metadata) {
       log.silly(
@@ -955,7 +971,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     record[CouchDBKeys.TABLE] = tableName;
     // record[CouchDBKeys.ID] = this.generateId(tableName, id);
     Object.assign(record, model);
-    return [tableName, id, record, ctx];
+    return [tableName, id, record, ...args, ctx];
   }
 
   protected override createAllPrefix(
