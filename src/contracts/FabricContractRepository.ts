@@ -18,6 +18,7 @@ import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
 import { Context } from "fabric-contract-api";
+import { Context as CTX } from "@decaf-ts/db-decorators";
 import { FabricContractSequence } from "./FabricContractSequence";
 import { ContractLogger } from "./logging";
 import { Logging } from "@decaf-ts/logging";
@@ -196,7 +197,16 @@ export class FabricContractRepository<M extends Model> extends Repository<
    * @return {Promise<any>} Promise resolving to the query results
    */
   async raw(rawInput: MangoQuery, docsOnly: boolean, ...args: any[]) {
-    return this.adapter.raw(rawInput, docsOnly, ...args);
+    const ctx = args.pop();
+    const transformedArgs = await CTX.args(
+      "QUERY" as OperationKeys.CREATE,
+      this.class,
+      [ctx],
+      this["adapter"] as any,
+      {}
+    );
+
+    return this.adapter.raw(rawInput, docsOnly, ...transformedArgs.args);
   }
 
   /**

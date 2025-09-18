@@ -427,6 +427,25 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
     expect(error).toBe(true);
   });
+
+  it("Should raw", async () => {
+    const mango = {
+      selector: {
+        id: 1,
+      },
+    };
+
+    try {
+      const args = [JSON.stringify(mango), String(true)];
+      let record = queryChaincode(contractName, "raw", args) as any;
+      expect(record).toBeDefined();
+
+      record = JSON.parse(record.toString());
+      console.log("Raw response: ", record);
+    } catch (error: any) {
+      expect(error).toBeUndefined();
+    }
+  });
 });
 
 // it("Should createAll models", async () => {
