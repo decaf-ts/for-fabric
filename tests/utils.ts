@@ -102,3 +102,25 @@ export function compileContract(contractFolder: string): void {
     )
   );
 }
+
+export function packageContract(
+  dockerName: string,
+  contractFolder: string,
+  contractName: string
+): void {
+  execSync(`docker exec ${dockerName} node ./weaver/lib/core/cli.cjs package-chaincode -d \
+    --chaincode-path ./weaver/chaincode/${contractFolder} \
+    --lang node \
+    --chaincode-output /weaver/peer/${contractName}.tar.gz \
+    --chaincode-name ${contractName} \
+    --chaincode-version 1.0 -s
+    `);
+}
+
+export function deployContract(contractFolder: string, contractName: string) {
+  const peers = ["org-a-peer-0", "org-b-peer-0", "org-c-peer-0"];
+
+  for (const peer of peers) {
+    packageContract(peer, contractFolder, contractName);
+  }
+}
