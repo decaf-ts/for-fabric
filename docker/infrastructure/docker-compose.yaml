@@ -1046,7 +1046,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - org-a-peer-0-vol:/weaver/peer:rw
-      - ./chaincode:/weaver/chaincode/basic:rw
+      - ./chaincode:/weaver/chaincode:rw
     networks:
       test_network:
     healthcheck:
@@ -1099,7 +1099,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - org-b-peer-0-vol:/weaver/peer:rw
-      - ./chaincode:/weaver/chaincode/basic:rw
+      - ./chaincode:/weaver/chaincode:rw
     networks:
       test_network:
     healthcheck:
@@ -1152,7 +1152,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - org-c-peer-0-vol:/weaver/peer:rw
-      - ./chaincode:/weaver/chaincode/basic:rw
+      - ./chaincode:/weaver/chaincode:rw
     networks:
       test_network:
     healthcheck:
