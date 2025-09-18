@@ -72,9 +72,15 @@ export async function ensureInfrastructureBooted(
 }
 
 export function compileContract(contractFolder: string): void {
+  // create folder
+  fs.mkdirSync(
+    path.join(__dirname, "../docker/infrastructure/chaincode", contractFolder),
+    { recursive: true }
+  );
+
   // Compile/Transpile the contract to JavaScript
   execSync(
-    `npx weaver compile-contract -d --contract-file ./tests/assets/contract/${contractFolder}/index.ts --output-dir ./docker/infrastructure/chaincode/${contractFolder}`
+    `npx weaver compile-contract -d --contract-file ${path.join(__dirname, "./assets/contract", contractFolder, "index.ts")} --output-dir ${path.join(__dirname, "../docker/infrastructure/chaincode/", contractFolder)}`
   );
 
   // Copy necessary files to the chaincode directory

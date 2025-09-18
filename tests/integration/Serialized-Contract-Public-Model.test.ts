@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { ensureInfrastructureBooted } from "../utils";
+import { compileContract, ensureInfrastructureBooted } from "../utils";
 // import { TestModel } from "../assets/contract/serialized-contract/TestModel";
 // import { createCompositeKey, randomName, randomNif } from "../utils";
 
@@ -12,6 +12,9 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
     //Ensure Infrastructure is ready
     await ensureInfrastructureBooted();
+
+    // Compile contract
+    compileContract("serialized-contract-public-model");
   });
 
   it("Should create a new model", async () => {
