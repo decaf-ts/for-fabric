@@ -18,7 +18,7 @@
       "request": "attach",
       "name": "Attach to Remote",
       "address": "${input:remoteAddr}",
-      "localRoot": "${workspaceFolder}/docker/infrastructure/chaincode", // your local source code path
+      "localRoot": "${workspaceFolder}/docker/infrastructure/chaincode/${input:contractName}", // your local source code path
       "remoteRoot": "/usr/local/src"
     },
     {
@@ -138,6 +138,12 @@
       "type": "promptString",
       "description": "Enter the remote address",
       "default": "172.18.0.13"
+    },
+    {
+      "id": "contractName",
+      "type": "promptString",
+      "description": "Enter contract folder name",
+      "default": "serialized-contract-public-model"
     }
   ]
 }
