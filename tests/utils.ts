@@ -117,10 +117,36 @@ export function packageContract(
     `);
 }
 
+export function installContract(dockerName: string, contractName: string) {
+  execSync(`docker exec ${dockerName} node./weaver/lib/core/cli.cjs install-chaincode -d -s \
+    --chaincode-path ./weaver/peer/${contractName}.tar.gz`);
+}
+
+export function approveContract(
+  dockerName: string,
+  contractName: string,
+  tlsCertName: string
+) {
+  execSync(`docker exec ${dockerName} node./weaver/lib/core/cli.cjs approve-chaincode -d -s \
+    --orderer-address org-a-orderer-0:7021 \
+    --channel-id simple-channel \
+    --chaincode-name ${contractName} \
+    --chaincode-version 1.0 \
+    --sequence 1 \
+    --enable-tls \
+    --tls-ca-cert-file /weaver/peer/${tlsCertName}`);
+}
+
 export function deployContract(contractFolder: string, contractName: string) {
   const peers = ["org-a-peer-0", "org-b-peer-0", "org-c-peer-0"];
 
   for (const peer of peers) {
     packageContract(peer, contractFolder, contractName);
+    installContract(peer, contractName);
+    approveContract(
+      peer,
+      contractName,
+      peer === "org-a-peer-0" ? "tls-ca-cert.pem" : "orderer-tls-ca-cert.pem"
+    );
   }
 }
