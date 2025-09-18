@@ -268,28 +268,28 @@ export class FabricContractRepository<M extends Model> extends Repository<
       throw new InternalError(
         `No value for the Id is defined under the property ${this.pk as string}`
       );
-    const oldModel = await this.read(pk, ...contextArgs.args);
-    model = this.merge(oldModel, model);
+    // const oldModel = await this.read(pk, ...contextArgs.args);
+    model = this.merge(model, model);
     await enforceDBDecorators(
       this,
       contextArgs.context,
       model,
       OperationKeys.UPDATE,
       OperationKeys.ON,
-      oldModel
+      model
     );
 
     const errors = await Promise.resolve(
       model.hasErrors(
-        oldModel,
+        model,
         ...Repository.relations(this.class),
         ...(contextArgs.context.get("ignoredValidationProperties") || [])
       )
     );
     if (errors) throw new ValidationError(errors.toString());
-    if (Repository.getMetadata(oldModel)) {
+    if (Repository.getMetadata(model)) {
       if (!Repository.getMetadata(model))
-        Repository.setMetadata(model, Repository.getMetadata(oldModel));
+        Repository.setMetadata(model, Repository.getMetadata(model));
     }
     return [model, ...contextArgs.args];
   }

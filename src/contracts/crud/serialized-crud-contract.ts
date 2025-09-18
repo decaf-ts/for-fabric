@@ -48,7 +48,10 @@ export class SerializedCrudContract<
     const m = this.deserialize<M>(model);
 
     const result = await super.update(ctx, m);
-    return this.serialize(result as M);
+    const serializedResult = this.serialize(result as M);
+
+    log.info(`${serializedResult} was updated successfully`);
+    return serializedResult;
   }
 
   @Transaction()

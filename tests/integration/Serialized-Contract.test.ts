@@ -485,12 +485,18 @@ describe("Test Serialized Crud Contract", () => {
     expect(record.nif).toBe(model.nif);
     expect(record.email).toBe(transientData?.transient?.email);
 
-    model.name = randomName(6);
-    model.nif = randomNif(9);
-    model.id = id;
-    model.email = "newEmail@example.com";
+    const newModel = new TestModel(record);
 
-    const transientData1 = modelToTransient(model);
+    expect(newModel.name).toBe(model.name);
+    expect(newModel.nif).toBe(model.nif);
+    expect(newModel.email).toBe(transientData?.transient?.email);
+
+    newModel.name = randomName(6);
+    newModel.nif = randomNif(9);
+    newModel.id = id;
+    newModel.email = `${randomName(10)}@example.com`;
+
+    const transientData1 = modelToTransient(newModel);
     const encoded1 = Buffer.from(
       Model.build(
         transientData1.transient,
@@ -527,8 +533,8 @@ describe("Test Serialized Crud Contract", () => {
 
     expect(record).toBeDefined();
 
-    expect(record.name).toBe(model.name);
-    expect(record.nif).toBe(model.nif);
+    expect(record.name).toBe(newModel.name);
+    expect(record.nif).toBe(newModel.nif);
     expect(record.email).toBe(transientData1?.transient?.email);
     expect(record.id).toBe(id);
   });
