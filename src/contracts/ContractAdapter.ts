@@ -735,7 +735,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
         `re-adding transient properties: ${Object.keys(transient).join(", ")}`
       );
       Object.entries(transient).forEach(([key, val]) => {
-        if (key in result)
+        if (key in result && (result as any)[key] !== undefined)
           throw new InternalError(
             `Transient property ${key} already exists on model ${m.constructor.name}. should be impossible`
           );
