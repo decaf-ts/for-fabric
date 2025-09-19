@@ -15,6 +15,7 @@ import {
   trim,
 } from "../utils";
 import { TestModel } from "../assets/contract/serialized-contract-public-model/TestModel";
+import { Model } from "@decaf-ts/decorator-validation";
 // import { createCompositeKey, randomName, randomNif } from "../utils";
 
 jest.setTimeout(5000000);
@@ -143,10 +144,60 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
       record = JSON.parse(record.toString());
 
-      console.log("Retrieved model: ", Object.keys(record).join(", "));
-
       expect(record["tst_name"]).toBe(model.name);
       expect(record["tst_nif"]).toBe(model.nif);
+      expect(record.id).toBe(id);
+    } catch (error: any) {
+      expect(error).toBeUndefined();
+    }
+  });
+
+  it("Should create model with transient data", async () => {
+    // Ensure contract is initialized
+    const ready = await ensureContractReadiness(contractName);
+    expect(trim(ready)).toBe("true");
+
+    const data = getData();
+
+    const model = new TestModel({ name: data.name });
+    console.log("Using model: ", model.serialize());
+
+    const encoded = Buffer.from(
+      Model.build({ nif: data.nif }, model.constructor.name).serialize()
+    ).toString("base64");
+
+    const transient = {
+      [modelTableName]: encoded,
+    };
+
+    try {
+      invokeChaincode(contractName, "create", [model.serialize()], transient);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+    let id = undefined;
+
+    try {
+      id = getCurrentId();
+    } catch (error: any) {
+      expect(error).toBeUndefined();
+    }
+
+    expect(id).toBeDefined();
+
+    try {
+      const args = [createCompositeKey(modelTableName, [String(id)]), "none"];
+      let record = queryChaincode(contractName, "readByPass", args) as any;
+      expect(record).toBeDefined();
+
+      record = JSON.parse(record.toString());
+
+      expect(record["tst_name"]).toBe(data.name);
+      expect(record["tst_nif"]).toBe(data.nif);
       expect(record.id).toBe(id);
     } catch (error: any) {
       expect(error).toBeUndefined();
@@ -314,6 +365,105 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     }
   });
 
+  it("Should update model with transient data", async () => {
+    // Ensure contract is initialized
+    const ready = await ensureContractReadiness(contractName);
+    expect(trim(ready)).toBe("true");
+
+    const data = getData();
+
+    const model = new TestModel({ name: data.name });
+    console.log("Using model: ", model.serialize());
+
+    const encoded = Buffer.from(
+      Model.build({ nif: data.nif }, model.constructor.name).serialize()
+    ).toString("base64");
+
+    const transient = {
+      [modelTableName]: encoded,
+    };
+
+    try {
+      invokeChaincode(contractName, "create", [model.serialize()], transient);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+    let id = undefined;
+
+    try {
+      id = getCurrentId();
+    } catch (error: any) {
+      expect(error).toBeUndefined();
+    }
+
+    expect(id).toBeDefined();
+
+    try {
+      const args = [String(id)];
+      let record = queryChaincode(contractName, "read", args) as any;
+      expect(record).toBeDefined();
+
+      record = JSON.parse(record.toString());
+
+      expect(record.name).toBe(data.name);
+      expect(record.nif).toBe(data.nif);
+      expect(record.id).toBe(id);
+    } catch (error: any) {
+      expect(error).toBeUndefined();
+    }
+
+    const data1 = getData();
+
+    const newModel = new TestModel({ name: data1.name });
+    console.log("Using model: ", newModel.serialize());
+
+    const encoded1 = Buffer.from(
+      Model.build({ nif: data1.nif }, newModel.constructor.name).serialize()
+    ).toString("base64");
+
+    const transient1 = {
+      [modelTableName]: encoded1,
+    };
+
+    newModel.id = id;
+
+    console.log("Using model: ", newModel.serialize());
+
+    try {
+      invokeChaincode(
+        contractName,
+        "update",
+        [newModel.serialize()],
+        transient1
+      );
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+    try {
+      const args = [String(id)];
+      let record = queryChaincode(contractName, "read", args) as any;
+      expect(record).toBeDefined();
+
+      record = JSON.parse(record.toString());
+
+      expect(record.name).toBe(data1.name);
+      expect(record.nif).toBe(data1.nif);
+      expect(record.name).not.toBe(model.name);
+      expect(record.nif).not.toBe(model.nif);
+      expect(record.id).toBe(id);
+    } catch (error: any) {
+      expect(error).toBeUndefined();
+    }
+  });
+
   it("Should fail to update model with non-existing id", async () => {
     // Ensure contract is initialized
     const ready = await ensureContractReadiness(contractName);
@@ -429,9 +579,35 @@ describe("Test Serialized Crud Contract With Public Model", () => {
   });
 
   it("Should raw", async () => {
+    // Ensure contract is initialized
+    const ready = await ensureContractReadiness(contractName);
+    expect(trim(ready)).toBe("true");
+
+    const model = new TestModel(getData());
+    console.log("Using model: ", model.serialize());
+
+    try {
+      invokeChaincode(contractName, "create", [model.serialize()]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
+
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+    let id = undefined;
+
+    try {
+      id = getCurrentId();
+    } catch (error: any) {
+      expect(error).toBeUndefined();
+    }
+
+    expect(id).toBeDefined();
+
     const mango = {
       selector: {
-        id: 1,
+        id: id,
       },
     };
 
@@ -442,6 +618,16 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
       record = JSON.parse(record.toString());
       console.log("Raw response: ", record);
+
+      const key = createCompositeKey(modelTableName, [String(id)]);
+
+      const result = record[0];
+      const resultModel = result.Record;
+
+      expect(result).toBeDefined();
+      expect(result.Key).toBe(key);
+      expect(resultModel["tst_name"]).toEqual(model.name);
+      expect(resultModel["tst_nif"]).toEqual(model.nif);
     } catch (error: any) {
       expect(error).toBeUndefined();
     }
