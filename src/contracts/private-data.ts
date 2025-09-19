@@ -95,17 +95,18 @@ export function modelToPrivate<M extends Model>(
   const modelCollections: Record<string, any> =
     getClassPrivateDataMetadata(model);
 
-  const result = Object.entries(decs).reduce(
-    (
-      accum: { model: Record<string, any>; private?: Record<string, any> },
-      [k, val]
-    ) => {
-      const privateData = val.find((el) => el.key === "");
+  let result: { model: Record<string, any>; private?: Record<string, any> } = {
+    model: model as Record<string, any>,
+    private: undefined,
+  };
 
-      if (privateData || isPrivate) {
-        const collections = isPrivate
-          ? modelCollections.collections
-          : privateData.props.collections;
+  if (isPrivate) {
+    result = Object.keys(model).reduce(
+      (
+        accum: { model: Record<string, any>; private?: Record<string, any> },
+        k
+      ) => {
+        const collections = modelCollections.collections;
         accum.private = accum.private || {};
 
         for (const collection of collections) {
@@ -118,18 +119,50 @@ export function modelToPrivate<M extends Model>(
             );
           }
         }
-      } else {
-        accum.model = accum.model || {};
-        accum.model[k] = (model as Record<string, any>)[k];
-      }
-      return accum;
-    },
-    {} as { model: Record<string, any>; private?: Record<string, any> }
-  );
 
-  if (result.model !== undefined)
-    result.model = Model.build(result.model, model.constructor.name);
-  else result.model = {};
+        return accum;
+      },
+      { model: {} } as {
+        model: Record<string, any>;
+        private?: Record<string, any>;
+      }
+    );
+  } else {
+    result = Object.entries(decs).reduce(
+      (
+        accum: { model: Record<string, any>; private?: Record<string, any> },
+        [k, val]
+      ) => {
+        const privateData = val.find((el) => el.key === "");
+
+        if (privateData) {
+          const collections = privateData.props.collections;
+
+          accum.private = accum.private || {};
+
+          for (const collection of collections) {
+            try {
+              accum.private[collection] = accum.private[collection] || {};
+              accum.private[collection][k] = model[k as keyof M];
+            } catch (e: unknown) {
+              throw new SerializationError(
+                `Failed to serialize private property ${k}: ${e}`
+              );
+            }
+          }
+        } else {
+          accum.model = accum.model || {};
+          accum.model[k] = (model as Record<string, any>)[k];
+        }
+        return accum;
+      },
+      {} as { model: Record<string, any>; private?: Record<string, any> }
+    );
+  }
+
+  result.model = result.model || {};
+
+  result.model = Model.build(result.model, model.constructor.name);
 
   if (result.private) {
     const collections = Object.keys(result.private);

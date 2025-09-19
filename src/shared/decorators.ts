@@ -55,7 +55,7 @@ export function privateData(collection?: string) {
 
   const key: string = getFabricModelKey(FabricModelKeys.PRIVATE);
 
-  return function privateData(model: any, attribute?: string) {
+  return function privateData(model: any, attribute?: any) {
     const propertyKey = attribute || undefined;
 
     const meta = Reflect.getMetadata(

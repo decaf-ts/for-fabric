@@ -1,4 +1,4 @@
-import { model, Model, ModelArg } from "@decaf-ts/decorator-validation";
+import { model, Model, ModelArg, prop } from "@decaf-ts/decorator-validation";
 import { getFabricModelKey, privateData } from "../../src/shared/decorators";
 import { FabricModelKeys } from "../../src/shared/constants";
 import {
@@ -12,7 +12,7 @@ jest.setTimeout(5000000);
 
 const ORGA = "OrganizationA";
 const ORGB = "OrganizationB";
-const ORGExample = "_implicit_org_Org1MSP";
+// const ORGExample = "_implicit_org_Org1MSP";
 
 describe("@privateData() decorator", () => {
   it("tests private data decorator on property", () => {
@@ -509,5 +509,72 @@ describe("isModelPrivate", () => {
     console.log(metadata);
 
     expect(metadata).toBe(false);
+  });
+});
+
+describe("modelToPrivate", () => {
+  it("Tests modelToPrivate on decorated property", () => {
+    @model()
+    class TestPrivateData extends Model {
+      @privateData(ORGA)
+      @privateData(ORGB)
+      name!: string;
+      constructor(arg?: ModelArg<TestPrivateData>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "Jane Doe" });
+
+    const result = modelToPrivate(instance);
+    expect(result.model).toBeInstanceOf(TestPrivateData);
+    expect(result.private).toBeDefined();
+    expect(Object.keys(result.private!).length).toBe(2);
+    expect(Object.keys(result.private!)).toContain(ORGA);
+    expect(Object.keys(result.private!)).toContain(ORGB);
+    expect(result.private![ORGA]!.name).toBe("Jane Doe");
+    expect(result.private![ORGB]!.name).toBe("Jane Doe");
+  });
+
+  it("Tests modelToPrivate on decorated class", () => {
+    @model()
+    @privateData(ORGA)
+    @privateData(ORGB)
+    class TestPrivateData extends Model {
+      @prop()
+      name!: string;
+      constructor(arg?: ModelArg<TestPrivateData>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "Jane Doe" });
+
+    const result = modelToPrivate(instance);
+    expect(result.model).toBeInstanceOf(TestPrivateData);
+    expect(result.private).toBeDefined();
+    expect(Object.keys(result.private!).length).toBe(2);
+    expect(Object.keys(result.private!)).toContain(ORGA);
+    expect(Object.keys(result.private!)).toContain(ORGB);
+    expect(result.private![ORGA]!.name).toBe("Jane Doe");
+    expect(result.private![ORGB]!.name).toBe("Jane Doe");
+  });
+
+  it("Tests modelToPrivate on non-decorated property or class", () => {
+    @model()
+    class TestPrivateData extends Model {
+      @prop()
+      name!: string;
+      constructor(arg?: ModelArg<TestPrivateData>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "Jane Doe" });
+
+    const result = modelToPrivate(instance);
+    expect(result.model).toBeInstanceOf(TestPrivateData);
+    expect(result.private).toBeUndefined();
+    expect(result.model.name).toEqual(instance.name);
   });
 });
