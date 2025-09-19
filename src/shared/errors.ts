@@ -1,5 +1,6 @@
-import { InternalError } from "@decaf-ts/db-decorators";
+import { BaseError, InternalError } from "@decaf-ts/db-decorators";
 import { AuthorizationError } from "@decaf-ts/core";
+import { MISSING_PRIVATE_DATA_ERROR_MESSAGE } from "../contracts/private-data";
 /**
  * @summary Represents an overflow error in arithmetic operations in Smart Contracts
  *
@@ -75,5 +76,11 @@ export class RegistrationError extends AuthorizationError {
 export class MissingContextError extends InternalError {
   constructor(msg: string | Error) {
     super(msg, MissingContextError.name, 500);
+  }
+}
+
+export class UnauthorizedPrivateDataAccess extends BaseError {
+  constructor(msg: string | Error = MISSING_PRIVATE_DATA_ERROR_MESSAGE) {
+    super(MissingContextError.name, msg, 403);
   }
 }
