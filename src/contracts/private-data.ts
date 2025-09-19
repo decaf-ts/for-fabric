@@ -126,7 +126,10 @@ export function modelToPrivate<M extends Model>(
     },
     {} as { model: Record<string, any>; private?: Record<string, any> }
   );
-  result.model = Model.build(result.model, model.constructor.name);
+
+  if (result.model !== undefined)
+    result.model = Model.build(result.model, model.constructor.name);
+  else result.model = {};
 
   if (result.private) {
     const collections = Object.keys(result.private);

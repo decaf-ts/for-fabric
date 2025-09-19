@@ -1,9 +1,11 @@
-import { Model, ModelArg } from "@decaf-ts/decorator-validation";
+import { model, Model, ModelArg } from "@decaf-ts/decorator-validation";
 import { getFabricModelKey, privateData } from "../../src/shared/decorators";
 import { FabricModelKeys } from "../../src/shared/constants";
 import {
   getClassPrivateDataMetadata,
   hasPrivateData,
+  isModelPrivate,
+  modelToPrivate,
 } from "../../src/contracts/private-data";
 
 jest.setTimeout(5000000);
@@ -405,7 +407,7 @@ describe("getClassPrivateDataMetadata", () => {
 });
 
 describe("hasPrivateData", () => {
-  it("Tests hasPrivateData on decorated property", () => {
+  it("Tests hasPrivateData on decorated class", () => {
     @privateData(ORGA)
     class TestPrivateData extends Model {
       name!: string;
@@ -422,7 +424,7 @@ describe("hasPrivateData", () => {
 
     expect(metadata).toBe(true);
   });
-  it("Tests hasPrivateData on decorated class", () => {
+  it("Tests hasPrivateData on decorated property", () => {
     class TestPrivateData extends Model {
       @privateData(ORGA)
       name!: string;
@@ -450,6 +452,59 @@ describe("hasPrivateData", () => {
     const instance = new TestPrivateData({ name: "John Doe" });
 
     const metadata = hasPrivateData(instance);
+
+    console.log(metadata);
+
+    expect(metadata).toBe(false);
+  });
+});
+
+describe("isModelPrivate", () => {
+  it("Tests isModelPrivate on decorated property", () => {
+    class TestPrivateData extends Model {
+      @privateData(ORGA)
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "John Doe" });
+
+    const metadata = isModelPrivate(instance);
+
+    console.log(metadata);
+
+    expect(metadata).toBe(false);
+  });
+  it("Tests isModelPrivate on decorated class", () => {
+    @privateData(ORGA)
+    class TestPrivateData extends Model {
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "John Doe" });
+
+    const metadata = isModelPrivate(instance);
+
+    console.log(metadata);
+
+    expect(metadata).toBe(true);
+  });
+  it("Tests isModelPrivate on non-decorated property or class", () => {
+    class TestPrivateData extends Model {
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "John Doe" });
+
+    const metadata = isModelPrivate(instance);
 
     console.log(metadata);
 
