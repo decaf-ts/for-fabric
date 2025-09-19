@@ -1,7 +1,10 @@
 import { Model, ModelArg } from "@decaf-ts/decorator-validation";
 import { getFabricModelKey, privateData } from "../../src/shared/decorators";
 import { FabricModelKeys } from "../../src/shared/constants";
-import { getClassPrivateDataMetadata } from "../../src/contracts/private-data";
+import {
+  getClassPrivateDataMetadata,
+  hasPrivateData,
+} from "../../src/contracts/private-data";
 
 jest.setTimeout(5000000);
 
@@ -262,7 +265,7 @@ describe("@privateData() decorator", () => {
   });
 });
 
-describe("get ClassPrivateDataMetadata", () => {
+describe("getClassPrivateDataMetadata", () => {
   it("Tests getClassPrivateDataMetadata on decorated property", () => {
     class TestPrivateData extends Model {
       @privateData(ORGA)
@@ -398,5 +401,58 @@ describe("get ClassPrivateDataMetadata", () => {
     expect(metadata.collections.length).toEqual(2);
     expect(metadata.collections).toContain(ORGA);
     expect(metadata.collections).toContain(ORGB);
+  });
+});
+
+describe("hasPrivateData", () => {
+  it("Tests hasPrivateData on decorated property", () => {
+    @privateData(ORGA)
+    class TestPrivateData extends Model {
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "John Doe" });
+
+    const metadata = hasPrivateData(instance);
+
+    console.log(metadata);
+
+    expect(metadata).toBe(true);
+  });
+  it("Tests hasPrivateData on decorated class", () => {
+    class TestPrivateData extends Model {
+      @privateData(ORGA)
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "John Doe" });
+
+    const metadata = hasPrivateData(instance);
+
+    console.log(metadata);
+
+    expect(metadata).toBe(true);
+  });
+  it("Tests hasPrivateData on non-decorated property or class", () => {
+    class TestPrivateData extends Model {
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "John Doe" });
+
+    const metadata = hasPrivateData(instance);
+
+    console.log(metadata);
+
+    expect(metadata).toBe(false);
   });
 });
