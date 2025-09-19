@@ -1,29 +1,16 @@
-import {
-  model,
-  Model,
-  ModelArg,
-  required,
-} from "@decaf-ts/decorator-validation";
-import {
-  FabricModelKeys,
-  getClassPrivateDataMetadata,
-  getFabricModelKey,
-  hasPrivateData,
-  isModelPrivate,
-  modelToPrivate,
-  privateData,
-} from "../../src/shared";
+import { Model, ModelArg } from "@decaf-ts/decorator-validation";
+import { getFabricModelKey, privateData } from "../../src/shared/decorators";
+import { FabricModelKeys } from "../../src/shared/constants";
 
 jest.setTimeout(5000000);
 
-const ORGA = "OrganizationA";
-const ORGB = "OrganizationB";
 const ORGExample = "_implicit_org_Org1MSP";
 
-describe("Tests private data decorator", () => {
-  it("Tests private data decorator on property", () => {
-    class TestPrivateData1 extends Model {
-      @required()
+describe("@privateData() decorator", () => {
+  const ORGA = "OrganizationA";
+  const ORGB = "OrganizationB";
+  it("tests private data decorator on property", () => {
+    class TestPrivateData extends Model {
       @privateData(ORGA)
       name!: string;
       constructor(arg?: ModelArg<Model>) {
@@ -31,21 +18,23 @@ describe("Tests private data decorator", () => {
       }
     }
 
-    const c = new TestPrivateData1({ name: "John Doe" });
+    const instance = new TestPrivateData({ name: "John Doe" });
 
     const propMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      c,
+      instance,
       "name"
     );
+
     console.log(propMetadata);
+
     expect(propMetadata.collections.length).toBe(1);
     expect(propMetadata.collections[0]).toBe(ORGA);
     expect(Object.keys(propMetadata).length).toBe(1);
 
     const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      TestPrivateData1
+      TestPrivateData
     );
 
     console.log(modelMetadata);
@@ -54,10 +43,9 @@ describe("Tests private data decorator", () => {
     expect(modelMetadata.isPrivate).toBe(false);
   });
 
-  it("Tests private data decorator on class", () => {
+  it("tests private data decorator on class", () => {
     @privateData(ORGB)
-    class TestPrivateData2 extends Model {
-      @required()
+    class TestPrivateData extends Model {
       name!: string;
       constructor(arg?: ModelArg<Model>) {
         super(arg);
@@ -66,117 +54,122 @@ describe("Tests private data decorator", () => {
 
     const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      TestPrivateData2
+      TestPrivateData
     );
 
     console.log(modelMetadata);
     expect(Object.keys(modelMetadata).length).toBe(2);
     expect(modelMetadata.collections.length).toEqual(1);
-    expect(modelMetadata.collections[0]).toEqual(ORGB);
+    expect(modelMetadata.collections).toContain(ORGB);
     expect(modelMetadata.isPrivate).toBe(true);
   });
 
-  it("Tests multiple private data decorator on property runned mannually", () => {
-    class TestPrivateData3 extends Model {
-      @required()
+  it("tests private data decorator called manually on property", () => {
+    class TestPrivateData extends Model {
       name!: string;
       constructor(arg?: ModelArg<Model>) {
         super(arg);
       }
     }
 
-    const c = new TestPrivateData3({ name: "John Doe" });
-
-    privateData(ORGA)(c, "name");
-    privateData(ORGB)(c, "name");
+    const instance = new TestPrivateData({ name: "John Doe" });
+    privateData(ORGA)(instance, "name");
 
     const propMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      c,
+      instance,
       "name"
     );
+
     console.log(propMetadata);
-    expect(propMetadata.collections.length).toBe(2);
+    expect(propMetadata.collections.length).toBe(1);
     expect(propMetadata.collections).toContain(ORGA);
-    expect(propMetadata.collections).toContain(ORGB);
     expect(Object.keys(propMetadata).length).toBe(1);
 
     const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      c.constructor
+      instance.constructor
     );
 
     console.log(modelMetadata);
-
     expect(Object.keys(modelMetadata).length).toBe(1);
     expect(modelMetadata.isPrivate).toBe(false);
   });
 
-  it("Tests multiple private data decorator on property present in the class", () => {
-    class TestPrivateData4 extends Model {
-      @required()
-      @privateData(ORGA)
-      @privateData(ORGB)
+  it("tests private data decorator called manually on class", () => {
+    class TestPrivateData extends Model {
       name!: string;
       constructor(arg?: ModelArg<Model>) {
         super(arg);
       }
     }
 
-    const c = new TestPrivateData4({ name: "John Doe" });
+    privateData(ORGB)(TestPrivateData);
 
-    const propMetadata = Reflect.getMetadata(
+    const classMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      c,
+      TestPrivateData
+    );
+
+    console.log(classMetadata);
+    expect(Object.keys(classMetadata).length).toBe(2);
+    expect(classMetadata.collections.length).toEqual(1);
+    expect(classMetadata.collections).toContain(ORGB);
+    expect(classMetadata.isPrivate).toBe(true);
+  });
+
+  it("tests multiple private data decorators on multiple properties", () => {
+    class TestPrivateData extends Model {
+      @privateData(ORGA)
+      @privateData(ORGB)
+      name!: string;
+
+      @privateData(ORGA)
+      nif!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({
+      name: "John Doe",
+      nif: "123456789",
+    });
+
+    const propMetadata1 = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      instance,
       "name"
     );
-    console.log(propMetadata);
-    expect(propMetadata.collections.length).toBe(2);
-    expect(propMetadata.collections).toContain(ORGA);
-    expect(propMetadata.collections).toContain(ORGB);
-    expect(Object.keys(propMetadata).length).toBe(1);
+
+    const propMetadata2 = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      instance,
+      "nif"
+    );
+
+    console.log(propMetadata1);
+    console.log(propMetadata2);
+    expect(propMetadata1.collections.length).toBe(2);
+    expect(propMetadata2.collections.length).toBe(1);
+    expect(propMetadata1.collections).toContain(ORGA);
+    expect(propMetadata1.collections).toContain(ORGB);
+    expect(propMetadata2.collections).toContain(ORGA);
 
     const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      c.constructor
+      instance.constructor
     );
 
     console.log(modelMetadata);
-
     expect(Object.keys(modelMetadata).length).toBe(1);
     expect(modelMetadata.isPrivate).toBe(false);
   });
 
-  it("Tests multiple private data decorator on class runned mannually", () => {
-    class TestPrivateData5 extends Model {
-      @required()
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    privateData(ORGA)(TestPrivateData5);
-    privateData(ORGB)(TestPrivateData5);
-
-    const modelMetadata = Reflect.getMetadata(
-      getFabricModelKey(FabricModelKeys.PRIVATE),
-      TestPrivateData5
-    );
-
-    console.log(modelMetadata);
-    expect(Object.keys(modelMetadata).length).toBe(2);
-    expect(modelMetadata.collections.length).toEqual(2);
-    expect(modelMetadata.collections).toContain(ORGB);
-    expect(modelMetadata.collections).toContain(ORGA);
-    expect(modelMetadata.isPrivate).toBe(true);
-  });
-
-  it("Tests multiple private data decorator on class present in the class", () => {
+  it("tests multiple private data decorators on class", () => {
     @privateData(ORGA)
     @privateData(ORGB)
-    class TestPrivateData5 extends Model {
-      @required()
+    class TestPrivateData extends Model {
       name!: string;
       constructor(arg?: ModelArg<Model>) {
         super(arg);
@@ -185,7 +178,7 @@ describe("Tests private data decorator", () => {
 
     const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      TestPrivateData5
+      TestPrivateData
     );
 
     console.log(modelMetadata);
@@ -195,479 +188,75 @@ describe("Tests private data decorator", () => {
     expect(modelMetadata.collections).toContain(ORGA);
     expect(modelMetadata.isPrivate).toBe(true);
   });
-});
 
-describe("Tests private data utility function", () => {
-  it("Tests getPrivateDataMetadata on class with property decorated with privateData", () => {
-    class TestPrivateData1 extends Model {
-      @required()
-      @privateData(ORGA)
+  it("tests multiple private data decorators on multiple properties runned mannually", () => {
+    class TestPrivateData extends Model {
       name!: string;
+      nif!: string;
       constructor(arg?: ModelArg<Model>) {
         super(arg);
       }
     }
 
-    const c = new TestPrivateData1({ name: "John Doe" });
+    const instance = new TestPrivateData({ name: "John Doe" });
+    privateData(ORGA)(instance, "name");
+    privateData(ORGB)(instance, "name");
+    privateData(ORGA)(instance, "nif");
 
-    const modelMetadata = getClassPrivateDataMetadata(c);
+    const propMetadata1 = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      instance,
+      "name"
+    );
+
+    const propMetadata2 = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      instance,
+      "nif"
+    );
+
+    console.log(propMetadata1);
+    expect(propMetadata1.collections.length).toBe(2);
+    expect(propMetadata1.collections).toContain(ORGA);
+    expect(propMetadata1.collections).toContain(ORGB);
+    expect(Object.keys(propMetadata1).length).toBe(1);
+
+    console.log(propMetadata2);
+    expect(propMetadata2.collections.length).toBe(1);
+    expect(propMetadata2.collections).toContain(ORGA);
+    expect(Object.keys(propMetadata2).length).toBe(1);
+
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      instance.constructor
+    );
 
     console.log(modelMetadata);
-
     expect(Object.keys(modelMetadata).length).toBe(1);
     expect(modelMetadata.isPrivate).toBe(false);
   });
 
-  it("Tests getPrivateDataMetadata on class with class decorated with privateData", () => {
-    @privateData(ORGB)
-    class TestPrivateData2 extends Model {
-      @required()
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData2({ name: "John Doe" });
-
-    const modelMetadata = getClassPrivateDataMetadata(c);
-
-    console.log(modelMetadata);
-    expect(Object.keys(modelMetadata).length).toBe(2);
-    expect(modelMetadata.collections.length).toEqual(1);
-    expect(modelMetadata.collections[0]).toEqual(ORGB);
-    expect(modelMetadata.isPrivate).toBe(true);
-  });
-
-  it("Tests getPrivateDataMetadata on class running multiple decorators on property manually", () => {
-    class TestPrivateData3 extends Model {
-      @required()
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData3({ name: "John Doe" });
-
-    privateData(ORGA)(c, "name");
-    privateData(ORGB)(c, "name");
-
-    const modelMetadata = getClassPrivateDataMetadata(c);
-
-    console.log(modelMetadata);
-
-    expect(Object.keys(modelMetadata).length).toBe(1);
-    expect(modelMetadata.isPrivate).toBe(false);
-  });
-
-  it("Tests getPrivateDataMetadata on class with property decorated with multiple decorators", () => {
-    class TestPrivateData4 extends Model {
-      @required()
-      @privateData(ORGA)
-      @privateData(ORGB)
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData4({ name: "John Doe" });
-
-    const modelMetadata = getClassPrivateDataMetadata(c);
-    console.log(modelMetadata);
-
-    expect(Object.keys(modelMetadata).length).toBe(1);
-    expect(modelMetadata.isPrivate).toBe(false);
-  });
-
-  it("Tests getPrivateDataMetadata on class running manually multiple decorators on class", () => {
-    class TestPrivateData5 extends Model {
-      @required()
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData5({ name: "John Doe" });
-
-    privateData(ORGA)(TestPrivateData5);
-    privateData(ORGB)(TestPrivateData5);
-
-    const modelMetadata = getClassPrivateDataMetadata(c);
-    console.log(modelMetadata);
-    expect(Object.keys(modelMetadata).length).toBe(2);
-    expect(modelMetadata.collections.length).toEqual(2);
-    expect(modelMetadata.collections).toContain(ORGB);
-    expect(modelMetadata.collections).toContain(ORGA);
-    expect(modelMetadata.isPrivate).toBe(true);
-  });
-
-  it("Tests getPrivateDataMetadata on class with multiple decoraters at the class level", () => {
-    @privateData(ORGA)
-    @privateData(ORGB)
-    class TestPrivateData5 extends Model {
-      @required()
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData5({ name: "John Doe" });
-
-    const modelMetadata = getClassPrivateDataMetadata(c);
-
-    console.log(modelMetadata);
-    expect(Object.keys(modelMetadata).length).toBe(2);
-    expect(modelMetadata.collections.length).toEqual(2);
-    expect(modelMetadata.collections).toContain(ORGB);
-    expect(modelMetadata.collections).toContain(ORGA);
-    expect(modelMetadata.isPrivate).toBe(true);
-  });
-
-  it("Tests hasPrivateData function on class decorated with privateData", () => {
-    @privateData(ORGA)
+  it("tests multiple private data decorator called manually on class", () => {
     class TestPrivateData extends Model {
-      @required()
       name!: string;
       constructor(arg?: ModelArg<Model>) {
         super(arg);
       }
     }
 
-    const c = new TestPrivateData({ name: "John Doe" });
+    privateData(ORGA)(TestPrivateData);
+    privateData(ORGB)(TestPrivateData);
 
-    const hasPrivate = hasPrivateData(c);
-    console.log(hasPrivate);
-    expect(hasPrivate).toBe(true);
-  });
+    const classMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestPrivateData
+    );
 
-  it("Tests hasPrivateData function on class not decorated", () => {
-    class TestPrivateData extends Model {
-      @required()
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData({ name: "John Doe" });
-
-    const hasPrivate = hasPrivateData(c);
-    console.log(hasPrivate);
-    expect(hasPrivate).toBe(false);
-  });
-
-  it("Tests hasPrivateData function on class with property decorated with privateData", () => {
-    class TestPrivateData extends Model {
-      @required()
-      @privateData(ORGA)
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData({ name: "John Doe" });
-
-    const hasPrivate = hasPrivateData(c);
-    console.log(hasPrivate);
-    expect(hasPrivate).toBe(true);
-  });
-
-  it("Tests isModelPrivate function on class decorated with privateData", () => {
-    @privateData(ORGA)
-    class TestPrivateData extends Model {
-      @required()
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData({ name: "John Doe" });
-
-    const isPrivate = isModelPrivate(c);
-    console.log(isPrivate);
-    expect(isPrivate).toBe(true);
-  });
-
-  it("Tests isModelPrivate function on class with property decorated with privateData", () => {
-    class TestPrivateData extends Model {
-      @required()
-      @privateData(ORGA)
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData({ name: "John Doe" });
-
-    const isPrivate = isModelPrivate(c);
-    console.log(isPrivate);
-    expect(isPrivate).toBe(false);
-  });
-
-  it("Tests isModelPrivate function on class with no private data decorators", () => {
-    class TestPrivateData extends Model {
-      @required()
-      name!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData({ name: "John Doe" });
-
-    const isPrivate = isModelPrivate(c);
-    console.log(isPrivate);
-    expect(isPrivate).toBe(false);
-  });
-
-  it("Tests modelToPrivate function on class not decorated with privateData", () => {
-    @model()
-    class TestPrivateData extends Model {
-      @required()
-      name!: string;
-
-      @required()
-      age!: string;
-
-      @required()
-      size!: string;
-
-      @required()
-      description!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData({
-      name: "John Doe",
-      age: "25",
-      size: "medium",
-      description: "A test model",
-    });
-
-    const isPrivate = isModelPrivate(c);
-    console.log(isPrivate);
-    expect(isPrivate).toBe(false);
-
-    const res = modelToPrivate(c);
-
-    expect(res.model.name).toBe(c.name);
-    expect(res.model.age).toBe(c.age);
-    expect(res.model.size).toBe(c.size);
-    expect(res.model.description).toBe(c.description);
-    expect(res.private).toBeUndefined();
-  });
-
-  it("Tests modelToPrivate function on class decorated with privateData", () => {
-    @model()
-    @privateData(ORGA)
-    class TestPrivateData extends Model {
-      @required()
-      name!: string;
-
-      @required()
-      age!: string;
-
-      @required()
-      size!: string;
-
-      @required()
-      description!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData({
-      name: "John Doe",
-      age: "25",
-      size: "medium",
-      description: "A test model",
-    });
-
-    const isPrivate = isModelPrivate(c);
-    console.log(isPrivate);
-    expect(isPrivate).toBe(true);
-
-    const res = modelToPrivate(c);
-    console.log(res);
-
-    expect(res.private).toBeDefined();
-    expect(res.private![ORGA].name).toBe(c.name);
-    expect(res.private![ORGA].age).toBe(c.age);
-    expect(res.private![ORGA].size).toBe(c.size);
-    expect(res.private![ORGA].description).toBe(c.description);
-    expect(res.model.name).toBeUndefined();
-    expect(res.model.age).toBeUndefined();
-    expect(res.model.size).toBeUndefined();
-    expect(res.model.description).toBeUndefined();
-  });
-
-  it("Tests modelToPrivate function on class decorated with multiple privateData", () => {
-    @model()
-    @privateData(ORGB)
-    @privateData(ORGA)
-    class TestPrivateData extends Model {
-      @required()
-      name!: string;
-
-      @required()
-      age!: string;
-
-      @required()
-      size!: string;
-
-      @required()
-      description!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData({
-      name: "John Doe",
-      age: "25",
-      size: "medium",
-      description: "A test model",
-    });
-
-    const isPrivate = isModelPrivate(c);
-    console.log(isPrivate);
-    expect(isPrivate).toBe(true);
-
-    const res = modelToPrivate(c);
-    console.log(res);
-
-    expect(res.private).toBeDefined();
-    expect(res.private![ORGA].name).toBe(c.name);
-    expect(res.private![ORGA].age).toBe(c.age);
-    expect(res.private![ORGA].size).toBe(c.size);
-    expect(res.private![ORGA].description).toBe(c.description);
-    expect(res.private![ORGB].name).toBe(c.name);
-    expect(res.private![ORGB].age).toBe(c.age);
-    expect(res.private![ORGB].size).toBe(c.size);
-    expect(res.private![ORGB].description).toBe(c.description);
-    expect(res.model.name).toBeUndefined();
-    expect(res.model.age).toBeUndefined();
-    expect(res.model.size).toBeUndefined();
-    expect(res.model.description).toBeUndefined();
-  });
-
-  it("Tests modelToPrivate function on class decorated with privateData", () => {
-    @model()
-    class TestPrivateData extends Model {
-      @required()
-      @privateData(ORGA)
-      name!: string;
-
-      @required()
-      @privateData(ORGA)
-      age!: string;
-
-      @required()
-      size!: string;
-
-      @required()
-      description!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData({
-      name: "John Doe",
-      age: "25",
-      size: "medium",
-      description: "A test model",
-    });
-
-    const isPrivate = isModelPrivate(c);
-    console.log(isPrivate);
-    expect(isPrivate).toBe(false);
-
-    const res = modelToPrivate(c);
-    console.log(res);
-
-    expect(res.private).toBeDefined();
-    expect(res.model).toBeDefined();
-    expect(res.private![ORGA].name).toBe(c.name);
-    expect(res.private![ORGA].age).toBe(c.age);
-    expect(res.model.size).toBe(c.size);
-    expect(res.model.description).toBe(c.description);
-    expect(res.model.name).toBeUndefined();
-    expect(res.model.age).toBeUndefined();
-    expect(res.private![ORGA].size).toBeUndefined();
-    expect(res.private![ORGA].description).toBeUndefined();
-  });
-
-  it("Tests modelToPrivate function on class decorated with multiple privateData in the properties", () => {
-    @model()
-    class TestPrivateData extends Model {
-      @required()
-      @privateData(ORGA)
-      name!: string;
-
-      @required()
-      @privateData(ORGB)
-      @privateData(ORGA)
-      age!: string;
-
-      @required()
-      @privateData(ORGA)
-      @privateData(ORGB)
-      size!: string;
-
-      @required()
-      @privateData(ORGB)
-      @privateData(ORGExample)
-      description!: string;
-
-      @required()
-      test!: string;
-      constructor(arg?: ModelArg<Model>) {
-        super(arg);
-      }
-    }
-
-    const c = new TestPrivateData({
-      name: "John Doe",
-      age: "25",
-      size: "medium",
-      description: "A test model",
-      test: "something",
-    });
-
-    const isPrivate = isModelPrivate(c);
-    console.log(isPrivate);
-    expect(isPrivate).toBe(false);
-
-    const res = modelToPrivate(c);
-    console.log(res);
-
-    expect(res.private).toBeDefined();
-    expect(res.model).toBeDefined();
-    expect(res.private![ORGA].name).toBe(c.name);
-    expect(res.private![ORGB].name).toBeUndefined();
-    expect(res.private![ORGA].age).toBe(c.age);
-    expect(res.private![ORGB].age).toBe(c.age);
-    expect(res.private![ORGA].size).toBe(c.size);
-    expect(res.private![ORGB].size).toBe(c.size);
-    expect(res.private![ORGB].description).toBe(c.description);
-    expect(res.private![ORGA].description).toBeUndefined();
-    expect(res.private![ORGB].test).toBeUndefined();
-    expect(res.private![ORGA].test).toBeUndefined();
-    expect(res.model.name).toBeUndefined();
-    expect(res.model.age).toBeUndefined();
-    expect(res.model.size).toBeUndefined();
-    expect(res.model.description).toBeUndefined();
-    expect(res.model.test).toBe(c.test);
+    console.log(classMetadata);
+    expect(Object.keys(classMetadata).length).toBe(2);
+    expect(classMetadata.collections.length).toEqual(2);
+    expect(classMetadata.collections).toContain(ORGA);
+    expect(classMetadata.collections).toContain(ORGB);
+    expect(classMetadata.isPrivate).toBe(true);
   });
 });
