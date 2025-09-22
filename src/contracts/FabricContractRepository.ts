@@ -113,6 +113,70 @@ export class FabricContractRepository<M extends Model> extends Repository<
   }
 
   /**
+   * @description Creates a single model in the state database
+   * @summary Prepares, creates, and reverts a model using the adapter
+   * @param {M} model - The model to create
+   * @param {...any[]} args - Additional arguments, including the chaincode context
+   * @return {Promise<M>} Promise resolving to the created model
+   */
+  override async create(model: M, ...args: any[]): Promise<M> {
+    const ctx = args[args.length - 1] as Context;
+    const log = this.logFor(ctx).for(this.create);
+    log.info(`Preparing model: ${JSON.stringify(model)}`);
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient } = this.adapter.prepare(
+      model,
+      this.pk,
+      this.tableName,
+      ...args
+    );
+    log.info(`Creating model: ${JSON.stringify(model)}`);
+    record = await this.adapter.create(this.tableName, id, record, ...args);
+    let c: FabricContractContext | undefined = undefined;
+    if (args.length) c = args[args.length - 1] as FabricContractContext;
+    log.info(`Reverting model: ${JSON.stringify(model)}`);
+    return this.adapter.revert<M>(
+      record,
+      this.class,
+      this.pk,
+      id,
+      c && c.get("rebuildWithTransient") ? transient : undefined
+    );
+  }
+
+  /**
+   * @description Updates a single model in the state database
+   * @summary Prepares, updates, and reverts a model using the adapter
+   * @param {M} model - The model to update
+   * @param {...any[]} args - Additional arguments, including the chaincode context
+   * @return {Promise<M>} Promise resolving to the updated model
+   */
+  override async update(model: M, ...args: any[]): Promise<M> {
+    const ctx = args[args.length - 1] as Context;
+    const log = this.logFor(ctx).for(this.update);
+    log.info(`Preparing model: ${JSON.stringify(model)}`);
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient } = this.adapter.prepare(
+      model,
+      this.pk,
+      this.tableName,
+      ...args
+    );
+    log.info(`Updating model: ${JSON.stringify(model)}`);
+    record = await this.adapter.update(this.tableName, id, record, ...args);
+    let c: FabricContractContext | undefined = undefined;
+    if (args.length) c = args[args.length - 1] as FabricContractContext;
+    log.info(`Reverting model: ${JSON.stringify(model)}`);
+    return this.adapter.revert<M>(
+      record,
+      this.class,
+      this.pk,
+      id,
+      c && c.get("rebuildWithTransient") ? transient : undefined
+    );
+  }
+
+  /**
    * @description Gets the observer handler for this repository
    * @summary Returns a FabricContractRepositoryObservableHandler instance
    * @return {ObserverHandler} The observer handler
@@ -248,70 +312,6 @@ export class FabricContractRepository<M extends Model> extends Repository<
       return this.adapter.Statement<M>(ctx).select().from(this.class);
     }
     return this.adapter.Statement<M>(ctx).select(selector).from(this.class);
-  }
-
-  /**
-   * @description Creates a single model in the state database
-   * @summary Prepares, creates, and reverts a model using the adapter
-   * @param {M} model - The model to create
-   * @param {...any[]} args - Additional arguments, including the chaincode context
-   * @return {Promise<M>} Promise resolving to the created model
-   */
-  override async create(model: M, ...args: any[]): Promise<M> {
-    const ctx = args[args.length - 1] as Context;
-    const log = this.logFor(ctx).for(this.create);
-    log.info(`Preparing model: ${JSON.stringify(model)}`);
-    // eslint-disable-next-line prefer-const
-    let { record, id, transient } = this.adapter.prepare(
-      model,
-      this.pk,
-      this.tableName,
-      ...args
-    );
-    log.info(`Creating model: ${JSON.stringify(model)}`);
-    record = await this.adapter.create(this.tableName, id, record, ...args);
-    let c: FabricContractContext | undefined = undefined;
-    if (args.length) c = args[args.length - 1] as FabricContractContext;
-    log.info(`Reverting model: ${JSON.stringify(model)}`);
-    return this.adapter.revert<M>(
-      record,
-      this.class,
-      this.pk,
-      id,
-      c && c.get("rebuildWithTransient") ? transient : undefined
-    );
-  }
-
-  /**
-   * @description Updates a single model in the state database
-   * @summary Prepares, updates, and reverts a model using the adapter
-   * @param {M} model - The model to update
-   * @param {...any[]} args - Additional arguments, including the chaincode context
-   * @return {Promise<M>} Promise resolving to the updated model
-   */
-  override async update(model: M, ...args: any[]): Promise<M> {
-    const ctx = args[args.length - 1] as Context;
-    const log = this.logFor(ctx).for(this.update);
-    log.info(`Preparing model: ${JSON.stringify(model)}`);
-    // eslint-disable-next-line prefer-const
-    let { record, id, transient } = this.adapter.prepare(
-      model,
-      this.pk,
-      this.tableName,
-      ...args
-    );
-    log.info(`Updating model: ${JSON.stringify(model)}`);
-    record = await this.adapter.update(this.tableName, id, record, ...args);
-    let c: FabricContractContext | undefined = undefined;
-    if (args.length) c = args[args.length - 1] as FabricContractContext;
-    log.info(`Reverting model: ${JSON.stringify(model)}`);
-    return this.adapter.revert<M>(
-      record,
-      this.class,
-      this.pk,
-      id,
-      c && c.get("rebuildWithTransient") ? transient : undefined
-    );
   }
 
   /**
