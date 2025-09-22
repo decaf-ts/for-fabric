@@ -11,29 +11,30 @@ export class SimpleDeterministicSerializer<
 
   override deserialize(str: string, tableName?: string): M {
     const deserialization = JSON.parse(str);
-    const className = tableName;
-    if (!className)
-      throw new Error("Could not find class reference in serialized model");
+    // const className = tableName;
+    // if (!className)
+    //   throw new Error("Could not find class reference in serialized model");
 
-    // this will return undefined values
-    const model: M = Model.build(deserialization, className) as unknown as M;
+    // // this will return undefined values
+    // const model: M = Model.build(deserialization, className) as unknown as M;
 
-    // Populate Model
-    const processedDesealization = Object.keys(model).reduce(
-      (accum: M, key) => {
-        (accum as Record<string, any>)[key] =
-          deserialization[Repository.column(accum, key)];
-        return accum;
-      },
-      model
-    );
+    // // Populate Model
+    // const processedDesealization = Object.keys(model).reduce(
+    //   (accum: M, key) => {
+    //     (accum as Record<string, any>)[key] =
+    //       deserialization[Repository.column(accum, key)];
+    //     return accum;
+    //   },
+    //   model
+    // );
 
-    const result = Model.build(
-      processedDesealization,
-      className
-    ) as unknown as M;
+    // const result = Model.build(
+    //   processedDesealization,
+    //   className
+    // ) as unknown as M;
 
-    return result;
+    // return result;
+    return deserialization;
   }
 
   override serialize(model: M): string {

@@ -315,7 +315,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
   override async read(
     tableName: string,
     id: string | number,
-    instance: Model,
     ...args: any[]
   ): Promise<Record<string, any>> {
     const { stub, logger } = args.pop();
@@ -324,7 +323,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     let model: Record<string, any>;
     const composedKey = stub.createCompositeKey(tableName, [String(id)]);
     try {
-      const results = await this.readState(stub, composedKey, instance);
+      const results = await this.readState(stub, composedKey);
 
       if (results.length < 1) {
         log.debug(`No record found for id ${id} in ${tableName} table`);
@@ -397,33 +396,26 @@ export class FabricContractAdapter extends CouchDBAdapter<
   protected async readState(
     stub: ChaincodeStub,
     id: string,
-    model: Model,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ...args: any[]
   ) {
     const results: any[] = [];
 
+    let res: Buffer | Record<string, any> = await stub.getState(id.toString());
+
+    if (res.toString() === "")
+      throw new NotFoundError(`Record with id ${id} not found`);
+
     try {
-      let res: Buffer | Record<string, any> = await stub.getState(
-        id.toString()
+      res = FabricContractAdapter.serializer.deserialize(
+        res.toString()
+        // model.constructor.name
       );
-
-      if (res.toString() === "")
-        throw new NotFoundError(`Record with id ${id} not found`);
-
-      try {
-        res = FabricContractAdapter.serializer.deserialize(
-          res.toString(),
-          model.constructor.name
-        );
-      } catch (e: unknown) {
-        throw new SerializationError(`Failed to parse record: ${e}`);
-      }
-
-      results.push(res);
     } catch (e: unknown) {
       throw new SerializationError(`Failed to parse record: ${e}`);
     }
+
+    results.push(res);
 
     return results;
   }
