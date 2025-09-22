@@ -1,4 +1,10 @@
-import { model, Model, ModelArg, prop } from "@decaf-ts/decorator-validation";
+import {
+  model,
+  Model,
+  ModelArg,
+  prop,
+  required,
+} from "@decaf-ts/decorator-validation";
 import { getFabricModelKey, privateData } from "../../src/shared/decorators";
 import { FabricModelKeys } from "../../src/shared/constants";
 import {
@@ -264,6 +270,63 @@ describe("@privateData() decorator", () => {
     expect(classMetadata.collections).toContain(ORGA);
     expect(classMetadata.collections).toContain(ORGB);
     expect(classMetadata.isPrivate).toBe(true);
+  });
+
+  it.skip("tests if private data decorator playes well with other decorators on class", () => {
+    @privateData(ORGB)
+    @model()
+    class TestPrivateData extends Model {
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestPrivateData
+    );
+
+    console.log(modelMetadata);
+    expect(Object.keys(modelMetadata).length).toBe(2);
+    expect(modelMetadata.collections.length).toEqual(1);
+    expect(modelMetadata.collections).toContain(ORGB);
+    expect(modelMetadata.isPrivate).toBe(true);
+  });
+
+  it("tests if private data decorator works with other decorators on property", () => {
+    class TestPrivateData extends Model {
+      @privateData(ORGA)
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "John Doe" });
+
+    const propMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      instance,
+      "name"
+    );
+
+    console.log(propMetadata);
+
+    expect(propMetadata.collections.length).toBe(1);
+    expect(propMetadata.collections[0]).toBe(ORGA);
+    expect(Object.keys(propMetadata).length).toBe(1);
+
+    const modelMetadata = Reflect.getMetadata(
+      getFabricModelKey(FabricModelKeys.PRIVATE),
+      TestPrivateData
+    );
+
+    console.log(modelMetadata);
+
+    expect(Object.keys(modelMetadata).length).toBe(1);
+    expect(modelMetadata.isPrivate).toBe(false);
   });
 });
 
