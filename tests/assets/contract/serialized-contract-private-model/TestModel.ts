@@ -27,7 +27,7 @@ export class TestPrivateModel extends Model {
   @required()
   nif!: string;
 
-  constructor(arg?: ModelArg<TestModel>) {
+  constructor(arg?: ModelArg<TestPrivateModel>) {
     super(arg);
   }
 }

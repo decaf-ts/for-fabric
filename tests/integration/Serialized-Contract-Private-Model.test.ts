@@ -14,8 +14,9 @@ import {
   randomNif,
   trim,
 } from "../utils";
-import { TestModel } from "../assets/contract/serialized-contract-private-model/TestModel";
+
 import { Model } from "@decaf-ts/decorator-validation";
+import { TestPrivateModel } from "../assets/contract/serialized-contract-private-model/TestModel";
 
 jest.setTimeout(5000000);
 
@@ -109,47 +110,47 @@ describe("Test Serialized Crud Contract With Private Model", () => {
     expect(trim(readyCheck)).toBe("true");
   });
 
-  // it("Should create model", async () => {
-  //   // Ensure contract is initialized
-  //   const ready = await ensureContractReadiness(contractName);
-  //   expect(trim(ready)).toBe("true");
+  it("Should create model", async () => {
+    // Ensure contract is initialized
+    const ready = await ensureContractReadiness(contractName);
+    expect(trim(ready)).toBe("true");
 
-  //   const model = new TestModel(getData());
-  //   console.log("Using model: ", model.serialize());
+    const model = new TestPrivateModel(getData());
+    console.log("Using model: ", model.serialize());
 
-  //   try {
-  //     invokeChaincode(contractName, "create", [model.serialize()]);
-  //   } catch (e) {
-  //     expect(e).toBeUndefined();
-  //   }
+    try {
+      invokeChaincode(contractName, "create", [model.serialize()]);
+    } catch (e) {
+      expect(e).toBeUndefined();
+    }
 
-  //   //Giving some time for the transaction to be committed
-  //   await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+    //Giving some time for the transaction to be committed
+    await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
 
-  //   let id = undefined;
+    let id = undefined;
 
-  //   try {
-  //     id = getCurrentId();
-  //   } catch (error: any) {
-  //     expect(error).toBeUndefined();
-  //   }
+    try {
+      id = getCurrentId();
+    } catch (error: any) {
+      expect(error).toBeUndefined();
+    }
 
-  //   expect(id).toBeDefined();
+    expect(id).toBeDefined();
 
-  //   try {
-  //     const args = [createCompositeKey(modelTableName, [String(id)]), "none"];
-  //     let record = queryChaincode(contractName, "readByPass", args) as any;
-  //     expect(record).toBeDefined();
+    try {
+      const args = [createCompositeKey(modelTableName, [String(id)]), "none"];
+      let record = queryChaincode(contractName, "readByPass", args) as any;
+      expect(record).toBeDefined();
 
-  //     record = JSON.parse(record.toString());
+      record = JSON.parse(record.toString());
 
-  //     expect(record["tst_name"]).toBe(model.name);
-  //     expect(record["tst_nif"]).toBe(model.nif);
-  //     expect(record.id).toBe(id);
-  //   } catch (error: any) {
-  //     expect(error).toBeUndefined();
-  //   }
-  // });
+      expect(record["tst_name"]).toBe(model.name);
+      expect(record["tst_nif"]).toBe(model.nif);
+      expect(record.id).toBe(id);
+    } catch (error: any) {
+      expect(error).toBeUndefined();
+    }
+  });
 
   // it("Should create model with transient data", async () => {
   //   // Ensure contract is initialized
