@@ -2,6 +2,7 @@ import {
   model,
   Model,
   ModelArg,
+  ModelKeys,
   prop,
   required,
 } from "@decaf-ts/decorator-validation";
@@ -272,7 +273,7 @@ describe("@privateData() decorator", () => {
     expect(classMetadata.isPrivate).toBe(true);
   });
 
-  it.skip("tests if private data decorator playes well with other decorators on class", () => {
+  it("tests if private data decorator playes well with other decorators on class", () => {
     @privateData(ORGB)
     @model()
     class TestPrivateData extends Model {
@@ -284,7 +285,7 @@ describe("@privateData() decorator", () => {
 
     const modelMetadata = Reflect.getMetadata(
       getFabricModelKey(FabricModelKeys.PRIVATE),
-      TestPrivateData
+      (TestPrivateData as any)[ModelKeys.ANCHOR] || TestPrivateData
     );
 
     console.log(modelMetadata);
@@ -466,6 +467,45 @@ describe("getClassPrivateDataMetadata", () => {
     expect(metadata.collections.length).toEqual(2);
     expect(metadata.collections).toContain(ORGA);
     expect(metadata.collections).toContain(ORGB);
+  });
+
+  it("Tests getClassPrivateDataMetadata on decorated class with different decorators", () => {
+    @privateData(ORGA)
+    @model()
+    class TestPrivateData extends Model {
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "John Doe" });
+    const metadata = getClassPrivateDataMetadata(instance);
+
+    console.log(metadata);
+    expect(Object.keys(metadata).length).toBe(2);
+    expect(metadata.collections.length).toEqual(1);
+    expect(metadata.collections).toContain(ORGA);
+    expect(metadata.isPrivate).toBe(true);
+  });
+
+  it("Tests getClassPrivateDataMetadata on decorated property  with different decorators", () => {
+    class TestPrivateData extends Model {
+      @privateData(ORGA)
+      @required()
+      name!: string;
+      constructor(arg?: ModelArg<Model>) {
+        super(arg);
+      }
+    }
+
+    const instance = new TestPrivateData({ name: "John Doe" });
+    const metadata = getClassPrivateDataMetadata(instance);
+
+    console.log(metadata);
+
+    expect(Object.keys(metadata).length).toBe(1);
+    expect(metadata.isPrivate).toBe(false);
   });
 });
 

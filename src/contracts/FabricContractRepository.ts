@@ -9,6 +9,7 @@ import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import {
+  ConflictError,
   Context as Ctx,
   enforceDBDecorators,
   InternalError,
@@ -142,6 +143,19 @@ export class FabricContractRepository<M extends Model> extends Repository<
       id,
       c && c.get("rebuildWithTransient") ? transient : undefined
     );
+  }
+
+  override async read(
+    id: string | number | bigint,
+    ...args: any[]
+  ): Promise<M> {
+    const m = await this.adapter.read(
+      this.tableName,
+      id as string,
+      new this.class(),
+      ...args
+    );
+    return this.adapter.revert<M>(m, this.class, this.pk, id as string);
   }
 
   /**
@@ -383,5 +397,30 @@ export class FabricContractRepository<M extends Model> extends Repository<
 
     if (errorMessages) throw new ValidationError(errorMessages);
     return [models, ...contextArgs.args];
+  }
+
+  protected override async createPrefix(
+    model: M,
+    ...args: any[]
+  ): Promise<[M, ...any[]]> {
+    const result = await super.createPrefix(model, ...args);
+    const id = result[0][this.pk];
+    try {
+      const res = await this.read(String(id), ...args);
+      if (res) {
+        throw new ConflictError(
+          `Conflict detected while creating model with id: ${id} already exists`
+        );
+      }
+    } catch (e) {
+      if ((e as any).code === 404) {
+        this.logFor(args[args.length - 1]).info(
+          `Record entry with pk ${id} does not exist, creating it now...`
+        );
+      } else {
+        throw e;
+      }
+    }
+    return result;
   }
 }
