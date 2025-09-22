@@ -9,10 +9,10 @@ import {
 } from "@decaf-ts/decorator-validation";
 import { privateData } from "../../../../src/shared/decorators";
 
-@table("tst_user")
+@table("tst_private_user")
 @model()
 @privateData("_implicit_org_Peer0OrgaMSP")
-export class TestModel extends Model {
+export class TestPrivateModel extends Model {
   @pk({ type: "Number" })
   id!: number;
 
