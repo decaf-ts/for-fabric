@@ -219,7 +219,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
       error = true;
       expect(e).toBeDefined();
       expect((e as any).message).toContain(
-        "[ConflictError] Entry with id \\000tst_user\\0001\\000 already exists in tst_user table"
+        "[ConflictError] Conflict detected while creating model with id: 1 already exists"
       );
     }
 
@@ -287,7 +287,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
       error = true;
       expect(err).toBeDefined();
       expect(err.message).toContain(
-        "[NotFoundError] The record with id 1000000000 does not exist in table tst_user"
+        "[NotFoundError] Record with id \\000tst_user\\0001000000000\\000 not found"
       );
     }
 

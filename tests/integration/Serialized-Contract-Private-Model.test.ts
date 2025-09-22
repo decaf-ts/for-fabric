@@ -19,7 +19,7 @@ import { Model } from "@decaf-ts/decorator-validation";
 
 jest.setTimeout(5000000);
 
-describe("Test Serialized Crud Contract With Public Model", () => {
+describe("Test Serialized Crud Contract With Private Model", () => {
   const contractFolderName = "serialized-contract-private-model";
   const contractName = "TestPrivateModel";
   const sequenceTableName = "??sequence";
