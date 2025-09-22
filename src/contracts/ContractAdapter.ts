@@ -3,14 +3,12 @@ import {
   Constructor,
   Decoration,
   Model,
-  ModelKeys,
   propMetadata,
   required,
 } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
-  ConflictError,
   Context,
   DBKeys,
   InternalError,
@@ -321,9 +319,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const log = logger.for(this.read);
 
     let model: Record<string, any>;
-    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
     try {
-      const results = await this.readState(stub, composedKey);
+      const results = await this.readState(stub, tableName, id.toString());
 
       if (results.length < 1) {
         log.debug(`No record found for id ${id} in ${tableName} table`);
@@ -395,13 +392,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
   protected async readState(
     stub: ChaincodeStub,
+    tableName: string,
     id: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ...args: any[]
   ) {
+    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
     const results: any[] = [];
 
-    let res: Buffer | Record<string, any> = await stub.getState(id.toString());
+    let res: Buffer | Record<string, any> = await stub.getState(composedKey);
 
     if (res.toString() === "")
       throw new NotFoundError(`Record with id ${id} not found`);

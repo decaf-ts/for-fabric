@@ -209,7 +209,9 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     const ready = await ensureContractReadiness(contractName);
     expect(trim(ready)).toBe("true");
 
-    const model = new TestModel({ ...getData(), id: 1 });
+    const id = 1;
+
+    const model = new TestModel({ ...getData(), id: id });
     console.log("Using model: ", model.serialize());
 
     let error = false;
@@ -219,7 +221,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
       error = true;
       expect(e).toBeDefined();
       expect((e as any).message).toContain(
-        "[ConflictError] Conflict detected while creating model with id: 1 already exists"
+        `[ConflictError] Conflict detected while creating model with id: ${id} already exists`
       );
     }
 
@@ -287,7 +289,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
       error = true;
       expect(err).toBeDefined();
       expect(err.message).toContain(
-        "[NotFoundError] Record with id \\000tst_user\\0001000000000\\000 not found"
+        `[NotFoundError] Record with id ${id} not found`
       );
     }
 
@@ -484,7 +486,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
       error = true;
       expect(e).toBeDefined();
       expect((e as any).message).toContain(
-        "[NotFoundError] The record with id 10000000000 does not exist in table tst_user"
+        `[NotFoundError] Record with id ${id} not found`
       );
     }
 
@@ -549,7 +551,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
       error = true;
       expect(err).toBeDefined();
       expect(err.message).toContain(
-        `[NotFoundError] The record with id ${id} does not exist in table tst_user`
+        `[NotFoundError] Record with id ${id} not found`
       );
     }
 
@@ -571,7 +573,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
       expect(e).toBeDefined();
       error = true;
       expect(e.message).toContain(
-        `[NotFoundError] The record with id ${id} does not exist in table tst_user`
+        `[NotFoundError] Record with id ${id} not found`
       );
     }
 
