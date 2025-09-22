@@ -10,8 +10,8 @@ import {
 import { privateData } from "../../../../src/shared/decorators";
 
 @table("tst_private_user")
-@model()
 @privateData("_implicit_org_Peer0OrgaMSP")
+@model()
 export class TestPrivateModel extends Model {
   @pk({ type: "Number" })
   id!: number;
