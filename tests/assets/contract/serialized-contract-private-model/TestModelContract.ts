@@ -19,7 +19,7 @@ FabricObject()(Model);
 FabricObject()(BaseModel);
 
 @Info({
-  title: "TestContractPublicModel",
+  title: "TestContractPrivateModel",
   description: "Test implementation of serialized crud contract",
 })
 export class TestModelContract extends SerializedCrudContract<TestModel> {
