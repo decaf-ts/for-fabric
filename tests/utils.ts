@@ -183,7 +183,7 @@ export async function ensureContractReadiness(
     });
 
     if (counter > 10) {
-      return undefined as unknown as string;
+      return "";
     }
 
     // Invoke the chaincode
