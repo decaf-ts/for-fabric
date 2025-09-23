@@ -5,7 +5,7 @@ console.log(
   FabricCrudContract
 );
 import { Model } from "@decaf-ts/decorator-validation";
-import { TestModel } from "./TestPublicModel";
+import { TestPublicModel } from "./TestPublicModel";
 import {
   Info,
   Object as FabricObject,
@@ -22,9 +22,9 @@ FabricObject()(BaseModel);
   title: "TestContractPublicModel",
   description: "Test implementation of serialized crud contract",
 })
-export class TestModelContract extends SerializedCrudContract<TestModel> {
+export class TestModelContract extends SerializedCrudContract<TestPublicModel> {
   constructor() {
-    super(TestModelContract.name, TestModel);
+    super(TestModelContract.name, TestPublicModel);
   }
 
   @Transaction(false)

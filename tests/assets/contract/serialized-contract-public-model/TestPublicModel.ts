@@ -10,7 +10,7 @@ import {
 
 @table("tst_user")
 @model()
-export class TestModel extends Model {
+export class TestPublicModel extends Model {
   @pk({ type: "Number" })
   id!: number;
 
@@ -25,7 +25,7 @@ export class TestModel extends Model {
   @required()
   nif!: string;
 
-  constructor(arg?: ModelArg<TestModel>) {
+  constructor(arg?: ModelArg<TestPublicModel>) {
     super(arg);
   }
 }

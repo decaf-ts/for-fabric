@@ -14,9 +14,8 @@ import {
   randomNif,
   trim,
 } from "../utils";
-import { TestModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
+import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
 import { Model } from "@decaf-ts/decorator-validation";
-// import { createCompositeKey, randomName, randomNif } from "../utils";
 
 jest.setTimeout(5000000);
 
@@ -25,7 +24,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
   const contractName = "TestPublicModel";
   const sequenceTableName = "??sequence";
   const modelTableName = "tst_user";
-  const sequenceId = "TestModel_pk";
+  const sequenceId = "TestPublicModel_pk";
 
   const getData = () => {
     return {
@@ -115,7 +114,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     const ready = await ensureContractReadiness(contractName);
     expect(trim(ready)).toBe("true");
 
-    const model = new TestModel(getData());
+    const model = new TestPublicModel(getData());
     console.log("Using model: ", model.serialize());
 
     try {
@@ -159,7 +158,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
     const data = getData();
 
-    const model = new TestModel({ name: data.name });
+    const model = new TestPublicModel({ name: data.name });
     console.log("Using model: ", model.serialize());
 
     const encoded = Buffer.from(
@@ -211,7 +210,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
     const id = 1;
 
-    const model = new TestModel({ ...getData(), id: id });
+    const model = new TestPublicModel({ ...getData(), id: id });
     console.log("Using model: ", model.serialize());
 
     let error = false;
@@ -233,7 +232,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     const ready = await ensureContractReadiness(contractName);
     expect(trim(ready)).toBe("true");
 
-    const model = new TestModel(getData());
+    const model = new TestPublicModel(getData());
     console.log("Using model: ", model.serialize());
 
     try {
@@ -275,7 +274,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     const ready = await ensureContractReadiness(contractName);
     expect(trim(ready)).toBe("true");
 
-    const model = new TestModel(getData());
+    const model = new TestPublicModel(getData());
     console.log("Using model: ", model.serialize());
 
     const id = 1000000000;
@@ -301,7 +300,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     const ready = await ensureContractReadiness(contractName);
     expect(trim(ready)).toBe("true");
 
-    const model = new TestModel(getData());
+    const model = new TestPublicModel(getData());
     console.log("Using model: ", model.serialize());
 
     try {
@@ -336,7 +335,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     } catch (error: any) {
       expect(error).toBeUndefined();
     }
-    const newModel = new TestModel(getData());
+    const newModel = new TestPublicModel(getData());
     newModel.id = id;
 
     console.log("Using model: ", newModel.serialize());
@@ -374,7 +373,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
     const data = getData();
 
-    const model = new TestModel({ name: data.name });
+    const model = new TestPublicModel({ name: data.name });
     console.log("Using model: ", model.serialize());
 
     const encoded = Buffer.from(
@@ -420,7 +419,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
     const data1 = getData();
 
-    const newModel = new TestModel({ name: data1.name });
+    const newModel = new TestPublicModel({ name: data1.name });
     console.log("Using model: ", newModel.serialize());
 
     const encoded1 = Buffer.from(
@@ -471,7 +470,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     const ready = await ensureContractReadiness(contractName);
     expect(trim(ready)).toBe("true");
 
-    const model = new TestModel(getData());
+    const model = new TestPublicModel(getData());
     console.log("Using model: ", model.serialize());
 
     const id = 10000000000;
@@ -498,7 +497,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     const ready = await ensureContractReadiness(contractName);
     expect(trim(ready)).toBe("true");
 
-    const model = new TestModel(getData());
+    const model = new TestPublicModel(getData());
     console.log("Using model: ", model.serialize());
 
     try {
@@ -585,7 +584,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     const ready = await ensureContractReadiness(contractName);
     expect(trim(ready)).toBe("true");
 
-    const model = new TestModel(getData());
+    const model = new TestPublicModel(getData());
     console.log("Using model: ", model.serialize());
 
     try {
