@@ -16,7 +16,7 @@
         "@decaf-ts/logging": "latest",
         "@decaf-ts/reflection": "latest",
         "@decaf-ts/transactional-decorators": "latest",
-        "fabric-contract-api": "^2.5.4",
+        "fabric-contract-api": "^2.5.8",
         "fabric-shim": "2.4.2",
         "json-stringify-deterministic": "^1.0.0",
         "sort-keys-recursive": "^2.1.0"
@@ -66,9 +66,9 @@
       }
     },
     "node_modules/@decaf-ts/db-decorators": {
-      "version": "0.6.8",
-      "resolved": "https://registry.npmjs.org/@decaf-ts/db-decorators/-/db-decorators-0.6.8.tgz",
-      "integrity": "sha512-qOeGabvtDFmdCpsBAGkl1MkqdHwmU8IkET/ksABnuJul2OPoqpJB+CN95PbeeMQP3L34q2L7dy0pNtXleeU6kw==",
+      "version": "0.6.9",
+      "resolved": "https://registry.npmjs.org/@decaf-ts/db-decorators/-/db-decorators-0.6.9.tgz",
+      "integrity": "sha512-HcuZZbXplNwiXdg+gT0ckgCLuMLbcbgE5xLdYbLjfr6EzDYDX/wp8QtF90+0qhZN+4tEF760HOmBRwvQCYCeNA==",
       "license": "MIT",
       "engines": {
         "node": ">=20.0.0",
@@ -118,9 +118,9 @@
       }
     },
     "node_modules/@decaf-ts/injectable-decorators": {
-      "version": "1.6.2",
-      "resolved": "https://registry.npmjs.org/@decaf-ts/injectable-decorators/-/injectable-decorators-1.6.2.tgz",
-      "integrity": "sha512-IKIKBp2aAEEKKAEe0nkngevt6ebuSt1e4CS0Qe+yQEsqWr7VHIvWin17MaEoVrETClL4ec9hOMq8Ovo1hXN7ew==",
+      "version": "1.6.9",
+      "resolved": "https://registry.npmjs.org/@decaf-ts/injectable-decorators/-/injectable-decorators-1.6.9.tgz",
+      "integrity": "sha512-nXsuA4xvz+7yyglR2tnpwufsw4ebCFhe8kq6c1VmSOCMvmhJ7fph0aEKOeNj9/aMT1efe26K1Mq08BcclB5cgA==",
       "license": "MIT",
       "engines": {
         "node": ">=20.0.0",
@@ -131,12 +131,12 @@
       }
     },
     "node_modules/@decaf-ts/logging": {
-      "version": "0.3.4",
-      "resolved": "https://registry.npmjs.org/@decaf-ts/logging/-/logging-0.3.4.tgz",
-      "integrity": "sha512-/LdNEDbPwWlpe1HZ2lNymHqw7YfTBU/TFk9IL5RkcM1Cf6YvW0IvP6Vt88GK9Wb3rR/tF0ogIImlneXmC2zcmg==",
+      "version": "0.3.7",
+      "resolved": "https://registry.npmjs.org/@decaf-ts/logging/-/logging-0.3.7.tgz",
+      "integrity": "sha512-tPWagWu2wbTTrsxCquhSS9pSkq9jl8TCoqELxKobwV1NeRB3E+Lh7yJJX1pDrRmjhnYyFThiQgHwvZPRJKxg5A==",
       "license": "MIT",
       "dependencies": {
-        "styled-string-builder": "^1.4.11"
+        "styled-string-builder": "^1.4.12"
       },
       "engines": {
         "node": ">=20.0.0",
