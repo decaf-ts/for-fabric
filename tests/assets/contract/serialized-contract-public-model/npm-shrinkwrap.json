@@ -8,10 +8,14 @@
       "name": "simple",
       "version": "1.0.0",
       "dependencies": {
-        "@decaf-ts/core": "^0.5.27",
-        "@decaf-ts/db-decorators": "^0.6.8",
-        "@decaf-ts/decorator-validation": "^1.7.17",
-        "@decaf-ts/for-couchdb": "^0.3.11",
+        "@decaf-ts/core": "latest",
+        "@decaf-ts/db-decorators": "latest",
+        "@decaf-ts/decorator-validation": "latest",
+        "@decaf-ts/for-couchdb": "latest",
+        "@decaf-ts/injectable-decorators": "latest",
+        "@decaf-ts/logging": "latest",
+        "@decaf-ts/reflection": "latest",
+        "@decaf-ts/transactional-decorators": "latest",
         "fabric-contract-api": "^2.5.4",
         "fabric-shim": "2.4.2",
         "json-stringify-deterministic": "^1.0.0",
@@ -118,7 +122,6 @@
       "resolved": "https://registry.npmjs.org/@decaf-ts/injectable-decorators/-/injectable-decorators-1.6.2.tgz",
       "integrity": "sha512-IKIKBp2aAEEKKAEe0nkngevt6ebuSt1e4CS0Qe+yQEsqWr7VHIvWin17MaEoVrETClL4ec9hOMq8Ovo1hXN7ew==",
       "license": "MIT",
-      "peer": true,
       "engines": {
         "node": ">=20.0.0",
         "npm": ">=10.0.0"
@@ -132,7 +135,6 @@
       "resolved": "https://registry.npmjs.org/@decaf-ts/logging/-/logging-0.3.4.tgz",
       "integrity": "sha512-/LdNEDbPwWlpe1HZ2lNymHqw7YfTBU/TFk9IL5RkcM1Cf6YvW0IvP6Vt88GK9Wb3rR/tF0ogIImlneXmC2zcmg==",
       "license": "MIT",
-      "peer": true,
       "dependencies": {
         "styled-string-builder": "^1.4.11"
       },
@@ -146,7 +148,6 @@
       "resolved": "https://registry.npmjs.org/@decaf-ts/reflection/-/reflection-0.4.10.tgz",
       "integrity": "sha512-6Fvl7qA2pmfvgN8Xs+e+OCaaOR9W2fKxw87fhpMdDFQ96f0RmBgoml1Umu9fhHUJNFxnQDkcgpLkDhvbNrmF9w==",
       "license": "MIT",
-      "peer": true,
       "dependencies": {
         "reflect-metadata": "^0.2.2"
       },
@@ -160,7 +161,6 @@
       "resolved": "https://registry.npmjs.org/@decaf-ts/transactional-decorators/-/transactional-decorators-0.1.3.tgz",
       "integrity": "sha512-RoXs2w/eG9mCI8I0pDMTsAFfFV65AmM1cbsOQptHtnje4001BfgKe2mKmgRNbUyE9FenBAU9ZTjgoJdJzqYdZw==",
       "license": "MIT",
-      "peer": true,
       "engines": {
         "node": ">=20.0.0",
         "npm": ">=10.0.0"
@@ -895,8 +895,7 @@
       "version": "0.2.2",
       "resolved": "https://registry.npmjs.org/reflect-metadata/-/reflect-metadata-0.2.2.tgz",
       "integrity": "sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==",
-      "license": "Apache-2.0",
-      "peer": true
+      "license": "Apache-2.0"
     },
     "node_modules/require-directory": {
       "version": "2.1.1",
@@ -1022,7 +1021,6 @@
       "resolved": "https://registry.npmjs.org/styled-string-builder/-/styled-string-builder-1.4.12.tgz",
       "integrity": "sha512-4Ht2N4NmUJgYDRh+UI1XzbWh7OXtdeGU13CKDIzTf1y/saXseP6sm+WfVeBfxwkHrUC44pmUx0kg/7oUhru6iQ==",
       "license": "MIT",
-      "peer": true,
       "engines": {
         "node": ">=20.0.0",
         "npm": ">=10.0.0"
