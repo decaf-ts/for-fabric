@@ -35,12 +35,12 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
       log.silly(
         `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
       );
-      Object.defineProperty(result, PersistenceKeys.METADATA, {
-        enumerable: false,
-        writable: false,
-        configurable: true,
-        value: (model as any)[PersistenceKeys.METADATA],
-      });
+      // Object.defineProperty(result, PersistenceKeys.METADATA, {
+      //   enumerable: false,
+      //   writable: false,
+      //   configurable: true,
+      //   value: (model as any)[PersistenceKeys.METADATA],
+      // });
     }
 
     log.info(`Preparing record for ${tableName} table with pk ${model[pk]}`);

@@ -172,7 +172,8 @@ export function commitChaincode(contractName: string) {
 export async function ensureContractReadiness(
   contractName: string,
   dockerName: string = "org-a-peer-0",
-  tlsCert: string = "tls-ca-cert.pem"
+  tlsCert: string = "tls-ca-cert.pem",
+  counter = 0
 ): Promise<string> {
   try {
     // Prepare the JSON argument for the chaincode
@@ -180,6 +181,10 @@ export async function ensureContractReadiness(
       function: "healthcheck",
       Args: [],
     });
+
+    if (counter > 10) {
+      return undefined as unknown as string;
+    }
 
     // Invoke the chaincode
     const res = execSync(
@@ -195,7 +200,12 @@ export async function ensureContractReadiness(
   } catch (err: any) {
     console.log("Chaincode not ready. Retrying...");
     await new Promise((r) => setTimeout(r, 5000)); // Wait for 5 seconds before retrying
-    return ensureContractReadiness(contractName, dockerName, tlsCert);
+    return ensureContractReadiness(
+      contractName,
+      dockerName,
+      tlsCert,
+      counter++
+    );
   }
 }
 
