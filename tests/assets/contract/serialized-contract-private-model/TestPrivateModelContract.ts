@@ -4,9 +4,8 @@ console.log(
   "Forcing Fabric Crud Contract before models to trigger adaptor decorators override:",
   FabricCrudContract
 );
-
 import { Model } from "@decaf-ts/decorator-validation";
-import { TestPrivateModel } from "./TestModel";
+import { TestPrivateModel } from "./TestPrivateModel";
 import {
   Info,
   Object as FabricObject,
@@ -15,7 +14,6 @@ import {
 } from "fabric-contract-api";
 import { BaseModel } from "@decaf-ts/core";
 import { SerializedCrudContract } from "../../../../src/contracts/crud/serialized-crud-contract";
-import { FabricContractPrivateDataAdapter } from "../../../../src/contracts/ContractPrivateDataAdapter";
 
 FabricObject()(Model);
 FabricObject()(BaseModel);
@@ -24,10 +22,9 @@ FabricObject()(BaseModel);
   title: "TestContractPrivateModel",
   description: "Test implementation of serialized crud contract",
 })
-export class TestModelContract extends SerializedCrudContract<TestPrivateModel> {
+export class TestPrivateModelContract extends SerializedCrudContract<TestPrivateModel> {
   constructor() {
-    super(TestModelContract.name, TestPrivateModel);
-    FabricCrudContract.adapter = new FabricContractPrivateDataAdapter();
+    super(TestPrivateModelContract.name, TestPrivateModel);
   }
 
   @Transaction(false)

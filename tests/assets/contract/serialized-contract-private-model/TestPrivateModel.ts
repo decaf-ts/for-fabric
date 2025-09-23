@@ -7,11 +7,9 @@ import {
   ModelArg,
   required,
 } from "@decaf-ts/decorator-validation";
-import { privateData } from "../../../../src/shared/decorators";
 
-@table("tst_private_user")
+@table("tst_user")
 @model()
-@privateData("_implicit_org_Peer0OrgaMSP")
 export class TestPrivateModel extends Model {
   @pk({ type: "Number" })
   id!: number;
@@ -31,5 +29,3 @@ export class TestPrivateModel extends Model {
     super(arg);
   }
 }
-
-Model.register(TestPrivateModel, TestPrivateModel.constructor.name);

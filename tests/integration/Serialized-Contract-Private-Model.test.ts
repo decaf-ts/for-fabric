@@ -15,17 +15,17 @@ import {
   trim,
 } from "../utils";
 
-import { Model } from "@decaf-ts/decorator-validation";
-import { TestPrivateModel } from "../assets/contract/serialized-contract-private-model/TestModel";
+import { TestPrivateModel } from "../assets/contract/serialized-contract-private-model/TestPrivateModel";
+import { TestPrivateModelContract } from "../assets/contract/serialized-contract-private-model/TestPrivateModelContract";
 
 jest.setTimeout(5000000);
 
 describe("Test Serialized Crud Contract With Private Model", () => {
   const contractFolderName = "serialized-contract-private-model";
-  const contractName = "TestPrivateModel";
+  const contractName = TestPrivateModelContract.name;
   const sequenceTableName = "??sequence";
   const modelTableName = "tst_private_user";
-  const sequenceId = "TestPrivateModel_pk";
+  const sequenceId = `${TestPrivateModel.name}_pk";`;
 
   const getData = () => {
     return {
