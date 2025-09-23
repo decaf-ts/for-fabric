@@ -14,7 +14,7 @@ import {
   randomNif,
   trim,
 } from "../utils";
-import { TestModel } from "../assets/contract/serialized-contract-public-model/TestModel";
+import { TestModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
 import { Model } from "@decaf-ts/decorator-validation";
 // import { createCompositeKey, randomName, randomNif } from "../utils";
 

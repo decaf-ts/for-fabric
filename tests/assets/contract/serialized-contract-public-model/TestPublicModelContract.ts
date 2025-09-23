@@ -5,7 +5,7 @@ console.log(
   FabricCrudContract
 );
 import { Model } from "@decaf-ts/decorator-validation";
-import { TestModel } from "./TestModel";
+import { TestModel } from "./TestPublicModel";
 import {
   Info,
   Object as FabricObject,

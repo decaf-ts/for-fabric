@@ -1,8 +1,8 @@
 import { MiniLogger } from "@decaf-ts/logging";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
 import { SerializedCrudContract } from "../../src/contracts";
-import { TestModelContract } from "../assets/contract/serialized-contract-public-model/TestModelContract";
-import { TestModel } from "../assets/contract/serialized-contract-public-model/TestModel";
+import { TestModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
+import { TestModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
 
 const state: Record<string, any> = {};
 
