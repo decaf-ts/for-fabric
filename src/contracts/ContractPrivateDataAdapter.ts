@@ -6,7 +6,6 @@ import {
   SerializationError,
 } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
-import { PersistenceKeys } from "@decaf-ts/core";
 import {
   MISSING_PRIVATE_DATA_REGEX,
   modelToPrivate,
@@ -15,6 +14,16 @@ import {
 import { UnauthorizedPrivateDataAccess } from "../shared/errors";
 
 export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
+  /**
+   * @description Creates a new FabricContractAdapter instance
+   * @summary Initializes an adapter for interacting with the Fabric state database
+   * @param {void} scope - Not used in this adapter
+   * @param {string} [alias] - Optional alias for the adapter instance
+   */
+  constructor(scope: void, alias?: string) {
+    super(scope, alias);
+  }
+
   override prepare<M extends Model>(
     model: M,
     pk: keyof M,
@@ -29,17 +38,17 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
     const log = logger.for(this.prepare);
 
     const split = processModel(this, model);
-    if ((model as any)[PersistenceKeys.METADATA]) {
-      log.silly(
-        `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
-      );
-      // Object.defineProperty(result, PersistenceKeys.METADATA, {
-      //   enumerable: false,
-      //   writable: false,
-      //   configurable: true,
-      //   value: (model as any)[PersistenceKeys.METADATA],
-      // });
-    }
+    // if ((model as any)[PersistenceKeys.METADATA]) {
+    //   log.silly(
+    //     `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
+    //   );
+    //   Object.defineProperty(split.result, PersistenceKeys.METADATA, {
+    //     enumerable: false,
+    //     writable: false,
+    //     configurable: true,
+    //     value: (model as any)[PersistenceKeys.METADATA],
+    //   });
+    // }
 
     log.info(`Preparing record for ${tableName} table with pk ${model[pk]}`);
 

@@ -1,5 +1,4 @@
 import { FabricContractAdapter } from "../ContractAdapter";
-const adapter = new FabricContractAdapter();
 import { Context, Contract, Context as Ctx } from "fabric-contract-api";
 import { Constructor, Model, Serializer } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
@@ -9,6 +8,8 @@ import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { Checkable } from "../../shared/interfaces/Checkable";
 import { ContractLogger } from "../logging";
 import { Logging } from "@decaf-ts/logging";
+import { isModelPrivate } from "../private-data";
+import { FabricContractPrivateDataAdapter } from "../ContractPrivateDataAdapter";
 
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode
@@ -65,7 +66,7 @@ export abstract class FabricCrudContract<M extends Model>
   /**
    * @description Shared adapter instance for all contract instances
    */
-  protected static adapter: FabricContractAdapter = adapter;
+  protected static adapter: FabricContractAdapter;
 
   protected readonly repo: FabricContractRepository<M>;
 
@@ -84,7 +85,21 @@ export abstract class FabricCrudContract<M extends Model>
     protected readonly clazz: Constructor<M>
   ) {
     super(name);
+    FabricCrudContract.adapter = this.getAdapter(clazz);
     this.repo = Repository.forModel(clazz, FabricCrudContract.adapter.alias);
+  }
+
+  protected getAdapter(clazz: Constructor<M>): FabricContractAdapter {
+    const instance = new clazz();
+
+    if (isModelPrivate(instance)) {
+      return new FabricContractPrivateDataAdapter(
+        undefined,
+        "fabric-private-data-adapter"
+      );
+    } else {
+      return new FabricContractAdapter(undefined, "fabric-public-data-adapter");
+    }
   }
 
   /**
