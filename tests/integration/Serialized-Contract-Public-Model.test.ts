@@ -15,16 +15,17 @@ import {
   trim,
 } from "../utils";
 import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
+import { TestPublicModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
 import { Model } from "@decaf-ts/decorator-validation";
 
 jest.setTimeout(5000000);
 
 describe("Test Serialized Crud Contract With Public Model", () => {
   const contractFolderName = "serialized-contract-public-model";
-  const contractName = "TestPublicModel";
+  const contractName = TestPublicModelContract.name;
   const sequenceTableName = "??sequence";
   const modelTableName = "tst_user";
-  const sequenceId = "TestPublicModel_pk";
+  const sequenceId = `${TestPublicModel.name}_pk`;
 
   const getData = () => {
     return {

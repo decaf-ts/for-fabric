@@ -22,9 +22,9 @@ FabricObject()(BaseModel);
   title: "TestContractPublicModel",
   description: "Test implementation of serialized crud contract",
 })
-export class TestModelContract extends SerializedCrudContract<TestPublicModel> {
+export class TestPublicModelContract extends SerializedCrudContract<TestPublicModel> {
   constructor() {
-    super(TestModelContract.name, TestPublicModel);
+    super(TestPublicModelContract.name, TestPublicModel);
   }
 
   @Transaction(false)

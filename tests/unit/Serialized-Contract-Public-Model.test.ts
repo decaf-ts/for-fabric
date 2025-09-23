@@ -1,8 +1,8 @@
 import { MiniLogger } from "@decaf-ts/logging";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
 import { SerializedCrudContract } from "../../src/contracts";
-import { TestModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
-import { TestModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
+import { TestPublicModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
+import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
 
 const state: Record<string, any> = {};
 
@@ -86,9 +86,9 @@ const ctx = {
 } as unknown as FabricContractContext;
 
 describe("Tests Public contract", () => {
-  const contract = new TestModelContract();
+  const contract = new TestPublicModelContract();
   it("should create model", async () => {
-    const model = new TestModel({
+    const model = new TestPublicModel({
       id: 1,
       name: "John Doe",
       nif: "123456789",
