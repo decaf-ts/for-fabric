@@ -2,9 +2,7 @@ import { ChaincodeStub } from "fabric-shim";
 import { FabricContractAdapter } from "./ContractAdapter";
 import {
   BaseError,
-  InternalError,
   NotFoundError,
-  Repository,
   SerializationError,
 } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";

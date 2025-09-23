@@ -57,7 +57,7 @@ import { parseEventName } from "../shared/events";
  *     FabricDispatch-->>Client: callback(id)
  *   end
  */
-export class FabricClientDispatch extends Dispatch<PeerConfig> {
+export class FabricClientDispatch extends Dispatch {
   /**
    * @description Event listening stack for chaincode events
    */
@@ -123,15 +123,19 @@ export class FabricClientDispatch extends Dispatch<PeerConfig> {
       throw new InternalError(
         `Event stack not initialized. Ensure that "startListening" is called before attempting this operation.`
       );
+
+    if (!this.adapter || !this.adapter.config)
+      throw new InternalError(`No adapter found. should be impossible`);
+
     const log = this.log.for(this.handleEvents);
     log.info(
-      `Listening for incoming events on chaincode "${this.native?.chaincodeName}" on channel "${this.native?.channel}"...`
+      `Listening for incoming events on chaincode "${this.adapter.config.chaincodeName}" on channel "${this.adapter.config.channel}"...`
     );
 
     try {
       for await (const evt of this.listeningStack) {
         const { table, event, owner } = parseEventName(evt.eventName);
-        if (owner && owner !== this.native?.mspId) continue;
+        if (owner && owner !== this.adapter.config?.mspId) continue;
         const payload: { id: string } = this.parsePayload(evt.payload);
         try {
           await this.updateObservers(table, event, payload.id);
@@ -143,7 +147,7 @@ export class FabricClientDispatch extends Dispatch<PeerConfig> {
       }
     } catch (e: any) {
       log.error(
-        `Failed to read event for chaincode "${this.native?.chaincodeName}" on channel "${this.native?.channel}": ${e?.message || e}`
+        `Failed to read event for chaincode "${this.adapter.config.chaincodeName}" on channel "${this.adapter.config.channel}": ${e}`
       );
       await this.close();
     }
@@ -155,17 +159,17 @@ export class FabricClientDispatch extends Dispatch<PeerConfig> {
    * @return {Promise<void>} Promise that resolves when initialization is complete
    */
   protected override async initialize(): Promise<void> {
-    if (!this.native || this.adapter)
+    if (!this.adapter)
       throw new InternalError(`No adapter or config observed for dispatch`);
     const gateway = await FabricClientAdapter.getGateway(
-      this.native,
+      this.adapter.config as PeerConfig,
       this.client
     );
-    const network = gateway.getNetwork(this.native.channel);
+    const network = gateway.getNetwork(this.adapter.config.channel);
     if (!this.adapter)
       throw new InternalError(`No adapter observed for dispatch`);
     this.listeningStack = await network.getChaincodeEvents(
-      this.native.chaincodeName
+      this.adapter.config.chaincodeName
     );
     this.handleEvents();
   }
