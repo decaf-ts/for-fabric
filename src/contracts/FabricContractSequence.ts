@@ -6,10 +6,12 @@ import {
 } from "@decaf-ts/db-decorators";
 import { Adapter, Repository, SequenceOptions } from "@decaf-ts/core";
 import { Sequence } from "@decaf-ts/core";
-import { MangoQuery, Sequence as Seq } from "@decaf-ts/for-couchdb";
+import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { FabricContractContext } from "./ContractContext";
 import { FabricContractRepository } from "./FabricContractRepository";
 import { MissingContextError } from "../shared/errors";
+import { CustomizableSequence } from "./PrivateSequence";
+import { privateData } from "../shared/decorators";
 
 /**
  * @description Abstract implementation of a Sequence for Fabric contracts
@@ -34,14 +36,20 @@ import { MissingContextError } from "../shared/errors";
  *   Sequence-->>App: next value
  */
 export class FabricContractSequence extends Sequence {
-  protected repo: FabricContractRepository<Seq>;
+  protected repo: FabricContractRepository<CustomizableSequence>;
 
   constructor(
     options: SequenceOptions,
-    adapter: Adapter<any, any, MangoQuery, any, any>
+    adapter: Adapter<any, any, MangoQuery, any, any>,
+    collections?: string[]
   ) {
     super(options);
-    this.repo = Repository.forModel(Seq, adapter.alias);
+
+    for (const collection of collections || []) {
+      privateData(collection)(CustomizableSequence);
+    }
+
+    this.repo = Repository.forModel(CustomizableSequence, adapter.alias);
   }
 
   /**
@@ -54,7 +62,10 @@ export class FabricContractSequence extends Sequence {
     if (!ctx) throw new MissingContextError("Context is required");
     const { name, startWith } = this.options;
     try {
-      const sequence: Seq = await this.repo.read(name as string, ctx);
+      const sequence: CustomizableSequence = await this.repo.read(
+        name as string,
+        ctx
+      );
       return this.parse(sequence.current as string | number);
     } catch (e: any) {
       if (e instanceof NotFoundError) {
@@ -117,12 +128,18 @@ export class FabricContractSequence extends Sequence {
       default:
         throw new InternalError("Should never happen");
     }
-    let seq: Seq;
+    let seq: CustomizableSequence;
     try {
-      seq = await this.repo.update(new Seq({ id: name, current: next }), ctx);
+      seq = await this.repo.update(
+        new CustomizableSequence({ id: name, current: next }),
+        ctx
+      );
     } catch (e: any) {
       if (!(e instanceof NotFoundError)) throw e;
-      seq = await this.repo.create(new Seq({ id: name, current: next }), ctx);
+      seq = await this.repo.create(
+        new CustomizableSequence({ id: name, current: next }),
+        ctx
+      );
     }
 
     return seq.current as string | number | bigint;

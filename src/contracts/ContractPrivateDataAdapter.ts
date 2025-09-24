@@ -12,6 +12,8 @@ import {
   processModel,
 } from "./private-data";
 import { UnauthorizedPrivateDataAccess } from "../shared/errors";
+import { FabricContractSequence } from "./FabricContractSequence";
+import { Sequence, SequenceOptions } from "@decaf-ts/core";
 
 export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
   /**
@@ -20,8 +22,61 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
    * @param {void} scope - Not used in this adapter
    * @param {string} [alias] - Optional alias for the adapter instance
    */
-  constructor(scope: void, alias?: string) {
+  constructor(
+    scope: void,
+    alias?: string,
+    private readonly collections?: string[]
+  ) {
     super(scope, alias);
+    this.collections = collections || [];
+  }
+
+  override async Sequence(options: SequenceOptions): Promise<Sequence> {
+    return new FabricContractSequence(options, this, this.collections);
+  }
+
+  /**
+   * @description Reads a record from the state database
+   * @summary Retrieves and deserializes a record from the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the retrieved record
+   */
+  override async read(
+    tableName: string,
+    id: string | number,
+    instance: any,
+    ...args: any[]
+  ): Promise<Record<string, any>> {
+    const { stub, logger } = args.pop();
+    const log = logger.for(this.read);
+
+    let model: Record<string, any>;
+    try {
+      const results = await this.readState(
+        stub,
+        tableName,
+        id.toString(),
+        instance
+      );
+
+      if (results.length < 1) {
+        log.debug(`No record found for id ${id} in ${tableName} table`);
+        throw new NotFoundError(
+          `No record found for id ${id} in ${tableName} table`
+        );
+      } else if (results.length < 2) {
+        log.debug(`No record found for id ${id} in ${tableName} table`);
+        model = results.pop() as Record<string, any>;
+      } else {
+        model = this.mergeModels(results);
+      }
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+
+    return model;
   }
 
   override prepare<M extends Model>(

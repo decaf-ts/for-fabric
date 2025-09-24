@@ -25,7 +25,8 @@ describe("Test Serialized Crud Contract With Private Model", () => {
   const contractName = TestPrivateModelContract.name;
   const sequenceTableName = "??sequence";
   const modelTableName = "tst_private_user";
-  const sequenceId = `${TestPrivateModel.name}_pk";`;
+  const sequenceId = `${TestPrivateModel.name}_pk`;
+  const private_collection = "_implicit_org_Peer0OrgaMSP";
 
   const getData = () => {
     return {
@@ -130,7 +131,7 @@ describe("Test Serialized Crud Contract With Private Model", () => {
     let id = undefined;
 
     try {
-      id = getCurrentId();
+      id = getCurrentId(private_collection);
     } catch (error: any) {
       expect(error).toBeUndefined();
     }
@@ -138,7 +139,10 @@ describe("Test Serialized Crud Contract With Private Model", () => {
     expect(id).toBeDefined();
 
     try {
-      const args = [createCompositeKey(modelTableName, [String(id)]), "none"];
+      const args = [
+        createCompositeKey(modelTableName, [String(id)]),
+        private_collection,
+      ];
       let record = queryChaincode(contractName, "readByPass", args) as any;
       expect(record).toBeDefined();
 

@@ -8,7 +8,7 @@ import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { Checkable } from "../../shared/interfaces/Checkable";
 import { ContractLogger } from "../logging";
 import { Logging } from "@decaf-ts/logging";
-import { isModelPrivate } from "../private-data";
+import { isModelPrivate, modelToPrivate } from "../private-data";
 import { FabricContractPrivateDataAdapter } from "../ContractPrivateDataAdapter";
 
 /**
@@ -93,9 +93,13 @@ export abstract class FabricCrudContract<M extends Model>
     const instance = new clazz();
 
     if (isModelPrivate(instance)) {
+      const pvt = modelToPrivate(instance);
+      const collections = Object.keys(pvt.private!);
+
       return new FabricContractPrivateDataAdapter(
         undefined,
-        "fabric-private-data-adapter"
+        "fabric-private-data-adapter",
+        collections
       );
     } else {
       return new FabricContractAdapter(undefined, "fabric-public-data-adapter");
