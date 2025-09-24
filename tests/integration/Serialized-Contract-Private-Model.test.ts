@@ -512,7 +512,7 @@ describe("Test Serialized Crud Contract With Private Model", () => {
     expect(error).toBe(true);
   });
 
-  it.skip("Should delete model", async () => {
+  it("Should delete model", async () => {
     // Ensure contract is initialized
     const ready = await ensureContractReadiness(contractName);
     expect(trim(ready)).toBe("true");

@@ -14,6 +14,8 @@ import {
 import { UnauthorizedPrivateDataAccess } from "../shared/errors";
 import { FabricContractSequence } from "./FabricContractSequence";
 import { Sequence, SequenceOptions } from "@decaf-ts/core";
+import { FabricContractContext } from "./ContractContext";
+import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 
 export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
   /**
@@ -79,6 +81,37 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
     return model;
   }
 
+  /**
+   * @description Deletes a record from the state database
+   * @summary Retrieves a record and then removes it from the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier to delete
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the deleted record
+   */
+  override async delete(
+    tableName: string,
+    id: string | number,
+    instance: any,
+    ...args: any[]
+  ): Promise<Record<string, any>> {
+    const ctx = args.pop();
+    const { stub, logger } = ctx;
+    const log = logger.for(this.delete);
+
+    args.push(ctx);
+
+    let model: Record<string, any>;
+    try {
+      model = this.read(tableName, id, instance, ...args);
+      log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
+      this.deleteState(stub, tableName, id.toString(), instance);
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+
+    return model;
+  }
   override prepare<M extends Model>(
     model: M,
     pk: keyof M,
@@ -112,6 +145,24 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
       id: stub.createCompositeKey(tableName, [String(model[pk])]),
       transient: split.transient,
     };
+  }
+
+  override updatePrefix(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>,
+    ...args: any[]
+  ): (string | number | Record<string, any>)[] {
+    const ctx: FabricContractContext = args.pop();
+    const collections = Object.keys(model);
+
+    for (const collection of collections) {
+      model[collection][CouchDBKeys.TABLE] = tableName;
+    }
+
+    const record: Record<string, any> = model;
+
+    return [tableName, id, record, ctx];
   }
   override async putState(
     stub: ChaincodeStub,
@@ -182,5 +233,22 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
     }
 
     return results;
+  }
+
+  override async deleteState(
+    stub: ChaincodeStub,
+    tableName: string,
+    id: string,
+    instance: any,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ...args: any[]
+  ) {
+    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+    const model = modelToPrivate(instance);
+    const collections = Object.keys(model.private!);
+
+    for (const collection of collections) {
+      await stub.deletePrivateData(collection, composedKey);
+    }
   }
 }
