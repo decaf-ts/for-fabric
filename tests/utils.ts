@@ -281,3 +281,39 @@ export function queryChaincode(
     throw err;
   }
 }
+
+export function invokePrivateChaincode(
+  contractName: string,
+  functionName: string,
+  args: any[],
+  transient: any = {},
+  dockerName: string = "org-a-peer-0",
+  tls: string = "tls-ca-cert.pem"
+) {
+  // Prepare the JSON argument for the chaincode
+  const chaincodeArgs = JSON.stringify({
+    function: functionName,
+    Args: args,
+  });
+
+  const transientData = JSON.stringify(transient);
+  const transientString = `--transient '${transientData}'`;
+
+  // Invoke the chaincode
+  return execSync(
+    `docker exec ${dockerName} peer chaincode invoke \
+    -C simple-channel \
+    -n ${contractName} \
+    -c '${chaincodeArgs}' \
+    --peerAddresses org-a-peer-0:7031 \
+    --tlsRootCertFiles /weaver/peer/tls-ca-cert.pem \
+    -o org-a-orderer-0:7021 \
+    --tls --cafile /weaver/peer/${tls} \
+    ${transient ? transientString : ""}`
+  );
+
+  //   --peerAddresses org-b-peer-0:7032 \
+  // --tlsRootCertFiles /weaver/peer/org-b-tls-ca-cert.pem \
+  // --peerAddresses org-c-peer-0:7033 \
+  // --tlsRootCertFiles /weaver/peer/org-c-tls-ca-cert.pem \
+}
