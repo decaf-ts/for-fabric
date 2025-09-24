@@ -103,7 +103,7 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
 
     let model: Record<string, any>;
     try {
-      model = this.read(tableName, id, instance, ...args);
+      model = await this.read(tableName, id, instance, ...args);
       log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
       this.deleteState(stub, tableName, id.toString(), instance);
     } catch (e: unknown) {

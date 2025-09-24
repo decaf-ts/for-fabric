@@ -390,7 +390,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     let model: Record<string, any>;
     try {
-      model = this.read(tableName, id, ...args);
+      model = await this.read(tableName, id, ...args);
       log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
       this.deleteState(stub, tableName, id.toString());
     } catch (e: unknown) {

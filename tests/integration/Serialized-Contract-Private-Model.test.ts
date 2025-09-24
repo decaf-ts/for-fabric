@@ -570,7 +570,7 @@ describe("Test Serialized Crud Contract With Private Model", () => {
       error = true;
       expect(err).toBeDefined();
       expect(err.message).toContain(
-        `[NotFoundError] The record with id ${id} does not exist in table tst_user`
+        `[NotFoundError] Entry with id ${id} doesn't exist...`
       );
     }
 

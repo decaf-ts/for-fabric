@@ -158,17 +158,22 @@ export class FabricContractRepository<M extends Model> extends Repository<
     return this.adapter.revert<M>(m, this.class, this.pk, id as string);
   }
 
-  // /**
-  //  * @description Deletes a model from the database by ID.
-  //  * @summary Removes a model instance from the database using its primary key.
-  //  * @param {string|number|bigint} id - The primary key of the model to delete.
-  //  * @param {...any[]} args - Additional arguments.
-  //  * @return {Promise<M>} The deleted model instance.
-  //  */
-  // override async delete(id, ...args) {
-  //   const m = await this.adapter.delete(this.tableName, id, ...args);
-  //   return this.adapter.revert(m, this.class, this.pk, id);
-  // }
+  /**
+   * @description Deletes a model from the database by ID.
+   * @summary Removes a model instance from the database using its primary key.
+   * @param {string|number|bigint} id - The primary key of the model to delete.
+   * @param {...any[]} args - Additional arguments.
+   * @return {Promise<M>} The deleted model instance.
+   */
+  override async delete(id: string, ...args: any[]) {
+    const m = await this.adapter.delete(
+      this.tableName,
+      id,
+      new this.class(),
+      ...args
+    );
+    return this.adapter.revert(m, this.class, this.pk, id);
+  }
 
   /**
    * @description Updates a single model in the state database
