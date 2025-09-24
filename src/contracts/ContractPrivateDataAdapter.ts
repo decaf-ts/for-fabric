@@ -121,9 +121,11 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
     ...args: any[]
   ) {
     const collections = Object.keys(model);
+    let res: Record<string, any> = {};
     let data: Buffer;
 
     for (const collection of collections) {
+      res = model![collection];
       try {
         data = Buffer.from(
           FabricContractAdapter.serializer.serialize(
@@ -137,6 +139,8 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
       }
       await stub.putPrivateData(collection, id.toString(), data);
     }
+
+    return res;
   }
 
   override async readState(

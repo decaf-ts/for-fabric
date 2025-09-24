@@ -294,7 +294,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
-      await this.putState(stub, id.toString(), model);
+      model = await this.putState(stub, id.toString(), model);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -361,7 +361,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     try {
       log.info(`updating entry to ${tableName} table with pk ${id}`);
-      await this.putState(stub, id.toString(), model);
+      model = await this.putState(stub, id.toString(), model);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -388,6 +388,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
     }
     await stub.putState(id.toString(), data);
+
+    return model;
   }
 
   protected async readState(
