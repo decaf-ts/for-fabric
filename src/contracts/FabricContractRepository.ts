@@ -301,7 +301,12 @@ export class FabricContractRepository<M extends Model> extends Repository<
       {}
     );
 
-    return this.adapter.raw(rawInput, docsOnly, ...transformedArgs.args);
+    return this.adapter.raw(
+      rawInput,
+      docsOnly,
+      new this.class(),
+      ...transformedArgs.args
+    );
   }
 
   /**

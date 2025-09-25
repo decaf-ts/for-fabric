@@ -1,4 +1,4 @@
-import { ChaincodeStub } from "fabric-shim";
+import { ChaincodeStub, Iterators, StateQueryResponse } from "fabric-shim";
 import { FabricContractAdapter } from "./ContractAdapter";
 import {
   BaseError,
@@ -15,7 +15,7 @@ import { UnauthorizedPrivateDataAccess } from "../shared/errors";
 import { FabricContractSequence } from "./FabricContractSequence";
 import { Sequence, SequenceOptions } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
-import { CouchDBKeys } from "@decaf-ts/for-couchdb";
+import { CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
 
 export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
   /**
@@ -250,5 +250,163 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
     for (const collection of collections) {
       await stub.deletePrivateData(collection, composedKey);
     }
+  }
+
+  override async queryResult(
+    stub: ChaincodeStub,
+    rawInput: any,
+    instance: any
+  ): Promise<Iterators.StateQueryIterator> {
+    const privateData = modelToPrivate(instance).private!;
+    const collection = Object.keys(privateData)[0] || "";
+
+    const result = (await stub.getPrivateDataQueryResult(
+      collection,
+      JSON.stringify(rawInput)
+    )) as any;
+
+    const iterator = result.iterator as Iterators.StateQueryIterator;
+
+    return iterator;
+  }
+
+  override async queryResultPaginated(
+    stub: ChaincodeStub,
+    rawInput: any,
+    limit: number = 250,
+    skip: number | undefined = undefined,
+    instance: any
+  ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
+    const privateData = modelToPrivate(instance).private!;
+    const collection = Object.keys(privateData)[0] || "";
+
+    const iterator = await stub.getPrivateDataQueryResult(
+      collection,
+      JSON.stringify(rawInput)
+    );
+
+    const results: any[] = [];
+    let count = 0;
+    let reachedBookmark = skip ? false : true;
+    let lastKey: string | null = null;
+
+    while (true) {
+      const res = await iterator.next();
+
+      if (res.value && res.value.value.toString()) {
+        const recordKey = res.value.key;
+        const recordValue = (res.value.value as any).toString("utf8");
+
+        // If we have a skip, skip until we reach it
+        if (!reachedBookmark) {
+          if (recordKey === skip?.toString()) {
+            reachedBookmark = true;
+          }
+          continue;
+        }
+
+        results.push({ Key: recordKey, Record: JSON.parse(recordValue) });
+        lastKey = recordKey;
+        count++;
+
+        if (count >= limit) {
+          await iterator.close();
+          return {
+            iterator: results as unknown as Iterators.StateQueryIterator,
+            metadata: {
+              fetchedRecordsCount: results.length,
+              bookmark: lastKey,
+            },
+          };
+        }
+      }
+
+      if (res.done) {
+        await iterator.close();
+        return {
+          iterator: results as unknown as Iterators.StateQueryIterator,
+          metadata: {
+            fetchedRecordsCount: results.length,
+            bookmark: "",
+          },
+        };
+      }
+    }
+    // return (await stub.getQueryResultWithPagination(
+    //   JSON.stringify(rawInput),
+    //   limit,
+    //   skip?.toString()
+    // )) as StateQueryResponse<Iterators.StateQueryIterator>;
+  }
+
+  /**
+   * @description Executes a raw query against the state database
+   * @summary Performs a rich query using CouchDB syntax against the Fabric state database
+   * @template R - The return type
+   * @param {MangoQuery} rawInput - The Mango Query to execute
+   * @param {boolean} docsOnly - Whether to return only documents (not used in this implementation)
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<R>} Promise resolving to the query results
+   * @mermaid
+   * sequenceDiagram
+   *   participant Caller
+   *   participant FabricContractAdapter
+   *   participant Stub
+   *   participant StateDB
+   *
+   *   Caller->>FabricContractAdapter: raw(rawInput, docsOnly, ctx)
+   *   FabricContractAdapter->>FabricContractAdapter: Extract limit and skip
+   *   alt With pagination
+   *     FabricContractAdapter->>Stub: getQueryResultWithPagination(query, limit, skip)
+   *   else Without pagination
+   *     FabricContractAdapter->>Stub: getQueryResult(query)
+   *   end
+   *   Stub->>StateDB: Execute query
+   *   StateDB-->>Stub: Iterator
+   *   Stub-->>FabricContractAdapter: Iterator
+   *   FabricContractAdapter->>FabricContractAdapter: resultIterator(log, iterator)
+   *   FabricContractAdapter-->>Caller: results
+   */
+  override async raw<R>(
+    rawInput: MangoQuery,
+    docsOnly: boolean,
+    ...args: any[]
+  ): Promise<R> {
+    const { stub, logger } = args.pop();
+    const log = logger.for(this.raw);
+    const { skip, limit } = rawInput;
+    const instance = args.shift();
+    let iterator: Iterators.StateQueryIterator;
+    if (limit || skip) {
+      delete rawInput["limit"];
+      delete rawInput["skip"];
+      log.debug(
+        `Retrieving paginated iterator: limit: ${limit}/ skip: ${skip}`
+      );
+      const response: StateQueryResponse<Iterators.StateQueryIterator> =
+        (await this.queryResultPaginated(
+          stub,
+          rawInput,
+          limit || 250,
+          (skip as any)?.toString(),
+          instance
+        )) as StateQueryResponse<Iterators.StateQueryIterator>;
+      iterator = response.iterator;
+    } else {
+      log.debug("Retrieving iterator");
+      iterator = (await this.queryResult(
+        stub,
+        rawInput,
+        instance
+      )) as Iterators.StateQueryIterator;
+    }
+    log.debug("Iterator acquired");
+
+    const results = (await this.resultIterator(log, iterator)) as R;
+    log.debug(
+      `returning {0} results`,
+      `${Array.isArray(results) ? results.length : 1}`
+    );
+    return results;
   }
 }

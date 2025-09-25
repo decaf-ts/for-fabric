@@ -465,7 +465,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
   protected async queryResult(
     stub: ChaincodeStub,
-    rawInput: any
+    rawInput: any,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ...args: any[]
   ): Promise<Iterators.StateQueryIterator> {
     return (await stub.getQueryResult(
       JSON.stringify(rawInput)
@@ -476,7 +478,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     stub: ChaincodeStub,
     rawInput: any,
     limit: number = 250,
-    skip?: number
+    skip?: number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ...args: any[]
   ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
     return (await stub.getQueryResultWithPagination(
       JSON.stringify(rawInput),
