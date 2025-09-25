@@ -463,6 +463,28 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return results;
   }
 
+  protected async queryResult(
+    stub: ChaincodeStub,
+    rawInput: any
+  ): Promise<Iterators.StateQueryIterator> {
+    return (await stub.getQueryResult(
+      JSON.stringify(rawInput)
+    )) as Iterators.StateQueryIterator;
+  }
+
+  protected async queryResultPaginated(
+    stub: ChaincodeStub,
+    rawInput: any,
+    limit: number = 250,
+    skip?: number
+  ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
+    return (await stub.getQueryResultWithPagination(
+      JSON.stringify(rawInput),
+      limit,
+      skip?.toString()
+    )) as StateQueryResponse<Iterators.StateQueryIterator>;
+  }
+
   protected mergeModels(results: Record<string, any>[]): Record<string, any> {
     const extract = (model: Record<string, any>) =>
       Object.entries(model).reduce((accum: Record<string, any>, [key, val]) => {
@@ -632,16 +654,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
         `Retrieving paginated iterator: limit: ${limit}/ skip: ${skip}`
       );
       const response: StateQueryResponse<Iterators.StateQueryIterator> =
-        (await stub.getQueryResultWithPagination(
-          JSON.stringify(rawInput),
+        (await this.queryResultPaginated(
+          stub,
+          rawInput,
           limit || 250,
-          skip?.toString()
+          (skip as any)?.toString()
         )) as StateQueryResponse<Iterators.StateQueryIterator>;
       iterator = response.iterator;
     } else {
       log.debug("Retrieving iterator");
-      iterator = (await stub.getQueryResult(
-        JSON.stringify(rawInput)
+      iterator = (await this.queryResult(
+        stub,
+        rawInput
       )) as Iterators.StateQueryIterator;
     }
     log.debug("Iterator acquired");
