@@ -1,0 +1,32 @@
+{
+  "name": "public-contract",
+  "version": "1.0.0",
+  "main": "index.js",
+  "engines": {
+    "node": ">=8",
+    "npm": ">=5"
+  },
+  "scripts": {
+    "start": "node --inspect=0.0.0.0:9229 /usr/local/src/node_modules/.bin/fabric-chaincode-node start",
+    "start:dev": "fabric-chaincode-node start --peer.address \"127.0.0.1:8541\" --chaincode-id-name \"chaincode1:0.0.1\" --tls.enabled false",
+    "start:watch": "nodemon --exec \"npm run start:dev\"",
+    "build": "echo \"No need to build the chaincode\"",
+    "lint": "eslint . --fix --ext .js",
+    "update-dependencies": "PREFIX=\"decaf-ts\"; npm ls | grep \"$PREFIX\" | awk -F/ '{print $NF}' | sed 's/@.*//' | xargs -I package npm update @\"$PREFIX\"/package"
+  },
+  "author": "PDM",
+  "dependencies": {
+    "@decaf-ts/core": "latest",
+    "@decaf-ts/db-decorators": "latest",
+    "@decaf-ts/decorator-validation": "latest",
+    "@decaf-ts/for-couchdb": "latest",
+    "@decaf-ts/injectable-decorators": "latest",
+    "@decaf-ts/logging": "latest",
+    "@decaf-ts/reflection": "latest",
+    "@decaf-ts/transactional-decorators": "latest",
+    "fabric-contract-api": "^2.5.4",
+    "fabric-shim": "2.4.2",
+    "json-stringify-deterministic": "^1.0.0",
+    "sort-keys-recursive": "^2.1.0"
+  }
+}

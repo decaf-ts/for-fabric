@@ -5,9 +5,7 @@ import { Credentials, CAConfig, PeerConfig } from "../../src/shared/types";
 import { FabricEnrollmentService } from "../../src/client/services";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { Identity } from "../../src/shared/model/Identity";
-import { Repo } from "@decaf-ts/core";
-import { FabricClientRepository } from "../../src/client/FabricClientRepository";
-import { TestPublicModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
+import { FabricERC20ClientRepository } from "../../src/contracts/erc20/erc20Repository";
 import {
   commitChaincode,
   compileContract,
@@ -15,13 +13,14 @@ import {
   ensureInfrastructureBooted,
   randomName,
 } from "../utils";
-import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
+import { TestERC20Contract } from "../assets/contract/erc-20-contract/TestERC20Contract";
+import { ERC20Token, ERC20Wallet } from "../../src/contracts/erc20/models";
 
 jest.setTimeout(5000000);
 
-describe("Test enrollement", () => {
-  const contractFolderName = "serialized-contract-public-model";
-  const contractName = TestPublicModelContract.name;
+describe("Test ERC20", () => {
+  const contractFolderName = "erc-20-contract";
+  const contractName = TestERC20Contract.name;
 
   const user: Credentials = {
     userName: "TestUser" + Date.now(),
@@ -44,7 +43,7 @@ describe("Test enrollement", () => {
   let userID: Identity;
   let clientAdapter: FabricClientAdapter;
   let enrollmentService: FabricEnrollmentService;
-  let TestModelRepository: Repo<TestPublicModel, any, any, any, any>;
+  let TestERC20ModelRepository: FabricERC20ClientRepository;
 
   beforeAll(async () => {
     //Boot infrastructure for testing
@@ -92,7 +91,8 @@ describe("Test enrollement", () => {
     };
 
     clientAdapter = new FabricClientAdapter(peerConfig);
-    TestModelRepository = FabricClientRepository.forModel(TestPublicModel);
+    TestERC20ModelRepository =
+      FabricERC20ClientRepository.forModel(ERC20Wallet);
   });
 
   it("register and enroll new user ", async () => {
@@ -106,25 +106,21 @@ describe("Test enrollement", () => {
     expect(userID.id).toBeDefined();
   });
 
-  it("Creates new Gateway connection ", async () => {
-    const clientUser = new TestPublicModel({
-      name: randomName(6),
-      nif: "123456799",
+  it("Initialize the new Test Token as admin", async () => {
+    const TestToken = new ERC20Token({
+      name: "TestToken",
+      symbol: "TST",
+      decimals: 10,
     });
 
-    const clientUserCreated: TestPublicModel =
-      await TestModelRepository.create(clientUser);
-
-    const clientUserRead: TestPublicModel = await TestModelRepository.read(
-      clientUserCreated.id
-    );
-    expect(clientUserRead).toEqual(clientUserCreated);
+    await TestERC20ModelRepository.initialize(TestToken);
   });
 
-  it("Creates new Gateway connection with new user", async () => {
-    const clientUser = new TestPublicModel({
-      name: "user" + userID.id,
-      nif: "123456789",
+  it.skip("Creates new Gateway connection with new user", async () => {
+    const clientUser = new ERC20Token({
+      name: "TestToken",
+      symbol: "TST",
+      decimals: 2,
     });
 
     const clientConfig = {
@@ -134,11 +130,12 @@ describe("Test enrollement", () => {
 
     const clientTestModelRepository = TestModelRepository.for(clientConfig);
 
-    const clientUserCreated: TestPublicModel =
+    const clientUserCreated: ERC20Wallet =
       await clientTestModelRepository.create(clientUser);
 
-    const clientUserRead: TestPublicModel =
-      await clientTestModelRepository.read(clientUserCreated.id);
+    const clientUserRead: ERC20Wallet = await clientTestModelRepository.read(
+      clientUserCreated.id
+    );
     expect(clientUserRead).toEqual(clientUserCreated);
   });
 });

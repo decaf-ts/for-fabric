@@ -29,10 +29,10 @@ export type PeerConfig = {
   tlsCert: string | Buffer;
   peerEndpoint: string;
   peerHostAlias: string;
-  caEndpoint: string;
-  caTlsCertificate: string;
-  caCert: string;
-  caKey: string;
+  caEndpoint?: string;
+  caTlsCertificate?: string;
+  caCert?: string;
+  caKey?: string;
   chaincodeName: string;
   contractName?: string;
   ca?: string;

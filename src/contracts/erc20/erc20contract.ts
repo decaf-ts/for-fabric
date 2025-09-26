@@ -5,7 +5,6 @@ import { BalanceError } from "../../shared/errors";
 import { FabricContractAdapter } from "../ContractAdapter";
 import { Allowance, ERC20Token, ERC20Wallet } from "./models";
 import { FabricContractContext } from "../ContractContext";
-import { FabricCrudContract } from "../crud";
 import { Owner } from "../../shared/decorators";
 import { FabricContractRepository } from "../FabricContractRepository";
 import {
@@ -13,6 +12,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "@decaf-ts/db-decorators";
+import { SerializedCrudContract } from "../crud/serialized-crud-contract";
 
 /**
  * @description ERC20 token contract base for Hyperledger Fabric
@@ -38,7 +38,7 @@ import {
  *   Contract->>Ledger: putState(updated balances)
  *   Contract-->>Client: success
  */
-export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet> {
+export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wallet> {
   private walletRepository: FabricContractRepository<ERC20Wallet>;
 
   private tokenRepository: FabricContractRepository<ERC20Token>;
@@ -413,12 +413,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
    * @param {String} totalSupply The totalSupply of the token
    */
   @Transaction()
-  async Initialize(
-    ctx: FabricContractContext,
-    name: string,
-    symbol: string,
-    decimals: number
-  ) {
+  async Initialize(ctx: FabricContractContext, token: ERC20Token) {
     // Check contract options are not already set, client is not authorized to change them once intitialized
     const tokens = await this.tokenRepository.select(undefined, ctx).execute();
     if (tokens.length > 0) {
@@ -427,12 +422,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
       );
     }
 
-    const token = new ERC20Token({
-      name: name,
-      owner: ctx.identity.getID(),
-      symbol: symbol,
-      decimals: decimals,
-    });
+    token.owner = ctx.identity.getID();
 
     await this.tokenRepository.create(token, ctx);
 

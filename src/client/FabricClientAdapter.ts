@@ -25,6 +25,7 @@ import {
   OperationKeys,
   SerializationError,
   BulkCrudOperationKeys,
+  modelToTransient,
 } from "@decaf-ts/db-decorators";
 import { Adapter, final, PersistenceKeys, Repository } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
@@ -270,6 +271,44 @@ export class FabricClientAdapter extends CouchDBAdapter<
   }
 
   /**
+   * @description Prepares a model for persistence
+   * @summary Converts a model instance into a format suitable for database storage,
+   * handling column mapping and separating transient properties
+   * @template M - The model type
+   * @param {M} model - The model instance to prepare
+   * @param pk - The primary key property name
+   * @return The prepared data
+   */
+  override prepare<M extends Model>(
+    model: M,
+    pk: keyof M
+  ): {
+    record: Record<string, any>;
+    id: string;
+    transient?: Record<string, any>;
+  } {
+    const log = this.log.for(this.prepare);
+    const split = modelToTransient(model);
+    if ((model as any)[PersistenceKeys.METADATA]) {
+      log.silly(
+        `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
+      );
+      Object.defineProperty(split.model, PersistenceKeys.METADATA, {
+        enumerable: false,
+        writable: false,
+        configurable: true,
+        value: (model as any)[PersistenceKeys.METADATA],
+      });
+    }
+
+    return {
+      record: split.model,
+      id: model[pk] as string,
+      transient: split.transient,
+    };
+  }
+
+  /**
    * @description Converts database data back into a model instance
    * @summary Reconstructs a model instance from database data, handling column mapping
    * and reattaching transient properties
@@ -297,7 +336,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.silly(`Rebuilding model ${m.constructor.name} id ${id}`);
     const metadata = obj[PersistenceKeys.METADATA];
     const result = Object.keys(m).reduce((accum: M, key) => {
-      (accum as Record<string, any>)[key] = obj[Repository.column(accum, key)];
+      (accum as Record<string, any>)[key] = obj[key];
       return accum;
     }, m);
 
