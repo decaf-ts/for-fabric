@@ -106,14 +106,15 @@ export function compileContract(contractFolder: string): void {
 export function packageContract(
   dockerName: string,
   contractFolder: string,
-  contractName: string
+  contractName: string,
+  version: string = "1.0"
 ): void {
   execSync(`docker exec ${dockerName} node ./weaver/lib/core/cli.cjs package-chaincode -d \
     --chaincode-path ./weaver/chaincode/${contractFolder} \
     --lang node \
     --chaincode-output /weaver/peer/${contractName}.tar.gz \
     --chaincode-name ${contractName} \
-    --chaincode-version 1.0 -s
+    --chaincode-version ${version} -s
     `);
 }
 
@@ -126,29 +127,37 @@ export function installContract(dockerName: string, contractName: string) {
 export function approveContract(
   dockerName: string,
   contractName: string,
-  tlsCertName: string
+  tlsCertName: string,
+  sequence: number = 1,
+  version: string = "1.0"
 ) {
   execSync(`docker exec ${dockerName} node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
     --orderer-address org-a-orderer-0:7021 \
     --channel-id simple-channel \
     --chaincode-name ${contractName} \
-    --chaincode-version 1.0 \
-    --sequence 1 \
+    --chaincode-version ${version} \
+    --sequence ${sequence} \
     --enable-tls \
     --tls-ca-cert-file /weaver/peer/${tlsCertName}`);
 }
 
-export function deployContract(contractFolder: string, contractName: string) {
-  const peers = ["org-a-peer-0", "org-b-peer-0", "org-c-peer-0"];
-
+export function deployContract(
+  contractFolder: string,
+  contractName: string,
+  sequence: number = 1,
+  version: string = "1.0",
+  peers: string[] = ["org-a-peer-0", "org-b-peer-0", "org-c-peer-0"]
+) {
   try {
     for (const peer of peers) {
-      packageContract(peer, contractFolder, contractName);
+      packageContract(peer, contractFolder, contractName, version);
       installContract(peer, contractName);
       approveContract(
         peer,
         contractName,
-        peer === "org-a-peer-0" ? "tls-ca-cert.pem" : "orderer-tls-ca-cert.pem"
+        peer === "org-a-peer-0" ? "tls-ca-cert.pem" : "orderer-tls-ca-cert.pem",
+        sequence,
+        version
       );
     }
   } catch (err: any) {
@@ -156,13 +165,17 @@ export function deployContract(contractFolder: string, contractName: string) {
   }
 }
 
-export function commitChaincode(contractName: string) {
+export function commitChaincode(
+  contractName: string,
+  sequence: number = 1,
+  version: string = "1.0"
+): void {
   execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs commit-chaincode -d -s \
     --orderer-address org-a-orderer-0:7021 \
     --channel-id simple-channel \
     --chaincode-name ${contractName} \
-    --chaincode-version 1.0 \
-    --sequence 1 \
+    --chaincode-version ${version} \
+    --sequence ${sequence} \
     --enable-tls \
     --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem \
     --peer-addresses org-a-peer-0:7031,org-b-peer-0:7032,org-c-peer-0:7033 \
@@ -195,7 +208,9 @@ export async function ensureContractReadiness(
         --tls --cafile /weaver/peer/${tlsCert}`
     );
 
-    return res.toString();
+    const result = JSON.parse(res.toString());
+
+    return result.healthcheck.toString();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err: any) {
     console.log("Chaincode not ready. Retrying...");

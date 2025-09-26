@@ -29,6 +29,8 @@ describe("Test Serialized Crud Contract With Private Model", () => {
   const modelTableName = "tst_private_user";
   const sequenceId = `${TestPrivateModel.name}_pk`;
   const private_collection = "_implicit_org_Peer0OrgaMSP";
+  const contract_sequence = 1;
+  const version = "2.0";
 
   const getData = () => {
     return {
@@ -81,14 +83,21 @@ describe("Test Serialized Crud Contract With Private Model", () => {
       return;
     }
 
+    console.log("Compiling contract: ", contractName);
+
     // Compile contract
     compileContract(contractFolderName);
 
     //Deploy contract
-    deployContract(contractFolderName, contractName);
+    deployContract(
+      contractFolderName,
+      contractName,
+      contract_sequence,
+      version
+    );
 
     // Commit Chaincode
-    commitChaincode(contractName);
+    commitChaincode(contractName, contract_sequence, version);
   });
 
   it("Deploys contract corretly", async () => {
@@ -111,6 +120,19 @@ describe("Test Serialized Crud Contract With Private Model", () => {
 
     const readyCheck = await ensureContractReadiness(contractName);
     expect(trim(readyCheck)).toBe("true");
+  });
+
+  it("Whoami", async () => {
+    try {
+      console.log("Initializing contract...");
+      let res = queryChaincode(contractName, "whoami", []);
+      console.log("Whoami result: ", res);
+      res = JSON.parse(res);
+      expect((res as any).whoami).toBe(contractName);
+    } catch (error: any) {
+      console.error("Error initializing contract:", error);
+      expect(error).toBeUndefined();
+    }
   });
 
   it("Should create model", async () => {
