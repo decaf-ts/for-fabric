@@ -8,6 +8,12 @@ const state: Record<string, any> = {};
 
 const ctx = {
   stub: {
+    getCreator: async () => {
+      return {
+        idBytes: Buffer.from("creatorID"),
+        mspid: "MSPID",
+      };
+    },
     getTransient: () => {
       return {
         has: (item: any) => {
