@@ -282,7 +282,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
    * @return {Promise<Record<string, any>>} Promise resolving to the created record
    */
-  @debug(true)
   override async create(
     tableName: string,
     id: string | number,
@@ -294,7 +293,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
-      await this.putState(stub, id.toString(), model);
+      model = await this.putState(stub, id.toString(), model);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -361,12 +360,54 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     try {
       log.info(`updating entry to ${tableName} table with pk ${id}`);
-      await this.putState(stub, id.toString(), model);
+      model = await this.putState(stub, id.toString(), model);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
 
     return model;
+  }
+
+  /**
+   * @description Deletes a record from the state database
+   * @summary Retrieves a record and then removes it from the Fabric state database
+   * @param {string} tableName - The name of the table/collection
+   * @param {string | number} id - The record identifier to delete
+   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
+   * @return {Promise<Record<string, any>>} Promise resolving to the deleted record
+   */
+  async delete(
+    tableName: string,
+    id: string | number,
+    ...args: any[]
+  ): Promise<Record<string, any>> {
+    const ctx = args.pop();
+    const { stub, logger } = ctx;
+    const log = logger.for(this.delete);
+
+    args.push(ctx);
+
+    let model: Record<string, any>;
+    try {
+      model = await this.read(tableName, id, ...args);
+      log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
+      this.deleteState(stub, tableName, id.toString());
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+
+    return model;
+  }
+
+  protected async deleteState(
+    stub: ChaincodeStub,
+    tableName: string,
+    id: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ...args: any[]
+  ) {
+    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+    await stub.deleteState(composedKey);
   }
 
   protected async putState(
@@ -388,6 +429,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
     }
     await stub.putState(id.toString(), data);
+
+    return model;
   }
 
   protected async readState(
@@ -417,6 +460,32 @@ export class FabricContractAdapter extends CouchDBAdapter<
     results.push(res);
 
     return results;
+  }
+
+  protected async queryResult(
+    stub: ChaincodeStub,
+    rawInput: any,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ...args: any[]
+  ): Promise<Iterators.StateQueryIterator> {
+    return (await stub.getQueryResult(
+      JSON.stringify(rawInput)
+    )) as Iterators.StateQueryIterator;
+  }
+
+  protected async queryResultPaginated(
+    stub: ChaincodeStub,
+    rawInput: any,
+    limit: number = 250,
+    skip?: number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ...args: any[]
+  ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
+    return (await stub.getQueryResultWithPagination(
+      JSON.stringify(rawInput),
+      limit,
+      skip?.toString()
+    )) as StateQueryResponse<Iterators.StateQueryIterator>;
   }
 
   protected mergeModels(results: Record<string, any>[]): Record<string, any> {
@@ -588,16 +657,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
         `Retrieving paginated iterator: limit: ${limit}/ skip: ${skip}`
       );
       const response: StateQueryResponse<Iterators.StateQueryIterator> =
-        (await stub.getQueryResultWithPagination(
-          JSON.stringify(rawInput),
+        (await this.queryResultPaginated(
+          stub,
+          rawInput,
           limit || 250,
-          skip?.toString()
+          (skip as any)?.toString()
         )) as StateQueryResponse<Iterators.StateQueryIterator>;
       iterator = response.iterator;
     } else {
       log.debug("Retrieving iterator");
-      iterator = (await stub.getQueryResult(
-        JSON.stringify(rawInput)
+      iterator = (await this.queryResult(
+        stub,
+        rawInput
       )) as Iterators.StateQueryIterator;
     }
     log.debug("Iterator acquired");
@@ -664,35 +735,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
         return this.update(tableName, i, model[index], ...args);
       })
     );
-  }
-
-  /**
-   * @description Deletes a record from the state database
-   * @summary Retrieves a record and then removes it from the Fabric state database
-   * @param {string} tableName - The name of the table/collection
-   * @param {string | number} id - The record identifier to delete
-   * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
-   * @return {Promise<Record<string, any>>} Promise resolving to the deleted record
-   */
-  async delete(
-    tableName: string,
-    id: string | number,
-    ...args: any[]
-  ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
-    const log = logger.for(this.delete);
-
-    let model: Record<string, any>;
-    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
-    try {
-      model = JSON.parse(await stub.getState(composedKey));
-      log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
-      await stub.deleteState(composedKey);
-    } catch (e: unknown) {
-      throw this.parseError(e as Error);
-    }
-
-    return model;
   }
 
   /**
@@ -798,13 +840,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
   override createPrefix(
     tableName: string,
     id: string | number,
-    model: Record<string, any>
+    model: Record<string, any>,
+    ...args: any[]
   ) {
+    const ctx: FabricContractContext = args.pop();
     const record: Record<string, any> = {};
     record[CouchDBKeys.TABLE] = tableName;
     // record[CouchDBKeys.ID] = this.generateId(tableName, id);
     Object.assign(record, model);
-    return [tableName, id, record];
+    return [tableName, id, record, ctx];
   }
 
   override updatePrefix(

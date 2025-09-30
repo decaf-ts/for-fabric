@@ -28,6 +28,17 @@ export class TestPrivateModelContract extends SerializedCrudContract<TestPrivate
   }
 
   @Transaction(false)
+  public async whoami(ctx: Context): Promise<string> {
+    ctx.logging.getLogger().info("Transaction whoami called: ", this.getName());
+
+    const m = {
+      whoami: this.getName(),
+    };
+
+    return JSON.stringify(m) as string;
+  }
+
+  @Transaction(false)
   public async readByPass(
     ctx: Context,
     id: string,

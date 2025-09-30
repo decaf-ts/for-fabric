@@ -1,9 +1,23 @@
-import { AuthorizationError } from "@decaf-ts/core";
+import { AuthorizationError, Repo } from "@decaf-ts/core";
 import { FabricContractContext, FabricERC20Contract } from "../contracts";
-import { NotFoundError, transient } from "@decaf-ts/db-decorators";
-import { Model, ModelKeys, propMetadata } from "@decaf-ts/decorator-validation";
+import {
+  Context,
+  NotFoundError,
+  onCreate,
+  readonly,
+  RepositoryFlags,
+  transient,
+} from "@decaf-ts/db-decorators";
+import {
+  Decoration,
+  Model,
+  ModelKeys,
+  propMetadata,
+  required,
+} from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
-import { Context } from "fabric-contract-api";
+import { Context as HLContext } from "fabric-contract-api";
+import { apply } from "@decaf-ts/reflection";
 
 export function Owner() {
   return function (
@@ -17,7 +31,7 @@ export function Owner() {
       this: FabricERC20Contract,
       ...args: any[]
     ) {
-      const ctx: Context = args[0];
+      const ctx: HLContext = args[0];
       const acountId = ctx.clientIdentity.getID();
 
       const select = await (this as FabricERC20Contract)[
@@ -45,6 +59,62 @@ export function Owner() {
 
     return descriptor;
   };
+}
+
+export async function ownedByOnCreate<
+  M extends Model,
+  R extends Repo<M, F, C>,
+  V,
+  F extends RepositoryFlags,
+  C extends Context<F>,
+>(
+  this: R,
+  context: Context<F>,
+  data: V,
+  key: keyof M,
+  model: M
+): Promise<void> {
+  const { stub } = context as any;
+
+  const creator = await stub.getCreator();
+  const owner = creator.mspid;
+
+  const setOwnedByKeyValue = function <M extends Model>(
+    target: M,
+    propertyKey: string,
+    value: string | number | bigint
+  ) {
+    Object.defineProperty(target, propertyKey, {
+      enumerable: true,
+      writable: false,
+      configurable: true,
+      value: value,
+    });
+  };
+
+  setOwnedByKeyValue(model, key as string, owner);
+}
+
+export function OwnedBy() {
+  const key = getFabricModelKey(FabricModelKeys.OWNEDBY);
+
+  function ownedBy() {
+    return function (obj: any, attribute?: any) {
+      return apply(
+        required(),
+        readonly(),
+        onCreate(ownedByOnCreate),
+        propMetadata(getFabricModelKey(FabricModelKeys.OWNEDBY), attribute)
+      )(obj, attribute);
+    };
+  }
+
+  return Decoration.for(key)
+    .define({
+      decorator: ownedBy,
+      args: [],
+    })
+    .apply();
 }
 
 export function getFabricModelKey(key: string) {

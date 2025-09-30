@@ -10,6 +10,7 @@ export enum FabricModelKeys {
   PRIVATE = "private",
   /** Namespace prefix used for Fabric-specific metadata keys */
   FABRIC = "fabric.",
+  OWNEDBY = "owned-by",
 }
 /**
  * @description Supported identity types for Fabric credentials

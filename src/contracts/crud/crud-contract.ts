@@ -5,7 +5,7 @@ import { Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "../FabricContractRepository";
 import { DeterministicSerializer } from "../../shared/DeterministicSerializer";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
-import { Checkable } from "../../shared/interfaces/Checkable";
+import { Checkable, healthcheck } from "../../shared/interfaces/Checkable";
 import { ContractLogger } from "../logging";
 import { Logging } from "@decaf-ts/logging";
 import { isModelPrivate, modelToPrivate } from "../private-data";
@@ -220,7 +220,7 @@ export abstract class FabricCrudContract<M extends Model>
   ): Promise<M | string> {
     const log = this.logFor(ctx).for(this.delete);
     log.info(`deleting entry with pk ${key} `);
-    return this.repo.delete(key, ctx, ...args);
+    return this.repo.delete(String(key), ctx, ...args);
   }
 
   /**
@@ -317,10 +317,10 @@ export abstract class FabricCrudContract<M extends Model>
     log.info(`Contract initialization completed.`);
   }
 
-  async healthcheck(ctx: Ctx): Promise<string | boolean> {
+  async healthcheck(ctx: Ctx): Promise<string | healthcheck> {
     const log = this.logFor(ctx).for(this.healthcheck);
     log.info(`Running Healthcheck: ${this.initialized}...`);
-    return this.initialized;
+    return { healthcheck: this.initialized };
   }
 
   /**

@@ -15,5 +15,7 @@ export interface Checkable {
    * @param {Context} ctx - Fabric transaction context reference used during the check
    * @return {Promise<string|boolean>} A string message describing health or a boolean indicating healthy/unhealthy
    */
-  healthcheck(ctx: Context): Promise<string | boolean>;
+  healthcheck(ctx: Context): Promise<string | healthcheck>;
 }
+
+export type healthcheck = { healthcheck: boolean };
