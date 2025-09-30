@@ -840,13 +840,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
   override createPrefix(
     tableName: string,
     id: string | number,
-    model: Record<string, any>
+    model: Record<string, any>,
+    ...args: any[]
   ) {
+    const ctx: FabricContractContext = args.pop();
     const record: Record<string, any> = {};
     record[CouchDBKeys.TABLE] = tableName;
     // record[CouchDBKeys.ID] = this.generateId(tableName, id);
     Object.assign(record, model);
-    return [tableName, id, record];
+    return [tableName, id, record, ctx];
   }
 
   override updatePrefix(
