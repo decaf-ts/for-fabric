@@ -282,7 +282,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
    * @return {Promise<Record<string, any>>} Promise resolving to the created record
    */
-  @debug(true)
   override async create(
     tableName: string,
     id: string | number,
