@@ -129,7 +129,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {Uint8Array} data - The binary data to decode
    * @return {string} The decoded string
    */
-  protected decode(data: Uint8Array): string {
+  decode(data: Uint8Array): string {
     return FabricClientAdapter.decoder.decode(data);
   }
 

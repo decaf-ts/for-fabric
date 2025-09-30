@@ -3,6 +3,7 @@ import { FabricContractContext, FabricERC20Contract } from "../contracts";
 import { NotFoundError, transient } from "@decaf-ts/db-decorators";
 import { Model, ModelKeys, propMetadata } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
+import { Context } from "fabric-contract-api";
 
 export function Owner() {
   return function (
@@ -16,12 +17,14 @@ export function Owner() {
       this: FabricERC20Contract,
       ...args: any[]
     ) {
-      const ctx: FabricContractContext = args[0];
-      const acountId = ctx.identity.getID();
+      const ctx: Context = args[0];
+      const acountId = ctx.clientIdentity.getID();
 
-      const tokens = await (this as FabricERC20Contract)["tokenRepository"]
-        .select(undefined, ctx)
-        .execute();
+      const select = await (this as FabricERC20Contract)[
+        "tokenRepository"
+      ].select(undefined, ctx);
+
+      const tokens = await select.execute();
 
       if (tokens.length == 0) {
         throw new NotFoundError("No tokens avaialble");

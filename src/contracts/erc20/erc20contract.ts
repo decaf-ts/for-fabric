@@ -1,10 +1,9 @@
 import { AuthorizationError, Condition } from "@decaf-ts/core";
-import { Transaction } from "fabric-contract-api";
+import { Context, Transaction } from "fabric-contract-api";
 import { add, sub } from "../../shared/math";
 import { BalanceError } from "../../shared/errors";
 import { FabricContractAdapter } from "../ContractAdapter";
 import { Allowance, ERC20Token, ERC20Wallet } from "./models";
-import { FabricContractContext } from "../ContractContext";
 import { Owner } from "../../shared/decorators";
 import { FabricContractRepository } from "../FabricContractRepository";
 import {
@@ -68,7 +67,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   }
 
   @Transaction(false)
-  async TokenName(ctx: FabricContractContext): Promise<string> {
+  async TokenName(ctx: Context): Promise<string> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
@@ -86,7 +85,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
    * @returns {String} Returns the symbol of the token
    */
   @Transaction(false)
-  async Symbol(ctx: FabricContractContext): Promise<string> {
+  async Symbol(ctx: Context): Promise<string> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
@@ -104,7 +103,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
    * @returns {Number} Returns the number of decimals
    */
   @Transaction(false)
-  async Decimals(ctx: FabricContractContext): Promise<number> {
+  async Decimals(ctx: Context): Promise<number> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
@@ -117,11 +116,11 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   /**
    * Return the total token supply.
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @returns {Number} Returns the total token supply
    */
   @Transaction(false)
-  async TotalSupply(ctx: FabricContractContext): Promise<number> {
+  async TotalSupply(ctx: Context): Promise<number> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
@@ -150,12 +149,12 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   /**
    * BalanceOf returns the balance of the given account.
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @param {String} owner The owner from which the balance will be retrieved
    * @returns {Number} Returns the account balance
    */
-  @Transaction()
-  async BalanceOf(ctx: FabricContractContext, owner: string): Promise<number> {
+  @Transaction(false)
+  async BalanceOf(ctx: Context, owner: string): Promise<number> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
@@ -168,22 +167,18 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
    * @summary Transfer transfers tokens from client account to recipient account.
    * @description recipient account must be a valid clientID as returned by the ClientAccountID() function.
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @param {String} to The recipient
    * @param {number} value The amount of token to be transferred
    *
    * @returns {Boolean} Return whether the transfer was successful or not
    */
   @Transaction()
-  async Transfer(
-    ctx: FabricContractContext,
-    to: string,
-    value: number
-  ): Promise<boolean> {
+  async Transfer(ctx: Context, to: string, value: number): Promise<boolean> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const from = ctx.identity.getID();
+    const from = ctx.clientIdentity.getID();
 
     const transferResp = await this._transfer(ctx, from, to, value);
     if (!transferResp) {
@@ -200,7 +195,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   /**
    * Transfer `value` amount of tokens from `from` to `to`.
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @param {String} from The sender
    * @param {String} to The recipient
    * @param {number} value The amount of token to be transferred
@@ -208,7 +203,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
    */
   @Transaction()
   async TransferFrom(
-    ctx: FabricContractContext,
+    ctx: Context,
     from: string,
     to: string,
     value: number
@@ -218,7 +213,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
 
     // Retrieve the allowance of the spender
 
-    const spender = ctx.identity.getID();
+    const spender = ctx.clientIdentity.getID();
 
     const allowanceCondition = Condition.and(
       Condition.attribute<Allowance>("owner").eq(from),
@@ -266,12 +261,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   }
 
   @Transaction()
-  async _transfer(
-    ctx: FabricContractContext,
-    from: string,
-    to: string,
-    value: number
-  ) {
+  async _transfer(ctx: Context, from: string, to: string, value: number) {
     if (from === to) {
       throw new AuthorizationError(
         "cannot transfer to and from same client account"
@@ -329,21 +319,21 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   /**
    * Allows `spender` to spend `value` amount of tokens from the owner.
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @param {String} spender The spender
    * @param {number} value The amount of tokens to be approved for transfer
    * @returns {Boolean} Return whether the approval was successful or not
    */
   @Transaction()
   async Approve(
-    ctx: FabricContractContext,
+    ctx: Context,
     spender: string,
     value: number
   ): Promise<boolean> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const owner = ctx.identity.getID();
+    const owner = ctx.clientIdentity.getID();
 
     const ownerWallet = await this.walletRepository.read(owner);
 
@@ -369,14 +359,14 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   /**
    * Returns the amount of tokens which `spender` is allowed to withdraw from `owner`.
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @param {String} owner The owner of tokens
    * @param {String} spender The spender who are able to transfer the tokens
    * @returns {number} Return the amount of remaining tokens allowed to spent
    */
   @Transaction()
   async Allowance(
-    ctx: FabricContractContext,
+    ctx: Context,
     owner: string,
     spender: string
   ): Promise<number> {
@@ -406,23 +396,24 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   /**
    * Set optional infomation for a token.
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @param {String} name The name of the token
    * @param {String} symbol The symbol of the token
    * @param {String} decimals The decimals of the token
    * @param {String} totalSupply The totalSupply of the token
    */
   @Transaction()
-  async Initialize(ctx: FabricContractContext, token: ERC20Token) {
+  async Initialize(ctx: Context, token: ERC20Token) {
     // Check contract options are not already set, client is not authorized to change them once intitialized
-    const tokens = await this.tokenRepository.select(undefined, ctx).execute();
+    const select = await this.tokenRepository.select(undefined, ctx);
+    const tokens = await select.execute();
     if (tokens.length > 0) {
       throw new AuthorizationError(
         "contract options are already set, client is not authorized to change them"
       );
     }
 
-    token.owner = ctx.identity.getID();
+    token.owner = ctx.clientIdentity.getID();
 
     await this.tokenRepository.create(token, ctx);
 
@@ -431,8 +422,9 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
 
   // Checks that contract options have been already initialized
   @Transaction(false)
-  async CheckInitialized(ctx: FabricContractContext) {
-    const tokens = await this.tokenRepository.select(undefined, ctx).execute();
+  async CheckInitialized(ctx: Context) {
+    const select = await this.tokenRepository.select(undefined, ctx);
+    const tokens = await select.execute();
     if (tokens.length == 0) {
       throw new InternalError(
         "contract options need to be set before calling any function, call Initialize() to initialize contract"
@@ -443,18 +435,18 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   /**
    * Mint creates new tokens and adds them to minter's account balance
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @param {number} amount amount of tokens to be minted
    * @returns {Object} The balance
    */
   @Owner()
   @Transaction()
-  async Mint(ctx: FabricContractContext, amount: number): Promise<void> {
+  async Mint(ctx: Context, amount: number): Promise<void> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
     // Get ID of submitting client identity
-    const minter = ctx.identity.getID();
+    const minter = ctx.clientIdentity.getID();
 
     if (amount <= 0) {
       throw new ValidationError("mint amount must be a positive integer");
@@ -479,19 +471,19 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   /**
    * Burn redeem tokens from minter's account balance
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @param {number} amount amount of tokens to be burned
    * @returns {Object} The balance
    */
   @Owner()
   @Transaction()
-  async Burn(ctx: FabricContractContext, amount: number): Promise<void> {
+  async Burn(ctx: Context, amount: number): Promise<void> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const logger = ctx.logger;
+    const logger = this.logFor(ctx).for(this.Burn);
 
-    const minter = ctx.identity.getID();
+    const minter = ctx.clientIdentity.getID();
 
     const minterWallet = await this.walletRepository.read(minter);
 
@@ -519,22 +511,18 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   /**
    * BurnFrom redeem tokens from account allowence and balance
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @param {number} account account from where tokens will be burned
    * @param {number} amount amount of tokens to be burned
    * @returns {Object} The balance
    */
   @Owner()
   @Transaction()
-  async BurnFrom(
-    ctx: FabricContractContext,
-    account: string,
-    amount: number
-  ): Promise<void> {
+  async BurnFrom(ctx: Context, account: string, amount: number): Promise<void> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const logger = ctx.logger;
+    const logger = this.logFor(ctx).for(this.BurnFrom);
 
     const accountWallet = await this.walletRepository.read(account);
 
@@ -562,16 +550,16 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   /**
    * ClientAccountBalance returns the balance of the requesting client's account.
    *
-   * @param {FabricContractContext} ctx the transaction context
+   * @param {Context} ctx the transaction context
    * @returns {Number} Returns the account balance
    */
   @Transaction()
-  async ClientAccountBalance(ctx: FabricContractContext): Promise<number> {
+  async ClientAccountBalance(ctx: Context): Promise<number> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
     // Get ID of submitting client identity
-    const clientAccountID = ctx.identity.getID();
+    const clientAccountID = ctx.clientIdentity.getID();
 
     const clientWallet = await this.walletRepository.read(
       clientAccountID,
@@ -590,12 +578,12 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
   // In this implementation, the client account ID is the clientId itself.
   // Users can use this function to get their own account id, which they can then give to others as the payment address
   @Transaction()
-  async ClientAccountID(ctx: FabricContractContext) {
+  async ClientAccountID(ctx: Context) {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
     // Get ID of submitting client identity
-    const clientAccountID = ctx.identity.getID();
+    const clientAccountID = ctx.clientIdentity.getID();
     return clientAccountID;
   }
 }

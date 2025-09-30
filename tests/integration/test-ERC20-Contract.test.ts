@@ -11,10 +11,10 @@ import {
   compileContract,
   deployContract,
   ensureInfrastructureBooted,
-  randomName,
 } from "../utils";
 import { TestERC20Contract } from "../assets/contract/erc-20-contract/TestERC20Contract";
-import { ERC20Token, ERC20Wallet } from "../../src/contracts/erc20/models";
+import { ERC20Token } from "../../src/contracts/erc20/models";
+import { AuthorizationError } from "@decaf-ts/core";
 
 jest.setTimeout(5000000);
 
@@ -44,6 +44,7 @@ describe("Test ERC20", () => {
   let clientAdapter: FabricClientAdapter;
   let enrollmentService: FabricEnrollmentService;
   let TestERC20ModelRepository: FabricERC20ClientRepository;
+  let testToken: ERC20Token;
 
   beforeAll(async () => {
     //Boot infrastructure for testing
@@ -91,8 +92,13 @@ describe("Test ERC20", () => {
     };
 
     clientAdapter = new FabricClientAdapter(peerConfig);
-    TestERC20ModelRepository =
-      FabricERC20ClientRepository.forModel(ERC20Wallet);
+    TestERC20ModelRepository = new FabricERC20ClientRepository(clientAdapter);
+
+    testToken = new ERC20Token({
+      name: "TestToken",
+      symbol: "TST",
+      decimals: 10,
+    });
   });
 
   it("register and enroll new user ", async () => {
@@ -107,35 +113,42 @@ describe("Test ERC20", () => {
   });
 
   it("Initialize the new Test Token as admin", async () => {
-    const TestToken = new ERC20Token({
-      name: "TestToken",
-      symbol: "TST",
-      decimals: 10,
-    });
-
-    await TestERC20ModelRepository.initialize(TestToken);
+    await TestERC20ModelRepository.initialize(testToken);
   });
 
-  it.skip("Creates new Gateway connection with new user", async () => {
-    const clientUser = new ERC20Token({
-      name: "TestToken",
-      symbol: "TST",
-      decimals: 2,
-    });
+  it("Gets token name", async () => {
+    const tokenName = await TestERC20ModelRepository.tokenName();
+    expect(tokenName).toBe(testToken.name);
+  });
 
+  it("Gets token symbol", async () => {
+    const tokenSymbol = await TestERC20ModelRepository.symbol();
+    expect(tokenSymbol).toBe(testToken.symbol);
+  });
+
+  it("Gets token decimals", async () => {
+    const tokenDecimals = await TestERC20ModelRepository.decimals();
+    expect(tokenDecimals).toBe(testToken.decimals);
+  });
+
+  it("Mints new tokens", async () => {
+    await TestERC20ModelRepository.mint(1000000);
+  });
+
+  it("Fails to mint with not authorized user", async () => {
     const clientConfig = {
       keyDirectoryPath: Buffer.from(userID.credentials!.privateKey!),
       certDirectoryPath: Buffer.from(userID.credentials!.certificate!),
     };
 
-    const clientTestModelRepository = TestModelRepository.for(clientConfig);
+    const clientTestERC20ModelRepository = TestERC20ModelRepository.for(
+      clientConfig
+    ) as FabricERC20ClientRepository;
 
-    const clientUserCreated: ERC20Wallet =
-      await clientTestModelRepository.create(clientUser);
-
-    const clientUserRead: ERC20Wallet = await clientTestModelRepository.read(
-      clientUserCreated.id
-    );
-    expect(clientUserRead).toEqual(clientUserCreated);
+    try {
+      await clientTestERC20ModelRepository.mint(1000000); // This should fail
+    } catch (error) {
+      expect(error).toBeInstanceOf(AuthorizationError);
+    }
   });
 });
