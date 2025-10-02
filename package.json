@@ -82,7 +82,7 @@
     "ts"
   ],
   "author": "Tiago Venceslau",
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/decaf-ts/ts-workspace/issues"
   },
