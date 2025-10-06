@@ -2,13 +2,17 @@ import { CouchDBAdapter, CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
 import {
   Constructor,
   Decoration,
+  list,
   Model,
+  prop,
   propMetadata,
   required,
+  type,
 } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
+  afterAny,
   Context,
   DBKeys,
   InternalError,
@@ -16,6 +20,8 @@ import {
   NotFoundError,
   onCreate,
   onCreateUpdate,
+  onDelete,
+  onUpdate,
   OperationKeys,
   readonly,
   SerializationError,
@@ -25,7 +31,7 @@ import {
   Object as FabricObject,
   Property as FabricProperty,
 } from "fabric-contract-api";
-import { debug, Logger, Logging } from "@decaf-ts/logging";
+import { Logger, Logging } from "@decaf-ts/logging";
 import { ContractLogger } from "./logging";
 import {
   OrderDirection,
@@ -39,6 +45,11 @@ import {
   index,
   NumericSequence,
   Adapter,
+  CascadeMetadata,
+  JoinColumnOptions,
+  oneToManyOnUpdate,
+  JoinTableOptions,
+  JoinTableMultipleColumnsOptions,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -52,6 +63,15 @@ import { FabricContractSequence } from "./FabricContractSequence";
 import { MissingContextError } from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
+import {
+  oneToManyOnCreate,
+  oneToManyOnDelete,
+  oneToOneOnCreate,
+  oneToOneOnDelete,
+  oneToOneOnUpdate,
+  populate as pop,
+} from "./FabricConstruction";
+import { apply } from "@decaf-ts/reflection";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -584,7 +604,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     let res: { value: any; done: boolean } = await iterator.next();
     while (!res.done) {
       if (res.value && res.value.value.toString()) {
-        const jsonRes: any = {};
+        let jsonRes: any = {};
         log.debug(res.value.value.toString("utf8"));
         if (isHistory /* && isHistory === true*/) {
           jsonRes.TxId = res.value.txId;
@@ -596,12 +616,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
             jsonRes.Value = res.value.value.toString("utf8");
           }
         } else {
-          jsonRes.Key = res.value.key;
           try {
-            jsonRes.Record = JSON.parse(res.value.value.toString("utf8"));
+            jsonRes = JSON.parse(res.value.value.toString("utf8"));
           } catch (err: any) {
             log.error(err);
-            jsonRes.Record = res.value.value.toString("utf8");
+            jsonRes = res.value.value.toString("utf8");
           }
         }
         allResults.push(jsonRes);
@@ -973,6 +992,78 @@ export class FabricContractAdapter extends CouchDBAdapter<
         // } while (chain.length > 1);
 
         return FabricObject()(obj);
+      })
+      .apply();
+
+    const oneToOnekey = Repository.key(PersistenceKeys.ONE_TO_ONE);
+
+    function oneToOneDec<M extends Model>(
+      clazz: Constructor<M> | (() => Constructor<M>),
+      cascade: CascadeMetadata,
+      populate: boolean,
+      joinColumnOpts?: JoinColumnOptions,
+      fk?: string
+    ) {
+      const meta: RelationsMetadata = {
+        class: clazz.name ? clazz.name : (clazz as any),
+        cascade: cascade,
+        populate: populate,
+      };
+      if (joinColumnOpts) meta.joinTable = joinColumnOpts;
+      if (fk) meta.name = fk;
+      return apply(
+        prop(PersistenceKeys.RELATIONS),
+        type([
+          clazz.name ? clazz.name : (clazz as any),
+          String.name,
+          Number.name,
+          BigInt.name,
+        ]),
+        onCreate(oneToOneOnCreate, meta),
+        onUpdate(oneToOneOnUpdate, meta),
+        onDelete(oneToOneOnDelete, meta),
+        afterAny(pop, meta),
+        propMetadata(oneToOnekey, meta)
+      );
+    }
+
+    Decoration.flavouredAs(FabricFlavour)
+      .for(oneToOnekey)
+      .define({
+        decorator: oneToOneDec,
+      })
+      .apply();
+
+    const oneToManyKey = Repository.key(PersistenceKeys.ONE_TO_MANY);
+
+    function oneToManyDec<M extends Model>(
+      clazz: Constructor<M> | (() => Constructor<M>),
+      cascade: CascadeMetadata,
+      populate: boolean,
+      joinTableOpts?: JoinTableOptions | JoinTableMultipleColumnsOptions,
+      fk?: string
+    ) {
+      const metadata: RelationsMetadata = {
+        class: clazz.name ? clazz.name : (clazz as any),
+        cascade: cascade,
+        populate: populate,
+      };
+      if (joinTableOpts) metadata.joinTable = joinTableOpts;
+      if (fk) metadata.name = fk;
+      return apply(
+        prop(PersistenceKeys.RELATIONS),
+        list([clazz as Constructor<M>, String, Number, BigInt]),
+        onCreate(oneToManyOnCreate, metadata),
+        onUpdate(oneToManyOnUpdate, metadata),
+        onDelete(oneToManyOnDelete, metadata),
+        afterAny(pop, metadata),
+        propMetadata(oneToManyKey, metadata)
+      );
+    }
+
+    Decoration.for(oneToManyKey)
+      .define({
+        decorator: oneToManyDec,
       })
       .apply();
   }

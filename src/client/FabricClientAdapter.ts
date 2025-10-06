@@ -637,6 +637,9 @@ export class FabricClientAdapter extends CouchDBAdapter<
 
       return await method.call(contract, api, proposalOptions);
     } catch (e: any) {
+      if (e.code === 10) {
+        throw new Error(`${e.details[0].message}`);
+      }
       throw this.parseError(e);
     } finally {
       this.log.debug(`Closing ${this.config.mspId} gateway connection`);

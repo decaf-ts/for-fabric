@@ -71,9 +71,8 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const token = (
-      await this.tokenRepository.select(undefined, ctx).execute()
-    )[0];
+    const select = await this.tokenRepository.select(undefined, ctx);
+    const token = (await select.execute())[0];
 
     return token.name;
   }
@@ -89,9 +88,9 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const token = (
-      await this.tokenRepository.select(undefined, ctx).execute()
-    )[0];
+    const select = await this.tokenRepository.select(undefined, ctx);
+    const token = (await select.execute())[0];
+
     return token.symbol;
   }
 
@@ -107,9 +106,9 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const token = (
-      await this.tokenRepository.select(undefined, ctx).execute()
-    )[0];
+    const select = await this.tokenRepository.select(undefined, ctx);
+    const token = (await select.execute())[0];
+
     return token.decimals;
   }
 
@@ -158,7 +157,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const wallet = await this.walletRepository.read(owner);
+    const wallet = await this.walletRepository.read(owner, ctx);
 
     return wallet.balance;
   }
@@ -251,7 +250,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
       value: updatedAllowance,
     });
 
-    await this.allowanceRepository.update(newAllowance);
+    await this.allowanceRepository.update(newAllowance, ctx);
 
     // Emit the Transfer event
     const transferEvent = { from, to, value: value };
@@ -274,10 +273,22 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
     }
 
     // Retrieve the current balance of the sender
-    const fromWallet = await this.walletRepository.read(from);
-
-    if (!fromWallet) {
-      throw new NotFoundError(`client account ${from} not found`);
+    let fromWallet: ERC20Wallet;
+    let newFromWallet: boolean = false;
+    try {
+      fromWallet = await this.walletRepository.read(from, ctx);
+    } catch (e: any) {
+      if (e.code === 404) {
+        // Create a new wallet for the minter
+        fromWallet = new ERC20Wallet({
+          id: from,
+          balance: 0,
+          token: await this.TokenName(ctx),
+        });
+        newFromWallet = true;
+      } else {
+        throw e;
+      }
     }
 
     const fromBalance = fromWallet.balance;
@@ -289,7 +300,23 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
 
     // Retrieve the current balance of the recepient
 
-    const toWallet = await this.walletRepository.read(to);
+    let toWallet: ERC20Wallet;
+    let newToWallet: boolean = false;
+    try {
+      toWallet = await this.walletRepository.read(to, ctx);
+    } catch (e: any) {
+      if (e.code === 404) {
+        // Create a new wallet for the minter
+        toWallet = new ERC20Wallet({
+          id: from,
+          balance: 0,
+          token: await this.TokenName(ctx),
+        });
+        newToWallet = true;
+      } else {
+        throw e;
+      }
+    }
 
     if (!toWallet) {
       throw new NotFoundError(`client account ${to} not found`);
@@ -302,16 +329,23 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
     const toUpdatedBalance = add(toBalance, value);
 
     const updatedFromWallet = Object.assign({}, fromWallet, {
-      balence: fromUpdatedBalance,
+      balance: fromUpdatedBalance,
     });
-
-    await this.walletRepository.update(updatedFromWallet);
+    if (newFromWallet) {
+      await this.walletRepository.create(updatedFromWallet, ctx);
+    } else {
+      await this.walletRepository.update(updatedFromWallet, ctx);
+    }
 
     const updatedToWallet = Object.assign({}, fromWallet, {
-      balence: toUpdatedBalance,
+      balance: toUpdatedBalance,
     });
 
-    await this.walletRepository.update(updatedToWallet);
+    if (newToWallet) {
+      await this.walletRepository.create(updatedToWallet, ctx);
+    } else {
+      await this.walletRepository.update(updatedToWallet, ctx);
+    }
 
     return true;
   }
@@ -335,7 +369,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
 
     const owner = ctx.clientIdentity.getID();
 
-    const ownerWallet = await this.walletRepository.read(owner);
+    const ownerWallet = await this.walletRepository.read(owner, ctx);
 
     if (ownerWallet.balance < value) {
       throw new BalanceError(`client account ${owner} has insufficient funds.`);
@@ -347,7 +381,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
       value: value,
     });
 
-    await this.allowanceRepository.create(allowance);
+    await this.allowanceRepository.create(allowance, ctx);
 
     // Emit the Approval event
     const approvalEvent = { owner, spender, value: value };
@@ -452,16 +486,32 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
       throw new ValidationError("mint amount must be a positive integer");
     }
 
-    const minterWallet = await this.walletRepository.read(minter);
-    const currentBalance = minterWallet.balance;
+    let minterWallet: ERC20Wallet;
+    try {
+      minterWallet = await this.walletRepository.read(minter, ctx);
 
-    const updatedBalance = add(currentBalance, amount);
+      const currentBalance = minterWallet.balance;
 
-    const updatedminter = Object.assign({}, minterWallet, {
-      balance: updatedBalance,
-    });
+      const updatedBalance = add(currentBalance, amount);
 
-    await this.walletRepository.update(updatedminter);
+      const updatedminter = Object.assign({}, minterWallet, {
+        balance: updatedBalance,
+      });
+
+      await this.walletRepository.update(updatedminter, ctx);
+    } catch (error: any) {
+      if (error.code === 404) {
+        // Create a new wallet for the minter
+        const newWallet = new ERC20Wallet({
+          id: minter,
+          balance: amount,
+          token: await this.TokenName(ctx),
+        });
+        await this.walletRepository.create(newWallet, ctx);
+      } else {
+        throw error;
+      }
+    }
 
     // Emit the Transfer event
     const transferEvent = { from: "0x0", to: minter, value: amount };
@@ -485,7 +535,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
 
     const minter = ctx.clientIdentity.getID();
 
-    const minterWallet = await this.walletRepository.read(minter);
+    const minterWallet = await this.walletRepository.read(minter, ctx);
 
     const currentBalance = minterWallet.balance;
 
@@ -499,7 +549,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
       balance: updatedBalance,
     });
 
-    await this.walletRepository.update(updatedminter);
+    await this.walletRepository.update(updatedminter, ctx);
 
     logger.info(`${amount} tokens were burned`);
 
@@ -524,7 +574,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
 
     const logger = this.logFor(ctx).for(this.BurnFrom);
 
-    const accountWallet = await this.walletRepository.read(account);
+    const accountWallet = await this.walletRepository.read(account, ctx);
 
     const currentBalance = accountWallet.balance;
 
@@ -538,7 +588,7 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
       balance: updatedBalance,
     });
 
-    await this.walletRepository.update(updatedaccount);
+    await this.walletRepository.update(updatedaccount, ctx);
 
     logger.info(`${amount} tokens were berned from ${account}`);
 
@@ -585,5 +635,33 @@ export abstract class FabricERC20Contract extends SerializedCrudContract<ERC20Wa
     // Get ID of submitting client identity
     const clientAccountID = ctx.clientIdentity.getID();
     return clientAccountID;
+  }
+
+  /**
+   * Retrieves the wallet of a specific account from the blockchain.
+   *
+   * @param {Context} ctx - The transaction context.
+   * @param {string} account - The account ID for which the wallet needs to be retrieved.
+   *
+   * @returns {Promise<ERC20Wallet>} - A promise that resolves to the wallet of the specified account.
+   */
+  async getWallet(ctx: Context, account: string): Promise<ERC20Wallet> {
+    let wallet: ERC20Wallet;
+    try {
+      wallet = await this.walletRepository.read(account, ctx);
+    } catch (error: any) {
+      if (error.code === 404) {
+        // Create a new wallet for the minter
+        const newWallet = new ERC20Wallet({
+          id: account,
+          balance: 0,
+          token: await this.TokenName(ctx),
+        });
+        wallet = await this.walletRepository.create(newWallet, ctx);
+      } else {
+        throw error;
+      }
+    }
+    return wallet;
   }
 }

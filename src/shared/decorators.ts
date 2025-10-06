@@ -19,6 +19,22 @@ import { FabricModelKeys } from "./constants";
 import { Context as HLContext } from "fabric-contract-api";
 import { apply } from "@decaf-ts/reflection";
 
+/**
+ * Decorator for marking methods that require ownership authorization.
+ * Checks the owner of the token before allowing the method to be executed.
+ *
+ * @example
+ * ```typescript
+ * class TokenContract extends Contract {
+ *   @Owner()
+ *   async Mint(ctx: Context, amount: number) {
+ *     // Mint token logic
+ *   }
+ * }
+ * ```
+ *
+ * @returns {MethodDecorator} A method decorator that checks ownership authorization.
+ */
 export function Owner() {
   return function (
     target: any,

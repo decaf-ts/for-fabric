@@ -14,7 +14,7 @@ import {
 } from "../utils";
 import { TestERC20Contract } from "../assets/contract/erc-20-contract/TestERC20Contract";
 import { ERC20Token } from "../../src/contracts/erc20/models";
-import { AuthorizationError } from "@decaf-ts/core";
+import { CryptoUtils } from "../../src/shared/crypto";
 
 jest.setTimeout(5000000);
 
@@ -136,9 +136,18 @@ describe("Test ERC20", () => {
   });
 
   it("Fails to mint with not authorized user", async () => {
+    enrollmentService = new FabricEnrollmentService(caConfig);
+    userID = await enrollmentService.registerAndEnroll(
+      user,
+      false,
+      "",
+      "client"
+    );
+    expect(userID.id).toBeDefined();
+
     const clientConfig = {
-      keyDirectoryPath: Buffer.from(userID.credentials!.privateKey!),
-      certDirectoryPath: Buffer.from(userID.credentials!.certificate!),
+      keyCertOrDirectoryPath: Buffer.from(userID.credentials!.privateKey!),
+      certCertOrDirectoryPath: Buffer.from(userID.credentials!.certificate!),
     };
 
     const clientTestERC20ModelRepository = TestERC20ModelRepository.for(
@@ -147,8 +156,31 @@ describe("Test ERC20", () => {
 
     try {
       await clientTestERC20ModelRepository.mint(1000000); // This should fail
-    } catch (error) {
-      expect(error).toBeInstanceOf(AuthorizationError);
+    } catch (e: any) {
+      if (e.message.includes("AuthorizationError")) {
+        console.log("Authorization Error occurred as expected");
+      } else {
+        throw new Error("Unexpected error occurred: " + e);
+      }
     }
+  });
+
+  it("Burn tokens", async () => {
+    await TestERC20ModelRepository.burn(500000);
+  });
+
+  it("Transfer tokens from admin to client", async () => {
+    enrollmentService = new FabricEnrollmentService(caConfig);
+    userID = await enrollmentService.registerAndEnroll(
+      user,
+      false,
+      "",
+      "client"
+    );
+    expect(userID.id).toBeDefined();
+    await TestERC20ModelRepository.transfer(
+      CryptoUtils.decode(userID.id!),
+      500
+    );
   });
 });

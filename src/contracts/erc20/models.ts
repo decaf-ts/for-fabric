@@ -3,6 +3,7 @@ import {
   Cascade,
   column,
   oneToMany,
+  oneToOne,
   pk,
   table,
 } from "@decaf-ts/core";
@@ -83,7 +84,7 @@ export class ERC20Token extends BaseModel {
 @table("erc20_wallets")
 @model()
 export class ERC20Wallet extends BaseModel {
-  @pk({ type: "Number" })
+  @pk({ type: "String" })
   /**
    * @description Wallet unique identifier
    * @summary Primary key for the wallet; commonly references an account or identity
@@ -92,7 +93,7 @@ export class ERC20Wallet extends BaseModel {
 
   @column()
   @required()
-  @oneToMany(ERC20Token, {
+  @oneToOne(ERC20Token, {
     update: Cascade.CASCADE,
     delete: Cascade.CASCADE,
   })
@@ -145,6 +146,10 @@ export class Allowance extends BaseModel {
    */
   @column()
   @required()
+  @oneToMany(ERC20Wallet, {
+    update: Cascade.CASCADE,
+    delete: Cascade.CASCADE,
+  })
   /**
    * @description Owner wallet identifier
    * @summary Wallet that authorizes the allowance
@@ -165,10 +170,6 @@ export class Allowance extends BaseModel {
 
   @column()
   @required()
-  @oneToMany(ERC20Wallet, {
-    update: Cascade.CASCADE,
-    delete: Cascade.CASCADE,
-  })
   /**
    * @description Approved value
    * @summary Maximum token amount the spender may transfer on behalf of the owner
