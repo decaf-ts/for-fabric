@@ -88,7 +88,7 @@
     "typescript",
     "ts"
   ],
-  "author": "Tiago Venceslau",
+  "author": "Tiago Venceslau and Contributors",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/decaf-ts/ts-workspace/issues"
