@@ -1,7 +1,6 @@
 import { MiniLogger } from "@decaf-ts/logging";
 import { FabricContractContext } from "../../src/contracts";
 import { TestERC20Contract } from "../assets/contract/test/TestERc20Contract";
-import { v4 as uuidv4 } from "uuid";
 import { CouchDBStatement } from "@decaf-ts/for-couchdb";
 
 const state: Record<string, any> = {};

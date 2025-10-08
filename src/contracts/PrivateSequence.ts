@@ -1,5 +1,5 @@
 import { BaseModel, index, pk, table } from "@decaf-ts/core";
-import { model, ModelArg, required } from "@decaf-ts/decorator-validation";
+import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 
 @table(CouchDBKeys.SEQUENCE)

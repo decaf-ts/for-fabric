@@ -25,7 +25,7 @@ import {
   Object as FabricObject,
   Property as FabricProperty,
 } from "fabric-contract-api";
-import { debug, Logger, Logging } from "@decaf-ts/logging";
+import { Logger, Logging } from "@decaf-ts/logging";
 import { ContractLogger } from "./logging";
 import {
   OrderDirection,

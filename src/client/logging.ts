@@ -73,7 +73,7 @@ export class FabricLogger extends MiniLogger {
   protected override log(
     level: LogLevel,
     msg: StringLike | Error,
-    stack?: string
+    stack?: Error
   ) {
     if (
       NumericLogLevels[this.config("level") as LogLevel] <
