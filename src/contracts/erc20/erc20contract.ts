@@ -7,6 +7,7 @@ import { Allowance, ERC20Token, ERC20Wallet } from "./models";
 import { Owner } from "../../shared/decorators";
 import { FabricContractRepository } from "../FabricContractRepository";
 import {
+  BaseError,
   InternalError,
   NotFoundError,
   ValidationError,
@@ -278,17 +279,21 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     let newToWallet: boolean = false;
     try {
       toWallet = await this.walletRepository.read(to, ctx);
-    } catch (e: any) {
-      if (e.code === 404) {
-        // Create a new wallet for the minter
-        toWallet = new ERC20Wallet({
-          id: to,
-          balance: 0,
-          token: await this.TokenName(ctx),
-        });
-        newToWallet = true;
+    } catch (e: unknown) {
+      if (e instanceof BaseError) {
+        if (e.code === 404) {
+          // Create a new wallet for the minter
+          toWallet = new ERC20Wallet({
+            id: to,
+            balance: 0,
+            token: await this.TokenName(ctx),
+          });
+          newToWallet = true;
+        } else {
+          throw new InternalError(e.message);
+        }
       } else {
-        throw new InternalError(e.message | e);
+        throw new InternalError(e as string);
       }
     }
 
@@ -485,17 +490,21 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
       });
 
       await this.walletRepository.update(updatedminter, ctx);
-    } catch (e: any) {
-      if (e.code === 404) {
-        // Create a new wallet for the minter
-        const newWallet = new ERC20Wallet({
-          id: minter,
-          balance: amount,
-          token: await this.TokenName(ctx),
-        });
-        await this.walletRepository.create(newWallet, ctx);
+    } catch (e: unknown) {
+      if (e instanceof BaseError) {
+        if (e.code === 404) {
+          // Create a new wallet for the minter
+          const newWallet = new ERC20Wallet({
+            id: minter,
+            balance: amount,
+            token: await this.TokenName(ctx),
+          });
+          await this.walletRepository.create(newWallet, ctx);
+        } else {
+          throw new InternalError(e.message);
+        }
       } else {
-        throw new InternalError(e.message | e);
+        throw new InternalError(e as string);
       }
     }
 
