@@ -42,6 +42,7 @@ describe("Test enrollement", () => {
   let peerConfig: PeerConfig;
 
   let userID: Identity;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let clientAdapter: FabricClientAdapter;
   let enrollmentService: FabricEnrollmentService;
   let TestModelRepository: Repo<TestPublicModel, any, any, any, any>;

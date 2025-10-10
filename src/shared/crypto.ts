@@ -395,6 +395,7 @@ export class CryptoUtils {
    * @function getKey
    */
   static async getKey(derivation: ArrayBuffer) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const ivlen = 16;
     const keylen = 32;
     const derivedKey = derivation.slice(0, keylen);

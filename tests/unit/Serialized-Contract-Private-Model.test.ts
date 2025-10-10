@@ -11,6 +11,7 @@ const ctx = {
   stub: {
     getTransient: () => {
       return {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         has: (item: any) => {
           return false;
         },
@@ -106,6 +107,7 @@ describe("Tests Public contract", () => {
       nif: "123456789",
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const res = await contract.create(ctx as any, model.serialize());
 
     console.log("Result: ", privateState);

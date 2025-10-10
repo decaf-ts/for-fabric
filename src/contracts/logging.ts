@@ -65,13 +65,13 @@ export class ContractLogger extends MiniLogger {
    * @summary Overrides the base log method to use the Fabric context's logger
    * @param {LogLevel} level - The log level
    * @param {StringLike | Error} msg - The message to log
-   * @param {string} [stack] - Optional stack trace for errors
+   * @param {Error} [stack] - Optional stack trace for errors
    * @return {void}
    */
   protected override log(
     level: LogLevel,
     msg: StringLike | Error,
-    stack?: string
+    stack?: Error
   ) {
     if (
       NumericLogLevels[this.config("level") as LogLevel] <
