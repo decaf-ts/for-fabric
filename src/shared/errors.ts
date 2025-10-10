@@ -34,6 +34,22 @@ export class BalanceError extends InternalError {
 }
 
 /**
+ * @summary Represents a failure in balance to perform a transaction in Smart Contracts
+ *
+ * @param {string} msg the error message
+ *
+ * @class BalanceError
+ * @extends InternalError
+ *
+ * @category Errors
+ */
+export class AllowanceError extends InternalError {
+  constructor(msg: string | Error) {
+    super(msg, AllowanceError.name);
+  }
+}
+
+/**
  * @summary Represents a failure registrating new entities
  *
  * @param {string} msg the error message

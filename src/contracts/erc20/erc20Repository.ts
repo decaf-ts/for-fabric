@@ -42,7 +42,7 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
     return Number(this.decode(decimals));
   }
 
-  async totalSupplys(): Promise<number> {
+  async totalSupply(): Promise<number> {
     const total = await this.adapter.submitTransaction("TotalSupply");
     return Number(this.decode(total));
   }

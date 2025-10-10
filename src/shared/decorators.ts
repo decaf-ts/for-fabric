@@ -52,7 +52,7 @@ export function Owner() {
 
       const select = await (this as FabricERC20Contract)[
         "tokenRepository"
-      ].select(undefined, ctx);
+      ].selectWithContext(undefined, ctx);
 
       const tokens = await select.execute();
 

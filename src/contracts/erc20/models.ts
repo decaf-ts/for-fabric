@@ -1,12 +1,4 @@
-import {
-  BaseModel,
-  Cascade,
-  column,
-  oneToMany,
-  oneToOne,
-  pk,
-  table,
-} from "@decaf-ts/core";
+import { BaseModel, column, pk, table } from "@decaf-ts/core";
 import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
 
 /**
@@ -93,10 +85,6 @@ export class ERC20Wallet extends BaseModel {
 
   @column()
   @required()
-  @oneToOne(ERC20Token, {
-    update: Cascade.CASCADE,
-    delete: Cascade.CASCADE,
-  })
   /**
    * @description Associated token name
    * @summary References the ERC20Token this wallet holds; maintained as a relationship for cascading updates/deletes
@@ -146,10 +134,6 @@ export class Allowance extends BaseModel {
    */
   @column()
   @required()
-  @oneToMany(ERC20Wallet, {
-    update: Cascade.CASCADE,
-    delete: Cascade.CASCADE,
-  })
   /**
    * @description Owner wallet identifier
    * @summary Wallet that authorizes the allowance
@@ -158,10 +142,6 @@ export class Allowance extends BaseModel {
 
   @column()
   @required()
-  @oneToMany(ERC20Wallet, {
-    update: Cascade.CASCADE,
-    delete: Cascade.CASCADE,
-  })
   /**
    * @description Spender wallet identifier
    * @summary Wallet allowed to spend up to the approved value from the owner
