@@ -16,5 +16,5 @@
 
 .github/ @decaf-ts/CI-CD @decaf-ts/quality
 
-.github/CODEOWNERS @decaf-ts/owners
-LICENCE.md @decaf-ts/owners
+.github/CODEOWNERS @decaf-ts/Techlead
+LICENCE.md @decaf-ts/Techlead
