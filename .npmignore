@@ -18,3 +18,4 @@ eslint.config.js
 gulpfile.js
 jest.config.ts
 tsconfig.json
+.codex
