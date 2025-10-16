@@ -27,10 +27,17 @@ import {
   BulkCrudOperationKeys,
   modelToTransient,
 } from "@decaf-ts/db-decorators";
-import { Adapter, final, PersistenceKeys, Repository } from "@decaf-ts/core";
+import {
+  Adapter,
+  Dispatch,
+  final,
+  PersistenceKeys,
+  Repository,
+} from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
+import { FabricClientDispatch } from "./FabricClientDispatch";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -850,6 +857,10 @@ export class FabricClientAdapter extends CouchDBAdapter<
 
     log.debug(`Connecting to ${config.mspId}`);
     return connect(options);
+  }
+
+  override Dispatch(): Dispatch {
+    return new FabricClientDispatch(this.getClient());
   }
 
   /**

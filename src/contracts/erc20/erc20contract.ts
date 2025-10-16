@@ -1,7 +1,11 @@
 import { AuthorizationError, Condition } from "@decaf-ts/core";
 import { Context, Transaction } from "fabric-contract-api";
 import { add, sub } from "../../shared/math";
-import { AllowanceError, BalanceError } from "../../shared/errors";
+import {
+  AllowanceError,
+  BalanceError,
+  NotInitializedError,
+} from "../../shared/errors";
 import { FabricContractAdapter } from "../ContractAdapter";
 import { Allowance, ERC20Token, ERC20Wallet } from "./models";
 import { Owner } from "../../shared/decorators";
@@ -13,6 +17,7 @@ import {
   ValidationError,
 } from "@decaf-ts/db-decorators";
 import { FabricCrudContract } from "../crud/crud-contract";
+import { FabricContractRepositoryObservableHandler } from "../FabricContractRepositoryObservableHandler";
 
 /**
  * @description ERC20 token contract base for Hyperledger Fabric
@@ -183,10 +188,6 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
       throw new InternalError("Failed to transfer");
     }
 
-    // Emit the Transfer event
-    const transferEvent = { from, to, value: value };
-    ctx.stub.setEvent("Transfer", Buffer.from(JSON.stringify(transferEvent)));
-
     return true;
   }
 
@@ -243,14 +244,12 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
       throw new InternalError("Failed to transfer");
     }
 
-    // Emit the Transfer event
-    const transferEvent = { from, to, value: value };
-    ctx.stub.setEvent("Transfer", Buffer.from(JSON.stringify(transferEvent)));
-
     return true;
   }
 
   async _transfer(ctx: Context, from: string, to: string, value: number) {
+    const logger = this.logFor(ctx).for(this._transfer);
+
     if (from === to) {
       throw new AuthorizationError(
         "cannot transfer to and from same client account"
@@ -319,6 +318,20 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
       await this.walletRepository.update(updatedToWallet, ctx);
     }
 
+    // Emit the Transfer event
+    const transferEvent = { from, to, value: value };
+    const eventHandler =
+      this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
+    eventHandler.updateObservers(
+      logger,
+      "",
+      "Transfer",
+      "",
+      ctx,
+      "",
+      transferEvent
+    );
+
     return true;
   }
 
@@ -339,6 +352,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
   ): Promise<boolean> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
+    const logger = this.logFor(ctx).for(this.Approve);
 
     const owner = ctx.clientIdentity.getID();
 
@@ -366,7 +380,17 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     // Emit the Approval event
     const approvalEvent = { owner, spender, value: value };
-    ctx.stub.setEvent("Approval", Buffer.from(JSON.stringify(approvalEvent)));
+    const eventHandler =
+      this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
+    eventHandler.updateObservers(
+      logger,
+      "",
+      "Approval",
+      "",
+      ctx,
+      "",
+      approvalEvent
+    );
 
     return true;
   }
@@ -451,7 +475,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     const select = await this.tokenRepository.selectWithContext(undefined, ctx);
     const tokens = await select.execute();
     if (tokens.length == 0) {
-      throw new InternalError(
+      throw new NotInitializedError(
         "contract options need to be set before calling any function, call Initialize() to initialize contract"
       );
     }
@@ -469,6 +493,8 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
   async Mint(ctx: Context, amount: number): Promise<void> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
+
+    const logger = this.logFor(ctx).for(this.Mint);
 
     // Get ID of submitting client identity
     const minter = ctx.clientIdentity.getID();
@@ -510,7 +536,17 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     // Emit the Transfer event
     const transferEvent = { from: "0x0", to: minter, value: amount };
-    ctx.stub.setEvent("Transfer", Buffer.from(JSON.stringify(transferEvent)));
+    const eventHandler =
+      this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
+    eventHandler.updateObservers(
+      logger,
+      "",
+      "Transfer",
+      "",
+      ctx,
+      "",
+      transferEvent
+    );
   }
 
   /**
@@ -550,7 +586,17 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     // Emit the Transfer event
     const transferEvent = { from: minter, to: "0x0", value: amount };
-    ctx.stub.setEvent("Transfer", Buffer.from(JSON.stringify(transferEvent)));
+    const eventHandler =
+      this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
+    eventHandler.updateObservers(
+      logger,
+      "",
+      "Transfer",
+      "",
+      ctx,
+      "",
+      transferEvent
+    );
   }
 
   /**
@@ -589,7 +635,17 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     // Emit the Transfer event
     const transferEvent = { from: account, to: "0x0", value: amount };
-    ctx.stub.setEvent("Transfer", Buffer.from(JSON.stringify(transferEvent)));
+    const eventHandler =
+      this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
+    eventHandler.updateObservers(
+      logger,
+      "",
+      "Transfer",
+      "",
+      ctx,
+      "",
+      transferEvent
+    );
   }
 
   /**

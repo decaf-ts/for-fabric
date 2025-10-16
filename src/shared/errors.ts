@@ -97,6 +97,12 @@ export class MissingContextError extends InternalError {
 
 export class UnauthorizedPrivateDataAccess extends BaseError {
   constructor(msg: string | Error = MISSING_PRIVATE_DATA_ERROR_MESSAGE) {
-    super(MissingContextError.name, msg, 403);
+    super(UnauthorizedPrivateDataAccess.name, msg, 403);
+  }
+}
+
+export class NotInitializedError extends BaseError {
+  constructor(msg: string | Error) {
+    super(NotInitializedError.name, msg, 409);
   }
 }

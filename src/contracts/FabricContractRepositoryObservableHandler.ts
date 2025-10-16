@@ -1,8 +1,8 @@
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
 import { EventIds, ObserverHandler } from "@decaf-ts/core";
 import { generateFabricEventName } from "../shared/events";
-import { FabricContractContext } from "./ContractContext";
 import { Logger } from "@decaf-ts/logging";
+import { Context } from "fabric-contract-api";
 
 /**
  * @description Observer handler for Fabric chaincode events
@@ -78,14 +78,17 @@ export class FabricContractRepositoryObservableHandler extends ObserverHandler {
     table: string,
     event: OperationKeys | BulkCrudOperationKeys | string,
     id: EventIds,
-    ctx: FabricContractContext,
-    owner?: string
+    ctx: Context,
+    owner?: string,
+    payload?: object | string | undefined
   ): Promise<void> {
     const { stub } = ctx;
     if (this.supportedEvents.indexOf(event) !== -1) {
       log.debug(`Emitting ${event} event`);
       const eventName = generateFabricEventName(table, event, owner);
       stub.setEvent(eventName, Buffer.from(JSON.stringify({ id: id })));
+    } else {
+      stub.setEvent(event, Buffer.from(JSON.stringify(payload)));
     }
   }
 }

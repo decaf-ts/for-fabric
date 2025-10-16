@@ -1,4 +1,4 @@
-import { Dispatch } from "@decaf-ts/core";
+import { Adapter, Dispatch, EventIds, UnsupportedError } from "@decaf-ts/core";
 import { PeerConfig } from "../shared/types";
 import { Client } from "@grpc/grpc-js";
 import { FabricClientAdapter } from "./FabricClientAdapter";
@@ -98,6 +98,57 @@ export class FabricClientDispatch extends Dispatch {
   }
 
   /**
+   * @description Starts observing an adapter
+   * @summary Connects this dispatch to an adapter to monitor its operations
+   * @param {Adapter<any, any, any, any>} observer - The adapter to observe
+   * @return {void}
+   */
+  override observe(observer: FabricClientAdapter): void {
+    if (!(observer instanceof FabricClientAdapter))
+      throw new UnsupportedError(
+        "Only FabricClientAdapter can be observed by dispatch"
+      );
+    this.adapter = observer;
+    this.models = Adapter.models(this.adapter.alias);
+    this.initialize().then(() =>
+      this.log.verbose(
+        `Dispatch initialized for ${this.adapter!.alias} adapter`
+      )
+    );
+  }
+
+  /**
+   * @description Updates observers about a database event
+   * @summary Notifies observers about a change in the database
+   * @param {string} table - The name of the table where the change occurred
+   * @param {OperationKeys|BulkCrudOperationKeys|string} event - The type of operation that occurred
+   * @param {EventIds} id - The identifier(s) of the affected record(s)
+   * @return {Promise<void>} A promise that resolves when all observers have been notified
+   */
+  override async updateObservers(
+    table: string,
+    event: string,
+    payload: EventIds | object | string
+  ): Promise<void> {
+    if (!this.adapter) {
+      this.log.verbose(
+        `No adapter observed for dispatch; skipping observer update for ${table}:${event}`
+      );
+      return;
+    }
+    try {
+      await this.adapter.refresh(
+        table,
+        event,
+        payload.id ? payload.id : undefined,
+        payload
+      );
+    } catch (e: unknown) {
+      throw new InternalError(`Failed to refresh dispatch: ${e}`);
+    }
+  }
+
+  /**
    * @description Processes incoming chaincode events
    * @summary Listens for events from the chaincode and dispatches them to registered observers
    * @return {Promise<void>} Promise that resolves when event handling stops
@@ -138,7 +189,11 @@ export class FabricClientDispatch extends Dispatch {
         if (owner && owner !== this.adapter.config?.mspId) continue;
         const payload: { id: string } = this.parsePayload(evt.payload);
         try {
-          await this.updateObservers(table, event, payload.id);
+          await this.updateObservers(
+            table ? table : this.models[0].name,
+            event,
+            payload
+          );
         } catch (e: unknown) {
           log.error(
             `Failed update observables for table ${table} event ${event} id: ${payload.id}: ${e}`

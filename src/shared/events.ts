@@ -46,10 +46,7 @@ export function generateFabricEventName(
  */
 export function parseEventName(name: string) {
   const parts = name.split("_");
-  if (parts.length < 2 || parts.length > 3)
-    throw new InternalError(
-      "Invalid event name: " + name + " (expected table_event[_owner])"
-    );
+  if (parts.length < 2 || parts.length > 3) return { event: name };
   return {
     table: parts[0],
     event: parts[1],
