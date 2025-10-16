@@ -16,6 +16,7 @@ import { TestERC20Contract } from "../assets/contract/erc-20-contract/TestERC20C
 import { ERC20Token } from "../../src/contracts/erc20/models";
 import { CryptoUtils } from "../../src/shared/crypto";
 import { Observer } from "@decaf-ts/core";
+import { ERC20Events } from "../../src/shared/erc20/erc20-constants";
 
 jest.setTimeout(5000000);
 
@@ -186,7 +187,7 @@ describe("Test ERC20", () => {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     expect(mock).toHaveBeenCalledTimes(1);
-    expect(mock).toHaveBeenCalledWith("Transfer", {
+    expect(mock).toHaveBeenCalledWith(ERC20Events.TRANSFER, {
       from: "0x0",
       to: adminID,
       value: 1000000,
@@ -222,7 +223,7 @@ describe("Test ERC20", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
     expect(mock).toHaveBeenCalledTimes(1);
-    expect(mock).toHaveBeenCalledWith("Transfer", {
+    expect(mock).toHaveBeenCalledWith(ERC20Events.TRANSFER, {
       from: adminID,
       to: "0x0",
       value: 500000,
@@ -275,7 +276,7 @@ describe("Test ERC20", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
     expect(mock).toHaveBeenCalledTimes(1);
-    expect(mock).toHaveBeenCalledWith("Transfer", {
+    expect(mock).toHaveBeenCalledWith(ERC20Events.TRANSFER, {
       from: adminID,
       to: CryptoUtils.decode(clientID.id!),
       value: 500,
@@ -395,7 +396,7 @@ describe("Test ERC20", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
     expect(mock).toHaveBeenCalledTimes(2);
-    expect(mock).toHaveBeenLastCalledWith("Transfer", {
+    expect(mock).toHaveBeenLastCalledWith(ERC20Events.TRANSFER, {
       from: CryptoUtils.decode(userID1.id!),
       to: CryptoUtils.decode(userID2.id!),
       value: 500,
@@ -490,7 +491,7 @@ describe("Test ERC20", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
     expect(mock).toHaveBeenCalledTimes(2);
-    expect(mock).toHaveBeenLastCalledWith("Transfer", {
+    expect(mock).toHaveBeenLastCalledWith(ERC20Events.TRANSFER, {
       from: CryptoUtils.decode(userID1.id!),
       to: "0x0",
       value: 500,
@@ -544,7 +545,7 @@ describe("Test ERC20", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
     expect(mock).toHaveBeenCalledTimes(2);
-    expect(mock).toHaveBeenLastCalledWith("Approval", {
+    expect(mock).toHaveBeenLastCalledWith(ERC20Events.APPROVAL, {
       owner: CryptoUtils.decode(userID1.id!),
       spender: adminID,
       value: 500,
@@ -705,7 +706,7 @@ describe("Test ERC20", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
     expect(mock).toHaveBeenCalledTimes(2);
-    expect(mock).toHaveBeenLastCalledWith("Approval", {
+    expect(mock).toHaveBeenLastCalledWith(ERC20Events.APPROVAL, {
       owner: CryptoUtils.decode(userID1.id!),
       spender: adminID,
       value: 500,
@@ -762,7 +763,7 @@ describe("Test ERC20", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
     expect(mock).toHaveBeenCalledTimes(2);
-    expect(mock).toHaveBeenLastCalledWith("Approval", {
+    expect(mock).toHaveBeenLastCalledWith(ERC20Events.APPROVAL, {
       owner: CryptoUtils.decode(userID1.id!),
       spender: adminID,
       value: 500,

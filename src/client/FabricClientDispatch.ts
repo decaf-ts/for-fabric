@@ -122,13 +122,13 @@ export class FabricClientDispatch extends Dispatch {
    * @summary Notifies observers about a change in the database
    * @param {string} table - The name of the table where the change occurred
    * @param {OperationKeys|BulkCrudOperationKeys|string} event - The type of operation that occurred
-   * @param {EventIds} id - The identifier(s) of the affected record(s)
+   * @param {any} payload - The event payload
    * @return {Promise<void>} A promise that resolves when all observers have been notified
    */
   override async updateObservers(
     table: string,
     event: string,
-    payload: EventIds | object | string
+    payload: any
   ): Promise<void> {
     if (!this.adapter) {
       this.log.verbose(

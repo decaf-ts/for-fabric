@@ -18,6 +18,7 @@ import {
 } from "@decaf-ts/db-decorators";
 import { FabricCrudContract } from "../crud/crud-contract";
 import { FabricContractRepositoryObservableHandler } from "../FabricContractRepositoryObservableHandler";
+import { ERC20Events } from "../../shared/erc20/erc20-constants";
 
 /**
  * @description ERC20 token contract base for Hyperledger Fabric
@@ -325,7 +326,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     eventHandler.updateObservers(
       logger,
       "",
-      "Transfer",
+      ERC20Events.TRANSFER,
       "",
       ctx,
       "",
@@ -385,7 +386,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     eventHandler.updateObservers(
       logger,
       "",
-      "Approval",
+      ERC20Events.APPROVAL,
       "",
       ctx,
       "",
@@ -541,7 +542,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     eventHandler.updateObservers(
       logger,
       "",
-      "Transfer",
+      ERC20Events.TRANSFER,
       "",
       ctx,
       "",
@@ -591,7 +592,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     eventHandler.updateObservers(
       logger,
       "",
-      "Transfer",
+      ERC20Events.TRANSFER,
       "",
       ctx,
       "",
@@ -640,7 +641,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     eventHandler.updateObservers(
       logger,
       "",
-      "Transfer",
+      ERC20Events.TRANSFER,
       "",
       ctx,
       "",

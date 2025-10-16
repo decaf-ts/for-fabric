@@ -71,6 +71,8 @@ export class FabricContractRepositoryObservableHandler extends ObserverHandler {
    * @param {EventIds} id - The event identifier
    * @param {FabricContractContext} ctx - The Fabric contract context
    * @param {string} [owner] - Optional owner identifier for the event
+   * @param {object | string | undefined} [owner] - Optional payload for the event
+   *
    * @return {Promise<void>} Promise that resolves when the event is emitted
    */
   override async updateObservers(

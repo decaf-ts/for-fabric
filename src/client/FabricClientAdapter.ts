@@ -859,6 +859,15 @@ export class FabricClientAdapter extends CouchDBAdapter<
     return connect(options);
   }
 
+  /**
+   * @description Creates a new Dispatch instance for the Fabric client.
+   * @summary This function is responsible for creating a new FabricClientDispatch instance that can be used to interact with the Fabric network.
+   * @returns {Dispatch} A new Dispatch instance configured for the Fabric client.
+   * @remarks The Dispatch instance is used to encapsulate the logic for interacting with the Fabric network, such as submitting transactions or querying data.
+   * @example
+   * const fabricDispatch = fabricClientAdapter.Dispatch();
+   * fabricDispatch.submitTransaction('createProduct', { name: 'Product A', price: 100 });
+   */
   override Dispatch(): Dispatch {
     return new FabricClientDispatch(this.getClient());
   }
