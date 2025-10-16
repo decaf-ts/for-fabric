@@ -20,3 +20,4 @@
 /.confluence-token
 /node_modules
 !.gitkeep
+/docker/docker-data
