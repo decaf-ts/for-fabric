@@ -25,11 +25,19 @@ import {
   OperationKeys,
   SerializationError,
   BulkCrudOperationKeys,
+  modelToTransient,
 } from "@decaf-ts/db-decorators";
-import { Adapter, final, PersistenceKeys, Repository } from "@decaf-ts/core";
+import {
+  Adapter,
+  Dispatch,
+  final,
+  PersistenceKeys,
+  Repository,
+} from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
+import { FabricClientDispatch } from "./FabricClientDispatch";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -128,7 +136,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {Uint8Array} data - The binary data to decode
    * @return {string} The decoded string
    */
-  protected decode(data: Uint8Array): string {
+  decode(data: Uint8Array): string {
     return FabricClientAdapter.decoder.decode(data);
   }
 
@@ -270,6 +278,44 @@ export class FabricClientAdapter extends CouchDBAdapter<
   }
 
   /**
+   * @description Prepares a model for persistence
+   * @summary Converts a model instance into a format suitable for database storage,
+   * handling column mapping and separating transient properties
+   * @template M - The model type
+   * @param {M} model - The model instance to prepare
+   * @param pk - The primary key property name
+   * @return The prepared data
+   */
+  override prepare<M extends Model>(
+    model: M,
+    pk: keyof M
+  ): {
+    record: Record<string, any>;
+    id: string;
+    transient?: Record<string, any>;
+  } {
+    const log = this.log.for(this.prepare);
+    const split = modelToTransient(model);
+    if ((model as any)[PersistenceKeys.METADATA]) {
+      log.silly(
+        `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
+      );
+      Object.defineProperty(split.model, PersistenceKeys.METADATA, {
+        enumerable: false,
+        writable: false,
+        configurable: true,
+        value: (model as any)[PersistenceKeys.METADATA],
+      });
+    }
+
+    return {
+      record: split.model,
+      id: model[pk] as string,
+      transient: split.transient,
+    };
+  }
+
+  /**
    * @description Converts database data back into a model instance
    * @summary Reconstructs a model instance from database data, handling column mapping
    * and reattaching transient properties
@@ -297,7 +343,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.silly(`Rebuilding model ${m.constructor.name} id ${id}`);
     const metadata = obj[PersistenceKeys.METADATA];
     const result = Object.keys(m).reduce((accum: M, key) => {
-      (accum as Record<string, any>)[key] = obj[Repository.column(accum, key)];
+      (accum as Record<string, any>)[key] = obj[key];
       return accum;
     }, m);
 
@@ -598,6 +644,9 @@ export class FabricClientAdapter extends CouchDBAdapter<
 
       return await method.call(contract, api, proposalOptions);
     } catch (e: any) {
+      if (e.code === 10) {
+        throw new Error(`${e.details[0].message}`);
+      }
       throw this.parseError(e);
     } finally {
       this.log.debug(`Closing ${this.config.mspId} gateway connection`);
@@ -808,6 +857,19 @@ export class FabricClientAdapter extends CouchDBAdapter<
 
     log.debug(`Connecting to ${config.mspId}`);
     return connect(options);
+  }
+
+  /**
+   * @description Creates a new Dispatch instance for the Fabric client.
+   * @summary This function is responsible for creating a new FabricClientDispatch instance that can be used to interact with the Fabric network.
+   * @returns {Dispatch} A new Dispatch instance configured for the Fabric client.
+   * @remarks The Dispatch instance is used to encapsulate the logic for interacting with the Fabric network, such as submitting transactions or querying data.
+   * @example
+   * const fabricDispatch = fabricClientAdapter.Dispatch();
+   * fabricDispatch.submitTransaction('createProduct', { name: 'Product A', price: 100 });
+   */
+  override Dispatch(): Dispatch {
+    return new FabricClientDispatch(this.getClient());
   }
 
   /**

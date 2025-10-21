@@ -1,8 +1,7 @@
 import { normalizeImport } from "@decaf-ts/utils";
-import { Logging } from "@decaf-ts/logging";
+import { isBrowser, Logging } from "@decaf-ts/logging";
 import { User } from "fabric-common";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
-import { isBrowser } from "@decaf-ts/utils";
 import { InternalError } from "@decaf-ts/db-decorators";
 
 const log = Logging.for("fabric-fs");

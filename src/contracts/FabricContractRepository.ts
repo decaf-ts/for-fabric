@@ -10,6 +10,7 @@ import { FabricContractContext } from "./ContractContext";
 import { Constructor, Model } from "@decaf-ts/decorator-validation";
 import {
   ConflictError,
+  ContextArgs,
   Context as Ctx,
   enforceDBDecorators,
   InternalError,
@@ -330,24 +331,32 @@ export class FabricContractRepository<M extends Model> extends Repository<
       return await super.updateObservers(table, event, id, ctx, ...args);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  override select<S extends readonly (keyof M)[]>(): WhereOption<M, M[]>;
-  override select<S extends readonly (keyof M)[]>(
-    selector: readonly [...S]
-  ): WhereOption<M, Pick<M, S[number]>[]>;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  override select<S extends readonly (keyof M)[]>(
-    selector: undefined,
-    ctx: FabricContractContext
-  ): WhereOption<M, M[]>;
-  override select<S extends readonly (keyof M)[]>(
+  async selectWithContext<S extends readonly (keyof M)[]>(
     selector?: readonly [...S],
-    ctx?: FabricContractContext
-  ): WhereOption<M, M[]> | WhereOption<M, Pick<M, S[number]>[]> {
-    if (!selector) {
-      return this.adapter.Statement<M>(ctx).select().from(this.class);
+    ctx?: FabricContractContext | Context
+  ): Promise<WhereOption<M, M[]> | WhereOption<M, Pick<M, S[number]>[]>> {
+    let contextArgs: any;
+    if (ctx instanceof FabricContractContext) {
+      contextArgs.context = ctx;
+    } else {
+      contextArgs = await Ctx.args(
+        OperationKeys.CREATE,
+        this.class,
+        [ctx],
+        this.adapter,
+        this._overrides || {}
+      );
     }
-    return this.adapter.Statement<M>(ctx).select(selector).from(this.class);
+    if (!selector) {
+      return this.adapter
+        .Statement<M>(contextArgs.context as FabricContractContext)
+        .select()
+        .from(this.class);
+    }
+    return this.adapter
+      .Statement<M>(contextArgs.context as FabricContractContext)
+      .select(selector)
+      .from(this.class);
   }
 
   /**

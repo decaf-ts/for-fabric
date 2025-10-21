@@ -34,6 +34,22 @@ export class BalanceError extends InternalError {
 }
 
 /**
+ * @summary Represents a failure in balance to perform a transaction in Smart Contracts
+ *
+ * @param {string} msg the error message
+ *
+ * @class BalanceError
+ * @extends InternalError
+ *
+ * @category Errors
+ */
+export class AllowanceError extends InternalError {
+  constructor(msg: string | Error) {
+    super(msg, AllowanceError.name);
+  }
+}
+
+/**
  * @summary Represents a failure registrating new entities
  *
  * @param {string} msg the error message
@@ -81,6 +97,41 @@ export class MissingContextError extends InternalError {
 
 export class UnauthorizedPrivateDataAccess extends BaseError {
   constructor(msg: string | Error = MISSING_PRIVATE_DATA_ERROR_MESSAGE) {
-    super(MissingContextError.name, msg, 403);
+    super(UnauthorizedPrivateDataAccess.name, msg, 403);
+  }
+}
+
+/**
+ * Represents an error that occurs when a required initialization step is not performed.
+ *
+ * @class NotInitializedError
+ * @extends BaseError
+ *
+ * @category Errors
+ *
+ * @param {string | Error} msg - The error message or an Error object to wrap.
+ *
+ * @throws {NotInitializedError} - Throws an error when a required initialization step is not performed.
+ *
+ * @example
+ * ```typescript
+ * // Initialize the application
+ * if (!isInitialized) {
+ *   throw new NotInitializedError('Application is not initialized');
+ * }
+ *
+ * // Catching an NotInitializedError
+ * try {
+ *   // Perform operations that require initialization
+ * } catch (error) {
+ *   if (error instanceof NotInitializedError) {
+ *     console.error('Initialization error:', error.message);
+ *   }
+ * }
+ * ```
+ */
+export class NotInitializedError extends BaseError {
+  constructor(msg: string | Error) {
+    super(NotInitializedError.name, msg, 409);
   }
 }

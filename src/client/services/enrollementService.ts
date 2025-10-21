@@ -148,7 +148,7 @@ export class FabricEnrollmentService extends LoggedService {
 
     verify = false;
 
-    const root = (trustedRoots as string[]).shift() as string;
+    const root = (trustedRoots as string[])[0] as string;
     log.debug(`Retrieving CA certificate from ${root}. cwd: ${process.cwd()}`);
 
     const certificate = await CoreUtils.getFileContent(root);

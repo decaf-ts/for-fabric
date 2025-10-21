@@ -1,7 +1,6 @@
-import { BaseModel, Cascade, oneToMany, pk } from "@decaf-ts/core";
+import { BaseModel, column, pk, table } from "@decaf-ts/core";
 import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
 
-@model()
 /**
  * @description ERC20 token metadata model
  * @summary Represents an ERC20 token definition within the Fabric ERC20 sample, including name, symbol, decimals, and the owning identity. Used to define the unique token managed by the contract.
@@ -21,28 +20,31 @@ import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
  *   Adapter-->>Repo: stored
  *   Repo-->>App: model
  */
+@table("erc20_tokens")
+@model()
 export class ERC20Token extends BaseModel {
-  @pk()
+  @pk({ type: "String" })
   /**
    * @description Token unique name
    * @summary Serves as the primary key for the ERC20 token definition; typically a human-readable identifier
    */
   name!: string;
 
+  @column()
   @required()
   /**
    * @description Owning identity of the token
    * @summary X.509 subject or MSP identity string that denotes who owns/controls the token definition
    */
   owner!: string;
-
+  @column()
   @required()
   /**
    * @description Token symbol
    * @summary Short ticker-like symbol used to represent the token (e.g., MTK)
    */
   symbol!: string;
-
+  @column()
   @required()
   /**
    * @description Decimal precision for token amounts
@@ -55,7 +57,6 @@ export class ERC20Token extends BaseModel {
   }
 }
 
-@model()
 /**
  * @description ERC20 wallet model
  * @summary Represents a holder account for an ERC20 token within the Fabric network, tracking balance and token association.
@@ -72,25 +73,25 @@ export class ERC20Token extends BaseModel {
  *   App->>Repo: read("acct1", ctx)
  *   Repo-->>App: ERC20Wallet
  */
+@table("erc20_wallets")
+@model()
 export class ERC20Wallet extends BaseModel {
-  @pk()
+  @pk({ type: "String" })
   /**
    * @description Wallet unique identifier
    * @summary Primary key for the wallet; commonly references an account or identity
    */
   id!: string;
 
+  @column()
   @required()
-  @oneToMany(ERC20Token, {
-    update: Cascade.CASCADE,
-    delete: Cascade.CASCADE,
-  })
   /**
    * @description Associated token name
    * @summary References the ERC20Token this wallet holds; maintained as a relationship for cascading updates/deletes
    */
   token!: string;
 
+  @column()
   @required()
   /**
    * @description Token balance for this wallet
@@ -98,6 +99,7 @@ export class ERC20Wallet extends BaseModel {
    */
   balance!: number;
 
+  @column()
   /**
    * @description Captive flag or identifier
    * @summary Optional field used by some flows to mark non-transferable funds or managed custody
@@ -122,7 +124,15 @@ export class ERC20Wallet extends BaseModel {
  *   participant App
  *   App->>App: new Allowance({ owner, spender, value })
  */
+@table("erc20_allowances")
+@model()
 export class Allowance extends BaseModel {
+  @pk({ type: "String" })
+  /**
+   * @description Allowance unique identifier
+   * @summary Primary key for the allowance; typically a unique identifier for the approval relationship
+   */
+  @column()
   @required()
   /**
    * @description Owner wallet identifier
@@ -130,22 +140,16 @@ export class Allowance extends BaseModel {
    */
   owner!: string;
 
+  @column()
   @required()
-  @oneToMany(ERC20Wallet, {
-    update: Cascade.CASCADE,
-    delete: Cascade.CASCADE,
-  })
   /**
    * @description Spender wallet identifier
    * @summary Wallet allowed to spend up to the approved value from the owner
    */
   spender!: string;
 
+  @column()
   @required()
-  @oneToMany(ERC20Wallet, {
-    update: Cascade.CASCADE,
-    delete: Cascade.CASCADE,
-  })
   /**
    * @description Approved value
    * @summary Maximum token amount the spender may transfer on behalf of the owner

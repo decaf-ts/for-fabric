@@ -16,8 +16,25 @@ import {
   required,
 } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
+import { Context as HLContext } from "fabric-contract-api";
 import { apply } from "@decaf-ts/reflection";
 
+/**
+ * Decorator for marking methods that require ownership authorization.
+ * Checks the owner of the token before allowing the method to be executed.
+ *
+ * @example
+ * ```typescript
+ * class TokenContract extends Contract {
+ *   @Owner()
+ *   async Mint(ctx: Context, amount: number) {
+ *     // Mint token logic
+ *   }
+ * }
+ * ```
+ *
+ * @returns {MethodDecorator} A method decorator that checks ownership authorization.
+ */
 export function Owner() {
   return function (
     target: any,
@@ -30,12 +47,14 @@ export function Owner() {
       this: FabricERC20Contract,
       ...args: any[]
     ) {
-      const ctx: FabricContractContext = args[0];
-      const acountId = ctx.identity.getID();
+      const ctx: HLContext = args[0];
+      const acountId = ctx.clientIdentity.getID();
 
-      const tokens = await (this as FabricERC20Contract)["tokenRepository"]
-        .select(undefined, ctx)
-        .execute();
+      const select = await (this as FabricERC20Contract)[
+        "tokenRepository"
+      ].selectWithContext(undefined, ctx);
+
+      const tokens = await select.execute();
 
       if (tokens.length == 0) {
         throw new NotFoundError("No tokens avaialble");
