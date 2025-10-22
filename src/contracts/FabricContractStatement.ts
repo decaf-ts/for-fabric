@@ -4,14 +4,14 @@ import {
   CouchDBGroupOperator,
   CouchDBKeys,
   CouchDBOperator,
+  CouchDBStatement,
   MangoOperator,
   MangoQuery,
   MangoSelector,
 } from "@decaf-ts/for-couchdb";
 import { FabricContractAdapter } from "./ContractAdapter";
-import { findPrimaryKey, InternalError } from "@decaf-ts/db-decorators";
+import { findPrimaryKey } from "@decaf-ts/db-decorators";
 import { FabricContractContext } from "./ContractContext";
-import { CouchDBStatement } from "@decaf-ts/for-couchdb";
 import { Condition, OrderDirection, Repository } from "@decaf-ts/core";
 
 /**

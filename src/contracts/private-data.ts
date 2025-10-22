@@ -1,7 +1,7 @@
 import {
+  getAllPropertyDecoratorsRecursive,
   InternalError,
   modelToTransient,
-  getAllPropertyDecoratorsRecursive,
   SerializationError,
 } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";

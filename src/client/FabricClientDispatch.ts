@@ -1,4 +1,4 @@
-import { Adapter, Dispatch, EventIds, UnsupportedError } from "@decaf-ts/core";
+import { Adapter, Dispatch, UnsupportedError } from "@decaf-ts/core";
 import { PeerConfig } from "../shared/types";
 import { Client } from "@grpc/grpc-js";
 import { FabricClientAdapter } from "./FabricClientAdapter";

@@ -1,5 +1,5 @@
 import { AuthorizationError, Repo } from "@decaf-ts/core";
-import { FabricContractContext, FabricERC20Contract } from "../contracts";
+import { FabricERC20Contract } from "../contracts";
 import {
   Context,
   NotFoundError,

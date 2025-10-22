@@ -1,5 +1,6 @@
 import {
   BulkCrudOperationKeys,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   InternalError,
   OperationKeys,
 } from "@decaf-ts/db-decorators";

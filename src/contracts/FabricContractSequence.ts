@@ -4,8 +4,7 @@ import {
   NotFoundError,
   RepositoryFlags,
 } from "@decaf-ts/db-decorators";
-import { Adapter, Repository, SequenceOptions } from "@decaf-ts/core";
-import { Sequence } from "@decaf-ts/core";
+import { Adapter, Repository, Sequence, SequenceOptions } from "@decaf-ts/core";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { FabricContractContext } from "./ContractContext";
 import { FabricContractRepository } from "./FabricContractRepository";
