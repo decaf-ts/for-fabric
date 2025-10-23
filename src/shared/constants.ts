@@ -31,11 +31,3 @@ export enum IdentityType {
  * @memberOf module:for-fabric.shared
  */
 export const FabricFlavour = "hlf-fabric";
-
-/**
- * @description Package version placeholder replaced at build time
- * @summary Constant holding the current package version injected by the build pipeline
- * @const VERSION
- * @memberOf module:for-fabric.shared
- */
-export const VERSION = "##VERSION##";

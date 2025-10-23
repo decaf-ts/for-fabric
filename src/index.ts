@@ -7,3 +7,4 @@
 export * from "./client";
 export * from "./contracts";
 export * from "./shared";
+export * from "./version";
