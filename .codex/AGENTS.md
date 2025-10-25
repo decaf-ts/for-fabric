@@ -58,3 +58,21 @@ Mirror existing history by prefixing commit subjects with the tracker key when t
 
 ## Documentation & Assets
 Use Node 22+ and npm 10+. Rebuild documentation with `npm run docs`; regenerate diagrams via `npm run drawings` or `npm run uml` (requires Docker). Keep sensitive tokens (`.npmtoken`, `.confluence-token`) out of commits and refresh them only through the existing automation.
+
+
+## Coding Principles
+
+- group similar functionality in folders (analog to namespaces but without any namespace declaration)
+- one class per file;
+- one interface per file (unless interface is just used as a type);
+- group types as other interfaces in a types.ts file per folder;
+- group constants or enums in a constants.ts file per folder;
+- group decorators in a decorators.ts file per folder;
+- always import from the specific file, never from a folder or index file (exceptions for dependencies on other packages);
+- prefer the usage of established design patters where applicable:
+  - Singleton (can be an anti-pattern. use with care);
+  - factory;
+  - observer;
+  - strategy;
+  - builder;
+  - etc;
