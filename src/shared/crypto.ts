@@ -2,7 +2,7 @@ import * as x509 from "@peculiar/x509";
 import { Crypto, CryptoKey } from "@peculiar/webcrypto";
 import { stringFormat } from "@decaf-ts/decorator-validation";
 import { Logging } from "@decaf-ts/logging";
-import { isBrowser } from "@decaf-ts/utils";
+import { isBrowser } from "@decaf-ts/logging";
 
 const crypto = new Crypto();
 x509.cryptoProvider.set(crypto);
@@ -341,7 +341,7 @@ export class CryptoUtils {
     const textEncoder = new TextEncoder();
     if (data === undefined) {
       const genGenesis = crypto.randomUUID();
-      data = textEncoder.encode(genGenesis);
+      data = textEncoder.encode(genGenesis) as unknown as ArrayBuffer;
     }
 
     const importedKey = await this.getSubtleCrypto().importKey(
@@ -354,7 +354,7 @@ export class CryptoUtils {
 
     return {
       key: importedKey,
-      iv: data,
+      iv: data!,
     };
   }
 
