@@ -864,9 +864,17 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ) {
     const ctx: FabricContractContext = args.pop();
     const record: Record<string, any> = {};
-    record[CouchDBKeys.TABLE] = tableName;
-    // record[CouchDBKeys.ID] = this.generateId(tableName, id);
-    Object.assign(record, model);
+    const testing = Model.get(tableName) as any;
+    if (model instanceof (Model.get(tableName) as any)) {
+      record[CouchDBKeys.TABLE] = tableName;
+      Object.assign(record, model);
+    } else {
+      for (const key in model) {
+        record[key] = model[key];
+        record[key][CouchDBKeys.TABLE] = tableName;
+      }
+    }
+
     return [tableName, id, record, ctx];
   }
 
@@ -878,9 +886,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ): (string | number | Record<string, any>)[] {
     const ctx: FabricContractContext = args.pop();
     const record: Record<string, any> = {};
-    record[CouchDBKeys.TABLE] = tableName;
-    // record[CouchDBKeys.ID] = this.generateId(tableName, id);
-    Object.assign(record, model);
+    if (model instanceof (Model.get(tableName) as any)) {
+      record[CouchDBKeys.TABLE] = tableName;
+      Object.assign(record, model);
+    } else {
+      for (const key in model) {
+        record[key] = model[key];
+        record[key][CouchDBKeys.TABLE] = tableName;
+      }
+    }
+
     return [tableName, id, record, ctx];
   }
 
