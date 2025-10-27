@@ -1067,7 +1067,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       if (fk) metadata.name = fk;
       return apply(
         prop(PersistenceKeys.RELATIONS),
-        list([clazz as Constructor<M>, String, Number, BigInt]),
+        list([clazz as Constructor<M>, String, Number]),
         onCreate(oneToManyOnCreate, metadata),
         onUpdate(oneToManyOnUpdate, metadata),
         onDelete(oneToManyOnDelete, metadata),

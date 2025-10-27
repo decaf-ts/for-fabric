@@ -1,5 +1,4 @@
 import { AuthorizationError, Repo } from "@decaf-ts/core";
-import { FabricContractContext, FabricERC20Contract } from "../contracts";
 import {
   Context,
   NotFoundError,
@@ -18,6 +17,7 @@ import {
 import { FabricModelKeys } from "./constants";
 import { Context as HLContext } from "fabric-contract-api";
 import { apply } from "@decaf-ts/reflection";
+import { FabricERC20Contract } from "../contracts/erc20/erc20contract";
 
 /**
  * Decorator for marking methods that require ownership authorization.
