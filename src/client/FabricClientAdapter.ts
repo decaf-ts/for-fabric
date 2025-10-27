@@ -382,7 +382,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {Constructor<M>} models - The model constructor
    * @return {Promise<void>} Promise that will throw an error
    */
-  @debug(true)
+  @debug()
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected index<M>(models: Constructor<M>): Promise<void> {
     throw new Error();
@@ -397,7 +397,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {Record<string, any>} transient - Transient data for the transaction
    * @return {Promise<Record<string, any>>} Promise resolving to the created record
    */
-  @debug(true)
+  @debug()
   @final()
   override async create(
     tableName: string,
@@ -423,7 +423,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string | number} id - The record identifier
    * @return {Promise<Record<string, any>>} Promise resolving to the retrieved record
    */
-  @debug(true)
+  @debug()
   @final()
   async read(
     tableName: string,
@@ -447,7 +447,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {Record<string, any>} transient - Transient data for the transaction
    * @return {Promise<Record<string, any>>} Promise resolving to the updated record
    */
-  @debug(true)
+  @debug()
   @final()
   async update(
     tableName: string,
@@ -473,7 +473,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string | number} id - The record identifier to delete
    * @return {Promise<Record<string, any>>} Promise resolving to the deleted record
    */
-  @debug(true)
+  @debug()
   @final()
   async delete(
     tableName: string,
@@ -514,7 +514,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    *   FabricAdapter->>FabricAdapter: Process result based on type
    *   FabricAdapter-->>Client: processed result
    */
-  @debug(true)
+  @debug()
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async raw<V>(rawInput: MangoQuery, process: boolean): Promise<V> {
     const log = this.log.for(this.raw);
