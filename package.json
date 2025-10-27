@@ -47,17 +47,17 @@
     "infrastructure:down": "docker compose -f ./docker/infrastructure/docker-compose.yaml down --rmi local -v",
     "publish-docs": "docker run -it --rm --user $(id -u):$(id -g) -v \"$(pwd)/workdocs/confluence:/content\" -e ATLASSIAN_API_TOKEN=$(cat .confluence-token) ghcr.io/markdown-confluence/publish:latest",
     "copy-storage": "sudo cp -R docker/infrastructure/storage docker/docker-data/ && sudo chmod -R 755 docker/docker-data",
-    "repo:init": "codex exec \"$(cat ./.codex/prompts/repo-setup.md)\nbase_path is `./`, initialize the repository\"",
-    "repo:setup": "codex exec \"$(cat ./.codex/prompts/repo-setup.md)\nbase_path is ./\"",
-    "repo:doc": "codex exec \"$(cat ./.codex/prompts/doc.md) $(cat ./.codex/prompts/bulk-docs.md)\nbase_path is ./\"",
+    "repo:init": "codex exec \"$(cat ./.codex/prompts/repo-setup.md)\nbase_path is `./`, initialize the repository\" -s workspace-write",
+    "repo:setup": "codex exec \"$(cat ./.codex/prompts/repo-setup.md)\nbase_path is ./\" -s workspace-write",
+    "repo:doc": "codex exec \"$(cat ./.codex/prompts/doc.md) $(cat ./.codex/prompts/bulk-docs.md)\nbase_path is ./\" -s workspace-write",
     "repo:tests": "codex exec \"$(cat ./.codex/prompts/bulk-tests.md)\nbase_path is ./ and coverage is 95%\" -s workspace-write",
-    "repo:readme": "codex exec \"$(cat ./.codex/prompts/update-readme.md)\nbase_path is ./\"",
+    "repo:readme": "codex exec \"$(cat ./.codex/prompts/update-readme.md)\nbase_path is ./\" -s workspace-write",
     "repo:pr": "npm run repo:doc && npm run repo:tests && npm run repo:readme",
     "sync-codex": "./bin/sync-codex.sh"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/decaf-ts/ts-workspace.git"
+    "url": "git+https://github.com/decaf-ts/for-fabric.git"
   },
   "engines": {
     "node": ">=20.0.0",
@@ -68,65 +68,26 @@
     "dist"
   ],
   "keywords": [
-    "plantuml",
-    "mermaid",
-    "uml",
-    "drawio",
-    "mddocs",
-    "md",
-    "jsdoc",
-    "doc",
-    "docs",
-    "documentation",
-    "test",
-    "reports",
-    "confluence",
-    "ci/cd",
-    "ci",
-    "cd",
-    "template",
-    "typescript",
-    "ts"
+    "hyperledger",
+    "fabric",
+    "blockchain",
+    "chaincode",
+    "ledger",
+    "typescrip",
+    "decaf",
+    "grpc",
+    "network",
+    "contracts"
   ],
   "author": "Tiago Venceslau and Contributors",
-  "license": "MIT",
+  "license": "MPL-2.0",
   "bugs": {
-    "url": "https://github.com/decaf-ts/ts-workspace/issues"
+    "url": "https://github.com/decaf-ts/for-fabric/issues"
   },
-  "homepage": "https://github.com/decaf-ts/ts-workspace#readme",
+  "homepage": "https://github.com/decaf-ts/for-fabric#readme",
   "devDependencies": {
     "@decaf-ts/fabric-weaver": "latest",
-    "@decaf-ts/utils": "latest",
-    "@eslint/js": "^9.25.1",
-    "@rollup/plugin-commonjs": "^28.0.3",
-    "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^16.0.1",
-    "@rollup/plugin-typescript": "^12.1.2",
-    "@stylistic/eslint-plugin": "^4.2.0",
-    "@types/jest": "^29.5.14",
-    "clean-publish": "^5.1.0",
-    "dpdm": "^3.14.0",
-    "eslint": "^9.25.1",
-    "eslint-config-prettier": "^10.1.2",
-    "eslint-plugin-prettier": "^5.2.6",
-    "globals": "^16.0.0",
-    "jest": "^29.7.0",
-    "jest-html-reporters": "^3.1.7",
-    "jest-junit": "^16.0.0",
-    "jsdoc": "^4.0.4",
-    "jsdoc-mermaid": "^1.0.0",
-    "markdown-include": "^0.4.3",
-    "minimist": "^1.2.8",
-    "nodemon": "^3.1.9",
-    "npm-check-updates": "^18.0.0",
-    "prettier": "3.5.3",
-    "rimraf": "^6.0.1",
-    "rollup": "^4.40.0",
-    "ts-jest": "^29.3.2",
-    "ts-loader": "^9.5.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.31.0"
+    "@decaf-ts/utils": "latest"
   },
   "peerDependencies": {
     "@decaf-ts/core": "latest",
@@ -137,8 +98,7 @@
     "@decaf-ts/injectable-decorators": "latest",
     "@decaf-ts/transactional-decorators": "latest",
     "@decaf-ts/logging": "latest",
-    "@decaf-ts/reflection": "latest",
-    "reflect-metadata": "^0.2.1"
+    "@decaf-ts/reflection": "latest"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.13.3",
