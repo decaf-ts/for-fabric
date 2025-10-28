@@ -662,15 +662,12 @@ describe("Test Serialized Crud Contract With Private Model", () => {
       record = JSON.parse(record.toString());
       console.log("Raw response: ", record);
 
-      const key = createCompositeKey(modelTableName, [String(id)]);
-
       const result = record[0];
-      const resultModel = result.Record;
 
       expect(result).toBeDefined();
-      expect(result.Key).toBe(key);
-      expect(resultModel["tst_name"]).toEqual(model.name);
-      expect(resultModel["tst_nif"]).toEqual(model.nif);
+      expect(result["id"]).toBe(id);
+      expect(result["tst_name"]).toEqual(model.name);
+      expect(result["tst_nif"]).toEqual(model.nif);
     } catch (error: any) {
       expect(error).toBeUndefined();
     }

@@ -9,6 +9,6 @@
  */
 
 export * from "./fabric-fs";
-export * from "./FabricClientAdapter";
 export * from "./FabricClientDispatch";
+export * from "./FabricClientAdapter";
 export * from "../shared/types";

@@ -147,6 +147,23 @@ export class FabricContractPrivateDataAdapter extends FabricContractAdapter {
     };
   }
 
+  override createPrefix(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>,
+    ...args: any[]
+  ) {
+    const ctx: FabricContractContext = args.pop();
+    const collections = Object.keys(model);
+    for (const collection of collections) {
+      model[collection][CouchDBKeys.TABLE] = tableName;
+    }
+
+    const record: Record<string, any> = model;
+
+    return [tableName, id, record, ctx];
+  }
+
   override updatePrefix(
     tableName: string,
     id: string | number,

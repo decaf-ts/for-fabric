@@ -8,6 +8,7 @@ import {
   CloseableAsyncIterable,
 } from "@hyperledger/fabric-gateway";
 import { parseEventName } from "../shared/events";
+import { FabricContractAdapter } from "../contracts";
 
 /**
  * @description Event dispatcher for Hyperledger Fabric chaincode events
@@ -229,3 +230,6 @@ export class FabricClientDispatch extends Dispatch {
     this.handleEvents();
   }
 }
+
+if (FabricContractAdapter)
+  FabricContractAdapter["_baseDispatch"] = FabricClientDispatch;
