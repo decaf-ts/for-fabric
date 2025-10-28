@@ -86,6 +86,9 @@ describe("Test Serialized Crud Contract With Private Model", () => {
     console.log("Compiling contract: ", contractName);
 
     // Compile contract
+    // execSync(
+    //   `npm run build:contracts -- --dev --debug --name private-contract --output ./tests/assets/contract/serialized-contract-private-model`
+    // );
     compileContract(contractFolderName);
 
     //Deploy contract

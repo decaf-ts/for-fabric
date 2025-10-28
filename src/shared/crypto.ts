@@ -353,7 +353,7 @@ export class CryptoUtils {
 
     return {
       key: importedKey,
-      iv: data,
+      iv: data!,
     };
   }
 
