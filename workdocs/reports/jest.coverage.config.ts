@@ -4,6 +4,7 @@ import conf from "../../jest.config";
 const config: Config.InitialOptions = {
   ...conf,
   collectCoverage: true,
+
   coverageDirectory: "./workdocs/reports/coverage",
   reporters: [
     "default",
