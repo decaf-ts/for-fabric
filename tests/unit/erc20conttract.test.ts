@@ -1,5 +1,8 @@
 import { MiniLogger } from "@decaf-ts/logging";
-import { FabricContractContext } from "../../src/contracts";
+import type {
+  FabricContractContext,
+  FabricContractRepository,
+} from "../../src/contracts";
 import { TestERC20Contract } from "../assets/contract/test/TestERc20Contract";
 import { CouchDBStatement } from "@decaf-ts/for-couchdb";
 
@@ -75,6 +78,10 @@ const ctx = {
     getID: () => "id",
     getMSPID: () => "Aeon",
   },
+  clientIdentity: {
+    getID: () => "id",
+    getMSPID: () => "Aeon",
+  },
 } as unknown as FabricContractContext;
 
 jest
@@ -85,12 +92,36 @@ jest
 
 describe(`ERC20 token test`, function () {
   let contract: TestERC20Contract;
+  const tokens: Record<string, any>[] = [];
+  const tokenRepositoryMock = {
+    selectWithContext: jest.fn().mockImplementation(async () => ({
+      execute: jest.fn().mockResolvedValue(tokens.slice()),
+    })),
+    create: jest.fn().mockImplementation(async (token: Record<string, any>) => {
+      tokens.push({ ...token });
+    }),
+  };
 
   beforeAll(async () => {
     contract = new TestERC20Contract();
+    (contract as unknown as Record<string, unknown>).tokenRepository =
+      tokenRepositoryMock as unknown as FabricContractRepository<any>;
+  });
+
+  beforeEach(() => {
+    tokens.length = 0;
+    tokenRepositoryMock.selectWithContext.mockClear();
+    tokenRepositoryMock.create.mockClear();
   });
   it("initializes", async () => {
-    const created = await contract.Initialize(ctx, "TestToken", "TT", 1000);
+    const created = await contract.Initialize(
+      ctx,
+      {
+        name: "TestToken",
+        symbol: "TT",
+        decimals: 1000,
+      } as any
+    );
     expect(created).toBe(true);
 
     const tokenName = await contract.TokenName(ctx);
