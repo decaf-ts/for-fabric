@@ -605,9 +605,9 @@
       }
     },
     "node_modules/@decaf-ts/core": {
-      "version": "0.5.43",
-      "resolved": "https://registry.npmjs.org/@decaf-ts/core/-/core-0.5.43.tgz",
-      "integrity": "sha512-RJD854Ehg80pRwFlGDu9Dwg6Ru8YaenJ3Rxd61HXB7KUbGSmAap7T9JfwIJgfAPt4NO64eNlOwA03pOT0DZ7+g==",
+      "version": "0.5.46",
+      "resolved": "https://registry.npmjs.org/@decaf-ts/core/-/core-0.5.46.tgz",
+      "integrity": "sha512-KrBLHLIdIUkNCgO8f6Y0UfSY7pTrYMJ7lEMJzyN3Wk4DiFcRrofpT2IyzmrbHlCRw67fQRFX1NjWHwxqeHn3Nw==",
       "license": "MPL-2.0",
       "peer": true,
       "engines": {
@@ -619,16 +619,15 @@
         "@decaf-ts/decoration": "latest",
         "@decaf-ts/decorator-validation": "latest",
         "@decaf-ts/injectable-decorators": "latest",
-        "@decaf-ts/logging": "latest",
         "@decaf-ts/reflection": "latest",
         "@decaf-ts/transactional-decorators": "latest",
         "reflect-metadata": "^0.2.1"
       }
     },
     "node_modules/@decaf-ts/db-decorators": {
-      "version": "0.6.12",
-      "resolved": "https://registry.npmjs.org/@decaf-ts/db-decorators/-/db-decorators-0.6.12.tgz",
-      "integrity": "sha512-VzScaVUZ1HiinU5IYQ/jVjDfKrV0+TvCGcXxrCld9t4vklgf/bcxoE1DSR+n5Ehj80OPJWf+OVIDZTckLU3QjA==",
+      "version": "0.6.13",
+      "resolved": "https://registry.npmjs.org/@decaf-ts/db-decorators/-/db-decorators-0.6.13.tgz",
+      "integrity": "sha512-1/rLV/H3EfyF86FbaxMnSnUiqp0n+GnYcdmVhxbAMmlTLvJ+o98da7zqPe4AjHNnXvsaw9MKzFWPA9S5bc8aUA==",
       "license": "MIT",
       "peer": true,
       "engines": {
@@ -643,24 +642,23 @@
       }
     },
     "node_modules/@decaf-ts/decoration": {
-      "version": "0.6.1",
-      "resolved": "https://registry.npmjs.org/@decaf-ts/decoration/-/decoration-0.6.1.tgz",
-      "integrity": "sha512-dUsdxmZeqoY4LHbES7++TeD4KmoCuVE6uN6vX0/ujADZxtGRpJOOtNsvscO8gYwb1Vf29Tx2DBcbU6R/E8P52Q==",
+      "version": "0.6.2",
+      "resolved": "https://registry.npmjs.org/@decaf-ts/decoration/-/decoration-0.6.2.tgz",
+      "integrity": "sha512-v9NFJE6IxUg1X504itPC4v6X4E9JH0ANss0KVwxNx34jmny80dARc0rUm1m0yA51O6m5T+WiTZeE+tFLU+KL2w==",
       "license": "MIT",
       "peer": true,
+      "dependencies": {
+        "reflect-metadata": "^0.2.2"
+      },
       "engines": {
         "node": ">=20.0.0",
         "npm": ">=10.0.0"
-      },
-      "peerDependencies": {
-        "reflect-metadata": "^0.2.2",
-        "typed-object-accumulator": "latest"
       }
     },
     "node_modules/@decaf-ts/decorator-validation": {
-      "version": "1.10.1",
-      "resolved": "https://registry.npmjs.org/@decaf-ts/decorator-validation/-/decorator-validation-1.10.1.tgz",
-      "integrity": "sha512-cHIimBYTH46MoHSe+faTLywZWMh3JN9DejB58yoqpP+olj6avSURjnR0FsD9kT1eqGUjWxfIUBdeuQR7BFVYmA==",
+      "version": "1.10.2",
+      "resolved": "https://registry.npmjs.org/@decaf-ts/decorator-validation/-/decorator-validation-1.10.2.tgz",
+      "integrity": "sha512-UsP2ZkqbGnFeGCoI9HhGS4mPIeswBT/E7L6Mz2eeKlo/oYl1fAQKP7TwvVEV4pyVFicg28GHz2zpa+LtV+f+TA==",
       "license": "MIT",
       "peer": true,
       "engines": {
@@ -4077,9 +4075,9 @@
       "license": "MIT"
     },
     "node_modules/axios": {
-      "version": "1.12.2",
-      "resolved": "https://registry.npmjs.org/axios/-/axios-1.12.2.tgz",
-      "integrity": "sha512-vMJzPewAlRyOgxV2dU0Cuz2O8zzzx9VYtbJOaBgXFeLc4IV/Eg50n4LowmehOOR61S8ZMpc2K5Sa7g6A4jfkUw==",
+      "version": "1.13.0",
+      "resolved": "https://registry.npmjs.org/axios/-/axios-1.13.0.tgz",
+      "integrity": "sha512-zt40Pz4zcRXra9CVV31KeyofwiNvAbJ5B6YPz9pMJ+yOSLikvPT4Yi5LjfgjRa9CawVYBaD1JQzIVcIvBejKeA==",
       "license": "MIT",
       "dependencies": {
         "follow-redirects": "^1.15.6",
@@ -5241,9 +5239,9 @@
       "license": "MIT"
     },
     "node_modules/electron-to-chromium": {
-      "version": "1.5.240",
-      "resolved": "https://registry.npmjs.org/electron-to-chromium/-/electron-to-chromium-1.5.240.tgz",
-      "integrity": "sha512-OBwbZjWgrCOH+g6uJsA2/7Twpas2OlepS9uvByJjR2datRDuKGYeD+nP8lBBks2qnB7bGJNHDUx7c/YLaT3QMQ==",
+      "version": "1.5.241",
+      "resolved": "https://registry.npmjs.org/electron-to-chromium/-/electron-to-chromium-1.5.241.tgz",
+      "integrity": "sha512-ILMvKX/ZV5WIJzzdtuHg8xquk2y0BOGlFOxBVwTpbiXqWIH0hamG45ddU4R3PQ0gYu+xgo0vdHXHli9sHIGb4w==",
       "license": "ISC"
     },
     "node_modules/elliptic": {
