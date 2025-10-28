@@ -18,6 +18,22 @@
     }
   },
   "types": "lib/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "client": [
+        "./lib/esm/client/index.d.ts"
+      ],
+      "contracts": [
+        "./lib/esm/contracts/index.d.ts"
+      ],
+      "shared": [
+        "./lib/esm/shared/index.d.ts"
+      ],
+      "*": [
+        "./lib/index.d.ts"
+      ]
+    }
+  },
   "scripts": {
     "do-install": "NPM_TOKEN=$(cat .npmtoken) npm install",
     "update-dependencies": "PREFIX=\"decaf-ts\"; npm ls | grep \"$PREFIX\" | awk -F/ '{print $NF}' | sed 's/@.*//' | xargs -I package npm update @\"$PREFIX\"/package",
