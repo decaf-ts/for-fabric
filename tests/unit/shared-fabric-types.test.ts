@@ -3,10 +3,10 @@ import "reflect-metadata";
 import {
   HFCAIdentityAttributes,
   HFCAIdentityType,
-  type FabricIdentity,
-} from "../../src/client/services/enrollementService";
+} from "../../src/client/services/FabricEnrollmentService";
 import type {
   CertificateResponse,
+  FabricIdentity,
   GetCertificatesRequest,
 } from "../../src/shared/fabric-types";
 import "../../src/shared/fabric-types";
