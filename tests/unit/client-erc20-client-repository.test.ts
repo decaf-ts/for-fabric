@@ -6,7 +6,7 @@ import {
   OperationKeys,
 } from "@decaf-ts/db-decorators";
 import { Sequence } from "@decaf-ts/core";
-import { FabricERC20ClientRepository } from "../../src/client/erc20/erc20ClientRepository";
+import { FabricERC20ClientRepository } from "../../src/client/erc20/FabricERC20ClientRepository";
 import type { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 
 describe("FabricERC20ClientRepository", () => {
@@ -21,13 +21,11 @@ describe("FabricERC20ClientRepository", () => {
     const repo = new FabricERC20ClientRepository(
       repoAdapter as FabricClientAdapter
     );
-    jest
-      .spyOn(repo as any, "log", "get")
-      .mockReturnValue({
-        for: () => ({
-          verbose: jest.fn(),
-        }),
-      });
+    jest.spyOn(repo as any, "log", "get").mockReturnValue({
+      for: () => ({
+        verbose: jest.fn(),
+      }),
+    });
     return repo;
   };
 
@@ -61,7 +59,12 @@ describe("FabricERC20ClientRepository", () => {
       "wallet-42"
     );
 
-    expect(updateObservers).toHaveBeenCalledWith(expect.anything(), "erc20_wallets", OperationKeys.UPDATE, "parsed-wallet-42");
+    expect(updateObservers).toHaveBeenCalledWith(
+      expect.anything(),
+      "erc20_wallets",
+      OperationKeys.UPDATE,
+      "parsed-wallet-42"
+    );
   });
 
   it("updates observers with parsed array ids", async () => {
@@ -81,10 +84,12 @@ describe("FabricERC20ClientRepository", () => {
       ["wallet-1", "wallet-2"]
     );
 
-    expect(updateObservers).toHaveBeenCalledWith(expect.anything(), "erc20_wallets", BulkCrudOperationKeys.CREATE_ALL, [
-      "parsed-wallet-1",
-      "parsed-wallet-2",
-    ]);
+    expect(updateObservers).toHaveBeenCalledWith(
+      expect.anything(),
+      "erc20_wallets",
+      BulkCrudOperationKeys.CREATE_ALL,
+      ["parsed-wallet-1", "parsed-wallet-2"]
+    );
   });
 
   it("passes undefined ids through when not provided", async () => {
@@ -100,7 +105,12 @@ describe("FabricERC20ClientRepository", () => {
       undefined as unknown as string
     );
 
-    expect(updateObservers).toHaveBeenCalledWith(expect.anything(), "erc20_wallets", OperationKeys.DELETE, undefined);
+    expect(updateObservers).toHaveBeenCalledWith(
+      expect.anything(),
+      "erc20_wallets",
+      OperationKeys.DELETE,
+      undefined
+    );
   });
 
   it("decodes transaction results into strings", async () => {

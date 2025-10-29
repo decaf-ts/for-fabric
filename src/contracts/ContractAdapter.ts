@@ -865,8 +865,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const ctx: FabricContractContext = args.pop();
     const record: Record<string, any> = {};
     record[CouchDBKeys.TABLE] = tableName;
-    // record[CouchDBKeys.ID] = this.generateId(tableName, id);
     Object.assign(record, model);
+
     return [tableName, id, record, ctx];
   }
 
@@ -879,8 +879,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const ctx: FabricContractContext = args.pop();
     const record: Record<string, any> = {};
     record[CouchDBKeys.TABLE] = tableName;
-    // record[CouchDBKeys.ID] = this.generateId(tableName, id);
     Object.assign(record, model);
+
     return [tableName, id, record, ctx];
   }
 

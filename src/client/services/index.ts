@@ -1,1 +1,2 @@
-export * from "./enrollementService";
+export * from "./FabricEnrollmentService";
+export * from "./constants";

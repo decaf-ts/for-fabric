@@ -27,17 +27,11 @@ import {
   BulkCrudOperationKeys,
   modelToTransient,
 } from "@decaf-ts/db-decorators";
-import {
-  Adapter,
-  Dispatch,
-  final,
-  PersistenceKeys,
-  Repository,
-} from "@decaf-ts/core";
+import { Adapter, final, PersistenceKeys, Repository } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
-import { FabricClientDispatch } from "./FabricClientDispatch";
+import type { FabricClientDispatch } from "./FabricClientDispatch";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -868,8 +862,8 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * const fabricDispatch = fabricClientAdapter.Dispatch();
    * fabricDispatch.submitTransaction('createProduct', { name: 'Product A', price: 100 });
    */
-  override Dispatch(): Dispatch {
-    return new FabricClientDispatch(this.getClient());
+  override Dispatch(): FabricClientDispatch {
+    return new FabricClientAdapter["_baseDispatch"]();
   }
 
   /**

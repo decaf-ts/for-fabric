@@ -25,7 +25,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
   const contractName = TestPublicModelContract.name;
   const sequenceTableName = "??sequence";
   const modelTableName = "tst_user";
-  const sequenceId = `${TestPublicModel.name}_pk`;
+  const sequenceId = `${modelTableName}_pk`;
   const contract_sequence = 1;
   const version = "1.0";
 
@@ -646,15 +646,12 @@ describe("Test Serialized Crud Contract With Public Model", () => {
       record = JSON.parse(record.toString());
       console.log("Raw response: ", record);
 
-      const key = createCompositeKey(modelTableName, [String(id)]);
-
       const result = record[0];
-      const resultModel = result.Record;
 
       expect(result).toBeDefined();
-      expect(result.Key).toBe(key);
-      expect(resultModel["tst_name"]).toEqual(model.name);
-      expect(resultModel["tst_nif"]).toEqual(model.nif);
+      expect(result["id"]).toEqual(id);
+      expect(result["tst_name"]).toEqual(model.name);
+      expect(result["tst_nif"]).toEqual(model.nif);
     } catch (error: any) {
       expect(error).toBeUndefined();
     }
