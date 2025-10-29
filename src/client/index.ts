@@ -8,7 +8,9 @@
  * // See also: {@link module:for-fabric~FabricClientAdapter} and {@link module:for-fabric~FabricClientDispatch}
  */
 
-export * from "./fabric-fs";
 export * from "./FabricClientDispatch";
+export * from "./fabric-fs";
 export * from "./FabricClientAdapter";
 export * from "../shared/types";
+export * from "./services";
+export * from "./erc20";

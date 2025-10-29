@@ -13,7 +13,7 @@ export enum ERC20Events {
    * @param to - The address of the recipient.
    * @param value - The amount of tokens transferred.
    */
-  TRANSFER = " Transfer",
+  TRANSFER = "Transfer",
 
   /**
    * Emitted when an `approve` function is called successfully.

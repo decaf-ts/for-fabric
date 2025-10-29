@@ -1,4 +1,9 @@
-import { Adapter, Dispatch, EventIds, UnsupportedError } from "@decaf-ts/core";
+import {
+  Adapter,
+  Dispatch,
+  Repository,
+  UnsupportedError,
+} from "@decaf-ts/core";
 import { PeerConfig } from "../shared/types";
 import { Client } from "@grpc/grpc-js";
 import { FabricClientAdapter } from "./FabricClientAdapter";
@@ -8,7 +13,7 @@ import {
   CloseableAsyncIterable,
 } from "@hyperledger/fabric-gateway";
 import { parseEventName } from "../shared/events";
-import { FabricContractAdapter } from "../contracts";
+import { Model } from "@decaf-ts/decorator-validation";
 
 /**
  * @description Event dispatcher for Hyperledger Fabric chaincode events
@@ -191,7 +196,7 @@ export class FabricClientDispatch extends Dispatch {
         const payload: { id: string } = this.parsePayload(evt.payload);
         try {
           await this.updateObservers(
-            table ? table : this.models[0].name,
+            table ? table : Repository.table(Model.get(this.models[0].name)),
             event,
             payload
           );
@@ -231,5 +236,5 @@ export class FabricClientDispatch extends Dispatch {
   }
 }
 
-if (FabricContractAdapter)
-  FabricContractAdapter["_baseDispatch"] = FabricClientDispatch;
+if (FabricClientAdapter)
+  FabricClientAdapter["_baseDispatch"] = FabricClientDispatch;
