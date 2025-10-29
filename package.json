@@ -21,13 +21,13 @@
   "typesVersions": {
     "*": {
       "client": [
-        "./lib/esm/client/index.d.ts"
+        "./lib/client/index.d.ts"
       ],
       "contracts": [
-        "./lib/esm/contracts/index.d.ts"
+        "./lib/contracts/index.d.ts"
       ],
       "shared": [
-        "./lib/esm/shared/index.d.ts"
+        "./lib/shared/index.d.ts"
       ],
       "*": [
         "./lib/index.d.ts"
