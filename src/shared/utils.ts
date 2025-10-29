@@ -1,8 +1,26 @@
 import { stringFormat } from "@decaf-ts/decorator-validation";
 import { Logger, Logging } from "@decaf-ts/logging";
-import { normalizeImport } from "@decaf-ts/utils";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
 import { User } from "fabric-common";
+
+/**
+ * @description Normalizes imports to handle both CommonJS and ESModule formats.
+ * @summary Utility function to handle module import differences between formats.
+ *
+ * @template T - Type of the imported module.
+ * @param {Promise<T>} importPromise - Promise returned by dynamic import.
+ * @return {Promise<T>} Normalized module.
+ *
+ * @function normalizeImport
+ *
+ * @memberOf module:utils
+ */
+export async function normalizeImport<T>(
+  importPromise: Promise<T>
+): Promise<T> {
+  // CommonJS's `module.exports` is wrapped as `default` in ESModule.
+  return importPromise.then((m: any) => (m.default || m) as T);
+}
 
 /**
  * @description Core utilities for interacting with files, crypto identities, and Fabric SDK helpers
