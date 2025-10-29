@@ -4,6 +4,10 @@
   "description": "template for ts projects",
   "type": "module",
   "exports": {
+    ".": {
+      "require": "./lib/index.cjs",
+      "import": "./lib/esm/index.js"
+    },
     "./client": {
       "require": "./lib/client/index.cjs",
       "import": "./lib/esm/client/index.js"
