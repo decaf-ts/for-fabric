@@ -1,11 +1,12 @@
+import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { Credentials, CAConfig, PeerConfig } from "../../src/shared/types";
-import { FabricEnrollmentService } from "../../src/client/services";
-import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
+import { FabricEnrollmentService } from "../../src/client";
+import { FabricClientAdapter } from "../../src/client";
 import { Identity } from "../../src/shared/model/Identity";
-import { FabricERC20ClientRepository } from "../../src/client/erc20/erc20ClientRepository";
+import { FabricERC20ClientRepository } from "../../src/client/erc20/FabricERC20ClientRepository";
 import {
   commitChaincode,
   compileContract,
@@ -184,7 +185,7 @@ describe("Test ERC20", () => {
   it("Test events with mint", async () => {
     await testERC20ModelRepository.mint(1000000);
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 4000));
 
     expect(mock).toHaveBeenCalledTimes(1);
     expect(mock).toHaveBeenCalledWith(ERC20Events.TRANSFER, {

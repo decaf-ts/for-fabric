@@ -4,7 +4,7 @@ import { ConflictError } from "@decaf-ts/db-decorators";
 import { AuthorizationError } from "@decaf-ts/core";
 import { Identity } from "../../src/shared/model/Identity";
 import { IdentityType } from "../../src/shared/constants";
-import { FabricEnrollmentService } from "../../src/client/services/enrollementService";
+import { FabricEnrollmentService } from "../../src/client/services/FabricEnrollmentService";
 import { RegistrationError } from "../../src/shared/errors";
 
 const CERTIFICATE = `-----BEGIN CERTIFICATE-----
