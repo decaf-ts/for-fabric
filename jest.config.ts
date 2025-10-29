@@ -7,6 +7,7 @@ const config: Config.InitialOptions = {
   testEnvironment: "node",
   testRegex: "/tests/.*\\.(test|spec)\\.(ts|tsx)$",
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
+  testPathIgnorePatterns: ["/src/bin"],
   collectCoverage: false,
   coverageDirectory: "./workdocs/reports/coverage",
   collectCoverageFrom: ["src/**/*.{js,jsx,ts,tsx}", "!src/bin/**/*"],

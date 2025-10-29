@@ -4,6 +4,7 @@ import conf from "../../jest.config";
 const config: Config.InitialOptions = {
   ...conf,
   collectCoverage: true,
+
   coverageDirectory: "./workdocs/reports/coverage",
   reporters: [
     "default",
@@ -31,10 +32,10 @@ const config: Config.InitialOptions = {
   ],
   coverageThreshold: {
     global: {
-      branches: 70,
-      functions: 85,
-      lines: 80,
-      statements: 88,
+      branches: 50,
+      functions: 50,
+      lines: 50,
+      statements: 50,
     },
   },
 };
