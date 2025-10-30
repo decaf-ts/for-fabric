@@ -1,10 +1,10 @@
 import { normalizeImport } from "@decaf-ts/utils";
-import { isBrowser, Logging } from "@decaf-ts/logging";
+import { isBrowser, MiniLogger } from "@decaf-ts/logging";
 import { User } from "fabric-common";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
 import { InternalError } from "@decaf-ts/db-decorators";
 
-const log = Logging.for("fabric-fs");
+const log = new MiniLogger("fabric-fs");
 
 /**
  * @description Loads content from a file or returns the content if already loaded
