@@ -10,6 +10,7 @@ import {
 import { LoggingConfig } from "@decaf-ts/logging";
 import { Context as Ctx } from "fabric-contract-api";
 import { FabricContractContext } from "./ContractContext";
+import { MissingContextError } from "../shared/errors";
 
 /**
  * @description Logger implementation for Fabric chaincode contracts
@@ -50,13 +51,16 @@ export class ContractLogger extends MiniLogger {
   constructor(
     context: string,
     conf: Partial<LoggingConfig> | undefined,
-    ctx?: FabricContractContext
+    ctx: Ctx | FabricContractContext
   ) {
     super(context, conf);
-    if (!ctx) {
-      this.logger = new MiniLogger(context, conf);
+
+    if (ctx instanceof FabricContractContext) {
+      throw new MissingContextError(
+        "Receiving incorrect context... It should be the contract context!!!"
+      );
     } else {
-      this.logger = ctx.logger;
+      this.logger = ctx.logging.getLogger(context) as unknown as Logger;
     }
   }
 
