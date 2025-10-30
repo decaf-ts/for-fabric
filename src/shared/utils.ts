@@ -1,5 +1,5 @@
 import { stringFormat } from "@decaf-ts/decorator-validation";
-import { Logger, Logging } from "@decaf-ts/logging";
+import { Logger, Logging, MiniLogger } from "@decaf-ts/logging";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
 import { User } from "fabric-common";
 
@@ -34,7 +34,7 @@ export async function normalizeImport<T>(
  * const user = await CoreUtils.getCAUser('appUser', pemKey, pemCert, 'Org1MSP');
  */
 export class CoreUtils {
-  private static logger: Logger = Logging.for(CoreUtils.name);
+  private static logger: Logger = new MiniLogger(CoreUtils.name);
 
   private constructor() {}
 
