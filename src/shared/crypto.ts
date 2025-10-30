@@ -1,7 +1,7 @@
 import * as x509 from "@peculiar/x509";
 import { Crypto, CryptoKey } from "@peculiar/webcrypto";
 import { stringFormat } from "@decaf-ts/decorator-validation";
-import { isBrowser, Logging } from "@decaf-ts/logging";
+import { isBrowser, Logging, MiniLogger } from "@decaf-ts/logging";
 
 const crypto = new Crypto();
 x509.cryptoProvider.set(crypto);
@@ -175,7 +175,7 @@ export class BaseEncoder {
 
 export class CryptoUtils {
   private static readonly b58encoder = new BaseEncoder(BASE_ALPHABET.BASE58);
-  private static readonly logger = Logging.for(CryptoUtils.name);
+  private static readonly logger = new MiniLogger(CryptoUtils.name);
   private constructor() {}
 
   static fabricIdFromCertificate(certificate: string) {

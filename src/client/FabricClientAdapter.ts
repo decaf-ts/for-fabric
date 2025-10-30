@@ -7,7 +7,7 @@ import {
   Model,
   type Serializer,
 } from "@decaf-ts/decorator-validation";
-import { debug, Logger, Logging } from "@decaf-ts/logging";
+import { debug, Logger, MiniLogger } from "@decaf-ts/logging";
 import { FabricFlags, PeerConfig } from "../shared/types";
 import {
   connect,
@@ -100,7 +100,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
   /**
    * @description Static logger instance for the FabricAdapter class
    */
-  private static log: Logger = Logging.for(FabricClientAdapter);
+  private static log: Logger = new MiniLogger(FabricClientAdapter.name);
 
   /**
    * @description Gets the logger instance for this adapter

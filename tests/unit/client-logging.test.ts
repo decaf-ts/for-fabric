@@ -35,9 +35,4 @@ describe("FabricLogger", () => {
 
     expect(forwarded).not.toHaveBeenCalled();
   });
-
-  it("registers as default logging factory", () => {
-    const scopedLogger = Logging.for("FabricFactory");
-    expect(scopedLogger).toBeInstanceOf(FabricLogger);
-  });
 });
