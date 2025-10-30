@@ -548,13 +548,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
     operation: OperationKeys,
     model: Constructor<M>,
     flags: Partial<FabricContractFlags>,
-    ctx: Ctx,
+    ctx: Ctx | FabricContractContext,
     ...args: any[]
   ): Promise<FabricContractFlags> {
     return Object.assign(await super.flags(operation, model, flags, ...args), {
       stub: ctx.stub,
-      identity: ctx.clientIdentity,
-      logger: this.logFor(ctx),
+      identity:
+        (ctx as Ctx).clientIdentity ?? (ctx as FabricContractContext).identity!,
+      logger: (ctx as FabricContractContext).logger ?? this.logFor(ctx as Ctx),
     });
   }
 

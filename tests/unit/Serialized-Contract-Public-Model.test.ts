@@ -85,7 +85,11 @@ const ctx = {
       };
     },
   },
-  logger: new MiniLogger(SerializedCrudContract.name),
+  logging: {
+    getLogger(name: string) {
+      return new MiniLogger(name);
+    },
+  },
   identity: {
     getID: () => "id",
     getMSPID: () => "Aeon",

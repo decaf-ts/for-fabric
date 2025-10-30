@@ -65,14 +65,7 @@ export class FabricContractContext extends Context<FabricContractFlags> {
    * @return {ClientIdentity} The client identity
    */
   get identity(): ClientIdentity {
-    //TODO: Find what is happening it seems FabricContractContext is being created with FabricContractContext instead of the transaction context
-    // return this.get("clientIdentity");
-    try {
-      return this.get("clientIdentity");
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_: any) {
-      return this.get("identity" as any);
-    }
+    return this.get("clientIdentity");
   }
 
   /**

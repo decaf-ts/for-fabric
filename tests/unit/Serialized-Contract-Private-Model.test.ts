@@ -1,4 +1,4 @@
-import { MiniLogger } from "@decaf-ts/logging";
+import { Logging, MiniLogger } from "@decaf-ts/logging";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
 import { SerializedCrudContract } from "../../src/contracts";
 import { TestPrivateModelContract } from "../assets/contract/serialized-contract-private-model/TestPrivateModelContract";
@@ -91,7 +91,11 @@ const ctx = {
       };
     },
   },
-  logger: new MiniLogger(SerializedCrudContract.name),
+  logging: {
+    getLogger(name: string) {
+      return new MiniLogger(name);
+    },
+  },
   identity: {
     getID: () => "id",
     getMSPID: () => "Aeon",
