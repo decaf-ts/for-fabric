@@ -51,11 +51,13 @@ export class ContractLogger extends MiniLogger {
   constructor(
     context: string,
     conf: Partial<LoggingConfig> | undefined,
-    ctx: Ctx | FabricContractContext
+    ctx?: Ctx | FabricContractContext
   ) {
     super(context, conf);
 
-    if (ctx instanceof FabricContractContext) {
+    if (!ctx) {
+      this.logger = new MiniLogger(context, conf);
+    } else if (ctx instanceof FabricContractContext) {
       throw new MissingContextError(
         "Receiving incorrect context... It should be the contract context!!!"
       );
