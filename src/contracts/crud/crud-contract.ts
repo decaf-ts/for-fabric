@@ -10,6 +10,7 @@ import { ContractLogger } from "../logging";
 import { Logging } from "@decaf-ts/logging";
 import { isModelPrivate, modelToPrivate } from "../private-data";
 import { FabricContractPrivateDataAdapter } from "../ContractPrivateDataAdapter";
+import { FabricFlavour } from "../../shared/constants";
 
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode
@@ -102,7 +103,7 @@ export abstract class FabricCrudContract<M extends Model>
         collections
       );
     } else {
-      return new FabricContractAdapter(undefined, "fabric-public-data-adapter");
+      return new FabricContractAdapter(undefined, FabricFlavour);
     }
   }
 
