@@ -22,6 +22,22 @@
     }
   },
   "types": "lib/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "client": [
+        "./lib/esm/client/index.d.ts"
+      ],
+      "contracts": [
+        "./lib/esm/contracts/index.d.ts"
+      ],
+      "shared": [
+        "./lib/esm/shared/index.d.ts"
+      ],
+      "*": [
+        "./lib/index.d.ts"
+      ]
+    }
+  },
   "scripts": {
     "do-install": "NPM_TOKEN=$(cat .npmtoken) npm install",
     "update-dependencies": "PREFIX=\"decaf-ts\"; npm ls | grep \"$PREFIX\" | awk -F/ '{print $NF}' | sed 's/@.*//' | xargs -I package npm update @\"$PREFIX\"/package",
@@ -94,7 +110,7 @@
     "@decaf-ts/fabric-weaver": "latest",
     "@decaf-ts/utils": "latest"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@decaf-ts/core": "latest",
     "@decaf-ts/db-decorators": "latest",
     "@decaf-ts/decoration": "latest",
@@ -103,9 +119,11 @@
     "@decaf-ts/injectable-decorators": "latest",
     "@decaf-ts/transactional-decorators": "latest",
     "@decaf-ts/logging": "latest",
-    "@decaf-ts/reflection": "latest"
+    "@decaf-ts/reflection": "latest",
+    "json-stringify-deterministic": "^1.0.12",
+    "sort-keys-recursive": "^2.1.10"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@grpc/grpc-js": "^1.13.3",
     "@hyperledger/fabric-gateway": "^1.7.1",
     "@peculiar/webcrypto": "^1.5.0",
@@ -115,11 +133,9 @@
     "fabric-contract-api": "^2.5.8",
     "fabric-network": "^2.2.20",
     "fabric-shim": "^2.5.8",
-    "json-stringify-deterministic": "^1.0.12",
     "jsrsasign": "^11.1.0",
     "jsrsasign-util": "^1.0.5",
-    "rollup-plugin-ts": "^3.4.5",
-    "sort-keys-recursive": "^2.1.10"
+    "rollup-plugin-ts": "^3.4.5"
   },
   "overrides": {
     "fabric-common": {
