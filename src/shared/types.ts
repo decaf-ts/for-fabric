@@ -1,6 +1,15 @@
 import { RepositoryFlags } from "@decaf-ts/db-decorators";
 import { TLSOptions } from "fabric-ca-client";
 
+export type HSMOptions = {
+  library: string;
+  slot?: number;
+  tokenLabel?: string;
+  pin: string;
+  keyLabel?: string;
+  keyIdHex?: string;
+};
+
 /**
  * @description Configuration for connecting to a Hyperledger Fabric peer
  * @summary Contains all the necessary parameters to establish a connection to a Fabric peer and interact with chaincode
@@ -38,6 +47,7 @@ export type PeerConfig = {
   ca?: string;
   mspId: string;
   channel: string;
+  hsm?: HSMOptions;
 };
 
 /**
@@ -67,6 +77,7 @@ export type CAConfig = {
   caName: string;
   caCert: string;
   caKey: string;
+  hsm?: HSMOptions;
 };
 
 /**

@@ -16,6 +16,7 @@ import {
   Network,
   ProposalOptions,
   Contract as Contrakt,
+  Signer,
 } from "@hyperledger/fabric-gateway";
 import { getIdentity, getSigner } from "./fabric-fs";
 import {
@@ -32,6 +33,7 @@ import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import type { FabricClientDispatch } from "./FabricClientDispatch";
+import { getPkcs11Signer } from "./fabric-hsm";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -828,7 +830,16 @@ export class FabricClientAdapter extends CouchDBAdapter<
     );
     log.debug(`Retrieving signer key from ${config.keyCertOrDirectoryPath}`);
 
-    const signer = await getSigner(config.keyCertOrDirectoryPath);
+    let signer: Signer,
+      close = () => {};
+    if (!config.hsm) {
+      signer = await getSigner(config.keyCertOrDirectoryPath);
+    } else {
+      const pkcs11Signer = getPkcs11Signer(config.hsm);
+      signer = pkcs11Signer.signer;
+
+      close = pkcs11Signer.close;
+    }
 
     const options = {
       client,
@@ -850,7 +861,18 @@ export class FabricClientAdapter extends CouchDBAdapter<
     } as ConnectOptions;
 
     log.debug(`Connecting to ${config.mspId}`);
-    return connect(options);
+    const gateway = connect(options);
+
+    if (config.hsm) {
+      gateway.close = new Proxy(gateway.close, {
+        apply(target: () => void, thisArg: any, argArray: any[]): any {
+          Reflect.apply(target, thisArg, argArray);
+          close();
+        },
+      });
+    }
+
+    return gateway;
   }
 
   /**
