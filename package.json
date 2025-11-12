@@ -1,6 +1,6 @@
 {
   "name": "@decaf-ts/for-fabric",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "description": "template for ts projects",
   "type": "module",
   "exports": {
@@ -58,7 +58,7 @@
     "lint": "eslint .",
     "lint-fix": "eslint --fix .",
     "prepare-pr": "npm run lint-fix && npm run build:prod && npm run coverage && npm run docs",
-    "prepare-release": "npm run lint-fix && npm run build:prod && npm run coverage && npm run docs",
+    "prepare-release": "npm run build:prod && npm run coverage && npm run docs",
     "release": "./bin/tag-release.sh",
     "clean-publish": "npx clean-publish",
     "drawings": "for FILE in workdocs/drawings/*.drawio; do echo \"converting $FILE to image...\" && docker run --rm -v $(pwd):/data rlespinasse/drawio-export --format png $FILE; done && cp -rf workdocs/drawings/export/* workdocs/resources/",
@@ -117,9 +117,9 @@
     "@decaf-ts/decorator-validation": "latest",
     "@decaf-ts/for-couchdb": "latest",
     "@decaf-ts/injectable-decorators": "latest",
-    "@decaf-ts/transactional-decorators": "latest",
     "@decaf-ts/logging": "latest",
     "@decaf-ts/reflection": "latest",
+    "@decaf-ts/transactional-decorators": "latest",
     "json-stringify-deterministic": "^1.0.12",
     "sort-keys-recursive": "^2.1.10"
   },
@@ -144,5 +144,8 @@
     "fabric-ca-client": {
       "jsrsasign": "^11.1.0"
     }
+  },
+  "optionalDependencies": {
+    "pkcs11js": "^2.1.6"
   }
 }
