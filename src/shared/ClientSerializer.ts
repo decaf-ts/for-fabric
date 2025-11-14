@@ -1,10 +1,10 @@
 import {
-  getMetadata,
   JSONSerializer,
   Model,
   ModelKeys,
 } from "@decaf-ts/decorator-validation";
 import { SerializationError } from "@decaf-ts/db-decorators";
+import { Constructor, Metadata } from "@decaf-ts/decoration";
 
 /**
  * @description Client-side JSON serializer for Decaf models targeting Hyperledger Fabric
@@ -47,7 +47,7 @@ export class ClientSerializer<M extends Model> extends JSONSerializer<M> {
     const toSerialize: Record<string, any> = Object.assign({}, model);
     let metadata;
     try {
-      metadata = getMetadata(model);
+      metadata = Metadata.get(model.constructor as Constructor<M>);
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e: unknown) {
       metadata = table;

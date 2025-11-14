@@ -1,7 +1,6 @@
 import {
   InternalError,
   modelToTransient,
-  getAllPropertyDecoratorsRecursive,
   SerializationError,
 } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -85,6 +84,7 @@ export function modelToPrivate<M extends Model>(
   model: M
 ): { model: M; private?: Record<string, Record<string, any>> } {
   if (!hasPrivateData(model)) return { model: model };
+  // TODO: Replace from metadata
   const decs: Record<string, any[]> = getAllPropertyDecoratorsRecursive(
     model,
     undefined,

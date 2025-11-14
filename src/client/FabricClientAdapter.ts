@@ -2,11 +2,7 @@ import { CouchDBAdapter, type MangoQuery } from "@decaf-ts/for-couchdb";
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
 
-import {
-  type Constructor,
-  Model,
-  type Serializer,
-} from "@decaf-ts/decorator-validation";
+import { Model, type Serializer } from "@decaf-ts/decorator-validation";
 import { debug, Logger, MiniLogger } from "@decaf-ts/logging";
 import { FabricFlags, PeerConfig } from "../shared/types";
 import {
@@ -34,6 +30,7 @@ import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import type { FabricClientDispatch } from "./FabricClientDispatch";
 import { getPkcs11Signer } from "./fabric-hsm";
+import { Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks

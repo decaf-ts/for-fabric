@@ -1,14 +1,5 @@
 import { CouchDBAdapter, CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
-import {
-  Constructor,
-  Decoration,
-  list,
-  Model,
-  prop,
-  propMetadata,
-  required,
-  type,
-} from "@decaf-ts/decorator-validation";
+import { list, Model, required, type } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
@@ -50,6 +41,7 @@ import {
   oneToManyOnUpdate,
   JoinTableOptions,
   JoinTableMultipleColumnsOptions,
+  relation,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -72,6 +64,12 @@ import {
   populate as pop,
 } from "./FabricConstruction";
 import { apply } from "@decaf-ts/reflection";
+import {
+  Constructor,
+  Decoration,
+  prop,
+  propMetadata,
+} from "@decaf-ts/decoration";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -1013,7 +1011,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
       if (joinColumnOpts) meta.joinTable = joinColumnOpts;
       if (fk) meta.name = fk;
       return apply(
-        prop(PersistenceKeys.RELATIONS),
+        prop(),
+        relation(PersistenceKeys.ONE_TO_ONE, meta),
         type([
           clazz.name ? clazz.name : (clazz as any),
           String.name,
@@ -1052,7 +1051,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
       if (joinTableOpts) metadata.joinTable = joinTableOpts;
       if (fk) metadata.name = fk;
       return apply(
-        prop(PersistenceKeys.RELATIONS),
+        prop(),
+        relation(PersistenceKeys.ONE_TO_MANY, metadata),
         list([clazz as Constructor<M>, String, Number]),
         onCreate(oneToManyOnCreate, metadata),
         onUpdate(oneToManyOnUpdate, metadata),
