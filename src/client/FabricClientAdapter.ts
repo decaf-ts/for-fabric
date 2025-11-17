@@ -33,7 +33,8 @@ import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import type { FabricClientDispatch } from "./FabricClientDispatch";
-import { getPkcs11Signer } from "./fabric-hsm";
+import { extractIdentifierFromCert, getPkcs11Signer } from "./fabric-hsm";
+import { HSMSignerFactoryImpl } from "@hyperledger/fabric-gateway/dist/identity/hsmsigner";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -835,7 +836,16 @@ export class FabricClientAdapter extends CouchDBAdapter<
     if (!config.hsm) {
       signer = await getSigner(config.keyCertOrDirectoryPath);
     } else {
-      const pkcs11Signer = getPkcs11Signer(config.hsm);
+      const identifier = await extractIdentifierFromCert(
+        config.keyCertOrDirectoryPath
+      );
+      const factory = new HSMSignerFactoryImpl(config.hsm.library);
+      const pkcs11Signer = factory.newSigner({
+        label: config.hsm.tokenLabel as string,
+        pin: String(config.hsm.pin) as string,
+        identifier: identifier,
+        userType: 1 /*CKU_USER */,
+      });
       signer = pkcs11Signer.signer;
 
       close = pkcs11Signer.close;

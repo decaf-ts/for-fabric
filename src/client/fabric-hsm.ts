@@ -1,6 +1,7 @@
 import { Signer } from "@hyperledger/fabric-gateway";
 import pkcs11 from "pkcs11js";
-import { HSMOptions } from "../shared/index";
+import { HSMOptions, normalizeImport } from "../shared/index";
+import { Extension, X509Certificate } from "@peculiar/x509";
 
 type CurveInfo = { name: "P-256" | "P-384"; n: bigint; sizeBytes: number };
 const OID_P256 = "06082A8648CE3D030107"; // 1.2.840.10045.3.1.7
@@ -158,4 +159,29 @@ export function getPkcs11Signer(options: HSMOptions): {
   };
 
   return { signer, close };
+}
+
+export async function extractIdentifierFromCert(dirPath: string) {
+  const SUBJECT_KEY_IDENTIFIER = "2.5.29.14";
+
+  const { promises } = await normalizeImport(import("fs"));
+  const { join } = await normalizeImport(import("path"));
+  const files = await promises.readdir(dirPath);
+  const certPath = join(dirPath, files[0]);
+  const pem = await promises.readFile(certPath);
+  const cert = new X509Certificate(pem);
+
+  const keyIdentifier = cert.extensions
+    .map((e: Extension) => ({
+      oid: e.type,
+      value: Buffer.from(e.value).toString("hex"),
+    }))
+    .find((e) => e.oid === SUBJECT_KEY_IDENTIFIER);
+
+  if (!keyIdentifier || !keyIdentifier.value) throw new Error();
+
+  return Buffer.from(
+    Buffer.from(keyIdentifier!.value, "hex").subarray(2).toString("hex"),
+    "hex"
+  );
 }
