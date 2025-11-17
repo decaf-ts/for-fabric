@@ -1,5 +1,4 @@
 {
-  "jest.jestCommandLine": "npm run test --",
   "jest.runMode": "on-demand",
   "jest.coverageColors": {
     "uncovered": "rgba(255,99,71, 0.6)",
