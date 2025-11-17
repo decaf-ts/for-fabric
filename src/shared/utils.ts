@@ -1,5 +1,5 @@
 import { stringFormat } from "@decaf-ts/decorator-validation";
-import { Logger, Logging, MiniLogger } from "@decaf-ts/logging";
+import { Logger, MiniLogger } from "@decaf-ts/logging";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
 import { User } from "fabric-common";
 

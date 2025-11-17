@@ -1,6 +1,5 @@
-import { Logging, MiniLogger } from "@decaf-ts/logging";
+import { MiniLogger } from "@decaf-ts/logging";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
-import { SerializedCrudContract } from "../../src/contracts";
 import { TestPrivateModelContract } from "../assets/contract/serialized-contract-private-model/TestPrivateModelContract";
 import { TestPrivateModel } from "../assets/contract/serialized-contract-private-model/TestPrivateModel";
 

@@ -59,17 +59,10 @@ export function hasPrivateData<M extends Model>(model: M) {
 export function getClassPrivateDataMetadata<M extends Model>(
   model: M
 ): Record<string, any> {
-  let metadata = Reflect.getMetadata(
-    getFabricModelKey(FabricModelKeys.PRIVATE),
-    model
-  );
+  let metadata = Reflect.getMetadata(FabricModelKeys.PRIVATE, model);
 
   metadata =
-    metadata ||
-    Reflect.getMetadata(
-      getFabricModelKey(FabricModelKeys.PRIVATE),
-      model.constructor
-    );
+    metadata || Reflect.getMetadata(FabricModelKeys.PRIVATE, model.constructor);
 
   return metadata;
 }
@@ -88,7 +81,7 @@ export function modelToPrivate<M extends Model>(
   const decs: Record<string, any[]> = getAllPropertyDecoratorsRecursive(
     model,
     undefined,
-    getFabricModelKey(FabricModelKeys.PRIVATE)
+    FabricModelKeys.PRIVATE
   ) as Record<string, any[]>;
 
   const isPrivate = isModelPrivate(model);

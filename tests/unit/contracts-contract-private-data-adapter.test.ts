@@ -2,8 +2,9 @@ import "reflect-metadata";
 
 import { FabricContractPrivateDataAdapter } from "../../src/contracts/ContractPrivateDataAdapter";
 import { FabricContractSequence } from "../../src/contracts/FabricContractSequence";
-import { Model, model, prop } from "@decaf-ts/decorator-validation";
+import { Model, model } from "@decaf-ts/decorator-validation";
 import { privateData } from "../../src/shared/decorators";
+import { prop } from "@decaf-ts/decoration";
 
 @model()
 class PDModel extends Model {
@@ -24,9 +25,7 @@ describe("FabricContractPrivateDataAdapter", () => {
     const adapter = new FabricContractPrivateDataAdapter(
       undefined as any,
       `alias-${Math.random()}`,
-      [
-        "Org1",
-      ]
+      ["Org1"]
     );
     const seq = await adapter.Sequence({
       name: "pd-seq",
@@ -46,18 +45,15 @@ describe("FabricContractPrivateDataAdapter", () => {
     const stub = {
       createCompositeKey: jest
         .fn()
-        .mockImplementation((table: string, parts: string[]) => `${table}:${parts.join(":")}`),
+        .mockImplementation(
+          (table: string, parts: string[]) => `${table}:${parts.join(":")}`
+        ),
     };
     const logger = { for: jest.fn().mockReturnThis(), info: jest.fn() };
 
     const model = new PDModel({ id: "1", secret: "classified" });
 
-    const prepared = adapter.prepare(
-      model,
-      "id",
-      "pd-table",
-      { stub, logger }
-    );
+    const prepared = adapter.prepare(model, "id", "pd-table", { stub, logger });
 
     expect(prepared.id).toBe("pd-table:1");
     expect(prepared.record).toEqual(

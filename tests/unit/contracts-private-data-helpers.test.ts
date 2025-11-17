@@ -1,12 +1,13 @@
 import "reflect-metadata";
 
-import { Model, model, prop } from "@decaf-ts/decorator-validation";
+import { Model, model } from "@decaf-ts/decorator-validation";
 import { privateData } from "../../src/shared/decorators";
 import {
   hasPrivateData,
   isModelPrivate,
   processModel,
 } from "../../src/contracts/private-data";
+import { prop } from "@decaf-ts/decoration";
 
 @model()
 class PrivateDataModel extends Model {
