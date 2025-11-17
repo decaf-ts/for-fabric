@@ -1,6 +1,6 @@
 {
   "name": "@decaf-ts/for-fabric",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "description": "template for ts projects",
   "type": "module",
   "exports": {
