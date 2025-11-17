@@ -837,7 +837,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
       signer = await getSigner(config.keyCertOrDirectoryPath);
     } else {
       const identifier = await extractIdentifierFromCert(
-        config.keyCertOrDirectoryPath
+        config.certCertOrDirectoryPath
       );
       const factory = new HSMSignerFactoryImpl(config.hsm.library);
       const pkcs11Signer = factory.newSigner({
