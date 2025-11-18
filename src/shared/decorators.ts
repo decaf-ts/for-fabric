@@ -10,9 +10,9 @@ import {
 import { Model, ModelKeys, required } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
 import { Context as HLContext } from "fabric-contract-api";
-import { apply } from "@decaf-ts/reflection";
 import { FabricERC20Contract } from "../contracts/erc20/erc20contract";
 import {
+  apply,
   Constructor,
   Decoration,
   Metadata,
@@ -151,22 +151,25 @@ export function privateData(collection?: string) {
     const constr =
       model instanceof Model ? (model.constructor as Constructor) : model;
 
-    const meta = Metadata.get(
-      constr,
-      attribute ? Metadata.key(key, attribute) : attribute
-    );
-    const data = meta?.collections || [];
+    const metaData: any = Metadata.get(constr);
+    const modeldata = metaData?.private?.collections || [];
 
     propMetadata(key, {
       ...(!attribute && {
-        collections: data ? [...new Set([...data, collection])] : [collection],
+        collections: modeldata
+          ? [...new Set([...modeldata, collection])]
+          : [collection],
       }),
       isPrivate: !attribute,
     })(attribute ? constr : model);
 
     if (attribute) {
+      const attributeData =
+        (metaData?.private[attribute] as any)?.collections || [];
       propMetadata(Metadata.key(key, attribute), {
-        collections: data ? [...new Set([...data, collection])] : [collection],
+        collections: attributeData
+          ? [...new Set([...attributeData, collection])]
+          : [collection],
       })(model, attribute);
       transient()(model, attribute);
     }

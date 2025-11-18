@@ -860,6 +860,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.debug(`Connecting to ${config.mspId}`);
     const gateway = connect(options);
 
+    // TODO: replace?
     if (config.hsm) {
       gateway.close = new Proxy(gateway.close, {
         apply(target: () => void, thisArg: any, argArray: any[]): any {

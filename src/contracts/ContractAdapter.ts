@@ -63,8 +63,8 @@ import {
   oneToOneOnUpdate,
   populate as pop,
 } from "./FabricConstruction";
-import { apply } from "@decaf-ts/reflection";
 import {
+  apply,
   Constructor,
   Decoration,
   prop,
