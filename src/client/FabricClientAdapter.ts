@@ -33,12 +33,7 @@ import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import type { FabricClientDispatch } from "./FabricClientDispatch";
-import {
-  extractIdentifierFromCert,
-  getPkcs11Signer,
-  HSMSignerFactoryCustom,
-} from "./fabric-hsm";
-import { HSMSignerFactoryImpl } from "@hyperledger/fabric-gateway/dist/identity/hsmsigner";
+import { HSMSignerFactoryCustom } from "./fabric-hsm";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks

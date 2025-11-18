@@ -59,7 +59,7 @@ export class HSMSignerFactoryCustom {
     );
     this.assertNotEmpty(options.label, "label");
     this.assertNotEmpty(options.pin, "pin");
-    this.assertNotEmpty(options.identifier, "identifier");
+    this.assertNotEmpty(options.identifier as unknown as string, "identifier");
     return options;
   }
 
