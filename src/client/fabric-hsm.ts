@@ -1,5 +1,6 @@
 import pkcs11 from "pkcs11js";
 import fs from "fs";
+import path from "path";
 import { MissingPKCSS11Lib } from "../shared/errors";
 import crypto from "crypto";
 import nist from "@noble/curves/nist";
@@ -199,7 +200,10 @@ export class HSMSignerFactoryCustom {
   }
 
   getSKIFromCertificate(certPath: string): Buffer {
-    const credentials = fs.readFileSync(certPath);
+    const p = certPath.endsWith(".pem")
+      ? certPath
+      : path.join(certPath, "cert.pem");
+    const credentials = fs.readFileSync(p);
 
     const certificate = new crypto.X509Certificate(credentials);
     const uncompressedPoint = this.getUncompressedPointOnCurve(
