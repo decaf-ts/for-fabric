@@ -1,187 +1,217 @@
-import { Signer } from "@hyperledger/fabric-gateway";
 import pkcs11 from "pkcs11js";
-import { HSMOptions, normalizeImport } from "../shared/index";
-import { Extension, X509Certificate } from "@peculiar/x509";
+import fs from "fs";
+import { MissingPKCSS11Lib } from "../shared/errors";
+import crypto from "crypto";
+import nist from "@noble/curves/nist";
+export class HSMSignerFactoryCustom {
+  static #pkcs11: pkcs11.PKCS11 | null = null;
+  static #initialized = false;
 
-type CurveInfo = { name: "P-256" | "P-384"; n: bigint; sizeBytes: number };
-const OID_P256 = "06082A8648CE3D030107"; // 1.2.840.10045.3.1.7
-const OID_P384 = "06052B81040022"; // 1.3.132.0.34
+  constructor(library: string) {
+    if (!HSMSignerFactoryCustom.#pkcs11) {
+      HSMSignerFactoryCustom.#pkcs11 = new pkcs11.PKCS11();
+      HSMSignerFactoryCustom.#pkcs11.load(this.findHSMPKCS11Lib(library));
+    }
 
-function curveFromEcParams(ecParams: Buffer): CurveInfo {
-  const hex = ecParams.toString("hex").toUpperCase();
-  if (hex.includes(OID_P256)) {
-    return {
-      name: "P-256",
-      n: BigInt(
-        "0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551"
-      ),
-      sizeBytes: 32,
-    };
+    if (!HSMSignerFactoryCustom.#initialized) {
+      try {
+        HSMSignerFactoryCustom.#pkcs11.C_Initialize();
+      } catch (e: unknown) {
+        // ignore "already initialized" if tests / hot reloads cause reuse
+        if ((e as any).code !== pkcs11.CKR_CRYPTOKI_ALREADY_INITIALIZED) {
+          throw e;
+        }
+      }
+      HSMSignerFactoryCustom.#initialized = true;
+    }
   }
-  if (hex.includes(OID_P384)) {
-    return {
-      name: "P-384",
-      n: BigInt(
-        "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC7634D81F4372DDF581A0DB248B0A77AECEC196ACCC52973"
-      ),
-      sizeBytes: 48,
-    };
-  }
-  throw new Error("Unsupported EC curve (expect P-256 or P-384)");
-}
 
-function ecdsaRsToDerLowS(raw: Buffer, curve: CurveInfo): Buffer {
-  if (raw.length !== 2 * curve.sizeBytes) {
-    throw new Error(
-      `Unexpected raw sig length ${raw.length}, expected ${2 * curve.sizeBytes}`
+  private findHSMPKCS11Lib(lib?: string): string {
+    const commonSoftHSMPathNames = [
+      "/usr/lib/softhsm/libsofthsm2.so",
+      "/usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so",
+      "/usr/local/lib/softhsm/libsofthsm2.so",
+      "/usr/lib/libacsp-pkcs11.so",
+      "/opt/homebrew/lib/softhsm/libsofthsm2.so",
+    ];
+
+    if (lib) commonSoftHSMPathNames.push(lib);
+
+    for (const pathnameToTry of commonSoftHSMPathNames) {
+      if (fs.existsSync(pathnameToTry)) {
+        return pathnameToTry;
+      }
+    }
+
+    throw new MissingPKCSS11Lib("Unable to find PKCS11 library");
+  }
+
+  dispose() {
+    HSMSignerFactoryCustom.#pkcs11!.C_Finalize();
+  }
+
+  private sanitizeOptions(hsmSignerOptions: HSMConfig) {
+    const options = Object.assign(
+      {
+        userType: pkcs11.CKU_USER,
+      },
+      hsmSignerOptions
     );
+    this.assertNotEmpty(options.label, "label");
+    this.assertNotEmpty(options.pin, "pin");
+    this.assertNotEmpty(options.identifier, "identifier");
+    return options;
   }
-  const r = BigInt("0x" + raw.slice(0, curve.sizeBytes).toString("hex"));
-  let s = BigInt("0x" + raw.slice(curve.sizeBytes).toString("hex"));
-  if (s > curve.n >> BigInt(1)) s = curve.n - s;
 
-  const enc = (x: bigint, len: number) => {
-    let h = x.toString(16);
-    if (h.length % 2) h = "0" + h;
-    let b = Buffer.from(h, "hex");
-    if (b.length < len) b = Buffer.concat([Buffer.alloc(len - b.length, 0), b]);
-    if (b[0] & 0x80) b = Buffer.concat([Buffer.from([0x00]), b]);
-    return b;
-  };
-  const rEnc = enc(r, curve.sizeBytes);
-  const sEnc = enc(s, curve.sizeBytes);
-  const seqLen = 2 + rEnc.length + 2 + sEnc.length;
-  return Buffer.concat([
-    Buffer.from([0x30, seqLen]),
-    Buffer.from([0x02, rEnc.length]),
-    rEnc,
-    Buffer.from([0x02, sEnc.length]),
-    sEnc,
-  ]);
-}
-
-function getSlotHandle(
-  p11: pkcs11.PKCS11,
-  tokenLabel?: string,
-  slotIndex?: number
-): Buffer {
-  const slots: Buffer[] = p11.C_GetSlotList(true); // -> Buffer[] handles
-  if (!slots.length) throw new Error("No tokens found");
-  if (typeof slotIndex === "number") {
-    if (slotIndex < 0 || slotIndex >= slots.length)
-      throw new Error(`slotIndex ${slotIndex} out of range`);
-    return slots[slotIndex];
+  private assertNotEmpty(property: string, name: string) {
+    if (!property || property.toString().trim().length === 0) {
+      throw new Error(`${name} property must be provided`);
+    }
   }
-  if (tokenLabel) {
-    for (const s of slots) {
-      const info = p11.C_GetTokenInfo(s);
-      if (info.label?.trim() === tokenLabel) return s;
+
+  private findSlotForLabel(pkcs11Label: string) {
+    const slots = (
+      HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11
+    ).C_GetSlotList(true);
+    if (slots.length === 0) {
+      throw new Error("No pkcs11 slots can be found");
     }
-    throw new Error(`Token label "${tokenLabel}" not found`);
+    const slot = slots.find((slotToCheck) => {
+      const tokenInfo = (
+        HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11
+      ).C_GetTokenInfo(slotToCheck);
+      return tokenInfo.label.trim() === pkcs11Label;
+    });
+    if (!slot) {
+      throw new Error(
+        `label ${pkcs11Label} cannot be found in the pkcs11 slot list`
+      );
+    }
+    return slot;
   }
-  return slots[0];
+
+  private login(session: pkcs11.Handle, userType: number, pin: string) {
+    try {
+      (HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11).C_Login(
+        session,
+        userType,
+        pin
+      );
+    } catch (err: unknown) {
+      const pkcs11err = err as { code: number };
+      if (pkcs11err.code !== pkcs11.CKR_USER_ALREADY_LOGGED_IN) {
+        throw err;
+      }
+    }
+  }
+
+  private findObjectInHSM(
+    session: pkcs11.Handle,
+    keytype: number,
+    identifier: any
+  ) {
+    const pkcs11Template = [
+      { type: pkcs11.CKA_ID, value: identifier },
+      { type: pkcs11.CKA_CLASS, value: keytype },
+      { type: pkcs11.CKA_KEY_TYPE, value: pkcs11.CKK_EC },
+    ];
+
+    (HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11).C_FindObjectsInit(
+      session,
+      pkcs11Template
+    );
+    const hsmObject = (
+      HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11
+    ).C_FindObjects(session, 1)[0];
+    if (!hsmObject) {
+      (HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11).C_FindObjectsFinal(
+        session
+      );
+      throw new Error(
+        `Unable to find object in HSM with ID ${identifier.toString()}`
+      );
+    }
+    (HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11).C_FindObjectsFinal(
+      session
+    );
+    return hsmObject;
+  }
+
+  newSigner(hsmSignerOptions: HSMConfig) {
+    const options = this.sanitizeOptions(hsmSignerOptions);
+    const pkcs = HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11;
+    const slot = this.findSlotForLabel(options.label);
+    const session = pkcs.C_OpenSession(slot, pkcs11.CKF_SERIAL_SESSION);
+    let privateKeyHandle;
+    try {
+      this.login(session, options.userType, options.pin);
+      privateKeyHandle = this.findObjectInHSM(
+        session,
+        pkcs11.CKO_PRIVATE_KEY,
+        options.identifier
+      );
+    } catch (err) {
+      (HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11).C_CloseSession(session);
+      throw err;
+    }
+    return {
+      signer: async (digest: any) => {
+        (HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11).C_SignInit(
+          session,
+          { mechanism: pkcs11.CKM_ECDSA },
+          privateKeyHandle
+        );
+        const compactSignature = await (
+          HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11
+        ).C_SignAsync(
+          session,
+          Buffer.from(digest),
+          // EC signatures have length of 2n according to the PKCS11 spec:
+          // https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html
+          Buffer.alloc(nist.p256.Point.Fn.BYTES * 2)
+        );
+        return nist.p256.Signature.fromBytes(compactSignature, "compact")
+          .normalizeS()
+          .toBytes("der");
+      },
+      close: () => {
+        (HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11).C_CloseSession(
+          session
+        );
+      },
+    };
+  }
+
+  private assertDefined<T>(value: T | undefined): T {
+    if (value === undefined) {
+      throw new Error("required value was undefined");
+    }
+
+    return value;
+  }
+
+  private getUncompressedPointOnCurve(key: crypto.KeyObject): Buffer {
+    const jwk = key.export({ format: "jwk" });
+    const x = Buffer.from(this.assertDefined(jwk.x), "base64url");
+    const y = Buffer.from(this.assertDefined(jwk.y), "base64url");
+    const prefix = Buffer.from("04", "hex");
+    return Buffer.concat([prefix, x, y]);
+  }
+
+  getSKIFromCertificate(certPath: string): Buffer {
+    const credentials = fs.readFileSync(certPath);
+
+    const certificate = new crypto.X509Certificate(credentials);
+    const uncompressedPoint = this.getUncompressedPointOnCurve(
+      certificate.publicKey
+    );
+
+    return crypto.createHash("sha256").update(uncompressedPoint).digest();
+  }
 }
 
-function findPrivateKey(
-  p11: pkcs11.PKCS11,
-  session: Buffer,
-  keyLabel?: string,
-  keyIdHex?: string
-): Buffer {
-  const template: pkcs11.Template = [
-    { type: pkcs11.CKA_CLASS, value: pkcs11.CKO_PRIVATE_KEY },
-    { type: pkcs11.CKA_KEY_TYPE, value: pkcs11.CKK_EC },
-  ];
-  if (keyLabel) template.push({ type: pkcs11.CKA_LABEL, value: keyLabel });
-  if (keyIdHex)
-    template.push({ type: pkcs11.CKA_ID, value: Buffer.from(keyIdHex, "hex") });
-
-  p11.C_FindObjectsInit(session, template);
-  const objs = p11.C_FindObjects(session, 1);
-  p11.C_FindObjectsFinal(session);
-  if (!objs.length) throw new Error("HSM private key not found");
-  return objs[0];
-}
-
-export function getPkcs11Signer(options: HSMOptions): {
-  signer: Signer;
-  close: () => void;
-} {
-  const p11 = new pkcs11.PKCS11();
-  p11.load(options.library);
-  p11.C_Initialize();
-
-  const slot = getSlotHandle(p11, options.tokenLabel, options.slot);
-  const session = p11.C_OpenSession(
-    slot,
-    pkcs11.CKF_SERIAL_SESSION | pkcs11.CKF_RW_SESSION
-  ); // slot/session are Buffer
-  p11.C_Login(session, pkcs11.CKU_USER, options.pin);
-
-  const privKey = findPrivateKey(
-    p11,
-    session,
-    options.keyLabel,
-    options.keyIdHex
-  );
-
-  // ✅ Correct way to read attributes: TemplateResult is an array
-  const res = p11.C_GetAttributeValue(session, privKey, [
-    { type: pkcs11.CKA_EC_PARAMS },
-  ]);
-  const ecParams = res[0].value as Buffer;
-  const curve = curveFromEcParams(ecParams);
-
-  const signer: Signer = async (digest: Uint8Array): Promise<Uint8Array> => {
-    p11.C_SignInit(session, { mechanism: pkcs11.CKM_ECDSA }, privKey);
-    const out = Buffer.alloc(2 * curve.sizeBytes); // raw r||s
-    const raw = p11.C_Sign(session, Buffer.from(digest), out); // returns sliced Buffer
-    const der = ecdsaRsToDerLowS(raw, curve); // DER + low-S for Fabric
-    return new Uint8Array(der);
-  };
-
-  const close = () => {
-    try {
-      p11.C_Logout(session);
-    } catch {
-      // do nothing
-    }
-    try {
-      p11.C_CloseSession(session);
-    } catch {
-      // do nothing
-    }
-    try {
-      p11.C_Finalize();
-    } catch {
-      // do nothing
-    }
-  };
-
-  return { signer, close };
-}
-
-export async function extractIdentifierFromCert(dirPath: string) {
-  const SUBJECT_KEY_IDENTIFIER = "2.5.29.14";
-
-  const { promises } = await normalizeImport(import("fs"));
-  const { join } = await normalizeImport(import("path"));
-  const files = await promises.readdir(dirPath);
-  const certPath = join(dirPath, files[0]);
-  const pem = await promises.readFile(certPath);
-  const cert = new X509Certificate(pem);
-
-  const keyIdentifier = cert.extensions
-    .map((e: Extension) => ({
-      oid: e.type,
-      value: Buffer.from(e.value).toString("hex"),
-    }))
-    .find((e) => e.oid === SUBJECT_KEY_IDENTIFIER);
-
-  if (!keyIdentifier || !keyIdentifier.value) throw new Error();
-
-  return Buffer.from(
-    Buffer.from(keyIdentifier!.value, "hex").subarray(2).toString("hex"),
-    "hex"
-  );
+export interface HSMConfig {
+  label: string;
+  identifier: Buffer<ArrayBufferLike>;
+  pin: string;
 }
