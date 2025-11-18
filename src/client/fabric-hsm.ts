@@ -3,7 +3,8 @@ import fs from "fs";
 import path from "path";
 import { MissingPKCSS11Lib } from "../shared/errors";
 import crypto from "crypto";
-import nist from "@noble/curves/nist";
+import { p256 } from "@noble/curves/nist";
+
 export class HSMSignerFactoryCustom {
   static #pkcs11: pkcs11.PKCS11 | null = null;
   static #initialized = false;
@@ -169,9 +170,9 @@ export class HSMSignerFactoryCustom {
           Buffer.from(digest),
           // EC signatures have length of 2n according to the PKCS11 spec:
           // https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html
-          Buffer.alloc(nist.p256.Point.Fn.BYTES * 2)
+          Buffer.alloc(p256.Point.Fn.BYTES * 2)
         );
-        return nist.p256.Signature.fromBytes(compactSignature, "compact")
+        return p256.Signature.fromBytes(compactSignature, "compact")
           .normalizeS()
           .toBytes("der");
       },
