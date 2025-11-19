@@ -15,7 +15,7 @@ program
   .action(async (options: any) => {
     const dev: boolean = options.dev;
 
-    execSync("rm -rf ./contracts");
+    execSync("rm -rf ./global");
 
     const pkg = JSON.parse(
       fs.readFileSync(path.join(__dirname, "../../package.json"), "utf-8")
@@ -34,7 +34,7 @@ program
         typescript({
           tsconfig: "./tsconfig.json",
           compilerOptions: {
-            outDir: "contracts",
+            outDir: "global",
           },
           module: "esnext",
           declaration: false,
@@ -43,7 +43,7 @@ program
     });
 
     await bundle.write({
-      file: "./contracts/GlobalContract.js",
+      file: "./global/GlobalContract.js",
       format: "umd",
       name: "GlobalContract.js",
     });
@@ -71,15 +71,15 @@ program
     contractPackage.main = "GlobalContract.js";
 
     fs.writeFileSync(
-      path.join(__dirname, "../../contracts/package.json"),
+      path.join(__dirname, "../../global/package.json"),
       JSON.stringify(contractPackage)
     );
 
-    execSync("cd ./contracts && npm install");
-    execSync("cd ./contracts && npm shrinkwrap");
-    execSync("cd ./contracts && rm -rf node_modules");
+    execSync("cd ./global && npm install");
+    execSync("cd ./global && npm shrinkwrap");
+    execSync("cd ./global && rm -rf node_modules");
 
-    execSync("rm -rf ./contracts/lib && rm -rf ./contracts/dist");
+    execSync("rm -rf ./global/lib && rm -rf ./global/dist");
   });
 
 program.parse(process.argv);
