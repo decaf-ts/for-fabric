@@ -55,11 +55,6 @@ export function hasPrivateData<M extends Model>(model: M) {
 export function getClassPrivateDataMetadata<M extends Model>(
   model: M
 ): Record<string, any> {
-  // let metadata = Reflect.getMetadata(FabricModelKeys.PRIVATE, model);
-
-  // metadata =
-  //   metadata || Reflect.getMetadata(FabricModelKeys.PRIVATE, model.constructor);
-
   return Metadata.get(
     model.constructor as Constructor,
     FabricModelKeys.PRIVATE
@@ -77,14 +72,6 @@ export function modelToPrivate<M extends Model>(
 ): { model: M; private?: Record<string, Record<string, any>> } {
   if (!hasPrivateData(model)) return { model: model };
 
-  // const decs: Record<string, any[]> = getAllPropertyDecoratorsRecursive(
-  //   model,
-  //   undefined,
-  //   FabricModelKeys.PRIVATE
-  // ) as Record<string, any[]>;
-
-  const decs = Metadata.get(model.constructor as any);
-
   const isPrivate = isModelPrivate(model);
   const modelCollections: Record<string, any> =
     getClassPrivateDataMetadata(model);
@@ -96,7 +83,10 @@ export function modelToPrivate<M extends Model>(
 
   // TODO: the is private is not workign correctly. If no properties it doesn't create the private part.
   if (isPrivate) {
-    result = Object.keys(model).reduce(
+    const privatePart = modelCollections.collections;
+    result = (
+      Metadata.properties(model.constructor as Constructor) || []
+    ).reduce(
       (
         accum: { model: Record<string, any>; private?: Record<string, any> },
         k
@@ -117,7 +107,7 @@ export function modelToPrivate<M extends Model>(
 
         return accum;
       },
-      { model: {} } as {
+      { model: {}, private: privatePart } as {
         model: Record<string, any>;
         private?: Record<string, any>;
       }
@@ -128,7 +118,7 @@ export function modelToPrivate<M extends Model>(
         accum: { model: Record<string, any>; private?: Record<string, any> },
         [k, val]
       ) => {
-        const props = Object.keys(model);
+        const props = Metadata.properties(model.constructor as Constructor);
         if (!props?.includes(k)) return accum;
 
         const collections = (val as Record<string, any>).collections;

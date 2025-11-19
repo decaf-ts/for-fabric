@@ -165,7 +165,7 @@ export function privateData(collection?: string) {
 
     if (attribute) {
       const attributeData =
-        (metaData?.private[attribute] as any)?.collections || [];
+        (metaData?.private?.[attribute] as any)?.collections || [];
       propMetadata(Metadata.key(key, attribute), {
         collections: attributeData
           ? [...new Set([...attributeData, collection])]

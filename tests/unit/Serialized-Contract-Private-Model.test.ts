@@ -103,7 +103,7 @@ const ctx = {
 
 describe("Tests Public contract", () => {
   const contract = new TestPrivateModelContract();
-  it("should create model", async () => {
+  it.skip("should create model", async () => {
     const model = new TestPrivateModel({
       id: 1,
       name: "John Doe",

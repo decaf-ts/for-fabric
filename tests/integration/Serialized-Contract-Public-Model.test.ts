@@ -101,6 +101,10 @@ describe("Test Serialized Crud Contract With Public Model", () => {
   });
 
   it("Deploys contract corretly", async () => {
+    console.log("start");
+  });
+
+  it("Deploys contract corretly", async () => {
     const ready = await ensureContractReadiness(contractName);
     expect(ready).toBeDefined();
   });
