@@ -103,7 +103,10 @@ export abstract class FabricCrudContract<M extends Model>
         collections
       );
     } else {
-      return new FabricContractAdapter(undefined, FabricFlavour);
+      return new FabricContractAdapter(
+        undefined,
+        [FabricFlavour, clazz.name].join("_")
+      );
     }
   }
 
