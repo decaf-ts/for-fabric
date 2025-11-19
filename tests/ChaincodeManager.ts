@@ -46,6 +46,7 @@ export class ChaincodeManager {
       "contracts",
       this.contractFolder
     );
+
     const targetContractBuildFolder = path.join(
       this.rootPath,
       "tests",
@@ -83,12 +84,20 @@ export class ChaincodeManager {
       path.join(targetContractBuildFolder, "npm-shrinkwrap.json")
     );
 
-    if (copyBuildToDir)
+    if (copyBuildToDir) {
       fs.cpSync(
         targetContractBuildFolder,
         path.join(copyBuildToDir, this.contractFolder),
         { recursive: true, force: true }
       );
+      const adapterConfigExportPath = path.join(
+        targetContractBuildFolder,
+        "..",
+        "..",
+        "adapter-config"
+      );
+      this.exportAdapterConfig(adapterConfigExportPath);
+    }
 
     console.log("[compile] Process finished.");
     return this;
@@ -146,6 +155,30 @@ export class ChaincodeManager {
     //     functionName,
     //     args
     // );
+  }
+
+  exportAdapterConfig(target: string): void {
+    const peerConfig = {
+      cryptoPath: path.resolve("./docker/infrastructure/docker-data"),
+      keyCertOrDirectoryPath: path.resolve(
+        "./docker/docker-data/admin/msp/keystore"
+      ),
+      certCertOrDirectoryPath: path.resolve(
+        "./docker/docker-data/admin/msp/signcerts"
+      ),
+      tlsCert: path.resolve("./docker/docker-data/tls-ca-cert.pem"),
+      peerEndpoint: "localhost:7031",
+      peerHostAlias: "localhost",
+      chaincodeName: this.contractName,
+      ca: "org-a",
+      mspId: "Peer0OrgaMSP",
+      channel: this.channelName,
+    };
+
+    if (!fs.existsSync(target)) fs.mkdirSync(target, { recursive: true });
+
+    const filePath = path.join(target, `${this.contractName}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(peerConfig, null, 2), "utf8");
   }
 
   static deployContract(

@@ -36,6 +36,8 @@ describe("Global Contract Boot", () => {
       sequence: SEQUENCE,
     });
     chaincodeManager.compile(dockerBindVolume).deploy().commit();
+
+    execSync(`docker cp org-a:/weaver/client/. docker/docker-data`);
   });
 
   it("Deploys contract corretly", async () => {
@@ -60,16 +62,16 @@ describe("Global Contract Boot", () => {
     expect(trim(readyCheck)).toBe("true");
   });
 
-  // it("Whoami", async () => {
-  //   try {
-  //     console.log("Initializing contract...");
-  //     let res = queryChaincode(contractName, "whoami", []);
-  //     console.log("Whoami result: ", res);
-  //     res = JSON.parse(res);
-  //     expect((res as any).whoami).toBe(contractName);
-  //   } catch (error: any) {
-  //     console.error("Error initializing contract:", error);
-  //     expect(error).toBeUndefined();
-  //   }
-  // });
+  it("Whoami", async () => {
+    // try {
+    //   console.log("Initializing contract...");
+    //   let res = queryChaincode(contractName, "whoami", []);
+    //   console.log("Whoami result: ", res);
+    //   res = JSON.parse(res);
+    //   expect((res as any).whoami).toBe(contractName);
+    // } catch (error: any) {
+    //   console.error("Error initializing contract:", error);
+    //   expect(error).toBeUndefined();
+    // }
+  });
 });
