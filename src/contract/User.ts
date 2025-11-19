@@ -8,7 +8,7 @@ import { FabricFlavour } from "../shared/constants";
 @model()
 export class User extends Model {
   @pk({ type: "Number" })
-  id!: string;
+  id!: number;
 
   @column()
   name!: string;
