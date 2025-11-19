@@ -104,8 +104,16 @@ const config: PeerConfig = {
   caTlsCertificate: '/path/to/ca/tls/cert',
   caCert: '/path/to/ca/cert',
   caKey: '/path/to/ca/key',
+  hsm: {
+    library: '/usr/lib/softhsm/libsofthsm2.so',
+    tokenLabel: 'MyCaToken',
+    pin: '123456',
+    slot: 0,
+  },
   ca: 'ca.org1.example.com'
 };
+
+// When the optional hsm block is provided, the enrollment service loads the admin key from the configured token instead of reading caKey from disk.
 
 // Create an adapter instance
 const adapter = new FabricAdapter(config, 'org1-adapter');
