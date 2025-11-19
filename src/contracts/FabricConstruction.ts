@@ -93,7 +93,7 @@ export async function oneToOneOnCreate<
   data.class =
     typeof data.class === "string" ? data.class : (data.class as any)().name;
 
-  const constructor = Model.get(data.class as string);
+  const constructor = Model.get(data.class as unknown as string);
   if (!constructor)
     throw new InternalError(`Could not find model ${data.class}`);
   const repo: Repo<any> = Repository.forModel(constructor, this.adapter.alias);

@@ -22,7 +22,6 @@ import {
   OperationKeys,
   SerializationError,
   BulkCrudOperationKeys,
-  modelToTransient,
 } from "@decaf-ts/db-decorators";
 import { Adapter, final, PersistenceKeys, Repository } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
@@ -30,7 +29,7 @@ import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import type { FabricClientDispatch } from "./FabricClientDispatch";
 import { getPkcs11Signer } from "./fabric-hsm";
-import { Constructor } from "@decaf-ts/decoration";
+import type { Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -288,7 +287,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     transient?: Record<string, any>;
   } {
     const log = this.log.for(this.prepare);
-    const split = modelToTransient(model);
+    const split = Model.toTransient(model);
     if ((model as any)[PersistenceKeys.METADATA]) {
       log.silly(
         `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`

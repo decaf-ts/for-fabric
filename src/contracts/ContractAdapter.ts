@@ -7,7 +7,6 @@ import {
   Context,
   DBKeys,
   InternalError,
-  modelToTransient,
   NotFoundError,
   onCreate,
   onCreateUpdate,
@@ -774,7 +773,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = args.shift();
     const log = logger.for(this.prepare);
 
-    const split = modelToTransient(model);
+    const split = Model.toTransient(model);
     const result = Object.entries(split.model).reduce(
       (accum: Record<string, any>, [key, val]) => {
         if (typeof val === "undefined") return accum;
@@ -933,8 +932,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
    */
   static override decoration(): void {
     super.decoration();
-    const createdByKey = Repository.key(PersistenceKeys.CREATED_BY);
-    const updatedByKey = Repository.key(PersistenceKeys.UPDATED_BY);
+    const createdByKey = PersistenceKeys.CREATED_BY;
+    const updatedByKey = PersistenceKeys.UPDATED_BY;
     Decoration.flavouredAs(FabricFlavour)
       .for(createdByKey)
       .define(
@@ -951,7 +950,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       )
       .apply();
 
-    const pkKey = Repository.key(DBKeys.ID);
+    const pkKey = DBKeys.ID;
     Decoration.flavouredAs(FabricFlavour)
       .for(pkKey)
       .define(
@@ -964,13 +963,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
       )
       .apply();
 
-    const columnKey = Adapter.key(PersistenceKeys.COLUMN);
+    const columnKey = PersistenceKeys.COLUMN;
     Decoration.flavouredAs(FabricFlavour)
       .for(columnKey)
       .extend(FabricProperty())
       .apply();
 
-    const tableKey = Adapter.key(PersistenceKeys.TABLE);
+    const tableKey = PersistenceKeys.TABLE;
     Decoration.flavouredAs(FabricFlavour)
       .for(tableKey)
       .extend(function table(obj: any) {
@@ -994,7 +993,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       })
       .apply();
 
-    const oneToOnekey = Repository.key(PersistenceKeys.ONE_TO_ONE);
+    const oneToOnekey = PersistenceKeys.ONE_TO_ONE;
 
     function oneToOneDec<M extends Model>(
       clazz: Constructor<M> | (() => Constructor<M>),
@@ -1031,10 +1030,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
       .for(oneToOnekey)
       .define({
         decorator: oneToOneDec,
+        args: [],
       })
       .apply();
 
-    const oneToManyKey = Repository.key(PersistenceKeys.ONE_TO_MANY);
+    const oneToManyKey = PersistenceKeys.ONE_TO_MANY;
 
     function oneToManyDec<M extends Model>(
       clazz: Constructor<M> | (() => Constructor<M>),
@@ -1065,6 +1065,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     Decoration.for(oneToManyKey)
       .define({
         decorator: oneToManyDec,
+        args: [],
       })
       .apply();
   }

@@ -1,8 +1,4 @@
-import {
-  InternalError,
-  modelToTransient,
-  SerializationError,
-} from "@decaf-ts/db-decorators";
+import { InternalError, SerializationError } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
 import { FabricModelKeys } from "../shared/constants";
@@ -15,7 +11,7 @@ export const MISSING_PRIVATE_DATA_ERROR_MESSAGE =
   "private data matching public hash version is not available ...";
 
 export function processModel<M extends Model>(adapter: any, model: M) {
-  const transient = modelToTransient(model);
+  const transient = Model.toTransient(model);
   const privateData = modelToPrivate(model);
 
   const transformModel = (model: any) => {
