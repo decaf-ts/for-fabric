@@ -120,6 +120,17 @@ export class FabricEnrollmentService extends LoggedService {
   private user?: User;
 
   constructor(private caConfig: CAConfig) {
+    CoreUtils.getCryptoSuite(
+      caConfig.hsm
+        ? {
+            software: false,
+            lib: caConfig.hsm.library,
+            slot: caConfig.hsm.slot,
+            label: caConfig.hsm.tokenLabel,
+            pin: String(caConfig.hsm.pin),
+          }
+        : undefined
+    );
     super();
   }
 

@@ -1,7 +1,7 @@
 import { stringFormat } from "@decaf-ts/decorator-validation";
 import { Logger, Logging, MiniLogger } from "@decaf-ts/logging";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
-import { User } from "fabric-common";
+import { CryptoSetting, ICryptoSuite, User } from "fabric-common";
 import { HSMOptions } from "./types";
 
 /**
@@ -36,6 +36,8 @@ export async function normalizeImport<T>(
  */
 export class CoreUtils {
   private static logger: Logger = new MiniLogger(CoreUtils.name);
+
+  private static cryptoSuite: ICryptoSuite;
 
   private constructor() {}
 
@@ -102,23 +104,31 @@ export class CoreUtils {
       )
     );
     const user = new User(userName);
-    const cryptoSuite = User.newCryptoSuite(
-      options?.hsm
-        ? {
-            software: false,
-            lib: options.hsm.library,
-            slot: options.hsm.slot,
-            label: options.hsm.tokenLabel,
-            pin: String(options.hsm.pin),
-          }
-        : undefined
-    );
+    const config = options?.hsm
+      ? {
+          software: false,
+          lib: options.hsm.library,
+          slot: options.hsm.slot,
+          label: options.hsm.tokenLabel,
+          pin: String(options.hsm.pin),
+        }
+      : undefined;
+    const cryptoSuite = this.getCryptoSuite(config);
+
     user.setCryptoSuite(cryptoSuite);
     const enrollmentKey = options?.hsm
       ? await this.getHSMEnrollmentKey(cryptoSuite, certificate, options.hsm)
       : this.getSoftwareEnrollmentKey(cryptoSuite, privateKey);
     await user.setEnrollment(enrollmentKey, certificate, mspId);
     return user;
+  }
+
+  static getCryptoSuite(options?: CryptoSetting): ICryptoSuite {
+    if (!options) return User.newCryptoSuite();
+    if (CoreUtils.cryptoSuite) return CoreUtils.cryptoSuite;
+
+    CoreUtils.cryptoSuite = User.newCryptoSuite(options);
+    return CoreUtils.cryptoSuite;
   }
 
   private static getSoftwareEnrollmentKey(
