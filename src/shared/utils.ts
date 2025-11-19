@@ -109,7 +109,7 @@ export class CoreUtils {
             lib: options.hsm.library,
             slot: options.hsm.slot,
             label: options.hsm.tokenLabel,
-            pin: options.hsm.pin,
+            pin: String(options.hsm.pin),
           }
         : undefined
     );
