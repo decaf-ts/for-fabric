@@ -152,7 +152,7 @@ export class CoreUtils {
   static async getCertificateSKI(certificate: string): Promise<Buffer> {
     const crypto = await normalizeImport(import("crypto"));
     const x509 = new crypto.X509Certificate(certificate);
-    const jwk = x509.publicKey.export({ format: "jwk" }) as JsonWebKey;
+    const jwk = x509.publicKey.export({ format: "jwk" });
     const prefix = Buffer.from([0x04]);
     const x = Buffer.from(jwk.x || "", "base64url");
     const y = Buffer.from(jwk.y || "", "base64url");

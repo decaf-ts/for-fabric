@@ -200,13 +200,17 @@ export class HSMSignerFactoryCustom {
     return Buffer.concat([prefix, x, y]);
   }
 
-  getSKIFromCertificate(certPath: string): Buffer {
+  getSKIFromCertificatePath(certPath: string) {
     const p = certPath.endsWith(".pem")
       ? certPath
       : path.join(certPath, "cert.pem");
     const credentials = fs.readFileSync(p);
 
-    const certificate = new crypto.X509Certificate(credentials);
+    return this.getSKIFromCertificate(credentials);
+  }
+
+  getSKIFromCertificate(cert: string | NonSharedBuffer): Buffer {
+    const certificate = new crypto.X509Certificate(cert);
     const uncompressedPoint = this.getUncompressedPointOnCurve(
       certificate.publicKey
     );
