@@ -60,6 +60,8 @@ export class ChaincodeManager {
 
     // Create necessary directories
     fs.mkdirSync(contractSourceFolder, { recursive: true });
+    // remove build folder before build
+    // fs.rmSync(targetContractBuildFolder, { recursive: true, force: true });
     fs.mkdirSync(targetContractBuildFolder, { recursive: true });
 
     const contractFile = path.join(contractSourceFolder, "index.ts");
