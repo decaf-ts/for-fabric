@@ -23,7 +23,8 @@ import {
   cacheModelForPopulate,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
-import { Model, model, prop } from "@decaf-ts/decorator-validation";
+import { Model, model } from "@decaf-ts/decorator-validation";
+import { prop } from "@decaf-ts/decoration";
 
 @model()
 class ParentModel extends Model {
@@ -56,7 +57,9 @@ describe("FabricConstruction relationship hooks", () => {
   });
 
   it("oneToOneOnCreate loads and caches reference ids", async () => {
-    const repo = { read: jest.fn().mockResolvedValue(new ChildModel({ id: "c-1" })) };
+    const repo = {
+      read: jest.fn().mockResolvedValue(new ChildModel({ id: "c-1" })),
+    };
     (cacheModelForPopulate as jest.Mock).mockResolvedValue(undefined);
     (repositoryFromTypeMetadata as jest.Mock).mockReturnValue(repo);
 

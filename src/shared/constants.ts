@@ -8,6 +8,7 @@
 export enum FabricModelKeys {
   /** Private data marker used to tag properties or models for Fabric private collections */
   PRIVATE = "private",
+  SHARED = "shared",
   /** Namespace prefix used for Fabric-specific metadata keys */
   FABRIC = "fabric.",
   OWNEDBY = "owned-by",

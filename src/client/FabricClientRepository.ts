@@ -1,5 +1,5 @@
 import { Adapter, Repository } from "@decaf-ts/core";
-import { Constructor, Model } from "@decaf-ts/decorator-validation";
+import { Model } from "@decaf-ts/decorator-validation";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import {
   Context,
@@ -7,6 +7,7 @@ import {
   RepositoryFlags,
 } from "@decaf-ts/db-decorators";
 import { FabricFlags } from "../shared";
+import { Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Repository implementation for Fabric client operations

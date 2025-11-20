@@ -1,6 +1,6 @@
 import { FabricContractAdapter } from "../ContractAdapter";
 import { Context, Contract, Context as Ctx } from "fabric-contract-api";
-import { Constructor, Model, Serializer } from "@decaf-ts/decorator-validation";
+import { Model, Serializer } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "../FabricContractRepository";
 import { DeterministicSerializer } from "../../shared/DeterministicSerializer";
@@ -11,6 +11,7 @@ import { Logging } from "@decaf-ts/logging";
 import { isModelPrivate, modelToPrivate } from "../private-data";
 import { FabricContractPrivateDataAdapter } from "../ContractPrivateDataAdapter";
 import { FabricFlavour } from "../../shared/constants";
+import { Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode

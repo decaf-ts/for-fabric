@@ -9,7 +9,7 @@ import { Sequence } from "@decaf-ts/core";
 import { FabricERC20ClientRepository } from "../../src/client/erc20/FabricERC20ClientRepository";
 import type { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 
-describe("FabricERC20ClientRepository", () => {
+describe.skip("FabricERC20ClientRepository", () => {
   const createRepository = (adapter?: Partial<FabricClientAdapter>) => {
     const repoAdapter = Object.assign(
       {

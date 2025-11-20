@@ -54,7 +54,7 @@
     "test:integration": "jest --testPathPattern=\"/tests/(integration)\" --passWithNoTests --detectOpenHandles",
     "test:all": "jest --testPathPattern=\"/tests/unit\" --passWithNoTests --detectOpenHandles --runInBand",
     "test:circular": "dpdm -T --no-warning --no-tree ./src/index.ts",
-    "coverage": "rimraf ./workdocs/reports/data/*.json && npm run test:all -- --coverage --config=./workdocs/reports/jest.coverage.config.ts",
+    "coverage": "rimraf ./workdocs/reports/data/*.json && npm run test:unit -- --coverage --config=./workdocs/reports/jest.coverage.config.ts",
     "lint": "eslint .",
     "build:contract": "node ./lib/bin/build-contract.cjs compile-global-contract --dev --debug",
     "lint-fix": "eslint --fix .",

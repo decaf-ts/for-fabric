@@ -5,14 +5,9 @@ import {
 } from "@decaf-ts/for-couchdb";
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
-
-import {
-  type Constructor,
-  Model,
-  type Serializer,
-} from "@decaf-ts/decorator-validation";
-import { debug, Logger, MiniLogger } from "@decaf-ts/logging";
-import { FabricFlags, PeerConfig } from "../shared/types";
+import { Model, type Serializer } from "@decaf-ts/decorator-validation";
+import { debug, type Logger, MiniLogger } from "@decaf-ts/logging";
+import { type FabricFlags, type PeerConfig } from "../shared/types";
 import {
   connect,
   ConnectOptions,
@@ -20,7 +15,7 @@ import {
   Network,
   ProposalOptions,
   Contract as Contrakt,
-  Signer,
+  type Signer,
 } from "@hyperledger/fabric-gateway";
 import { getIdentity, getSigner } from "./fabric-fs";
 import {
@@ -30,7 +25,6 @@ import {
   OperationKeys,
   SerializationError,
   BulkCrudOperationKeys,
-  modelToTransient,
 } from "@decaf-ts/db-decorators";
 import { Adapter, final, PersistenceKeys, Repository } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
@@ -38,6 +32,7 @@ import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import type { FabricClientDispatch } from "./FabricClientDispatch";
 import { HSMSignerFactoryCustom } from "./fabric-hsm";
+import { type Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -295,7 +290,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     transient?: Record<string, any>;
   } {
     const log = this.log.for(this.prepare);
-    const split = modelToTransient(model);
+    const split = Model.toTransient(model);
     if ((model as any)[PersistenceKeys.METADATA]) {
       log.silly(
         `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
@@ -887,6 +882,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.debug(`Connecting to ${config.mspId}`);
     const gateway = connect(options);
 
+    // TODO: replace?
     if (config.hsm) {
       gateway.close = new Proxy(gateway.close, {
         apply(target: () => void, thisArg: any, argArray: any[]): any {

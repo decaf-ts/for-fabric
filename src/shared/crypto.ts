@@ -1,7 +1,7 @@
 import * as x509 from "@peculiar/x509";
 import { Crypto, CryptoKey } from "@peculiar/webcrypto";
 import { stringFormat } from "@decaf-ts/decorator-validation";
-import { isBrowser, Logging, MiniLogger } from "@decaf-ts/logging";
+import { isBrowser, MiniLogger } from "@decaf-ts/logging";
 
 const crypto = new Crypto();
 x509.cryptoProvider.set(crypto);
