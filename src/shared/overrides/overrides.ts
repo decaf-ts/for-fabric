@@ -21,7 +21,7 @@ Model.prototype.isPrivate = function isPrivate<M extends Model>(
 Model.prototype.segregate = function segregate<M extends Model>(
   this: M
 ): SegregatedModel<M> {
-  throw new Error("not implemented");
+  return Model.segregate(this);
 };
 
 //
@@ -61,12 +61,12 @@ Model.prototype.segregate = function segregate<M extends Model>(
 //   return result as { model: M; transient?: Record<string, any> };
 // };
 
+const seg = Model.segregate;
+
 (Model as any).segregate = function segregate<M extends Model>(
   model: M
 ): SegregatedModel<M> {
-  if (!Model.isTransient(model)) {
-  }
-  throw new Error("not implemented");
+  return seg.call(Model, model) as SegregatedModel<M>;
 }.bind(Model);
 
 (Model as any).isPrivate = function isPrivate<M extends Model>(
