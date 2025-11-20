@@ -16,7 +16,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
   beforeAll(async () => {
     //Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`);
+    execSync(`npm run infrastructure:up`, { stdio: "inherit" });
 
     //Ensure Infrastructure is ready
     await ensureInfrastructureBooted();

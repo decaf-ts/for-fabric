@@ -9,11 +9,9 @@ import path from "path";
 import { CAConfig } from "../../src/shared/types";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
-import { FabricEnrollmentService, FabricFlavour } from "../../src/shared";
+import { FabricEnrollmentService } from "../../src/shared";
 import { User } from "../../src/contract/User";
 import { Product } from "../../src/contract/Product";
-import { UserContract } from "../../src/contract/UserContract";
-import { ProductContract } from "../../src/contract/ProductContract";
 import { NotFoundError } from "@decaf-ts/db-decorators";
 import { Repository } from "@decaf-ts/core";
 
@@ -31,7 +29,7 @@ describe("Tests global contract implementation", () => {
 
   beforeAll(async () => {
     // Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`);
+    execSync(`npm run infrastructure:up`, { stdio: "inherit" });
     // Ensure Infrastructure is ready
     await ensureInfrastructureBooted();
     const location = path.join(
@@ -40,15 +38,18 @@ describe("Tests global contract implementation", () => {
       contractFolderName
     );
     if (!fs.existsSync(location)) {
-      execSync("npm run build:contract");
+      execSync("npm run build:contract", { stdio: "inherit" });
       execSync(
-        `cp -r  ${path.join(__dirname, "../..", contractFolderName)} ${path.join(__dirname, "../../docker/infrastructure/chaincode")}/`
+        `cp -r  ${path.join(__dirname, "../..", contractFolderName)} ${path.join(__dirname, "../../docker/infrastructure/chaincode")}/`,
+        { stdio: "inherit" }
       );
       deployContract(contractFolderName, contractName);
       commitChaincode(contractName);
     }
     // Copy client config to local directory for testing purposes
-    execSync(`docker cp org-a:/weaver/client/. docker/docker-data`);
+    execSync(`docker cp org-a:/weaver/client/. docker/docker-data`, {
+      stdio: "inherit",
+    });
 
     caConfig = {
       url: "https://localhost:7011",
