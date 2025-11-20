@@ -11,7 +11,7 @@ export const MISSING_PRIVATE_DATA_ERROR_MESSAGE =
   "private data matching public hash version is not available ...";
 
 export function processModel<M extends Model>(adapter: any, model: M) {
-  const transient = Model.toTransient(model);
+  const transient = Model.segregate(model);
   const privateData = modelToPrivate(model);
 
   const transformModel = (model: any) => {
