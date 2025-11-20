@@ -290,7 +290,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     transient?: Record<string, any>;
   } {
     const log = this.log.for(this.prepare);
-    const split = Model.toTransient(model);
+    const split = Model.segregate(model);
     if ((model as any)[PersistenceKeys.METADATA]) {
       log.silly(
         `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`

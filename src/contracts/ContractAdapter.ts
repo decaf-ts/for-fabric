@@ -772,7 +772,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = args.shift();
     const log = logger.for(this.prepare);
 
-    const split = Model.toTransient(model);
+    const split = Model.segregate(model);
     const result = Object.entries(split.model).reduce(
       (accum: Record<string, any>, [key, val]) => {
         if (typeof val === "undefined") return accum;
