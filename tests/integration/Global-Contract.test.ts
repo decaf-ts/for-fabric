@@ -14,6 +14,7 @@ import { User } from "../../src/contract/User";
 import { Product } from "../../src/contract/Product";
 import { UserContract } from "../../src/contract/UserContract";
 import { ProductContract } from "../../src/contract/ProductContract";
+import { NotFoundError } from "@decaf-ts/db-decorators";
 
 jest.setTimeout(3000000);
 
@@ -90,7 +91,7 @@ describe("Tests global contract implementation", () => {
     productRepository = new FabricClientRepository(productAdapter, Product);
   });
 
-  it.skip("Create User", async () => {
+  it("Create User Account", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -99,10 +100,24 @@ describe("Tests global contract implementation", () => {
       "client"
     );
 
+    const credentials = userID.credentials;
+
     expect(userID).toBeDefined();
+    expect(credentials).toBeDefined();
+    expect(userID.id).toBeDefined();
+    expect(userID.mspId).toBeDefined();
+    expect(userID.type).toBeDefined();
+    expect(userID.createdOn).toBeDefined();
+    expect(userID.updatedOn).toBeDefined();
+    expect(credentials?.certificate).toBeDefined();
+    expect(credentials?.createdOn).toBeDefined();
+    expect(credentials?.id).toBeDefined();
+    expect(credentials?.privateKey).toBeDefined();
+    expect(credentials?.rootCertificate).toBeDefined();
+    expect(credentials?.updatedOn).toBeDefined();
   });
 
-  it.skip("Should create User", async () => {
+  it("Should create User", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -113,6 +128,7 @@ describe("Tests global contract implementation", () => {
 
     expect(userID).toBeDefined();
     const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
 
     const client = {
       keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
@@ -123,12 +139,24 @@ describe("Tests global contract implementation", () => {
 
     const m = new User({ name: "juan" });
 
-    const res = await repo.create(m);
+    const created = await repo.create(m);
 
-    console.log(res);
+    expect(created).toBeDefined();
+    expect(created.name).toEqual(m.name);
+    expect(created.id).toBeDefined();
+
+    console.log(created);
+
+    const read = await repo.read(created.id);
+
+    expect(read).toBeDefined();
+    expect(read.name).toEqual(created.name);
+    expect(read.id).toEqual(created.id);
+
+    console.log(read);
   });
 
-  it.skip("Should Update User", async () => {
+  it("Should Update User", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -139,6 +167,7 @@ describe("Tests global contract implementation", () => {
 
     expect(userID).toBeDefined();
     const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
 
     const client = {
       keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
@@ -149,18 +178,46 @@ describe("Tests global contract implementation", () => {
 
     const m = new User({ name: "juan" });
 
-    const res = await repo.create(m);
+    const created = await repo.create(m);
 
-    console.log(res);
-    res.name = "Alice";
-    const updated = res;
+    expect(created).toBeDefined();
+    expect(created.name).toEqual(m.name);
+    expect(created.id).toBeDefined();
 
-    const res1 = await repo.update(updated);
+    console.log(created);
 
-    console.log(res1);
+    const read = await repo.read(created.id);
+
+    expect(read).toBeDefined();
+    expect(read.name).toEqual(created.name);
+    expect(read.id).toEqual(created.id);
+
+    console.log(read);
+
+    const newName = "Alice";
+
+    read.name = newName;
+
+    expect(read.name).toEqual(newName);
+
+    const updated = await repo.update(read);
+
+    expect(updated).toBeDefined();
+    expect(read.name).toEqual(updated.name);
+    expect(read.id).toEqual(updated.id);
+
+    console.log(updated);
+
+    const readUpdated = await repo.read(updated.id);
+
+    expect(readUpdated).toBeDefined();
+    expect(readUpdated.name).toEqual(updated.name);
+    expect(readUpdated.id).toEqual(updated.id);
+
+    console.log(readUpdated);
   });
 
-  it.skip("Should Read User", async () => {
+  it("Should Read User", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -171,6 +228,7 @@ describe("Tests global contract implementation", () => {
 
     expect(userID).toBeDefined();
     const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
 
     const client = {
       keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
@@ -181,12 +239,21 @@ describe("Tests global contract implementation", () => {
 
     const m = new User({ name: "juan" });
 
-    const res = await repo.create(m);
+    const created = await repo.create(m);
 
-    console.log(res);
-    const res1 = await repo.read(res.id);
+    expect(created).toBeDefined();
+    expect(created.name).toEqual(m.name);
+    expect(created.id).toBeDefined();
 
-    console.log(res1);
+    console.log(created);
+
+    const read = await repo.read(created.id);
+
+    expect(read).toBeDefined();
+    expect(read.name).toEqual(created.name);
+    expect(read.id).toEqual(created.id);
+
+    console.log(read);
   });
 
   it("Should Delete User", async () => {
@@ -200,6 +267,7 @@ describe("Tests global contract implementation", () => {
 
     expect(userID).toBeDefined();
     const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
 
     const client = {
       keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
@@ -210,20 +278,48 @@ describe("Tests global contract implementation", () => {
 
     const m = new User({ name: "juan" });
 
-    const res = await repo.create(m);
+    const created = await repo.create(m);
 
-    console.log(res);
+    expect(created).toBeDefined();
+    expect(created.name).toEqual(m.name);
+    expect(created.id).toBeDefined();
 
-    const res2 = await repo.delete(res.id);
+    console.log(created);
 
-    console.log(res2);
+    const read = await repo.read(created.id);
 
-    const res1 = await repo.read(res.id);
+    expect(read).toBeDefined();
+    expect(read.name).toEqual(created.name);
+    expect(read.id).toEqual(created.id);
 
-    console.log(res1);
+    console.log(read);
+
+    const deleted = await repo.delete(read.id);
+
+    expect(deleted).toBeDefined();
+    expect(read.name).toEqual(deleted.name);
+    expect(read.id).toEqual(deleted.id);
+
+    console.log(deleted);
+
+    let triggered = false;
+    try {
+      const readDeleted = await repo.read(read.id);
+      expect(readDeleted).toBeUndefined();
+    } catch (e: unknown) {
+      expect(e).toBeDefined();
+      const error = e as NotFoundError;
+      triggered = true;
+      expect(error.code).toEqual(500);
+      expect(
+        error.message.includes(`Record with id ${read.id} not found`)
+      ).toEqual(true);
+    }
+
+    expect(triggered).toEqual(true);
   });
 
-  it.skip("Should create Product", async () => {
+  it("Should create Product", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -234,6 +330,7 @@ describe("Tests global contract implementation", () => {
 
     expect(userID).toBeDefined();
     const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
 
     const client = {
       keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
@@ -244,12 +341,24 @@ describe("Tests global contract implementation", () => {
 
     const m = new Product({ inventedName: "juanito" });
 
-    const res = await repo.create(m);
+    const created = await repo.create(m);
 
-    console.log(res);
+    expect(created).toBeDefined();
+    expect(created.inventedName).toEqual(m.inventedName);
+    expect(created.productCode).toBeDefined();
+
+    console.log(created);
+
+    const read = await repo.read(created.productCode);
+
+    expect(read).toBeDefined();
+    expect(read.inventedName).toEqual(created.inventedName);
+    expect(read.productCode).toEqual(created.productCode);
+
+    console.log(read);
   });
 
-  it.skip("Should Update Product", async () => {
+  it("Should Update Product", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -260,6 +369,7 @@ describe("Tests global contract implementation", () => {
 
     expect(userID).toBeDefined();
     const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
 
     const client = {
       keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
@@ -270,18 +380,46 @@ describe("Tests global contract implementation", () => {
 
     const m = new Product({ inventedName: "juan" });
 
-    const res = await repo.create(m);
+    const created = await repo.create(m);
 
-    console.log(res);
-    res.inventedName = "Alice";
-    const updated = res;
+    expect(created).toBeDefined();
+    expect(created.inventedName).toEqual(m.inventedName);
+    expect(created.productCode).toBeDefined();
 
-    const res1 = await repo.update(updated);
+    console.log(created);
 
-    console.log(res1);
+    const read = await repo.read(created.productCode);
+
+    expect(read).toBeDefined();
+    expect(read.inventedName).toEqual(created.inventedName);
+    expect(read.productCode).toEqual(created.productCode);
+
+    console.log(read);
+
+    const newName = "Alice";
+
+    read.inventedName = newName;
+
+    expect(read.inventedName).toEqual(newName);
+
+    const updated = await repo.update(read);
+
+    expect(updated).toBeDefined();
+    expect(read.inventedName).toEqual(updated.inventedName);
+    expect(read.productCode).toEqual(updated.productCode);
+
+    console.log(updated);
+
+    const readUpdated = await repo.read(updated.productCode);
+
+    expect(readUpdated).toBeDefined();
+    expect(readUpdated.inventedName).toEqual(updated.inventedName);
+    expect(readUpdated.productCode).toEqual(updated.productCode);
+
+    console.log(readUpdated);
   });
 
-  it.skip("Should Read Product", async () => {
+  it("Should Read Product", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -292,6 +430,46 @@ describe("Tests global contract implementation", () => {
 
     expect(userID).toBeDefined();
     const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
+
+    const client = {
+      keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
+      certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
+    };
+
+    const repo = productRepository.for({ ...client });
+
+    const m = new Product({ inventedName: "juanito" });
+
+    const created = await repo.create(m);
+
+    expect(created).toBeDefined();
+    expect(created.inventedName).toEqual(m.inventedName);
+    expect(created.productCode).toBeDefined();
+
+    console.log(created);
+
+    const read = await repo.read(created.productCode);
+
+    expect(read).toBeDefined();
+    expect(read.inventedName).toEqual(created.inventedName);
+    expect(read.productCode).toEqual(created.productCode);
+
+    console.log(read);
+  });
+
+  it("Should Delete Product", async () => {
+    const enrollmentService = new FabricEnrollmentService(caConfig);
+    const userID = (await enrollmentService.registerAndEnroll(
+      { userName: "TestUser" + Date.now(), password: "TestUserPW" },
+      false,
+      "",
+      "client"
+    )) as any;
+
+    expect(userID).toBeDefined();
+    const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
 
     const client = {
       keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
@@ -302,12 +480,44 @@ describe("Tests global contract implementation", () => {
 
     const m = new Product({ inventedName: "juan" });
 
-    const res = await repo.create(m);
+    const created = await repo.create(m);
 
-    console.log(res);
+    expect(created).toBeDefined();
+    expect(created.inventedName).toEqual(m.inventedName);
+    expect(created.inventedName).toBeDefined();
 
-    const res1 = await repo.read(res.productCode);
+    console.log(created);
 
-    console.log(res1);
+    const read = await repo.read(created.productCode);
+
+    expect(read).toBeDefined();
+    expect(read.inventedName).toEqual(created.inventedName);
+    expect(read.productCode).toEqual(created.productCode);
+
+    console.log(read);
+
+    const deleted = await repo.delete(read.productCode);
+
+    expect(deleted).toBeDefined();
+    expect(read.inventedName).toEqual(deleted.inventedName);
+    expect(read.productCode).toEqual(deleted.productCode);
+
+    console.log(deleted);
+
+    let triggered = false;
+    try {
+      const readDeleted = await repo.read(read.productCode);
+      expect(readDeleted).toBeUndefined();
+    } catch (e: unknown) {
+      expect(e).toBeDefined();
+      const error = e as NotFoundError;
+      triggered = true;
+      expect(error.code).toEqual(500);
+      expect(
+        error.message.includes(`Record with id ${read.productCode} not found`)
+      ).toEqual(true);
+    }
+
+    expect(triggered).toEqual(true);
   });
 });

@@ -495,8 +495,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.verbose(`deleting entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(OperationKeys.DELETE, [
-      tableName,
-      id,
+      id.toString(),
     ]);
     return this.serializer.deserialize(this.decode(result));
   }
