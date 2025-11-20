@@ -6,6 +6,7 @@ import {
   afterAny,
   Context,
   DBKeys,
+  GroupSort,
   InternalError,
   NotFoundError,
   onCreate,
@@ -24,7 +25,6 @@ import {
 import { Logger, Logging } from "@decaf-ts/logging";
 import { ContractLogger } from "./logging";
 import {
-  OrderDirection,
   PersistenceKeys,
   RelationsMetadata,
   Repository,
@@ -32,8 +32,6 @@ import {
   sequenceNameForModel,
   SequenceOptions,
   UnsupportedError,
-  index,
-  NumericSequence,
   Adapter,
   CascadeMetadata,
   JoinColumnOptions,
@@ -68,6 +66,7 @@ import {
   Decoration,
   prop,
   propMetadata,
+  Metadata,
 } from "@decaf-ts/decoration";
 
 /**
@@ -932,46 +931,48 @@ export class FabricContractAdapter extends CouchDBAdapter<
    */
   static override decoration(): void {
     super.decoration();
-    const createdByKey = PersistenceKeys.CREATED_BY;
-    const updatedByKey = PersistenceKeys.UPDATED_BY;
     Decoration.flavouredAs(FabricFlavour)
-      .for(createdByKey)
+      .for(PersistenceKeys.CREATED_BY)
       .define(
         onCreate(createdByOnFabricCreateUpdate),
-        propMetadata(createdByKey, {})
+        propMetadata(PersistenceKeys.CREATED_BY, {})
       )
       .apply();
 
     Decoration.flavouredAs(FabricFlavour)
-      .for(updatedByKey)
+      .for(PersistenceKeys.UPDATED_BY)
       .define(
         onCreateUpdate(createdByOnFabricCreateUpdate),
-        propMetadata(updatedByKey, {})
+        propMetadata(PersistenceKeys.UPDATED_BY, {})
       )
       .apply();
 
-    const pkKey = DBKeys.ID;
     Decoration.flavouredAs(FabricFlavour)
-      .for(pkKey)
-      .define(
-        index([OrderDirection.ASC, OrderDirection.DSC]),
-        required(),
-        readonly(),
-        // type([String.name, Number.name, BigInt.name]),
-        propMetadata(pkKey, NumericSequence),
-        onCreate(pkFabricOnCreate, NumericSequence)
-      )
+      .for(DBKeys.ID)
+      .define({
+        decorator: function pkDec(
+          options: SequenceOptions,
+          groupsort?: GroupSort
+        ) {
+          return function pkDec(obj: any, attr: any) {
+            return apply(
+              required(),
+              readonly(),
+              propMetadata(Metadata.key(DBKeys.ID, attr), options),
+              onCreate(pkFabricOnCreate, options, groupsort)
+            )(obj, attr);
+          };
+        },
+      } as any)
       .apply();
 
-    const columnKey = PersistenceKeys.COLUMN;
     Decoration.flavouredAs(FabricFlavour)
-      .for(columnKey)
+      .for(PersistenceKeys.COLUMN)
       .extend(FabricProperty())
       .apply();
 
-    const tableKey = PersistenceKeys.TABLE;
     Decoration.flavouredAs(FabricFlavour)
-      .for(tableKey)
+      .for(PersistenceKeys.TABLE)
       .extend(function table(obj: any) {
         // const chain: any[] = [];
 
@@ -993,8 +994,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
       })
       .apply();
 
-    const oneToOnekey = PersistenceKeys.ONE_TO_ONE;
-
     function oneToOneDec<M extends Model>(
       clazz: Constructor<M> | (() => Constructor<M>),
       cascade: CascadeMetadata,
@@ -1003,7 +1002,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       fk?: string
     ) {
       const meta: RelationsMetadata = {
-        class: clazz.name ? clazz.name : (clazz as any),
+        class: clazz,
         cascade: cascade,
         populate: populate,
       };
@@ -1012,29 +1011,21 @@ export class FabricContractAdapter extends CouchDBAdapter<
       return apply(
         prop(),
         relation(PersistenceKeys.ONE_TO_ONE, meta),
-        type([
-          clazz.name ? clazz.name : (clazz as any),
-          String.name,
-          Number.name,
-          BigInt.name,
-        ]),
+        type([clazz, String, Number, BigInt]),
         onCreate(oneToOneOnCreate, meta),
         onUpdate(oneToOneOnUpdate, meta),
         onDelete(oneToOneOnDelete, meta),
         afterAny(pop, meta),
-        propMetadata(oneToOnekey, meta)
+        propMetadata(PersistenceKeys.ONE_TO_ONE, meta)
       );
     }
 
     Decoration.flavouredAs(FabricFlavour)
-      .for(oneToOnekey)
+      .for(PersistenceKeys.ONE_TO_ONE)
       .define({
         decorator: oneToOneDec,
-        args: [],
-      })
+      } as any)
       .apply();
-
-    const oneToManyKey = PersistenceKeys.ONE_TO_MANY;
 
     function oneToManyDec<M extends Model>(
       clazz: Constructor<M> | (() => Constructor<M>),
@@ -1044,7 +1035,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       fk?: string
     ) {
       const metadata: RelationsMetadata = {
-        class: clazz.name ? clazz.name : (clazz as any),
+        class: clazz,
         cascade: cascade,
         populate: populate,
       };
@@ -1058,15 +1049,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
         onUpdate(oneToManyOnUpdate, metadata),
         onDelete(oneToManyOnDelete, metadata),
         afterAny(pop, metadata),
-        propMetadata(oneToManyKey, metadata)
+        propMetadata(PersistenceKeys.ONE_TO_MANY, metadata)
       );
     }
 
-    Decoration.for(oneToManyKey)
+    Decoration.for(PersistenceKeys.ONE_TO_MANY)
       .define({
         decorator: oneToManyDec,
-        args: [],
-      })
+      } as any)
       .apply();
   }
 }

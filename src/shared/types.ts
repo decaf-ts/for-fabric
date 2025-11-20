@@ -1,5 +1,6 @@
 import { RepositoryFlags } from "@decaf-ts/db-decorators";
 import { TLSOptions } from "fabric-ca-client";
+import { Model } from "@decaf-ts/decorator-validation";
 
 export type HSMOptions = {
   library: string;
@@ -92,3 +93,10 @@ export interface Credentials {
   userName?: string;
   password?: string;
 }
+
+export type SegregatedModel<M extends Model> = {
+  model: M;
+  transient?: Record<keyof M, any>;
+  private?: Record<keyof M, any>;
+  shared?: Record<keyof M, any>;
+};

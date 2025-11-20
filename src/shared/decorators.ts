@@ -7,7 +7,7 @@ import {
   RepositoryFlags,
   transient,
 } from "@decaf-ts/db-decorators";
-import { Model, ModelKeys, required } from "@decaf-ts/decorator-validation";
+import { Model, required } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
 import { Context as HLContext } from "fabric-contract-api";
 import { FabricERC20Contract } from "../contracts/erc20/erc20contract";
@@ -78,7 +78,7 @@ export function Owner() {
 }
 
 export async function ownedByOnCreate<
-  M extends Model,
+  M extends Model<boolean>,
   R extends Repo<M, F, C>,
   V,
   F extends RepositoryFlags,
@@ -134,8 +134,23 @@ export function OwnedBy() {
 }
 
 export function getFabricModelKey(key: string) {
-  return Metadata.key(ModelKeys.MODEL, FabricModelKeys.FABRIC + key);
+  return Metadata.key(FabricModelKeys.FABRIC + key);
 }
+//
+// export function privateData2(collection: string) {
+//   function privateData(collection: string) {
+//     return function innerPrivateData(target: object, propertyKey?: any) {
+//       const constr = propertyKey ? target : target.constructor;
+//     };
+//   }
+//
+//   return Decoration.for(FabricModelKeys.PRIVATE)
+//     .define({
+//       decorator: privateData,
+//       args: [collection],
+//     })
+//     .apply();
+// }
 
 export function privateData(collection?: string) {
   if (!collection) {
