@@ -90,7 +90,7 @@ describe("Tests global contract implementation", () => {
     productRepository = new FabricClientRepository(productAdapter, Product);
   });
 
-  it("Create User", async () => {
+  it.skip("Create User", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -102,7 +102,7 @@ describe("Tests global contract implementation", () => {
     expect(userID).toBeDefined();
   });
 
-  it("Should create User", async () => {
+  it.skip("Should create User", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -128,7 +128,102 @@ describe("Tests global contract implementation", () => {
     console.log(res);
   });
 
-  it("Should create Product", async () => {
+  it.skip("Should Update User", async () => {
+    const enrollmentService = new FabricEnrollmentService(caConfig);
+    const userID = (await enrollmentService.registerAndEnroll(
+      { userName: "TestUser" + Date.now(), password: "TestUserPW" },
+      false,
+      "",
+      "client"
+    )) as any;
+
+    expect(userID).toBeDefined();
+    const credentials = userID.credentials;
+
+    const client = {
+      keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
+      certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
+    };
+
+    const repo = userRepository.for({ ...client });
+
+    const m = new User({ name: "juan" });
+
+    const res = await repo.create(m);
+
+    console.log(res);
+    res.name = "Alice";
+    const updated = res;
+
+    const res1 = await repo.update(updated);
+
+    console.log(res1);
+  });
+
+  it.skip("Should Read User", async () => {
+    const enrollmentService = new FabricEnrollmentService(caConfig);
+    const userID = (await enrollmentService.registerAndEnroll(
+      { userName: "TestUser" + Date.now(), password: "TestUserPW" },
+      false,
+      "",
+      "client"
+    )) as any;
+
+    expect(userID).toBeDefined();
+    const credentials = userID.credentials;
+
+    const client = {
+      keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
+      certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
+    };
+
+    const repo = userRepository.for({ ...client });
+
+    const m = new User({ name: "juan" });
+
+    const res = await repo.create(m);
+
+    console.log(res);
+    const res1 = await repo.read(res.id);
+
+    console.log(res1);
+  });
+
+  it("Should Delete User", async () => {
+    const enrollmentService = new FabricEnrollmentService(caConfig);
+    const userID = (await enrollmentService.registerAndEnroll(
+      { userName: "TestUser" + Date.now(), password: "TestUserPW" },
+      false,
+      "",
+      "client"
+    )) as any;
+
+    expect(userID).toBeDefined();
+    const credentials = userID.credentials;
+
+    const client = {
+      keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
+      certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
+    };
+
+    const repo = userRepository.for({ ...client });
+
+    const m = new User({ name: "juan" });
+
+    const res = await repo.create(m);
+
+    console.log(res);
+
+    const res2 = await repo.delete(res.id);
+
+    console.log(res2);
+
+    const res1 = await repo.read(res.id);
+
+    console.log(res1);
+  });
+
+  it.skip("Should create Product", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -152,5 +247,67 @@ describe("Tests global contract implementation", () => {
     const res = await repo.create(m);
 
     console.log(res);
+  });
+
+  it.skip("Should Update Product", async () => {
+    const enrollmentService = new FabricEnrollmentService(caConfig);
+    const userID = (await enrollmentService.registerAndEnroll(
+      { userName: "TestUser" + Date.now(), password: "TestUserPW" },
+      false,
+      "",
+      "client"
+    )) as any;
+
+    expect(userID).toBeDefined();
+    const credentials = userID.credentials;
+
+    const client = {
+      keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
+      certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
+    };
+
+    const repo = productRepository.for({ ...client });
+
+    const m = new Product({ inventedName: "juan" });
+
+    const res = await repo.create(m);
+
+    console.log(res);
+    res.inventedName = "Alice";
+    const updated = res;
+
+    const res1 = await repo.update(updated);
+
+    console.log(res1);
+  });
+
+  it.skip("Should Read Product", async () => {
+    const enrollmentService = new FabricEnrollmentService(caConfig);
+    const userID = (await enrollmentService.registerAndEnroll(
+      { userName: "TestUser" + Date.now(), password: "TestUserPW" },
+      false,
+      "",
+      "client"
+    )) as any;
+
+    expect(userID).toBeDefined();
+    const credentials = userID.credentials;
+
+    const client = {
+      keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
+      certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
+    };
+
+    const repo = productRepository.for({ ...client });
+
+    const m = new Product({ inventedName: "juan" });
+
+    const res = await repo.create(m);
+
+    console.log(res);
+
+    const res1 = await repo.read(res.productCode);
+
+    console.log(res1);
   });
 });

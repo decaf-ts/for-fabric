@@ -152,6 +152,13 @@ export class FabricClientRepository<M extends Model> extends Repository<
     return [model, ...contextArgs.args];
   }
 
+  override async update(model: M, ...args: any[]) {
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient } = this.adapter.prepare(model, this.pk);
+    record = await this.adapter.update(this.class.name, id, record, ...args);
+    return this.adapter.revert(record, this.class, this.pk, id, transient);
+  }
+
   /**
    * @description Prepare arguments and context for bulk update
    * @summary Resolves repository context for an updateAll operation and forwards the models and processed arguments

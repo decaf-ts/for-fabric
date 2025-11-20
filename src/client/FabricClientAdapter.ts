@@ -1,4 +1,8 @@
-import { CouchDBAdapter, type MangoQuery } from "@decaf-ts/for-couchdb";
+import {
+  CouchDBAdapter,
+  CouchDBKeys,
+  type MangoQuery,
+} from "@decaf-ts/for-couchdb";
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
 
@@ -432,6 +436,18 @@ export class FabricClientAdapter extends CouchDBAdapter<
       id.toString(),
     ]);
     return this.serializer.deserialize(this.decode(result));
+  }
+
+  override updatePrefix(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>
+  ) {
+    const record: Record<string, any> = {};
+    record[CouchDBKeys.TABLE] = tableName;
+    record[CouchDBKeys.ID] = this.generateId(tableName, id);
+    Object.assign(record, model);
+    return [tableName, id, record];
   }
 
   /**
