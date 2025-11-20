@@ -178,12 +178,17 @@ export class FabricClientAdapter extends CouchDBAdapter<
       throw new InternalError(
         `Ids and models must have the same length: ${ids.length} != ${models.length}`
       );
+
+    if (typeof tableName !== "string") tableName = (tableName as any).name;
+
     log.info(`adding ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.CREATE_ALL,
       [ids, models.map((m) => this.serializer.serialize(m, tableName))],
-      transient
+      transient,
+      undefined,
+      tableName
     );
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
@@ -204,11 +209,15 @@ export class FabricClientAdapter extends CouchDBAdapter<
     ids: string[] | number[]
   ): Promise<Record<string, any>[]> {
     const log = this.log.for(this.readAll);
+    if (typeof tableName !== "string") tableName = (tableName as any).name;
     log.info(`reading ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.READ_ALL,
-      [ids]
+      [ids],
+      undefined,
+      undefined,
+      tableName
     );
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
@@ -237,12 +246,16 @@ export class FabricClientAdapter extends CouchDBAdapter<
       throw new InternalError(
         `Ids and models must have the same length: ${ids.length} != ${models.length}`
       );
+    if (typeof tableName !== "string") tableName = (tableName as any).name;
     log.info(`updating ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
+
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.UPDATE_ALL,
       [ids, models.map((m) => this.serializer.serialize(m, tableName))],
-      transient
+      transient,
+      undefined,
+      tableName
     );
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
@@ -264,11 +277,15 @@ export class FabricClientAdapter extends CouchDBAdapter<
     ids: (string | number | bigint)[]
   ): Promise<Record<string, any>[]> {
     const log = this.log.for(this.deleteAll);
+    if (typeof tableName !== "string") tableName = (tableName as any).name;
     log.info(`deleting ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.DELETE_ALL,
-      [ids]
+      [ids],
+      undefined,
+      undefined,
+      tableName
     );
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
@@ -406,12 +423,15 @@ export class FabricClientAdapter extends CouchDBAdapter<
     transient: Record<string, any>
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.create);
+    if (typeof tableName !== "string") tableName = (tableName as any).name;
     log.verbose(`adding entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
       OperationKeys.CREATE,
       [this.serializer.serialize(model, tableName)],
-      transient
+      transient,
+      undefined,
+      tableName
     );
     return this.serializer.deserialize(this.decode(result));
   }
@@ -430,11 +450,18 @@ export class FabricClientAdapter extends CouchDBAdapter<
     id: string | number
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.read);
+
+    if (typeof tableName !== "string") tableName = (tableName as any).name;
+
     log.verbose(`reading entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
-    const result = await this.evaluateTransaction(OperationKeys.READ, [
-      id.toString(),
-    ]);
+    const result = await this.evaluateTransaction(
+      OperationKeys.READ,
+      [id.toString()],
+      undefined,
+      undefined,
+      tableName
+    );
     return this.serializer.deserialize(this.decode(result));
   }
 
@@ -468,12 +495,15 @@ export class FabricClientAdapter extends CouchDBAdapter<
     transient: Record<string, any>
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.update);
+    if (typeof tableName !== "string") tableName = (tableName as any).name;
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
       OperationKeys.UPDATE,
       [this.serializer.serialize(model, tableName)],
-      transient
+      transient,
+      undefined,
+      tableName
     );
     return this.serializer.deserialize(this.decode(result));
   }
@@ -492,11 +522,16 @@ export class FabricClientAdapter extends CouchDBAdapter<
     id: string | number
   ): Promise<Record<string, any>> {
     const log = this.log.for(this.delete);
+    if (typeof tableName !== "string") tableName = (tableName as any).name;
     log.verbose(`deleting entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
-    const result = await this.submitTransaction(OperationKeys.DELETE, [
-      id.toString(),
-    ]);
+    const result = await this.submitTransaction(
+      OperationKeys.DELETE,
+      [id.toString()],
+      undefined,
+      undefined,
+      tableName
+    );
     return this.serializer.deserialize(this.decode(result));
   }
 
@@ -526,8 +561,11 @@ export class FabricClientAdapter extends CouchDBAdapter<
    *   FabricAdapter-->>Client: processed result
    */
   @debug()
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async raw<V>(rawInput: MangoQuery, process: boolean): Promise<V> {
+  async raw<V>(
+    rawInput: MangoQuery,
+    process: boolean,
+    tableName?: string
+  ): Promise<V> {
     const log = this.log.for(this.raw);
     log.info(`Performing raw  query on table`);
     log.debug(`processing raw input for query: ${JSON.stringify(rawInput)}`);
@@ -541,7 +579,14 @@ export class FabricClientAdapter extends CouchDBAdapter<
     }
     let transactionResult: any;
     try {
-      transactionResult = await this.evaluateTransaction("query", [input]);
+      if (typeof tableName !== "string") tableName = (tableName as any).name;
+      transactionResult = await this.evaluateTransaction(
+        "query",
+        [input],
+        undefined,
+        undefined,
+        tableName
+      );
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -589,13 +634,22 @@ export class FabricClientAdapter extends CouchDBAdapter<
     return FabricClientAdapter.getGateway(this.config, this.client);
   }
 
+  private getContractName(className?: string) {
+    if (!className) return undefined;
+    return `${className}Contract`;
+  }
+
   /**
    * @description Gets a Contract instance for the Fabric chaincode
    * @summary Creates a new Contract instance using the current Gateway
    * @return {Promise<Contrakt>} Promise resolving to the Contract instance
    */
-  protected async Contract(): Promise<Contrakt> {
-    return FabricClientAdapter.getContract(await this.Gateway(), this.config);
+  protected async Contract(contractName?: string): Promise<Contrakt> {
+    return FabricClientAdapter.getContract(
+      await this.Gateway(),
+      this.config,
+      contractName
+    );
   }
 
   /**
@@ -631,19 +685,19 @@ export class FabricClientAdapter extends CouchDBAdapter<
     submit = true,
     args?: any[],
     transientData?: Record<string, string>,
-    endorsingOrganizations?: Array<string>
+    endorsingOrganizations?: Array<string>,
+    className?: string
   ): Promise<Uint8Array> {
     const log = this.log.for(this.transaction);
     const gateway = await this.Gateway();
     try {
-      const contract = await this.Contract();
+      const contract = await this.Contract(this.getContractName(className));
       log.verbose(
-        `${submit ? "Submit" : "Evaluate"}ting transaction ${this.config.contractName}.${api}`
+        `${submit ? "Submit" : "Evaluate"}ting transaction ${this.getContractName(className) || this.config.contractName}.${api}`
       );
       log.debug(`args: ${args?.map((a) => a.toString()).join("\n") || "none"}`);
       const method = submit ? contract.submit : contract.evaluate;
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       endorsingOrganizations = endorsingOrganizations?.length
         ? endorsingOrganizations
         : undefined;
@@ -689,14 +743,16 @@ export class FabricClientAdapter extends CouchDBAdapter<
     api: string,
     args?: any[],
     transientData?: Record<string, string>,
-    endorsingOrganizations?: Array<string>
+    endorsingOrganizations?: Array<string>,
+    className?: string
   ): Promise<Uint8Array> {
     return this.transaction(
       api,
       true,
       args,
       transientData,
-      endorsingOrganizations
+      endorsingOrganizations,
+      className
     );
   }
 
@@ -713,14 +769,16 @@ export class FabricClientAdapter extends CouchDBAdapter<
     api: string,
     args?: any[],
     transientData?: Record<string, string>,
-    endorsingOrganizations?: Array<string>
+    endorsingOrganizations?: Array<string>,
+    className?: string
   ): Promise<Uint8Array> {
     return this.transaction(
       api,
       false,
       args,
       transientData,
-      endorsingOrganizations
+      endorsingOrganizations,
+      className
     );
   }
 
@@ -743,15 +801,20 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {PeerConfig} config - The peer configuration
    * @return {Contrakt} The Contract instance
    */
-  static getContract(gateway: Gateway, config: PeerConfig): Contrakt {
+  static getContract(
+    gateway: Gateway,
+    config: PeerConfig,
+    contractName?: string
+  ): Contrakt {
     const log = this.log.for(this.getContract);
     const network = this.getNetwork(gateway, config.channel);
     let contract: Contrakt;
     try {
       log.debug(
-        `Retrieving chaincode ${config.chaincodeName} contract ${config.contractName} from network ${config.channel}`
+        `Retrieving chaincode ${config.chaincodeName} contract ${contractName || config.contractName} from network ${config.channel}`
       );
-      contract = network.getContract(config.chaincodeName, config.contractName);
+      contractName = contractName ? contractName : config.contractName;
+      contract = network.getContract(config.chaincodeName, contractName);
     } catch (e: any) {
       throw this.parseError(e);
     }

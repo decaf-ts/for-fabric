@@ -155,7 +155,12 @@ export class FabricClientRepository<M extends Model> extends Repository<
   override async update(model: M, ...args: any[]) {
     // eslint-disable-next-line prefer-const
     let { record, id, transient } = this.adapter.prepare(model, this.pk);
-    record = await this.adapter.update(this.class.name, id, record, ...args);
+    record = await this.adapter.update(
+      this.class as unknown as string,
+      id,
+      record,
+      ...args
+    );
     return this.adapter.revert(record, this.class, this.pk, id, transient);
   }
 
@@ -224,7 +229,12 @@ export class FabricClientRepository<M extends Model> extends Repository<
   override async create(model: M, ...args: any[]): Promise<M> {
     // eslint-disable-next-line prefer-const
     let { record, id, transient } = this.adapter.prepare(model, this.pk);
-    record = await this.adapter.create(this.class.name, id, record, ...args);
+    record = await this.adapter.create(
+      this.class as unknown as string,
+      id,
+      record,
+      ...args
+    );
     let c = undefined;
     if (args.length) c = args[args.length - 1];
     return this.adapter.revert(
