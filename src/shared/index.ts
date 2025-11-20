@@ -4,7 +4,7 @@
  * @namespace shared
  * @memberOf module:for-fabric
  */
-
+export * from "./overrides";
 export * from "./events";
 export * from "./utils";
 export * from "./types";
