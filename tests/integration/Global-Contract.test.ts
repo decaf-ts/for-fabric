@@ -15,6 +15,7 @@ import { Product } from "../../src/contract/Product";
 import { UserContract } from "../../src/contract/UserContract";
 import { ProductContract } from "../../src/contract/ProductContract";
 import { NotFoundError } from "@decaf-ts/db-decorators";
+import { Repository } from "@decaf-ts/core";
 
 jest.setTimeout(3000000);
 
@@ -73,22 +74,14 @@ describe("Tests global contract implementation", () => {
       channel: "simple-channel",
     };
 
-    userAdapter = new FabricClientAdapter(
-      {
-        ...peerConfig,
-        contractName: UserContract.name,
-      },
-      FabricFlavour + UserContract.name
-    );
-    productAdapter = new FabricClientAdapter(
-      {
-        ...peerConfig,
-        contractName: ProductContract.name,
-      },
-      FabricFlavour + ProductContract.name
-    );
-    userRepository = new FabricClientRepository(userAdapter, User);
-    productRepository = new FabricClientRepository(productAdapter, Product);
+    userAdapter = new FabricClientAdapter({
+      ...peerConfig,
+    });
+
+    userRepository = Repository.forModel(User);
+    productRepository = Repository.forModel(Product);
+    // userRepository = new FabricClientRepository(userAdapter, User);
+    // productRepository = new FabricClientRepository(userAdapter, Product);
   });
 
   it("Create User Account", async () => {

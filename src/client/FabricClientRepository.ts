@@ -245,4 +245,83 @@ export class FabricClientRepository<M extends Model> extends Repository<
       c && c.get("rebuildWithTransient") ? transient : undefined
     );
   }
+  override async createAll(models: M[], ...args: any[]): Promise<M[]> {
+    if (!models.length) return models;
+    const prepared = models.map((m) => this.adapter.prepare(m, this.pk));
+    const ids = prepared.map((p) => p.id);
+    let records = prepared.map((p) => p.record);
+    records = await this.adapter.createAll(
+      this.class as unknown as string,
+      ids as (string | number)[],
+      records,
+      ...args
+    );
+    return records.map((r, i) =>
+      this.adapter.revert(r, this.class, this.pk, ids[i] as string | number)
+    );
+  }
+  override async read(
+    id: string | number | bigint,
+    ...args: any[]
+  ): Promise<M> {
+    const m = await this.adapter.read(
+      this.class as unknown as string,
+      id,
+      ...args
+    );
+    return this.adapter.revert<M>(m, this.class, this.pk, id);
+  }
+
+  override async readAll(
+    keys: string[] | number[],
+    ...args: any[]
+  ): Promise<M[]> {
+    const records = await this.adapter.readAll(
+      this.class as unknown as string,
+      keys,
+      ...args
+    );
+    return records.map((r, i) =>
+      this.adapter.revert(r, this.class, this.pk, keys[i])
+    );
+  }
+
+  override async updateAll(models: M[], ...args: any[]): Promise<M[]> {
+    const records = models.map((m) => this.adapter.prepare(m, this.pk));
+    const updated = await this.adapter.updateAll(
+      this.class as unknown as string,
+      records.map((r) => r.id),
+      records.map((r) => r.record),
+      ...args
+    );
+    return updated.map((u, i) =>
+      this.adapter.revert(u, this.class, this.pk, records[i].id)
+    );
+  }
+
+  override async delete(
+    id: string | number | bigint,
+    ...args: any[]
+  ): Promise<M> {
+    const m = await this.adapter.delete(
+      this.class as unknown as string,
+      id,
+      ...args
+    );
+    return this.adapter.revert<M>(m, this.class, this.pk, id);
+  }
+
+  override async deleteAll(
+    keys: string[] | number[],
+    ...args: any[]
+  ): Promise<M[]> {
+    const results = await this.adapter.deleteAll(
+      this.class as unknown as string,
+      keys,
+      ...args
+    );
+    return results.map((r, i) =>
+      this.adapter.revert(r, this.class, this.pk, keys[i])
+    );
+  }
 }
