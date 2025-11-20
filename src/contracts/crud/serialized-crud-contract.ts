@@ -1,9 +1,10 @@
 import { FabricCrudContract } from "./crud-contract";
-import { Constructor, Model } from "@decaf-ts/decorator-validation";
+import { Model } from "@decaf-ts/decorator-validation";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { Context, Context as Ctx, Transaction } from "fabric-contract-api";
 import { ContractLogger } from "../logging";
 import { Logging } from "@decaf-ts/logging";
+import { Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description CRUD contract variant that serializes/deserializes payloads

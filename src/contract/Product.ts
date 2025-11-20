@@ -1,7 +1,8 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { Model, model } from "@decaf-ts/decorator-validation";
-import { column, pk, table, uses } from "@decaf-ts/core";
+import { column, pk, table } from "@decaf-ts/core";
 import { FabricFlavour } from "../shared/constants";
+import { uses } from "@decaf-ts/decoration";
 
 @uses(FabricFlavour)
 @table()
