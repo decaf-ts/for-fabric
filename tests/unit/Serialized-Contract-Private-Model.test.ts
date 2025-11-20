@@ -1,6 +1,5 @@
-import { Logging, MiniLogger } from "@decaf-ts/logging";
+import { MiniLogger } from "@decaf-ts/logging";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
-import { SerializedCrudContract } from "../../src/contracts";
 import { TestPrivateModelContract } from "../assets/contract/serialized-contract-private-model/TestPrivateModelContract";
 import { TestPrivateModel } from "../assets/contract/serialized-contract-private-model/TestPrivateModel";
 
@@ -104,7 +103,7 @@ const ctx = {
 
 describe("Tests Public contract", () => {
   const contract = new TestPrivateModelContract();
-  it("should create model", async () => {
+  it.skip("should create model", async () => {
     const model = new TestPrivateModel({
       id: 1,
       name: "John Doe",

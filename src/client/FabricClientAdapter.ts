@@ -1,14 +1,13 @@
-import { CouchDBAdapter, type MangoQuery } from "@decaf-ts/for-couchdb";
+import {
+  CouchDBAdapter,
+  CouchDBKeys,
+  type MangoQuery,
+} from "@decaf-ts/for-couchdb";
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
-
-import {
-  type Constructor,
-  Model,
-  type Serializer,
-} from "@decaf-ts/decorator-validation";
-import { debug, Logger, MiniLogger } from "@decaf-ts/logging";
-import { FabricFlags, PeerConfig } from "../shared/types";
+import { Model, type Serializer } from "@decaf-ts/decorator-validation";
+import { debug, type Logger, MiniLogger } from "@decaf-ts/logging";
+import { type FabricFlags, type PeerConfig } from "../shared/types";
 import {
   connect,
   ConnectOptions,
@@ -16,6 +15,7 @@ import {
   Network,
   ProposalOptions,
   Contract as Contrakt,
+  type Signer,
 } from "@hyperledger/fabric-gateway";
 import { getIdentity, getSigner } from "./fabric-fs";
 import {
@@ -25,13 +25,14 @@ import {
   OperationKeys,
   SerializationError,
   BulkCrudOperationKeys,
-  modelToTransient,
 } from "@decaf-ts/db-decorators";
 import { Adapter, final, PersistenceKeys, Repository } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import type { FabricClientDispatch } from "./FabricClientDispatch";
+import { HSMSignerFactoryCustom } from "./fabric-hsm";
+import { type Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -289,7 +290,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     transient?: Record<string, any>;
   } {
     const log = this.log.for(this.prepare);
-    const split = modelToTransient(model);
+    const split = Model.toTransient(model);
     if ((model as any)[PersistenceKeys.METADATA]) {
       log.silly(
         `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
@@ -432,6 +433,18 @@ export class FabricClientAdapter extends CouchDBAdapter<
     return this.serializer.deserialize(this.decode(result));
   }
 
+  override updatePrefix(
+    tableName: string,
+    id: string | number,
+    model: Record<string, any>
+  ) {
+    const record: Record<string, any> = {};
+    record[CouchDBKeys.TABLE] = tableName;
+    record[CouchDBKeys.ID] = this.generateId(tableName, id);
+    Object.assign(record, model);
+    return [tableName, id, record];
+  }
+
   /**
    * @description Updates a single record
    * @summary Submits a transaction to update a record in the Fabric ledger
@@ -477,8 +490,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.verbose(`deleting entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(OperationKeys.DELETE, [
-      tableName,
-      id,
+      id.toString(),
     ]);
     return this.serializer.deserialize(this.decode(result));
   }
@@ -828,7 +840,25 @@ export class FabricClientAdapter extends CouchDBAdapter<
     );
     log.debug(`Retrieving signer key from ${config.keyCertOrDirectoryPath}`);
 
-    const signer = await getSigner(config.keyCertOrDirectoryPath);
+    let signer: Signer,
+      close = () => {};
+    if (!config.hsm) {
+      signer = await getSigner(config.keyCertOrDirectoryPath);
+    } else {
+      const hsm = new HSMSignerFactoryCustom(config.hsm.library);
+      const identifier = hsm.getSKIFromCertificatePath(
+        config.certCertOrDirectoryPath
+      );
+      const pkcs11Signer = hsm.newSigner({
+        label: config.hsm.tokenLabel as string,
+        pin: String(config.hsm.pin) as string,
+        identifier: identifier,
+        // userType: 1 /*CKU_USER */,
+      });
+      signer = pkcs11Signer.signer;
+
+      close = pkcs11Signer.close;
+    }
 
     const options = {
       client,
@@ -850,7 +880,19 @@ export class FabricClientAdapter extends CouchDBAdapter<
     } as ConnectOptions;
 
     log.debug(`Connecting to ${config.mspId}`);
-    return connect(options);
+    const gateway = connect(options);
+
+    // TODO: replace?
+    if (config.hsm) {
+      gateway.close = new Proxy(gateway.close, {
+        apply(target: () => void, thisArg: any, argArray: any[]): any {
+          Reflect.apply(target, thisArg, argArray);
+          close();
+        },
+      });
+    }
+
+    return gateway;
   }
 
   /**

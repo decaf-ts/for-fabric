@@ -1,5 +1,15 @@
 import { RepositoryFlags } from "@decaf-ts/db-decorators";
 import { TLSOptions } from "fabric-ca-client";
+import { Model } from "@decaf-ts/decorator-validation";
+
+export type HSMOptions = {
+  library: string;
+  slot?: number;
+  tokenLabel?: string;
+  pin: string;
+  keyLabel?: string;
+  keyIdHex?: string;
+};
 
 /**
  * @description Configuration for connecting to a Hyperledger Fabric peer
@@ -38,6 +48,7 @@ export type PeerConfig = {
   ca?: string;
   mspId: string;
   channel: string;
+  hsm?: HSMOptions;
 };
 
 /**
@@ -58,7 +69,7 @@ export type FabricFlags = RepositoryFlags;
  * @property {string} caName - Path to the directory containing certificates
  * @property {string} tlsCertPath - Path to the TLS certificate
  * @property {string} caCert - Endpoint URL for the peer
- * @property {string} caKey - Host alias for the peer
+ * @property {string} [caKey] - Host alias for the peer or directory containing the admin private key
  * @memberOf module:for-fabric.shared
  */
 export type CAConfig = {
@@ -66,7 +77,8 @@ export type CAConfig = {
   tls?: TLSOptions;
   caName: string;
   caCert: string;
-  caKey: string;
+  caKey?: string;
+  hsm?: HSMOptions;
 };
 
 /**
@@ -81,3 +93,10 @@ export interface Credentials {
   userName?: string;
   password?: string;
 }
+
+export type SegregatedModel<M extends Model> = {
+  model: M;
+  transient?: Record<keyof M, any>;
+  private?: Record<keyof M, any>;
+  shared?: Record<keyof M, any>;
+};

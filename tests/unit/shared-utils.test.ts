@@ -24,8 +24,10 @@ jest.mock("fabric-common", () => {
   const setCryptoSuiteMock = jest.fn();
   const setEnrollmentMock = jest.fn().mockResolvedValue(undefined);
   const createKeyFromRawMock = jest.fn(() => "importedKey");
+  const getKeyMock = jest.fn(() => Promise.resolve("hsmKey"));
   const newCryptoSuiteMock = jest.fn(() => ({
     createKeyFromRaw: createKeyFromRawMock,
+    getKey: getKeyMock,
   }));
 
   class User {
@@ -42,6 +44,7 @@ jest.mock("fabric-common", () => {
       setEnrollmentMock,
       createKeyFromRawMock,
       newCryptoSuiteMock,
+      getKeyMock,
     },
   };
 });
@@ -54,6 +57,7 @@ const {
     setEnrollmentMock: jest.Mock;
     createKeyFromRawMock: jest.Mock;
     newCryptoSuiteMock: jest.Mock;
+    getKeyMock: jest.Mock;
   };
 };
 
@@ -62,6 +66,7 @@ const {
   setEnrollmentMock,
   createKeyFromRawMock,
   newCryptoSuiteMock,
+  getKeyMock,
 } = fabricCommonMocks;
 
 describe("shared/utils CoreUtils", () => {
@@ -160,6 +165,39 @@ aNUApmLEXF+k
     expect(setCryptoSuiteMock).toHaveBeenCalled();
     expect(setEnrollmentMock).toHaveBeenCalledWith(
       "importedKey",
+      certificatePem,
+      "Org1MSP"
+    );
+  });
+
+  it("getCAUser loads key material from HSM when configured", async () => {
+    const hsmKey = { isPrivate: () => true };
+    (getKeyMock as jest.Mock).mockResolvedValueOnce(hsmKey);
+
+    await CoreUtils.getCAUser(
+      "hsmUser",
+      undefined,
+      certificatePem,
+      "Org1MSP",
+      {
+        hsm: {
+          library: "/usr/lib/softhsm/libsofthsm2.so",
+          tokenLabel: "TestToken",
+          pin: "123456",
+        },
+      }
+    );
+
+    expect(newCryptoSuiteMock).toHaveBeenCalledWith({
+      software: false,
+      lib: "/usr/lib/softhsm/libsofthsm2.so",
+      slot: undefined,
+      label: "TestToken",
+      pin: "123456",
+    });
+    expect(getKeyMock).toHaveBeenCalledTimes(1);
+    expect(setEnrollmentMock).toHaveBeenCalledWith(
+      hsmKey,
       certificatePem,
       "Org1MSP"
     );

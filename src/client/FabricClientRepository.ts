@@ -1,5 +1,5 @@
 import { Adapter, Repository } from "@decaf-ts/core";
-import { Constructor, Model } from "@decaf-ts/decorator-validation";
+import { Model } from "@decaf-ts/decorator-validation";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import {
   Context,
@@ -7,6 +7,7 @@ import {
   RepositoryFlags,
 } from "@decaf-ts/db-decorators";
 import { FabricFlags } from "../shared";
+import { Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Repository implementation for Fabric client operations
@@ -152,6 +153,13 @@ export class FabricClientRepository<M extends Model> extends Repository<
     return [model, ...contextArgs.args];
   }
 
+  override async update(model: M, ...args: any[]) {
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient } = this.adapter.prepare(model, this.pk);
+    record = await this.adapter.update(this.class.name, id, record, ...args);
+    return this.adapter.revert(record, this.class, this.pk, id, transient);
+  }
+
   /**
    * @description Prepare arguments and context for bulk update
    * @summary Resolves repository context for an updateAll operation and forwards the models and processed arguments
@@ -212,5 +220,20 @@ export class FabricClientRepository<M extends Model> extends Repository<
     );
     await this.readAll(keys, ...contextArgs.args);
     return [keys, ...contextArgs.args];
+  }
+
+  override async create(model: M, ...args: any[]): Promise<M> {
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient } = this.adapter.prepare(model, this.pk);
+    record = await this.adapter.create(this.class.name, id, record, ...args);
+    let c = undefined;
+    if (args.length) c = args[args.length - 1];
+    return this.adapter.revert(
+      record,
+      this.class,
+      this.pk,
+      id,
+      c && c.get("rebuildWithTransient") ? transient : undefined
+    );
   }
 }

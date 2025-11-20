@@ -1,7 +1,8 @@
 import { stringFormat } from "@decaf-ts/decorator-validation";
-import { Logger, Logging, MiniLogger } from "@decaf-ts/logging";
+import { Logger, MiniLogger } from "@decaf-ts/logging";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
-import { User } from "fabric-common";
+import { CryptoSetting, ICryptoSuite, User } from "fabric-common";
+import { HSMOptions } from "./types";
 
 /**
  * @description Normalizes imports to handle both CommonJS and ESModule formats.
@@ -35,6 +36,8 @@ export async function normalizeImport<T>(
  */
 export class CoreUtils {
   private static logger: Logger = new MiniLogger(CoreUtils.name);
+
+  private static cryptoSuite: ICryptoSuite;
 
   private constructor() {}
 
@@ -87,9 +90,10 @@ export class CoreUtils {
    */
   static async getCAUser(
     userName: string,
-    privateKey: string,
+    privateKey: string | undefined,
     certificate: string,
-    mspId: string
+    mspId: string,
+    options?: { hsm?: HSMOptions }
   ): Promise<User> {
     this.logger.debug(
       stringFormat(
@@ -100,11 +104,72 @@ export class CoreUtils {
       )
     );
     const user = new User(userName);
-    const cryptoSuite = User.newCryptoSuite();
+    const config = options?.hsm
+      ? {
+          software: false,
+          lib: options.hsm.library,
+          slot: options.hsm.slot,
+          label: options.hsm.tokenLabel,
+          pin: String(options.hsm.pin),
+        }
+      : undefined;
+    const cryptoSuite = this.getCryptoSuite(config);
+
     user.setCryptoSuite(cryptoSuite);
-    const importedKey = cryptoSuite.createKeyFromRaw(privateKey);
-    await user.setEnrollment(importedKey, certificate, mspId);
+    const enrollmentKey = options?.hsm
+      ? await this.getHSMEnrollmentKey(cryptoSuite, certificate, options.hsm)
+      : this.getSoftwareEnrollmentKey(cryptoSuite, privateKey);
+    await user.setEnrollment(enrollmentKey, certificate, mspId);
     return user;
+  }
+
+  static getCryptoSuite(options?: CryptoSetting): ICryptoSuite {
+    if (!options) return User.newCryptoSuite();
+    if (CoreUtils.cryptoSuite) return CoreUtils.cryptoSuite;
+
+    CoreUtils.cryptoSuite = User.newCryptoSuite(options);
+    return CoreUtils.cryptoSuite;
+  }
+
+  private static getSoftwareEnrollmentKey(
+    cryptoSuite: any,
+    privateKey?: string
+  ) {
+    if (!privateKey) {
+      throw new Error(
+        "Private key must be provided when HSM configuration is not supplied"
+      );
+    }
+    return cryptoSuite.createKeyFromRaw(privateKey);
+  }
+
+  private static async getHSMEnrollmentKey(
+    cryptoSuite: any,
+    certificate: string,
+    hsm: HSMOptions
+  ) {
+    const ski =
+      hsm.keyIdHex && hsm.keyIdHex.trim().length > 0
+        ? Buffer.from(hsm.keyIdHex, "hex")
+        : await this.getCertificateSKI(certificate);
+    const key = await cryptoSuite.getKey(ski);
+    if (!key || (typeof key.isPrivate === "function" && !key.isPrivate())) {
+      throw new Error("Unable to resolve private key from HSM");
+    }
+    return key;
+  }
+
+  static async getCertificateSKI(certificate: string): Promise<Buffer> {
+    const crypto = await normalizeImport(import("crypto"));
+    const x509 = new crypto.X509Certificate(certificate);
+    const jwk = x509.publicKey.export({ format: "jwk" });
+    const prefix = Buffer.from([0x04]);
+    const x = Buffer.from(jwk.x || "", "base64url");
+    const y = Buffer.from(jwk.y || "", "base64url");
+    return crypto
+      .createHash("sha256")
+      .update(Buffer.concat([prefix, x, y]))
+      .digest();
   }
 
   /**

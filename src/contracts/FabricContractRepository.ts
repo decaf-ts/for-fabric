@@ -7,10 +7,9 @@ import {
 import { FabricContractAdapter } from "./ContractAdapter";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
-import { Constructor, Model } from "@decaf-ts/decorator-validation";
+import { Model } from "@decaf-ts/decorator-validation";
 import {
   ConflictError,
-  ContextArgs,
   Context as Ctx,
   enforceDBDecorators,
   InternalError,
@@ -24,6 +23,7 @@ import { Context as CTX } from "@decaf-ts/db-decorators";
 import { FabricContractSequence } from "./FabricContractSequence";
 import { ContractLogger } from "./logging";
 import { Logging } from "@decaf-ts/logging";
+import { Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models

@@ -120,20 +120,45 @@ export class FabricEnrollmentService extends LoggedService {
   private user?: User;
 
   constructor(private caConfig: CAConfig) {
+    CoreUtils.getCryptoSuite(
+      caConfig.hsm
+        ? {
+            software: false,
+            lib: caConfig.hsm.library,
+            slot: caConfig.hsm.slot,
+            label: caConfig.hsm.tokenLabel,
+            pin: String(caConfig.hsm.pin),
+          }
+        : undefined
+    );
     super();
   }
 
   protected async User(): Promise<User> {
     if (this.user) return this.user;
-    const { caName, caCert, caKey, url } = this.caConfig;
+    const { caName, caCert, caKey, url, hsm } = this.caConfig;
     const log = this.log.for(this.User);
     log.debug(`Creating CA user for ${caName} at ${url}`);
     log.debug(`Retrieving CA certificate from ${caCert}`);
     const certificate = await CoreUtils.getFirstDirFileNameContent(caCert);
-    log.debug(`Retrieving CA key from ${caKey}`);
-    const key = await CoreUtils.getFirstDirFileNameContent(caKey);
+    let key: string | undefined;
+    if (!hsm) {
+      if (!caKey) {
+        throw new InternalError(
+          `Missing caKey configuration for CA ${caName}. Provide a key directory or configure HSM support.`
+        );
+      }
+      log.debug(`Retrieving CA key from ${caKey}`);
+      key = await CoreUtils.getFirstDirFileNameContent(caKey);
+    } else {
+      log.debug(
+        `Using HSM configuration for CA ${caName} with library ${hsm.library}`
+      );
+    }
     log.debug(`Loading Admin user for ca ${caName}`);
-    this.user = await CoreUtils.getCAUser("admin", key, certificate, caName);
+    this.user = await CoreUtils.getCAUser("admin", key, certificate, caName, {
+      hsm,
+    });
     return this.user;
   }
 

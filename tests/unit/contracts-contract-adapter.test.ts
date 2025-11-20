@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { Model, model, prop } from "@decaf-ts/decorator-validation";
+import { Model, model } from "@decaf-ts/decorator-validation";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
 import {
   FabricContractAdapter,
@@ -12,6 +12,7 @@ import type { FabricContractSequence } from "../../src/contracts/FabricContractS
 import type { SequenceOptions } from "@decaf-ts/core";
 import { UnsupportedError } from "@decaf-ts/core";
 import type { Logger } from "@decaf-ts/logging";
+import { prop } from "@decaf-ts/decoration";
 
 @model()
 class TestModel extends Model {

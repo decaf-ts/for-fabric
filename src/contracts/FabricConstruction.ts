@@ -10,11 +10,7 @@ import {
 } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
-import {
-  Context,
-  findPrimaryKey,
-  InternalError,
-} from "@decaf-ts/db-decorators";
+import { Context, InternalError } from "@decaf-ts/db-decorators";
 
 /**
  * @description Handles one-to-one relationship creation
@@ -97,12 +93,12 @@ export async function oneToOneOnCreate<
   data.class =
     typeof data.class === "string" ? data.class : (data.class as any)().name;
 
-  const constructor = Model.get(data.class as string);
+  const constructor = Model.get(data.class as unknown as string);
   if (!constructor)
     throw new InternalError(`Could not find model ${data.class}`);
   const repo: Repo<any> = Repository.forModel(constructor, this.adapter.alias);
   const created = await repo.create(propertyValue, context);
-  const pk = findPrimaryKey(created).id;
+  const pk = Model.pk(created);
   await cacheModelForPopulate(context, model, key, created[pk], created);
   (model as any)[key] = created[pk];
 }
@@ -183,12 +179,12 @@ export async function oneToOneOnUpdate<
     return;
   }
 
-  const updated = await createOrUpdate(
+  const updated: any = await createOrUpdate(
     model[key] as M,
     context,
     this.adapter.alias
   );
-  const pk = findPrimaryKey(updated).id;
+  const pk = Model.pk(updated);
   await cacheModelForPopulate(
     context,
     model,
@@ -363,7 +359,7 @@ export async function oneToManyOnCreate<
     return;
   }
 
-  const pkName = findPrimaryKey(propertyValues[0]).id;
+  const pkName = Model.pk(propertyValues[0]);
 
   const result: Set<string> = new Set();
 
@@ -552,7 +548,11 @@ export async function populate<
         val = await c.get(cacheKey as any);
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e: any) {
-        const repo = repositoryFromTypeMetadata(model, propName, alias);
+        const repo = repositoryFromTypeMetadata(
+          model,
+          propName as keyof M,
+          alias
+        );
         if (!repo) throw new InternalError("Could not find repo");
         val = await repo.read(proKeyValue, context);
       }

@@ -7,17 +7,17 @@ import {
   RepositoryFlags,
   transient,
 } from "@decaf-ts/db-decorators";
-import {
-  Decoration,
-  Model,
-  ModelKeys,
-  propMetadata,
-  required,
-} from "@decaf-ts/decorator-validation";
+import { Model, required } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
 import { Context as HLContext } from "fabric-contract-api";
-import { apply } from "@decaf-ts/reflection";
 import { FabricERC20Contract } from "../contracts/erc20/erc20contract";
+import {
+  apply,
+  Constructor,
+  Decoration,
+  Metadata,
+  propMetadata,
+} from "@decaf-ts/decoration";
 
 /**
  * Decorator for marking methods that require ownership authorization.
@@ -78,7 +78,7 @@ export function Owner() {
 }
 
 export async function ownedByOnCreate<
-  M extends Model,
+  M extends Model<boolean>,
   R extends Repo<M, F, C>,
   V,
   F extends RepositoryFlags,
@@ -134,36 +134,57 @@ export function OwnedBy() {
 }
 
 export function getFabricModelKey(key: string) {
-  return Model.key(FabricModelKeys.FABRIC + key);
+  return Metadata.key(FabricModelKeys.FABRIC + key);
 }
+//
+// export function privateData2(collection: string) {
+//   function privateData(collection: string) {
+//     return function innerPrivateData(target: object, propertyKey?: any) {
+//       const constr = propertyKey ? target : target.constructor;
+//     };
+//   }
+//
+//   return Decoration.for(FabricModelKeys.PRIVATE)
+//     .define({
+//       decorator: privateData,
+//       args: [collection],
+//     })
+//     .apply();
+// }
 
 export function privateData(collection?: string) {
   if (!collection) {
     throw new Error("Collection name is required");
   }
 
-  const key: string = getFabricModelKey(FabricModelKeys.PRIVATE);
+  const key: string = FabricModelKeys.PRIVATE;
 
-  return function privateData(model: any, attribute?: any) {
-    const propertyKey = attribute || undefined;
+  return function privateData<M extends Model>(
+    model: M | Constructor<M>,
+    attribute?: any
+  ) {
+    const constr =
+      model instanceof Model ? (model.constructor as Constructor) : model;
 
-    const meta = Reflect.getMetadata(
-      key,
-      model[ModelKeys.ANCHOR] || model,
-      propertyKey as string
-    );
-    const data = meta?.collections || [];
+    const metaData: any = Metadata.get(constr);
+    const modeldata = metaData?.private?.collections || [];
 
-    propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
+    propMetadata(key, {
       ...(!attribute && {
-        collections: data ? [...new Set([...data, collection])] : [collection],
+        collections: modeldata
+          ? [...new Set([...modeldata, collection])]
+          : [collection],
       }),
       isPrivate: !attribute,
-    })(attribute ? model.constructor : model[ModelKeys.ANCHOR] || model);
+    })(attribute ? constr : model);
 
     if (attribute) {
-      propMetadata(getFabricModelKey(FabricModelKeys.PRIVATE), {
-        collections: data ? [...new Set([...data, collection])] : [collection],
+      const attributeData =
+        (metaData?.private?.[attribute] as any)?.collections || [];
+      propMetadata(Metadata.key(key, attribute), {
+        collections: attributeData
+          ? [...new Set([...attributeData, collection])]
+          : [collection],
       })(model, attribute);
       transient()(model, attribute);
     }

@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { LogLevel, Logging } from "@decaf-ts/logging";
+import { LogLevel } from "@decaf-ts/logging";
 import { FabricLogger } from "../../src/client/logging";
 
 describe("FabricLogger", () => {
