@@ -1298,159 +1298,67 @@ services:
 
 volumes:
   boot-files:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/boot-files
-      o: bind
+    name: boot-files
 
   org-a-tls-server-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-a-tls-server-vol
-      o: bind
+    name: org-a-tls-server-vol
   org-a-tls-client-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-a-tls-client-vol
-      o: bind
+    name: org-a-tls-client-vol
 
   org-b-tls-server-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-b-tls-server-vol
-      o: bind
+    name: org-b-tls-server-vol
   org-b-tls-client-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-b-tls-client-vol
-      o: bind
+    name: org-b-tls-client-vol
 
   org-c-tls-server-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-c-tls-server-vol
-      o: bind
+    name: org-c-tls-server-vol
   org-c-tls-client-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-c-tls-client-vol
-      o: bind
+    name: org-c-tls-client-vol
 
   org-a-server-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-a-server-vol
-      o: bind
+    name: org-a-server-vol
   org-a-client-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-a-client-vol
-      o: bind
+    name: org-a-client-vol
 
   org-b-server-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-b-server-vol
-      o: bind
+    name: org-b-server-vol
   org-b-client-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-b-client-vol
-      o: bind
+    name: org-b-client-vol
 
   org-c-server-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-c-server-vol
-      o: bind
+    name: org-c-server-vol
   org-c-client-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-c-client-vol
-      o: bind
+    name: org-c-client-vol
 
   org-a-orderer-0-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-a-orderer-0-vol
-      o: bind
+    name: org-a-orderer-0-vol
 
   org-a-peer-0-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-a-peer-0-vol
-      o: bind
+    name: org-a-peer-0-vol
 
   org-a-peer-0-couchdb-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-a-peer-0-couchdb-vol
-      o: bind
+    name: org-a-peer-0-couchdb-vol
 
   org-b-peer-0-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-b-peer-0-vol
-      o: bind
+    name: org-b-peer-0-vol
 
   org-b-peer-0-couchdb-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-b-peer-0-couchdb-vol
-      o: bind
+    name: org-b-peer-0-couchdb-vol
 
   org-c-peer-0-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-c-peer-0-vol
-      o: bind
+    name: org-c-peer-0-vol
 
   org-c-peer-0-couchdb-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-c-peer-0-couchdb-vol
-      o: bind
+    name: org-c-peer-0-couchdb-vol
 
   org-a-share-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-a-share-vol
-      o: bind
+    name: org-a-share-vol
 
   org-b-share-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-b-share-vol
-      o: bind
+    name: org-b-share-vol
 
   org-c-share-vol:
-    driver: local
-    driver_opts:
-      type: none
-      device: ./storage/org-c-share-vol
-      o: bind
+    name: org-c-share-vol
 
 networks:
   test_network:
