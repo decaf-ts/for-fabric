@@ -25,7 +25,7 @@ services:
   org-a-tls:
     container_name: org-a-tls
     hostname: org-a-tls
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     environment:
       - FABRIC_CA_CLIENT_HOME=/weaver/client/admin
@@ -61,7 +61,7 @@ services:
   org-b-tls:
     container_name: org-b-tls
     hostname: org-b-tls
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     environment:
       - FABRIC_CA_CLIENT_HOME=/weaver/client/admin
@@ -97,7 +97,7 @@ services:
   org-c-tls:
     container_name: org-c-tls
     hostname: org-c-tls
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     environment:
       - FABRIC_CA_CLIENT_HOME=/weaver/client/admin
@@ -132,7 +132,7 @@ services:
 
   boot-org-a-tls:
     container_name: boot-org-a-tls
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -217,7 +217,7 @@ services:
 
   boot-org-b-tls:
     container_name: boot-org-b-tls
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -286,7 +286,7 @@ services:
 
   boot-org-c-tls:
     container_name: boot-org-c-tls
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -356,7 +356,7 @@ services:
   org-a:
     container_name: org-a
     hostname: org-a
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     environment:
       - FABRIC_CA_CLIENT_HOME=/weaver/client/admin
@@ -399,7 +399,7 @@ services:
   org-b:
     container_name: org-b
     hostname: org-b
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     environment:
       - FABRIC_CA_CLIENT_HOME=/weaver/client/admin
@@ -441,7 +441,7 @@ services:
   org-c:
     container_name: org-c
     hostname: org-c
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-${FABRIC_VERSION:-2.5.12}-${WEAVER_VERSION:-latest}
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-${FABRIC_VERSION:-2.5.12}-${WEAVER_VERSION:-latest}
     restart: no
     environment:
       - FABRIC_CA_CLIENT_HOME=/weaver/client/admin
@@ -482,7 +482,7 @@ services:
 
   boot-org-a-ca:
     container_name: boot-org-a-ca
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -659,7 +659,7 @@ services:
 
   boot-org-b-ca:
     container_name: boot-org-b-ca
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -762,7 +762,7 @@ services:
 
   boot-org-c-ca:
     container_name: boot-org-c-ca
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -865,7 +865,7 @@ services:
 
   boot-infrastructure:
     container_name: boot-infrastructure
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -919,7 +919,7 @@ services:
   org-a-orderer-0:
     container_name: org-a-orderer-0
     hostname: org-a-orderer-0
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     depends_on:
       boot-infrastructure:
@@ -967,7 +967,7 @@ services:
 
   boot-org-a-orderer-0:
     container_name: boot-org-a-orderer-0
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -1058,7 +1058,7 @@ services:
   org-a-peer-0:
     container_name: org-a-peer-0
     hostname: org-a-peer-0
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     environment:
       - FABRIC_CFG_PATH=/weaver/peer
@@ -1111,7 +1111,7 @@ services:
   org-b-peer-0:
     container_name: org-b-peer-0
     hostname: org-b-peer-0
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     environment:
       - FABRIC_CFG_PATH=/weaver/peer
@@ -1164,7 +1164,7 @@ services:
   org-c-peer-0:
     container_name: org-c-peer-0
     hostname: org-c-peer-0
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     environment:
       - FABRIC_CFG_PATH=/weaver/peer
@@ -1216,7 +1216,7 @@ services:
 
   boot-org-a-peer-0:
     container_name: boot-org-a-peer-0
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -1251,7 +1251,7 @@ services:
 
   boot-org-b-peer-0:
     container_name: boot-org-b-peer-0
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -1286,7 +1286,7 @@ services:
 
   boot-org-c-peer-0:
     container_name: boot-org-c-peer-0
-    image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest
+    image: ghcr.io/decaf-ts/fabric-weaver:weaver-2.5.12-latest
     restart: no
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
