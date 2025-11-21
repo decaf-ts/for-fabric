@@ -110,8 +110,16 @@ export class FabricContractRepository<M extends Model> extends Repository<
    * @param {Ctx} ctx - The Fabric chaincode context
    * @return {ContractLogger} The logger instance
    */
-  public logFor(ctx: Context): ContractLogger {
-    return Logging.for(FabricContractRepository, {}, ctx) as ContractLogger;
+  public logFor(ctx: Context | FabricContractContext): ContractLogger {
+    if ((ctx as FabricContractContext).logger)
+      return (ctx as FabricContractContext).logger as ContractLogger;
+    return Logging.for(
+      this as any,
+      {
+        correlationId: ctx.stub.getTxID(),
+      },
+      ctx
+    ) as ContractLogger;
   }
 
   /**
@@ -122,7 +130,8 @@ export class FabricContractRepository<M extends Model> extends Repository<
    * @return {Promise<M>} Promise resolving to the created model
    */
   override async create(model: M, ...args: any[]): Promise<M> {
-    const ctx = args[args.length - 1] as Context;
+    if (args.length !== 1) throw new InternalError(`Missing context`);
+    const ctx = args[args.length - 1] as FabricContractContext;
     const log = this.logFor(ctx).for(this.create);
     log.info(`Preparing model: ${JSON.stringify(model)}`);
     // eslint-disable-next-line prefer-const
@@ -130,19 +139,18 @@ export class FabricContractRepository<M extends Model> extends Repository<
       model,
       this.pk,
       this.tableName,
-      ...args
+      ctx
     );
     log.info(`Creating model: ${JSON.stringify(model)}`);
-    record = await this.adapter.create(this.tableName, id, record, ...args);
-    let c: FabricContractContext | undefined = undefined;
-    if (args.length) c = args[args.length - 1] as FabricContractContext;
+    record = await this.adapter.create(this.tableName, id, record, ctx);
     log.info(`Reverting model: ${JSON.stringify(model)}`);
     return this.adapter.revert<M>(
       record,
       this.class,
       this.pk,
       id,
-      c && c.get("rebuildWithTransient") ? transient : undefined
+      ctx && ctx.get("rebuildWithTransient") ? transient : undefined,
+      ctx
     );
   }
 
@@ -150,13 +158,10 @@ export class FabricContractRepository<M extends Model> extends Repository<
     id: string | number | bigint,
     ...args: any[]
   ): Promise<M> {
-    const m = await this.adapter.read(
-      this.tableName,
-      id as string,
-      new this.class(),
-      ...args
-    );
-    return this.adapter.revert<M>(m, this.class, this.pk, id as string);
+    if (args.length !== 1) throw new InternalError(`Missing context`);
+    const ctx = args[args.length - 1] as FabricContractContext;
+    const m = await this.adapter.read(this.tableName, id as string, ctx);
+    return this.adapter.revert<M>(m, this.class, this.pk, id as string, ctx);
   }
 
   /**
@@ -167,13 +172,10 @@ export class FabricContractRepository<M extends Model> extends Repository<
    * @return {Promise<M>} The deleted model instance.
    */
   override async delete(id: string, ...args: any[]) {
-    const m = await this.adapter.delete(
-      this.tableName,
-      id,
-      new this.class(),
-      ...args
-    );
-    return this.adapter.revert(m, this.class, this.pk, id);
+    if (args.length !== 1) throw new InternalError(`Missing context`);
+    const ctx = args[args.length - 1] as FabricContractContext;
+    const m = await this.adapter.delete(this.tableName, id, ctx);
+    return this.adapter.revert(m, this.class, this.pk, id, ctx);
   }
 
   /**
@@ -184,7 +186,8 @@ export class FabricContractRepository<M extends Model> extends Repository<
    * @return {Promise<M>} Promise resolving to the updated model
    */
   override async update(model: M, ...args: any[]): Promise<M> {
-    const ctx = args[args.length - 1] as Context;
+    if (args.length !== 1) throw new InternalError(`Missing context`);
+    const ctx = args[args.length - 1] as FabricContractContext;
     const log = this.logFor(ctx).for(this.update);
     log.info(`Preparing model: ${JSON.stringify(model)}`);
     // eslint-disable-next-line prefer-const
@@ -192,10 +195,10 @@ export class FabricContractRepository<M extends Model> extends Repository<
       model,
       this.pk,
       this.tableName,
-      ...args
+      ctx
     );
     log.info(`Updating model: ${JSON.stringify(model)}`);
-    record = await this.adapter.update(this.tableName, id, record, ...args);
+    record = await this.adapter.update(this.tableName, id, record, ctx);
     let c: FabricContractContext | undefined = undefined;
     if (args.length) c = args[args.length - 1] as FabricContractContext;
     log.info(`Reverting model: ${JSON.stringify(model)}`);
@@ -204,7 +207,8 @@ export class FabricContractRepository<M extends Model> extends Repository<
       this.class,
       this.pk,
       id,
-      c && c.get("rebuildWithTransient") ? transient : undefined
+      c && c.get("rebuildWithTransient") ? transient : undefined,
+      ctx
     );
   }
 
@@ -225,9 +229,11 @@ export class FabricContractRepository<M extends Model> extends Repository<
    * @return {Promise<M[]>} Promise resolving to the created models
    */
   override async createAll(models: M[], ...args: any[]): Promise<M[]> {
+    if (args.length !== 1) throw new InternalError(`Missing context`);
+    const ctx = args[args.length - 1] as FabricContractContext;
     if (!models.length) return models;
     const prepared = models.map((m) =>
-      this.adapter.prepare(m, this.pk, this.tableName, ...args)
+      this.adapter.prepare(m, this.pk, this.tableName, ctx)
     );
     const ids = prepared.map((p) => p.id);
     let records = prepared.map((p) => p.record);
@@ -238,7 +244,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
       this.tableName,
       ids,
       records,
-      ...args
+      ...(args as [...any[], FabricContractContext])
     );
     return records.map((r, i) =>
       this.adapter.revert(
@@ -246,7 +252,8 @@ export class FabricContractRepository<M extends Model> extends Repository<
         this.class,
         this.pk,
         ids[i] as string | number,
-        c && c.get("rebuildWithTransient") ? transients : undefined
+        c && c.get("rebuildWithTransient") ? transients : undefined,
+        ctx
       )
     );
   }
@@ -259,9 +266,11 @@ export class FabricContractRepository<M extends Model> extends Repository<
    * @return {Promise<M[]>} Promise resolving to the updated models
    */
   override async updateAll(models: M[], ...args: any[]): Promise<M[]> {
+    if (args.length !== 1) throw new InternalError(`Missing context`);
+    const ctx = args[args.length - 1] as FabricContractContext;
     if (!models.length) return models;
     const records = models.map((m) =>
-      this.adapter.prepare(m, this.pk, this.tableName, ...args)
+      this.adapter.prepare(m, this.pk, this.tableName, ctx)
     );
     const transients = records.map((p) => p.transient).filter((e) => !!e);
     let c: FabricContractContext | undefined = undefined;
@@ -271,7 +280,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
       this.tableName,
       records.map((r) => r.id),
       records.map((r) => r.record),
-      ...args
+      ...(args as [...any[], FabricContractContext])
     );
     return updated.map((u, i) =>
       this.adapter.revert(
@@ -279,7 +288,8 @@ export class FabricContractRepository<M extends Model> extends Repository<
         this.class,
         this.pk,
         records[i].id,
-        c && c.get("rebuildWithTransient") ? transients : undefined
+        c && c.get("rebuildWithTransient") ? transients : undefined,
+        ctx
       )
     );
   }
@@ -305,8 +315,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
     return this.adapter.raw(
       rawInput,
       docsOnly,
-      new this.class(),
-      ...transformedArgs.args
+      ...(transformedArgs.args as [FabricContractContext])
     );
   }
 

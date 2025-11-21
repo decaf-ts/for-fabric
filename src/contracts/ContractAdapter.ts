@@ -4,6 +4,7 @@ import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
   afterAny,
+  BaseError,
   Context,
   DBKeys,
   GroupSort,
@@ -49,7 +50,10 @@ import {
 } from "fabric-shim-api";
 import { FabricStatement } from "./FabricContractStatement";
 import { FabricContractSequence } from "./FabricContractSequence";
-import { MissingContextError } from "../shared/errors";
+import {
+  MissingContextError,
+  UnauthorizedPrivateDataAccess,
+} from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
 import {
@@ -68,6 +72,7 @@ import {
   propMetadata,
   Metadata,
 } from "@decaf-ts/decoration";
+import { MISSING_PRIVATE_DATA_REGEX } from "./private-data";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -246,8 +251,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {Ctx} ctx - The Fabric chaincode context
    * @return {ContractLogger} The logger instance
    */
-  public logFor(ctx: Ctx): ContractLogger {
-    return Logging.for(FabricContractAdapter, {}, ctx) as ContractLogger;
+  public logFor(ctx: Ctx | FabricContractContext): ContractLogger {
+    if ((ctx as FabricContractContext).logger)
+      return (ctx as FabricContractContext).logger as ContractLogger;
+    return Logging.for(
+      FabricContractAdapter,
+      {
+        correlationId: ctx.stub.getTxID(),
+      },
+      ctx
+    ) as ContractLogger;
   }
 
   /**
@@ -302,14 +315,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: string,
     id: string | number,
     model: Record<string, any>,
-    ...args: any[]
+    ctx: FabricContractContext
   ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
+    const { stub, logger } = ctx;
     const log = logger.for(this.create);
 
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
-      model = await this.putState(stub, id.toString(), model);
+      const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+      model = await this.putState(composedKey, model, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -328,14 +342,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
   override async read(
     tableName: string,
     id: string | number,
-    ...args: any[]
+    ctx: FabricContractContext
   ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
+    const { stub, logger } = ctx;
     const log = logger.for(this.read);
 
     let model: Record<string, any>;
     try {
-      const results = await this.readState(stub, tableName, id.toString());
+      const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+
+      const results = await this.readState(composedKey, ctx);
 
       if (results.length < 1) {
         log.debug(`No record found for id ${id} in ${tableName} table`);
@@ -369,14 +385,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: string,
     id: string | number,
     model: Record<string, any>,
-    ...args: any[]
+    ctx: FabricContractContext
   ): Promise<Record<string, any>> {
-    const { stub, logger } = args.pop();
+    const { stub, logger } = ctx;
     const log = logger.for(this.update);
 
     try {
-      log.info(`updating entry to ${tableName} table with pk ${id}`);
-      model = await this.putState(stub, id.toString(), model);
+      log.verbose(`updating entry to ${tableName} table with pk ${id}`);
+      const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+      model = await this.putState(composedKey, model, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -395,19 +412,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
   async delete(
     tableName: string,
     id: string | number,
-    ...args: any[]
+    ctx: FabricContractContext
   ): Promise<Record<string, any>> {
-    const ctx = args.pop();
     const { stub, logger } = ctx;
     const log = logger.for(this.delete);
-
-    args.push(ctx);
-
     let model: Record<string, any>;
     try {
-      model = await this.read(tableName, id, ...args);
+      const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+      model = await this.read(tableName, id, ctx);
       log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
-      this.deleteState(stub, tableName, id.toString());
+      await this.deleteState(composedKey, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -415,26 +429,128 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
-  protected async deleteState(
-    stub: ChaincodeStub,
-    tableName: string,
-    id: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    ...args: any[]
-  ) {
-    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
-    await stub.deleteState(composedKey);
+  protected async deleteState(id: string, ctx: FabricContractContext) {
+    const { stub, logger } = ctx;
+    const log = logger.for(this.deleteState);
+    await stub.deleteState(id);
+    log.trace(`Deleted state for id ${id}`);
+  }
+
+  forPrivate(collection: string): FabricContractAdapter {
+    const toOverride = [
+      this.putState,
+      this.readState,
+      this.deleteState,
+      this.queryResult,
+      this.queryResultPaginated,
+    ].map((fn) => fn.name);
+    return new Proxy(this, {
+      get(target, prop, receiver) {
+        if (!toOverride.includes(prop as string))
+          return Reflect.get(target, prop, receiver);
+        return new Proxy((target as any)[prop], {
+          async apply(fn, thisArg, argsList) {
+            switch (prop) {
+              case "putState": {
+                const [stub, id, model] = argsList;
+                await stub.putPrivateData(collection, id.toString(), model);
+                return model;
+              }
+              case "deleteState": {
+                const [stub, id] = argsList;
+                return (stub as ChaincodeStub).deletePrivateData(
+                  collection,
+                  id
+                );
+              }
+              case "readState": {
+                const [stub, id] = argsList;
+                return stub.getPrivateData(collection, id);
+              }
+              case "queryResult": {
+                const [stub, rawInput] = argsList;
+                return stub.getPrivateDataQueryResult(collection, rawInput);
+              }
+              case "queryResultPaginated": {
+                const [stub, rawInput, limit, skip] = argsList;
+                const iterator = await (
+                  stub as ChaincodeStub
+                ).getPrivateDataQueryResult(collection, rawInput);
+                const results: any[] = [];
+                let count = 0;
+                let reachedBookmark = skip ? false : true;
+                let lastKey: string | null = null;
+
+                while (true) {
+                  const res = await iterator.next();
+
+                  if (res.value && res.value.value.toString()) {
+                    const recordKey = res.value.key;
+                    const recordValue = (res.value.value as any).toString(
+                      "utf8"
+                    );
+
+                    // If we have a skip, skip until we reach it
+                    if (!reachedBookmark) {
+                      if (recordKey === skip?.toString()) {
+                        reachedBookmark = true;
+                      }
+                      continue;
+                    }
+
+                    results.push({
+                      Key: recordKey,
+                      Record: JSON.parse(recordValue),
+                    });
+                    lastKey = recordKey;
+                    count++;
+
+                    if (count >= limit) {
+                      await iterator.close();
+                      return {
+                        iterator:
+                          results as unknown as Iterators.StateQueryIterator,
+                        metadata: {
+                          fetchedRecordsCount: results.length,
+                          bookmark: lastKey,
+                        },
+                      };
+                    }
+                  }
+
+                  if (res.done) {
+                    await iterator.close();
+                    return {
+                      iterator:
+                        results as unknown as Iterators.StateQueryIterator,
+                      metadata: {
+                        fetchedRecordsCount: results.length,
+                        bookmark: "",
+                      },
+                    };
+                  }
+                }
+              }
+              default:
+                throw new InternalError(
+                  `Unsupported method override ${String(prop)}`
+                );
+            }
+          },
+        });
+      },
+    });
   }
 
   protected async putState(
-    stub: ChaincodeStub,
     id: string,
     model: Record<string, any>,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    ...args: any[]
+    ctx: FabricContractContext
   ) {
     let data: Buffer;
 
+    const { stub, logger } = ctx;
+    const log = logger.for(this.putState);
     try {
       data = Buffer.from(
         FabricContractAdapter.serializer.serialize(model as Model)
@@ -445,37 +561,28 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
     }
     await stub.putState(id.toString(), data);
+    log.silly(`state stored under id ${id}`);
 
     return model;
   }
 
-  protected async readState(
-    stub: ChaincodeStub,
-    tableName: string,
-    id: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    ...args: any[]
-  ) {
-    const composedKey = stub.createCompositeKey(tableName, [String(id)]);
-    const results: any[] = [];
+  protected async readState(id: string, ctx: FabricContractContext) {
+    let result: any;
 
-    let res: Buffer | Record<string, any> = await stub.getState(composedKey);
+    const { stub, logger } = ctx;
+    const log = logger.for(this.readState);
+    const res: string = (await stub.getState(id)).toString();
 
-    if (res.toString() === "")
-      throw new NotFoundError(`Record with id ${id} not found`);
+    if (!res) throw new NotFoundError(`Record with id ${id} not found`);
 
+    log.silly(`Read state for id ${id}`);
     try {
-      res = FabricContractAdapter.serializer.deserialize(
-        res.toString()
-        // model.constructor.name
-      );
+      result = FabricContractAdapter.serializer.deserialize(res.toString());
     } catch (e: unknown) {
       throw new SerializationError(`Failed to parse record: ${e}`);
     }
 
-    results.push(res);
-
-    return results;
+    return result;
   }
 
   protected async queryResult(
@@ -660,7 +767,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   async raw<R>(
     rawInput: MangoQuery,
     docsOnly: boolean,
-    ...args: any[]
+    ...args: [...any, FabricContractContext]
   ): Promise<R> {
     const { stub, logger } = args.pop();
     const log = logger.for(this.raw);
@@ -714,19 +821,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: string,
     id: (string | number)[],
     model: Record<string, any>[],
-    ...args: any[]
+    ...args: [...any, FabricContractContext]
   ): Promise<Record<string, any>[]> {
     if (id.length !== model.length)
       throw new InternalError("Ids and models must have the same length");
 
-    const { logger } = args[args.length - 1] as FabricContractContext;
+    const ctx = args.pop();
+    const { logger } = ctx;
     const log = logger.for(this.createAll);
     log.info(`Creating ${id.length} entries ${tableName} table`);
     log.debug(`pks: ${id}`);
 
     return Promise.all(
       id.map(async (i, index) => {
-        return this.create(tableName, i, model[index], ...args);
+        return this.create(tableName, i, model[index], ctx);
       })
     );
   }
@@ -735,12 +843,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: string,
     id: string[] | number[],
     model: Record<string, any>[],
-    ...args: any[]
+    ...args: [...any, FabricContractContext]
   ): Promise<Record<string, any>[]> {
     if (id.length !== model.length)
       throw new InternalError("Ids and models must have the same length");
 
-    const { logger } = args[args.length - 1] as FabricContractContext;
+    const ctx = args.pop();
+    const { logger } = ctx;
 
     const log = logger.for(this.createAll);
     log.info(`Updating ${id.length} entries ${tableName} table`);
@@ -748,7 +857,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     return Promise.all(
       id.map(async (i, index) => {
-        return this.update(tableName, i, model[index], ...args);
+        return this.update(tableName, i, model[index], ctx);
       })
     );
   }
@@ -762,14 +871,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
   override prepare<M extends Model>(
     model: M,
     pk: keyof M,
-    ...args: any[]
+    tableName: string,
+    ctx: FabricContractContext
   ): {
     record: Record<string, any>;
     id: string;
     transient?: Record<string, any>;
   } {
-    const { stub, logger } = args.pop();
-    const tableName = args.shift();
+    const { stub, logger } = ctx;
+    // const { stub, logger } = args.pop();
     const log = logger.for(this.prepare);
 
     const split = Model.toTransient(model);
@@ -796,7 +906,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       });
     }
 
-    log.info(`Preparing record for ${tableName} table with pk ${model[pk]}`);
+    log.silly(`Preparing record for ${tableName} table with pk ${model[pk]}`);
 
     return {
       record: result,
@@ -810,9 +920,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
     clazz: string | Constructor<M>,
     pk: keyof M,
     id: string | number,
-    transient?: Record<string, any>
+    transient: Record<string, any> | FabricContractContext | undefined,
+    ctx?: FabricContractContext
   ): M {
-    const log = this.log.for(this.revert);
+    if (!ctx) {
+      ctx = transient as FabricContractContext;
+      transient = undefined;
+    }
+    const { logger } = ctx;
+    const log = logger.for(this.revert);
     const ob: Record<string, any> = {};
     ob[pk as string] = id;
     const m = (
@@ -826,7 +942,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }, m);
 
     if (transient) {
-      log.verbose(
+      log.debug(
         `re-adding transient properties: ${Object.keys(transient).join(", ")}`
       );
       Object.entries(transient).forEach(([key, val]) => {
@@ -857,7 +973,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: string,
     id: string | number,
     model: Record<string, any>,
-    ...args: any[]
+    ...args: [...any, FabricContractContext]
   ) {
     const ctx: FabricContractContext = args.pop();
     const record: Record<string, any> = {};
@@ -871,7 +987,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: string,
     id: string | number,
     model: Record<string, any>,
-    ...args: any[]
+    ...args: [...any, FabricContractContext]
   ): (string | number | Record<string, any>)[] {
     const ctx: FabricContractContext = args.pop();
     const record: Record<string, any> = {};
@@ -885,7 +1001,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: string,
     ids: string[] | number[],
     models: Record<string, any>[],
-    ...args: any[]
+    ...args: [...any, FabricContractContext]
   ): (string | string[] | number[] | Record<string, any>[])[] {
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
@@ -906,7 +1022,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: string,
     ids: string[] | number[],
     models: Record<string, any>[],
-    ...args: any[]
+    ...args: [...any, FabricContractContext]
   ) {
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
@@ -920,6 +1036,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
       return record;
     });
     return [tableName, ids, records, ctx as any];
+  }
+
+  override parseError(err: Error | string, reason?: string): BaseError {
+    return FabricContractAdapter.parseError(reason || err);
+  }
+
+  static override parseError(err: Error | string, reason?: string): BaseError {
+    if (
+      MISSING_PRIVATE_DATA_REGEX.test(
+        typeof err === "string" ? err : err.message
+      )
+    )
+      return new UnauthorizedPrivateDataAccess(err);
+    return super.parseError(err, reason);
   }
 
   /**

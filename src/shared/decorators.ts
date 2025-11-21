@@ -1,8 +1,12 @@
 import { AuthorizationError, Repo } from "@decaf-ts/core";
 import {
   Context,
+  InternalError,
   NotFoundError,
   onCreate,
+  onDelete,
+  onRead,
+  onUpdate,
   readonly,
   RepositoryFlags,
   transient,
@@ -18,6 +22,10 @@ import {
   Metadata,
   propMetadata,
 } from "@decaf-ts/decoration";
+import {
+  FabricContractContext,
+  FabricContractRepository,
+} from "../contracts/index";
 
 /**
  * Decorator for marking methods that require ownership authorization.
@@ -136,57 +144,204 @@ export function OwnedBy() {
 export function getFabricModelKey(key: string) {
   return Metadata.key(FabricModelKeys.FABRIC + key);
 }
-//
-// export function privateData2(collection: string) {
-//   function privateData(collection: string) {
-//     return function innerPrivateData(target: object, propertyKey?: any) {
-//       const constr = propertyKey ? target : target.constructor;
-//     };
-//   }
-//
-//   return Decoration.for(FabricModelKeys.PRIVATE)
-//     .define({
-//       decorator: privateData,
-//       args: [collection],
-//     })
-//     .apply();
-// }
 
-export function privateData(collection?: string) {
-  if (!collection) {
-    throw new Error("Collection name is required");
+export type CollectionResolver = <M extends Model>(model: M) => string;
+
+export const ImplicitPrivateCollection: CollectionResolver = <M extends Model>(
+  model: M
+) => {
+  return `__${model.constructor.name}PrivateCollection`;
+};
+
+export type SegregatedDataMetadata = {
+  collections: string | CollectionResolver;
+};
+
+export async function segregatedDataOnCreate<M extends Model>(
+  this: FabricContractRepository<M>,
+  context: FabricContractContext,
+  data: SegregatedDataMetadata[],
+  keys: (keyof M)[],
+  model: M
+): Promise<void> {
+  if (keys.length !== data.length)
+    throw new InternalError(
+      `Segregated data keys and metadata length mismatch`
+    );
+
+  let key: string, d: SegregatedDataMetadata;
+  for (let i = 0; i < keys.length; i++) {
+    key = keys[i] as string;
+    d = data[i];
+    const collection =
+      typeof d.collections === "function"
+        ? d.collections(model)
+        : d.collections;
+    await this.saveToCollection(context, collection, key, model[key]);
   }
 
-  const key: string = FabricModelKeys.PRIVATE;
+  const { private, shared } = Model.segregate(model);
+}
 
-  return function privateData<M extends Model>(
-    model: M | Constructor<M>,
-    attribute?: any
-  ) {
-    const constr =
-      model instanceof Model ? (model.constructor as Constructor) : model;
+export async function segregatedDataOnRead<M extends Model>(
+  this: FabricContractRepository<M>,
+  context: FabricContractContext,
+  data: SegregatedDataMetadata[],
+  key: (keyof M)[],
+  model: M
+  // id: string | symbol | number
+): Promise<void> {}
 
-    const metaData: any = Metadata.get(constr);
-    const modeldata = metaData?.private?.collections || [];
+export async function segregatedDataOnUpdate<M extends Model>(
+  this: FabricContractRepository<M>,
+  context: FabricContractContext,
+  data: SegregatedDataMetadata[],
+  key: keyof M[],
+  model: M,
+  oldModel: M
+): Promise<void> {}
 
-    propMetadata(key, {
-      ...(!attribute && {
-        collections: modeldata
-          ? [...new Set([...modeldata, collection])]
-          : [collection],
-      }),
-      isPrivate: !attribute,
-    })(attribute ? constr : model);
+export async function segregatedDataOnDelete<
+  M extends Model,
+  R extends FabricContractRepository<M>,
+  V extends SegregatedDataMetadata,
+>(
+  this: R,
+  context: FabricContractContext,
+  data: V[],
+  key: keyof M[],
+  model: M
+): Promise<void> {}
 
-    if (attribute) {
-      const attributeData =
-        (metaData?.private?.[attribute] as any)?.collections || [];
-      propMetadata(Metadata.key(key, attribute), {
-        collections: attributeData
-          ? [...new Set([...attributeData, collection])]
-          : [collection],
-      })(model, attribute);
-      transient()(model, attribute);
+function segregated(
+  collection: string | CollectionResolver,
+  type: FabricModelKeys.PRIVATE | FabricModelKeys.SHARED
+) {
+  return function innerSegregated(target: object, propertyKey?: any) {
+    function segregatedDec(target: object, propertyKey?: any) {
+      if (!propertyKey) {
+        const props = Metadata.properties(target as Constructor) || [];
+        for (const prop of props) segregated(collection, type)(target, prop);
+        return target;
+      }
+
+      const key = Metadata.key(type, propertyKey);
+      const constr: Constructor = target.constructor as Constructor;
+
+      const meta = Metadata.get(constr as Constructor, key) || {};
+      const collections = new Set(meta.collections || []);
+      collections.add(collection);
+      meta.collections = [...collections];
+      Metadata.set(constr as Constructor, key, meta);
     }
+
+    const decs = [
+      segregatedDec,
+      transient(),
+      onCreate(
+        segregatedDataOnCreate,
+        { collections: collection },
+        {
+          priority: 95,
+          group:
+            typeof collection === "string" ? collection : collection.toString(),
+        }
+      ),
+      onRead(
+        segregatedDataOnRead,
+        { collections: collection },
+        {
+          priority: 95,
+          group:
+            typeof collection === "string" ? collection : collection.toString(),
+        }
+      ),
+      onUpdate(
+        segregatedDataOnUpdate,
+        { collections: collection },
+        {
+          priority: 95,
+          group:
+            typeof collection === "string" ? collection : collection.toString(),
+        }
+      ),
+      onDelete(
+        segregatedDataOnDelete,
+        { collections: collection },
+        {
+          priority: 95,
+          group:
+            typeof collection === "string" ? collection : collection.toString(),
+        }
+      ),
+    ];
+    return apply(...decs)(target, propertyKey);
   };
 }
+
+export function privateData(
+  collection: string | CollectionResolver = ImplicitPrivateCollection
+) {
+  function privateData(collection: string | CollectionResolver) {
+    return segregated(collection, FabricModelKeys.PRIVATE);
+  }
+
+  return Decoration.for(FabricModelKeys.PRIVATE)
+    .define({
+      decorator: privateData,
+      args: [collection],
+    })
+    .apply();
+}
+
+export function sharedData(collection: string | CollectionResolver) {
+  function sharedData(collection: string | CollectionResolver) {
+    return segregated(collection, FabricModelKeys.SHARED);
+  }
+
+  return Decoration.for(FabricModelKeys.SHARED)
+    .define({
+      decorator: sharedData,
+      args: [collection],
+    })
+    .apply();
+}
+//
+// export function privateData(collection?: string) {
+//   if (!collection) {
+//     throw new Error("Collection name is required");
+//   }
+//
+//   const key: string = FabricModelKeys.PRIVATE;
+//
+//   return function privateData<M extends Model>(
+//     model: M | Constructor<M>,
+//     attribute?: any
+//   ) {
+//     const constr =
+//       model instanceof Model ? (model.constructor as Constructor) : model;
+//
+//     const metaData: any = Metadata.get(constr);
+//     const modeldata = metaData?.private?.collections || [];
+//
+//     propMetadata(key, {
+//       ...(!attribute && {
+//         collections: modeldata
+//           ? [...new Set([...modeldata, collection])]
+//           : [collection],
+//       }),
+//       isPrivate: !attribute,
+//     })(attribute ? constr : model);
+//
+//     if (attribute) {
+//       const attributeData =
+//         (metaData?.private?.[attribute] as any)?.collections || [];
+//       propMetadata(Metadata.key(key, attribute), {
+//         collections: attributeData
+//           ? [...new Set([...attributeData, collection])]
+//           : [collection],
+//       })(model, attribute);
+//       transient()(model, attribute);
+//     }
+//   };
+// }
