@@ -10,7 +10,11 @@ const config: Config.InitialOptions = {
   testPathIgnorePatterns: ["/src/bin"],
   collectCoverage: false,
   coverageDirectory: "./workdocs/reports/coverage",
-  collectCoverageFrom: ["src/**/*.{js,jsx,ts,tsx}", "!src/bin/**/*"],
+  collectCoverageFrom: [
+    "src/**/*.{js,jsx,ts,tsx}",
+    "!src/bin/**/*",
+    "!src/contract/**/*",
+  ],
   reporters: ["default"],
 };
 

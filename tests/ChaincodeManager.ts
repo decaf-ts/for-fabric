@@ -86,7 +86,7 @@ export class ChaincodeManager {
       path.join(targetContractBuildFolder, "npm-shrinkwrap.json")
     );
 
-    if (copyBuildToDir) {
+    if (copyBuildToDir)
       fs.cpSync(
         targetContractBuildFolder,
         path.join(copyBuildToDir, this.contractFolder),

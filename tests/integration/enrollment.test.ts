@@ -49,7 +49,7 @@ describe("Test enrollement", () => {
 
   beforeAll(async () => {
     //Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`);
+    execSync(`npm run infrastructure:up`, { stdio: "inherit" });
 
     //Ensure Infrastructure is ready
     await ensureInfrastructureBooted();
@@ -77,7 +77,9 @@ describe("Test enrollement", () => {
     }
 
     // Copy client config to local directory for testing purposes
-    execSync(`docker cp org-a:/weaver/client/. docker/docker-data`);
+    execSync(`docker cp org-a:/weaver/client/. docker/docker-data`, {
+      stdio: "inherit",
+    });
 
     peerConfig = {
       cryptoPath: "./docker/infrastructure/crypto-config",

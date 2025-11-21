@@ -1,5 +1,5 @@
 import { Adapter, Repository } from "@decaf-ts/core";
-import { Constructor, Model } from "@decaf-ts/decorator-validation";
+import { Model } from "@decaf-ts/decorator-validation";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import {
   Context,
@@ -7,6 +7,7 @@ import {
   RepositoryFlags,
 } from "@decaf-ts/db-decorators";
 import { FabricFlags } from "../shared";
+import { Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Repository implementation for Fabric client operations
@@ -152,6 +153,18 @@ export class FabricClientRepository<M extends Model> extends Repository<
     return [model, ...contextArgs.args];
   }
 
+  override async update(model: M, ...args: any[]) {
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient } = this.adapter.prepare(model, this.pk);
+    record = await this.adapter.update(
+      this.class as unknown as string,
+      id,
+      record,
+      ...args
+    );
+    return this.adapter.revert(record, this.class, this.pk, id, transient);
+  }
+
   /**
    * @description Prepare arguments and context for bulk update
    * @summary Resolves repository context for an updateAll operation and forwards the models and processed arguments
@@ -212,5 +225,104 @@ export class FabricClientRepository<M extends Model> extends Repository<
     );
     await this.readAll(keys, ...contextArgs.args);
     return [keys, ...contextArgs.args];
+  }
+
+  override async create(model: M, ...args: any[]): Promise<M> {
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient } = this.adapter.prepare(model, this.pk);
+    record = await this.adapter.create(
+      this.class as unknown as string,
+      id,
+      record,
+      ...args
+    );
+    let c = undefined;
+    if (args.length) c = args[args.length - 1];
+    return this.adapter.revert(
+      record,
+      this.class,
+      this.pk,
+      id,
+      c && c.get("rebuildWithTransient") ? transient : undefined
+    );
+  }
+  override async createAll(models: M[], ...args: any[]): Promise<M[]> {
+    if (!models.length) return models;
+    const prepared = models.map((m) => this.adapter.prepare(m, this.pk));
+    const ids = prepared.map((p) => p.id);
+    let records = prepared.map((p) => p.record);
+    records = await this.adapter.createAll(
+      this.class as unknown as string,
+      ids as (string | number)[],
+      records,
+      ...args
+    );
+    return records.map((r, i) =>
+      this.adapter.revert(r, this.class, this.pk, ids[i] as string | number)
+    );
+  }
+  override async read(
+    id: string | number | bigint,
+    ...args: any[]
+  ): Promise<M> {
+    const m = await this.adapter.read(
+      this.class as unknown as string,
+      id,
+      ...args
+    );
+    return this.adapter.revert<M>(m, this.class, this.pk, id);
+  }
+
+  override async readAll(
+    keys: string[] | number[],
+    ...args: any[]
+  ): Promise<M[]> {
+    const records = await this.adapter.readAll(
+      this.class as unknown as string,
+      keys,
+      ...args
+    );
+    return records.map((r, i) =>
+      this.adapter.revert(r, this.class, this.pk, keys[i])
+    );
+  }
+
+  override async updateAll(models: M[], ...args: any[]): Promise<M[]> {
+    const records = models.map((m) => this.adapter.prepare(m, this.pk));
+    const updated = await this.adapter.updateAll(
+      this.class as unknown as string,
+      records.map((r) => r.id),
+      records.map((r) => r.record),
+      ...args
+    );
+    return updated.map((u, i) =>
+      this.adapter.revert(u, this.class, this.pk, records[i].id)
+    );
+  }
+
+  override async delete(
+    id: string | number | bigint,
+    ...args: any[]
+  ): Promise<M> {
+    const m = await this.adapter.delete(
+      this.class as unknown as string,
+      id,
+      ...args
+    );
+    return this.adapter.revert<M>(m, this.class, this.pk, id);
+  }
+
+  override async deleteAll(
+    keys: string[] | number[],
+    ...args: any[]
+  ): Promise<M[]> {
+    const results = await this.adapter.deleteAll(
+      this.class as unknown as string,
+      keys,
+      ...args
+    );
+    return results.map((r, i) =>
+      this.adapter.revert(r, this.class, this.pk, keys[i])
+    );
   }
 }

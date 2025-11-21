@@ -61,7 +61,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
   beforeAll(async () => {
     //Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`);
+    execSync(`npm run infrastructure:up`, { stdio: "inherit" });
 
     //Ensure Infrastructure is ready
     await ensureInfrastructureBooted();
@@ -98,6 +98,10 @@ describe("Test Serialized Crud Contract With Public Model", () => {
 
     // Commit Chaincode
     commitChaincode(contractName, contract_sequence, version);
+  });
+
+  it("Deploys contract corretly", async () => {
+    console.log("start");
   });
 
   it("Deploys contract corretly", async () => {

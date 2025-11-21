@@ -9,10 +9,11 @@ import {
   MangoSelector,
 } from "@decaf-ts/for-couchdb";
 import { FabricContractAdapter } from "./ContractAdapter";
-import { findPrimaryKey, InternalError } from "@decaf-ts/db-decorators";
 import { FabricContractContext } from "./ContractContext";
 import { CouchDBStatement } from "@decaf-ts/for-couchdb";
 import { Condition, OrderDirection, Repository } from "@decaf-ts/core";
+import { Metadata } from "@decaf-ts/decoration";
+import { DBKeys } from "@decaf-ts/db-decorators";
 
 /**
  * @description Statement wrapper for executing Mango queries within Fabric contracts
@@ -52,9 +53,11 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
   override async raw<R>(rawInput: MangoQuery): Promise<R> {
     const results: any[] = await this.adapter.raw(rawInput, true, this.ctx);
 
-    const pkDef = findPrimaryKey(new this.fromSelector());
-    const pkAttr = pkDef.id;
-    const type = pkDef.props.type;
+    const pkAttr = Model.pk(this.fromSelector);
+    const type = Metadata.get(
+      this.fromSelector,
+      Metadata.key(DBKeys.ID, pkAttr as string)
+    )?.type;
 
     if (!this.selectSelector)
       return results.map((r) => this.processRecord(r, pkAttr, type)) as R;

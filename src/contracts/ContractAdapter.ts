@@ -1,22 +1,13 @@
 import { CouchDBAdapter, CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
-import {
-  Constructor,
-  Decoration,
-  list,
-  Model,
-  prop,
-  propMetadata,
-  required,
-  type,
-} from "@decaf-ts/decorator-validation";
+import { list, Model, required, type } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
   afterAny,
   Context,
   DBKeys,
+  GroupSort,
   InternalError,
-  modelToTransient,
   NotFoundError,
   onCreate,
   onCreateUpdate,
@@ -34,7 +25,6 @@ import {
 import { Logger, Logging } from "@decaf-ts/logging";
 import { ContractLogger } from "./logging";
 import {
-  OrderDirection,
   PersistenceKeys,
   RelationsMetadata,
   Repository,
@@ -42,14 +32,13 @@ import {
   sequenceNameForModel,
   SequenceOptions,
   UnsupportedError,
-  index,
-  NumericSequence,
   Adapter,
   CascadeMetadata,
   JoinColumnOptions,
   oneToManyOnUpdate,
   JoinTableOptions,
   JoinTableMultipleColumnsOptions,
+  relation,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -71,7 +60,14 @@ import {
   oneToOneOnUpdate,
   populate as pop,
 } from "./FabricConstruction";
-import { apply } from "@decaf-ts/reflection";
+import {
+  apply,
+  Constructor,
+  Decoration,
+  prop,
+  propMetadata,
+  Metadata,
+} from "@decaf-ts/decoration";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -776,7 +772,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = args.shift();
     const log = logger.for(this.prepare);
 
-    const split = modelToTransient(model);
+    const split = Model.segregate(model);
     const result = Object.entries(split.model).reduce(
       (accum: Record<string, any>, [key, val]) => {
         if (typeof val === "undefined") return accum;
@@ -935,46 +931,48 @@ export class FabricContractAdapter extends CouchDBAdapter<
    */
   static override decoration(): void {
     super.decoration();
-    const createdByKey = Repository.key(PersistenceKeys.CREATED_BY);
-    const updatedByKey = Repository.key(PersistenceKeys.UPDATED_BY);
     Decoration.flavouredAs(FabricFlavour)
-      .for(createdByKey)
+      .for(PersistenceKeys.CREATED_BY)
       .define(
         onCreate(createdByOnFabricCreateUpdate),
-        propMetadata(createdByKey, {})
+        propMetadata(PersistenceKeys.CREATED_BY, {})
       )
       .apply();
 
     Decoration.flavouredAs(FabricFlavour)
-      .for(updatedByKey)
+      .for(PersistenceKeys.UPDATED_BY)
       .define(
         onCreateUpdate(createdByOnFabricCreateUpdate),
-        propMetadata(updatedByKey, {})
+        propMetadata(PersistenceKeys.UPDATED_BY, {})
       )
       .apply();
 
-    const pkKey = Repository.key(DBKeys.ID);
     Decoration.flavouredAs(FabricFlavour)
-      .for(pkKey)
-      .define(
-        index([OrderDirection.ASC, OrderDirection.DSC]),
-        required(),
-        readonly(),
-        // type([String.name, Number.name, BigInt.name]),
-        propMetadata(pkKey, NumericSequence),
-        onCreate(pkFabricOnCreate, NumericSequence)
-      )
+      .for(DBKeys.ID)
+      .define({
+        decorator: function pkDec(
+          options: SequenceOptions,
+          groupsort?: GroupSort
+        ) {
+          return function pkDec(obj: any, attr: any) {
+            return apply(
+              required(),
+              readonly(),
+              propMetadata(Metadata.key(DBKeys.ID, attr), options),
+              onCreate(pkFabricOnCreate, options, groupsort)
+            )(obj, attr);
+          };
+        },
+      } as any)
       .apply();
 
-    const columnKey = Adapter.key(PersistenceKeys.COLUMN);
     Decoration.flavouredAs(FabricFlavour)
-      .for(columnKey)
+      .for(PersistenceKeys.COLUMN)
       .extend(FabricProperty())
       .apply();
 
-    const tableKey = Adapter.key(PersistenceKeys.TABLE);
     Decoration.flavouredAs(FabricFlavour)
-      .for(tableKey)
+      .for(PersistenceKeys.TABLE)
       .extend(function table(obj: any) {
         // const chain: any[] = [];
 
@@ -996,8 +994,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
       })
       .apply();
 
-    const oneToOnekey = Repository.key(PersistenceKeys.ONE_TO_ONE);
-
     function oneToOneDec<M extends Model>(
       clazz: Constructor<M> | (() => Constructor<M>),
       cascade: CascadeMetadata,
@@ -1006,36 +1002,30 @@ export class FabricContractAdapter extends CouchDBAdapter<
       fk?: string
     ) {
       const meta: RelationsMetadata = {
-        class: clazz.name ? clazz.name : (clazz as any),
+        class: clazz,
         cascade: cascade,
         populate: populate,
       };
       if (joinColumnOpts) meta.joinTable = joinColumnOpts;
       if (fk) meta.name = fk;
       return apply(
-        prop(PersistenceKeys.RELATIONS),
-        type([
-          clazz.name ? clazz.name : (clazz as any),
-          String.name,
-          Number.name,
-          BigInt.name,
-        ]),
+        prop(),
+        relation(PersistenceKeys.ONE_TO_ONE, meta),
+        type([clazz, String, Number, BigInt]),
         onCreate(oneToOneOnCreate, meta),
         onUpdate(oneToOneOnUpdate, meta),
         onDelete(oneToOneOnDelete, meta),
         afterAny(pop, meta),
-        propMetadata(oneToOnekey, meta)
+        propMetadata(PersistenceKeys.ONE_TO_ONE, meta)
       );
     }
 
     Decoration.flavouredAs(FabricFlavour)
-      .for(oneToOnekey)
+      .for(PersistenceKeys.ONE_TO_ONE)
       .define({
         decorator: oneToOneDec,
-      })
+      } as any)
       .apply();
-
-    const oneToManyKey = Repository.key(PersistenceKeys.ONE_TO_MANY);
 
     function oneToManyDec<M extends Model>(
       clazz: Constructor<M> | (() => Constructor<M>),
@@ -1045,27 +1035,28 @@ export class FabricContractAdapter extends CouchDBAdapter<
       fk?: string
     ) {
       const metadata: RelationsMetadata = {
-        class: clazz.name ? clazz.name : (clazz as any),
+        class: clazz,
         cascade: cascade,
         populate: populate,
       };
       if (joinTableOpts) metadata.joinTable = joinTableOpts;
       if (fk) metadata.name = fk;
       return apply(
-        prop(PersistenceKeys.RELATIONS),
+        prop(),
+        relation(PersistenceKeys.ONE_TO_MANY, metadata),
         list([clazz as Constructor<M>, String, Number]),
         onCreate(oneToManyOnCreate, metadata),
         onUpdate(oneToManyOnUpdate, metadata),
         onDelete(oneToManyOnDelete, metadata),
         afterAny(pop, metadata),
-        propMetadata(oneToManyKey, metadata)
+        propMetadata(PersistenceKeys.ONE_TO_MANY, metadata)
       );
     }
 
-    Decoration.for(oneToManyKey)
+    Decoration.for(PersistenceKeys.ONE_TO_MANY)
       .define({
         decorator: oneToManyDec,
-      })
+      } as any)
       .apply();
   }
 }

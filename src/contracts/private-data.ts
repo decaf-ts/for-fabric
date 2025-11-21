@@ -1,13 +1,8 @@
-import {
-  InternalError,
-  modelToTransient,
-  getAllPropertyDecoratorsRecursive,
-  SerializationError,
-} from "@decaf-ts/db-decorators";
+import { InternalError, SerializationError } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
-import { getFabricModelKey } from "../shared/decorators";
 import { FabricModelKeys } from "../shared/constants";
+import { Constructor, Metadata } from "@decaf-ts/decoration";
 
 export const MISSING_PRIVATE_DATA_REGEX =
   /private\s+data\s+matching\s+public\s+hash\s+version\s+is\s+not\s+available/i;
@@ -16,7 +11,7 @@ export const MISSING_PRIVATE_DATA_ERROR_MESSAGE =
   "private data matching public hash version is not available ...";
 
 export function processModel<M extends Model>(adapter: any, model: M) {
-  const transient = modelToTransient(model);
+  const transient = Model.segregate(model);
   const privateData = modelToPrivate(model);
 
   const transformModel = (model: any) => {
@@ -60,19 +55,10 @@ export function hasPrivateData<M extends Model>(model: M) {
 export function getClassPrivateDataMetadata<M extends Model>(
   model: M
 ): Record<string, any> {
-  let metadata = Reflect.getMetadata(
-    getFabricModelKey(FabricModelKeys.PRIVATE),
-    model
+  return Metadata.get(
+    model.constructor as Constructor,
+    FabricModelKeys.PRIVATE
   );
-
-  metadata =
-    metadata ||
-    Reflect.getMetadata(
-      getFabricModelKey(FabricModelKeys.PRIVATE),
-      model.constructor
-    );
-
-  return metadata;
 }
 
 export function isModelPrivate<M extends Model>(model: M): boolean {
@@ -85,11 +71,6 @@ export function modelToPrivate<M extends Model>(
   model: M
 ): { model: M; private?: Record<string, Record<string, any>> } {
   if (!hasPrivateData(model)) return { model: model };
-  const decs: Record<string, any[]> = getAllPropertyDecoratorsRecursive(
-    model,
-    undefined,
-    getFabricModelKey(FabricModelKeys.PRIVATE)
-  ) as Record<string, any[]>;
 
   const isPrivate = isModelPrivate(model);
   const modelCollections: Record<string, any> =
@@ -100,8 +81,12 @@ export function modelToPrivate<M extends Model>(
     private: undefined,
   };
 
+  // TODO: the is private is not workign correctly. If no properties it doesn't create the private part.
   if (isPrivate) {
-    result = Object.keys(model).reduce(
+    const privatePart = modelCollections.collections;
+    result = (
+      Metadata.properties(model.constructor as Constructor) || []
+    ).reduce(
       (
         accum: { model: Record<string, any>; private?: Record<string, any> },
         k
@@ -122,22 +107,23 @@ export function modelToPrivate<M extends Model>(
 
         return accum;
       },
-      { model: {} } as {
+      { model: {}, private: privatePart } as {
         model: Record<string, any>;
         private?: Record<string, any>;
       }
     );
   } else {
-    result = Object.entries(decs).reduce(
+    result = Object.entries(modelCollections).reduce(
       (
         accum: { model: Record<string, any>; private?: Record<string, any> },
         [k, val]
       ) => {
-        const privateData = val.find((el) => el.key === "");
+        const props = Metadata.properties(model.constructor as Constructor);
+        if (!props?.includes(k)) return accum;
 
-        if (privateData) {
-          const collections = privateData.props.collections;
+        const collections = (val as Record<string, any>).collections;
 
+        if (collections?.length) {
           accum.private = accum.private || {};
 
           for (const collection of collections) {
