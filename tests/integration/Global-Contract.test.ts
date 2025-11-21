@@ -23,13 +23,16 @@ describe("Tests global contract implementation", () => {
   let caConfig: CAConfig;
   let peerConfig: any;
   let userAdapter: FabricClientAdapter;
-  let productAdapter: FabricClientAdapter;
   let userRepository: FabricClientRepository<User>;
   let productRepository: FabricClientRepository<Product>;
 
+  const useHsm = true;
+
   beforeAll(async () => {
     // Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`, { stdio: "inherit" });
+    execSync(`npm run infrastructure${useHsm ? "-hsm" : ""}:up`, {
+      stdio: "inherit",
+    });
     // Ensure Infrastructure is ready
     await ensureInfrastructureBooted();
     const location = path.join(
