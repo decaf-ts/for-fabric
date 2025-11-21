@@ -86,18 +86,20 @@ export class ChaincodeManager {
       path.join(targetContractBuildFolder, "npm-shrinkwrap.json")
     );
 
-    if (copyBuildToDir)
+    if (copyBuildToDir) {
       fs.cpSync(
         targetContractBuildFolder,
         path.join(copyBuildToDir, this.contractFolder),
         { recursive: true, force: true }
       );
+
       const adapterConfigExportPath = path.join(
         targetContractBuildFolder,
         "..",
         "..",
         "adapter-config"
       );
+
       this.exportAdapterConfig(adapterConfigExportPath);
     }
 
