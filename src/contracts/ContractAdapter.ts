@@ -878,11 +878,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
     id: string;
     transient?: Record<string, any>;
   } {
-    const { stub, logger } = ctx;
+    const { logger } = ctx;
     // const { stub, logger } = args.pop();
     const log = logger.for(this.prepare);
 
-    const split = Model.toTransient(model);
+    const split = Model.segregate(model);
     const result = Object.entries(split.model).reduce(
       (accum: Record<string, any>, [key, val]) => {
         if (typeof val === "undefined") return accum;
@@ -894,23 +894,23 @@ export class FabricContractAdapter extends CouchDBAdapter<
       },
       {}
     );
-    if ((model as any)[PersistenceKeys.METADATA]) {
-      log.silly(
-        `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
-      );
-      Object.defineProperty(result, PersistenceKeys.METADATA, {
-        enumerable: false,
-        writable: false,
-        configurable: true,
-        value: (model as any)[PersistenceKeys.METADATA],
-      });
-    }
+    // if ((model as any)[PersistenceKeys.METADATA]) {
+    //   log.silly(
+    //     `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
+    //   );
+    //   Object.defineProperty(result, PersistenceKeys.METADATA, {
+    //     enumerable: false,
+    //     writable: false,
+    //     configurable: true,
+    //     value: (model as any)[PersistenceKeys.METADATA],
+    //   });
+    // }
 
     log.silly(`Preparing record for ${tableName} table with pk ${model[pk]}`);
 
     return {
       record: result,
-      id: stub.createCompositeKey(tableName, [String(model[pk])]),
+      id: model[pk] as string,
       transient: split.transient,
     };
   }
