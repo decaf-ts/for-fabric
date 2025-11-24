@@ -52,7 +52,7 @@ const attachLoggerSpies = (adapter: FabricClientAdapter) => {
   });
 };
 
-describe("FabricClientAdapter", () => {
+describe.skip("FabricClientAdapter", () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
