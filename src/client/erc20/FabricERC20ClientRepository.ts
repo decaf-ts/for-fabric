@@ -1,14 +1,18 @@
 import { FabricClientRepository } from "../FabricClientRepository";
 import { ERC20Token, ERC20Wallet } from "../../contracts/erc20/models";
-import { Serializer } from "@decaf-ts/decorator-validation";
-import { FabricClientAdapter } from "../FabricClientAdapter";
+import { Model, Serializer } from "@decaf-ts/decorator-validation";
+import {
+  FabricClientAdapter,
+  FabricClientContext,
+} from "../FabricClientAdapter";
 import { ClientSerializer } from "../../shared/ClientSerializer";
-import { EventIds, Sequence } from "@decaf-ts/core";
+import { ContextualArgs, EventIds, Sequence } from "@decaf-ts/core";
 import {
   BulkCrudOperationKeys,
   InternalError,
   OperationKeys,
 } from "@decaf-ts/db-decorators";
+import { Constructor } from "@decaf-ts/decoration";
 /**
  * Repository for interacting with ERC20 contracts on a Hyperledger Fabric network.
  * Extends the base FabricClientRepository class and utilizes the ClientSerializer for data serialization.
@@ -31,39 +35,43 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
    * @return {Promise<void>} A promise that resolves when all observers have been notified.
    * @throws {InternalError} If the observer handler is not initialized.
    */
-  override async updateObservers(
-    table: string,
+  override async updateObservers<M extends Model>(
+    table: Constructor<M> | string,
     event: OperationKeys | BulkCrudOperationKeys | string,
     id: EventIds,
-    ...args: any[]
+    ...args: ContextualArgs<FabricClientContext>
   ): Promise<void> {
     if (!this.observerHandler)
       throw new InternalError(
         "ObserverHandler not initialized. Did you register any observables?"
       );
-    this.log
-      .for(this.updateObservers)
-      .verbose(
-        `Updating ${this.observerHandler.count()} observers for ${this}`
-      );
+    const { log, ctxArgs } = this.logCtx(args, this.updateObservers);
+    log.verbose(
+      `Updating ${this.observerHandler.count()} observers for ${this}`
+    );
 
+    table = (
+      typeof table === "string" ? Model.get(table) : table
+    ) as Constructor<M>;
     let parsedId: string | string[] | undefined;
 
     if (id === undefined) {
       parsedId = undefined;
     } else if (Array.isArray(id)) {
       parsedId = id.map(
-        (i) => Sequence.parseValue(this.pkProps.type, i) as string
+        (i) => Sequence.parseValue(Model.sequenceFor(table).type, i) as string
       );
     } else {
-      parsedId = Sequence.parseValue(this.pkProps.type, id) as string;
+      parsedId = Sequence.parseValue(
+        Model.sequenceFor(table).type,
+        id
+      ) as string;
     }
     await this.observerHandler.updateObservers(
-      this.log,
       table,
       event,
       parsedId!,
-      ...args
+      ...ctxArgs
     );
   }
 
@@ -75,10 +83,6 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
    */
   decode(data: Uint8Array): string {
     return FabricERC20ClientRepository.decoder.decode(data);
-  }
-
-  protected override get adapter(): FabricClientAdapter {
-    return super.adapter as FabricClientAdapter;
   }
 
   constructor(adapter?: FabricClientAdapter) {
@@ -97,7 +101,7 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async tokenName(): Promise<string> {
-    const name = await this.adapter.submitTransaction("TokenName");
+    const name = await this.adapter.evaluateTransaction("TokenName");
     return this.decode(name);
   }
 
@@ -112,7 +116,7 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async symbol(): Promise<string> {
-    const symbol = await this.adapter.submitTransaction("Symbol");
+    const symbol = await this.adapter.evaluateTransaction("Symbol");
     return this.decode(symbol);
   }
 
@@ -127,7 +131,7 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async decimals(): Promise<number> {
-    const decimals = await this.adapter.submitTransaction("Decimals");
+    const decimals = await this.adapter.evaluateTransaction("Decimals");
     return Number(this.decode(decimals));
   }
 
@@ -142,7 +146,7 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async totalSupply(): Promise<number> {
-    const total = await this.adapter.submitTransaction("TotalSupply");
+    const total = await this.adapter.evaluateTransaction("TotalSupply");
     return Number(this.decode(total));
   }
 
@@ -161,7 +165,9 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async balanceOf(owner: string): Promise<number> {
-    const balance = await this.adapter.submitTransaction("BalanceOf", [owner]);
+    const balance = await this.adapter.evaluateTransaction("BalanceOf", [
+      owner,
+    ]);
     return Number(this.decode(balance));
   }
 
@@ -297,7 +303,7 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
    * @throws {Error} If the transaction fails.
    */
   async checkInitialized(): Promise<void> {
-    await this.adapter.submitTransaction("CheckInitialized");
+    await this.adapter.evaluateTransaction("CheckInitialized");
   }
 
   /**
@@ -368,7 +374,7 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async clientAccountBalance(): Promise<number> {
-    const serializedAccountBalance = await this.adapter.submitTransaction(
+    const serializedAccountBalance = await this.adapter.evaluateTransaction(
       "ClientAccountBalance"
     );
 
@@ -388,7 +394,7 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
    */
   async clientAccountID(): Promise<string> {
     const clientAccountID =
-      await this.adapter.submitTransaction("ClientAccountID");
+      await this.adapter.evaluateTransaction("ClientAccountID");
 
     return this.decode(clientAccountID);
   }

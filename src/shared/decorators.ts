@@ -60,9 +60,9 @@ export function Owner() {
 
       const select = await (this as FabricERC20Contract)[
         "tokenRepository"
-      ].selectWithContext(undefined, ctx);
+      ].select();
 
-      const tokens = await select.execute();
+      const tokens = await select.execute(ctx);
 
       if (tokens.length == 0) {
         throw new NotFoundError("No tokens avaialble");

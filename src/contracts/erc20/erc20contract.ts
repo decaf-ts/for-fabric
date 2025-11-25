@@ -96,8 +96,8 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const select = await this.tokenRepository.selectWithContext(undefined, ctx);
-    const token = (await select.execute())[0];
+    const select = await this.tokenRepository.select();
+    const token = (await select.execute(ctx))[0];
 
     return token.symbol;
   }
@@ -114,8 +114,8 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const select = await this.tokenRepository.selectWithContext(undefined, ctx);
-    const token = (await select.execute())[0];
+    const select = await this.tokenRepository.select();
+    const token = (await select.execute(ctx))[0];
 
     return token.decimals;
   }
@@ -131,11 +131,8 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const select = await this.walletRepository.selectWithContext(
-      undefined,
-      ctx
-    );
-    const wallets = await select.execute();
+    const select = await this.walletRepository.select();
+    const wallets = await select.execute(ctx);
 
     if (wallets.length == 0) {
       throw new NotFoundError(`The token ${this.getName()} does not exist`);
@@ -323,15 +320,9 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     const transferEvent = { from, to, value: value };
     const eventHandler =
       this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
-    eventHandler.updateObservers(
-      logger,
-      "",
-      ERC20Events.TRANSFER,
-      "",
-      ctx,
-      "",
-      transferEvent
-    );
+    eventHandler
+      .updateObservers("", ERC20Events.TRANSFER, "", transferEvent, ctx)
+      .catch((e) => lo);
 
     return true;
   }
@@ -433,11 +424,8 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
       Condition.attribute<Allowance>("spender").eq(spender)
     );
 
-    const select = await this.allowanceRepository.selectWithContext(
-      undefined,
-      ctx
-    );
-    const allowance = await select.where(allowanceCondition).execute();
+    const select = await this.allowanceRepository.select();
+    const allowance = await select.where(allowanceCondition).execute(ctx);
     return allowance?.[0];
   }
 
@@ -455,8 +443,8 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
   @Transaction()
   async Initialize(ctx: Context, token: ERC20Token) {
     // Check contract options are not already set, client is not authorized to change them once intitialized
-    const select = await this.tokenRepository.selectWithContext(undefined, ctx);
-    const tokens = await select.execute();
+    const select = await this.tokenRepository.select();
+    const tokens = await select.execute(ctx);
     if (tokens.length > 0) {
       throw new AuthorizationError(
         "contract options are already set, client is not authorized to change them"
@@ -473,8 +461,8 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
   // Checks that contract options have been already initialized
   @Transaction(false)
   async CheckInitialized(ctx: Context) {
-    const select = await this.tokenRepository.selectWithContext(undefined, ctx);
-    const tokens = await select.execute();
+    const select = await this.tokenRepository.select();
+    const tokens = await select.execute(ctx);
     if (tokens.length == 0) {
       throw new NotInitializedError(
         "contract options need to be set before calling any function, call Initialize() to initialize contract"
@@ -539,15 +527,10 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     const transferEvent = { from: "0x0", to: minter, value: amount };
     const eventHandler =
       this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
-    eventHandler.updateObservers(
-      logger,
-      "",
-      ERC20Events.TRANSFER,
-      "",
+    eventHandler.updateObservers(ERC20Token, ERC20Events.TRANSFER, "", [
+      transferEvent,
       ctx,
-      "",
-      transferEvent
-    );
+    ]);
   }
 
   /**

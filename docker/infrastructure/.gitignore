@@ -4,6 +4,7 @@
 # Allow these top-level files/folders
 !configtx.yaml
 !docker-compose.yaml
+!docker-compose-hsm.yaml
 
 
 !.gitignore

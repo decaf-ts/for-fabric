@@ -30,7 +30,10 @@ import {
 import {
   Adapter,
   ContextualArgs,
+  MaybeContextualArg,
   PersistenceKeys,
+  pk,
+  PreparedModel,
   Repository,
 } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
@@ -39,6 +42,7 @@ import { ClientSerializer } from "../shared/ClientSerializer";
 import type { FabricClientDispatch } from "./FabricClientDispatch";
 import { HSMSignerFactoryCustom } from "./fabric-hsm";
 import { type Constructor } from "@decaf-ts/decoration";
+import tableName = module;
 
 export type FabricClientContext = Context<FabricFlags>;
 /**
@@ -189,7 +193,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(clazz);
     log.info(`reading ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
-    const result = await this.submitTransaction(
+    const result = await this.evaluateTransaction(
       BulkCrudOperationKeys.READ_ALL,
       [ids],
       undefined,
@@ -219,7 +223,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     transient: Record<string, any>,
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>[]> {
-    if (ids.length !== model.length)
+    if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
     const { log } = this.logCtx(args, this.updateAll);
     const tableName = Model.tableName(clazz);
@@ -231,7 +235,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
       [ids, models.map((m) => this.serializer.serialize(m, clazz.name))],
       transient,
       undefined,
-      tableName
+      clazz.name
     );
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
@@ -248,12 +252,13 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {Serializer<any>} serializer - Serializer for the model data
    * @return {Promise<Array<Record<string, any>>>} Promise resolving to the deleted records
    */
-  override async deleteAll(
-    tableName: string,
-    ids: (string | number | bigint)[]
+  override async deleteAll<M extends Model>(
+    clazz: Constructor<M>,
+    ids: PrimaryKeyType[],
+    ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>[]> {
-    const log = this.log.for(this.deleteAll);
-    if (typeof tableName !== "string") tableName = (tableName as any).name;
+    const { log } = Adapter.logCtx(args, this.deleteAll);
+    const tableName = Model.tableName(clazz);
     log.info(`deleting ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
@@ -261,7 +266,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
       [ids],
       undefined,
       undefined,
-      tableName
+      clazz.name
     );
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
@@ -281,13 +286,9 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   override prepare<M extends Model>(
     model: M,
-    pk: keyof M
-  ): {
-    record: Record<string, any>;
-    id: string;
-    transient?: Record<string, any>;
-  } {
-    const log = this.log.for(this.prepare);
+    ...args: ContextualArgs<FabricClientContext>
+  ): PreparedModel {
+    const { log } = this.logCtx(args, this.prepare);
     const split = Model.segregate(model);
     if ((model as any)[PersistenceKeys.METADATA]) {
       log.silly(
@@ -303,7 +304,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
 
     return {
       record: split.model,
-      id: model[pk] as string,
+      id: model[Model.pk(model.constructor as Constructor<M>)] as string,
       transient: split.transient,
     };
   }
@@ -322,17 +323,16 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   override revert<M extends Model>(
     obj: Record<string, any>,
-    clazz: string | Constructor<M>,
-    pk: keyof M,
-    id: string | number | bigint,
-    transient?: Record<string, any>
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    transient?: Record<string, any>,
+    ...args: ContextualArgs<FabricClientContext>
   ): M {
-    const log = this.log.for(this.revert);
+    const { log, ctx } = this.logCtx(args, this.revert);
     const ob: Record<string, any> = {};
-    ob[pk as string] = id;
-    const m = (
-      typeof clazz === "string" ? Model.build(ob, clazz) : new clazz(ob)
-    ) as M;
+    const pk = Model.pk(clazz) as string;
+    ob[pk] = id;
+    const m = new clazz(ob) as M;
     log.silly(`Rebuilding model ${m.constructor.name} id ${id}`);
     const metadata = obj[PersistenceKeys.METADATA];
     const result = Object.keys(m).reduce((accum: M, key) => {
@@ -340,12 +340,12 @@ export class FabricClientAdapter extends CouchDBAdapter<
       return accum;
     }, m);
 
-    if (transient) {
+    if (ctx.get("rebuildWithTransient") && transient) {
       log.verbose(
         `re-adding transient properties: ${Object.keys(transient).join(", ")}`
       );
       Object.entries(transient).forEach(([key, val]) => {
-        if (key in result && (result as any)[key] !== undefined)
+        if (key in result)
           throw new InternalError(
             `Transient property ${key} already exists on model ${m.constructor.name}. should be impossible`
           );
@@ -354,13 +354,14 @@ export class FabricClientAdapter extends CouchDBAdapter<
     }
 
     if (metadata) {
+      // TODO move to couchdb
       log.silly(
         `Passing along ${this.flavour} persistence metadata for ${m.constructor.name} id ${id}: ${metadata}`
       );
       Object.defineProperty(result, PersistenceKeys.METADATA, {
         enumerable: false,
-        configurable: false,
-        writable: false,
+        configurable: true,
+        writable: true,
         value: metadata,
       });
     }
@@ -392,22 +393,23 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   @debug()
   @final()
-  override async create(
-    tableName: string,
-    id: string | number,
+  override async create<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
     model: Record<string, any>,
-    transient: Record<string, any>
+    transient: Record<string, any>,
+    ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>> {
-    const log = this.log.for(this.create);
-    if (typeof tableName !== "string") tableName = (tableName as any).name;
+    const { log } = this.logCtx(args, this.create);
+    const tableName = Model.tableName(clazz);
     log.verbose(`adding entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
       OperationKeys.CREATE,
-      [this.serializer.serialize(model, tableName)],
+      [this.serializer.serialize(model, clazz.name)],
       transient,
       undefined,
-      tableName
+      clazz.name
     );
     return this.serializer.deserialize(this.decode(result));
   }
@@ -421,13 +423,13 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   @debug()
   @final()
-  async read(
-    tableName: string,
-    id: string | number
+  async read<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>> {
-    const log = this.log.for(this.read);
-
-    if (typeof tableName !== "string") tableName = (tableName as any).name;
+    const { log } = this.logCtx(args, this.readAll);
+    const tableName = Model.tableName(clazz);
 
     log.verbose(`reading entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
@@ -436,21 +438,24 @@ export class FabricClientAdapter extends CouchDBAdapter<
       [id.toString()],
       undefined,
       undefined,
-      tableName
+      clazz.name
     );
     return this.serializer.deserialize(this.decode(result));
   }
 
-  override updatePrefix(
-    tableName: string,
-    id: string | number,
-    model: Record<string, any>
+  override updatePrefix<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    model: Record<string, any>,
+    ...args: MaybeContextualArg<FabricClientContext>
   ) {
+    const tableName = Model.tableName(clazz);
+    const { ctxArgs } = this.logCtx(args, this.updatePrefix);
     const record: Record<string, any> = {};
     record[CouchDBKeys.TABLE] = tableName;
     record[CouchDBKeys.ID] = this.generateId(tableName, id);
     Object.assign(record, model);
-    return [tableName, id, record];
+    return [tableName, id, record, ...ctxArgs];
   }
 
   /**
@@ -464,22 +469,23 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   @debug()
   @final()
-  async update(
-    tableName: string,
-    id: string | number,
+  async update<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
     model: Record<string, any>,
-    transient: Record<string, any>
+    transient: Record<string, any>,
+    ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>> {
-    const log = this.log.for(this.update);
-    if (typeof tableName !== "string") tableName = (tableName as any).name;
+    const { log } = this.logCtx(args, this.updateAll);
+    const tableName = Model.tableName(clazz);
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
       OperationKeys.UPDATE,
-      [this.serializer.serialize(model, tableName)],
+      [this.serializer.serialize(model, clazz.name)],
       transient,
       undefined,
-      tableName
+      clazz.name
     );
     return this.serializer.deserialize(this.decode(result));
   }

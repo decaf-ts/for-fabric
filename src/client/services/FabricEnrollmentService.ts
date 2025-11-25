@@ -27,6 +27,7 @@ import {
 } from "../../shared/fabric-types";
 import { RegistrationError } from "../../shared/errors";
 import { LoggedService } from "./LoggedService";
+import { LoggedClass } from "@decaf-ts/logging";
 
 /**
  * @description Hyperledger Fabric CA identity types.
@@ -106,7 +107,7 @@ export enum HFCAIdentityAttributes {
  *   CA-->>Svc: certificates
  *   Svc-->>App: Identity
  */
-export class FabricEnrollmentService extends LoggedService {
+export class FabricEnrollmentService extends LoggedClass {
   private ca?: FabricCAServices;
 
   private certificateService?: any;

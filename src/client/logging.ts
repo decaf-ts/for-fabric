@@ -115,10 +115,10 @@ export class FabricLogger extends MiniLogger {
  * @memberOf module:for-fabric.client
  */
 const factory: LoggerFactory = (
-  object: string,
-  config: Partial<LoggingConfig> | undefined
+  object?: string,
+  config?: Partial<LoggingConfig> | undefined
 ) => {
-  return new FabricLogger(object, config || {});
+  return new FabricLogger(object || "MISSING", config || {});
 };
 
 // Set the factory as the default logger factory

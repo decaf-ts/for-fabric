@@ -9,6 +9,7 @@ import { Checkable, healthcheck } from "../../shared/interfaces/Checkable";
 import { ContractLogger } from "../logging";
 import { Logging } from "@decaf-ts/logging";
 import { Constructor } from "@decaf-ts/decoration";
+import { FabricContractContext } from "../ContractContext";
 
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode
@@ -86,15 +87,19 @@ export abstract class FabricCrudContract<M extends Model>
     super(name);
     this.repo = Repository.forModel(clazz);
   }
+  //
+  // /**
+  //  * @description Creates a logger for a specific chaincode context
+  //  * @summary Returns a ContractLogger instance configured for the current context
+  //  * @param {Ctx} ctx - The Fabric chaincode context
+  //  * @return {ContractLogger} The logger instance
+  //  */
+  // public logFor(ctx: Context): ContractLogger {
+  //   return Logging.for(FabricCrudContract.name, {}, ctx) as ContractLogger;
+  // }
 
-  /**
-   * @description Creates a logger for a specific chaincode context
-   * @summary Returns a ContractLogger instance configured for the current context
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @return {ContractLogger} The logger instance
-   */
-  public logFor(ctx: Context): ContractLogger {
-    return Logging.for(FabricCrudContract.name, {}, ctx) as ContractLogger;
+  protected logCtx(ctx: Context, op: string) {
+    return FabricCrudContract.adapter.context();
   }
 
   /**

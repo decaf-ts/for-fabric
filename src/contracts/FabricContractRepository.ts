@@ -114,6 +114,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
    * @return {ObserverHandler} The observer handler
    */
   override ObserverHandler(): ObserverHandler {
+    this.select().execute();
     return new FabricContractRepositoryObservableHandler();
   }
 
