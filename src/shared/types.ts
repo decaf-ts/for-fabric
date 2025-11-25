@@ -34,8 +34,8 @@ export type HSMOptions = {
  */
 export type PeerConfig = {
   cryptoPath: string;
-  keyCertOrDirectoryPath: string;
-  certCertOrDirectoryPath: string;
+  keyCertOrDirectoryPath: string | Buffer;
+  certCertOrDirectoryPath: string | Buffer;
   tlsCert: string | Buffer;
   peerEndpoint: string;
   peerHostAlias: string;
