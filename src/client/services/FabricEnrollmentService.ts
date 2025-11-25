@@ -26,7 +26,6 @@ import {
   IdentityResponse,
 } from "../../shared/fabric-types";
 import { RegistrationError } from "../../shared/errors";
-import { LoggedService } from "./LoggedService";
 import { LoggedClass } from "@decaf-ts/logging";
 
 /**
