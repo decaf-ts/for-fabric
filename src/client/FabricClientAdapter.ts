@@ -425,7 +425,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>> {
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = (ctxArgs.shift() as Record<string, any>) || {};
+    const transient = {}; //(ctxArgs.shift() as Record<string, any>) || {}; TODO: Verify
     const { log } = this.logCtx(
       ctxArgs as ContextualArgs<FabricClientContext>,
       this.create
@@ -505,7 +505,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>> {
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = (ctxArgs.shift() as Record<string, any>) || {};
+    const transient = {}; //(ctxArgs.shift() as Record<string, any>) || {}; TODO: Verify
     const { log } = this.logCtx(
       ctxArgs as ContextualArgs<FabricClientContext>,
       this.updateAll
