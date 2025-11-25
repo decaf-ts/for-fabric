@@ -8,8 +8,8 @@ import { uses } from "@decaf-ts/decoration";
 @table()
 @model()
 export class Product extends Model {
-  @pk({ type: "String" })
-  productCode!: string;
+  @pk({ type: "Number", generated: true })
+  productCode!: number;
 
   @column()
   inventedName!: string;

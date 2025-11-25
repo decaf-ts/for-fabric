@@ -21,7 +21,7 @@ describe("Tests global contract implementation", () => {
   const contractFolderName = "global";
   const contractName = "global";
   let caConfig: CAConfig;
-  let peerConfig: any;
+  let peerConfig: PeerConfig;
   let userAdapter: FabricClientAdapter;
   let userRepository: FabricClientRepository<User>;
   let productRepository: FabricClientRepository<Product>;
@@ -29,10 +29,12 @@ describe("Tests global contract implementation", () => {
   const useHsm = false;
 
   beforeAll(async () => {
-    //Creates hsm folder
-    fs.mkdirSync(
-      path.join(__dirname, "../../docker/infrastructure/storage/softhsm/orghsm")
+    const dest = path.join(
+      __dirname,
+      "../../docker/infrastructure/storage/softhsm/orghsm"
     );
+    //Creates hsm folder
+    if (!fs.existsSync(dest)) fs.mkdirSync(dest);
 
     // Boot infrastructure for testing
     execSync(`npm run infrastructure${useHsm ? "-hsm" : ""}:up`, {
@@ -109,14 +111,14 @@ describe("Tests global contract implementation", () => {
     expect(userID.id).toBeDefined();
     expect(userID.mspId).toBeDefined();
     expect(userID.type).toBeDefined();
-    // expect(userID.createdOn).toBeDefined();
-    // expect(userID.updatedOn).toBeDefined();
+    // expect(userID.createdAt).toBeDefined();
+    // expect(userID.updatedAt).toBeDefined();
     expect(credentials?.certificate).toBeDefined();
-    // expect(credentials?.createdOn).toBeDefined();
+    // expect(credentials?.createdAt).toBeDefined();
     expect(credentials?.id).toBeDefined();
     expect(credentials?.privateKey).toBeDefined();
     expect(credentials?.rootCertificate).toBeDefined();
-    // expect(credentials?.updatedOn).toBeDefined();
+    // expect(credentials?.updatedAt).toBeDefined();
   });
 
   it("Should create User", async () => {
@@ -132,9 +134,13 @@ describe("Tests global contract implementation", () => {
     const credentials = userID.credentials;
     expect(credentials).toBeDefined();
 
-    const client: Partial<PeerConfig> = {
-      keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
-      certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
+    const client = {
+      keyCertOrDirectoryPath: Buffer.from(
+        credentials.privateKey!
+      ) as unknown as string,
+      certCertOrDirectoryPath: Buffer.from(
+        credentials.certificate!
+      ) as unknown as string,
     };
 
     const repo = userRepository.for({ ...client });

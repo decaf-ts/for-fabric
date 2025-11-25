@@ -1,8 +1,17 @@
-import { Repository } from "@decaf-ts/core";
-import type { FlagsOf } from "@decaf-ts/core";
+import { Repository, Sequence } from "@decaf-ts/core";
+import type { ContextOf, FlagsOf, MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
 import type { FabricClientAdapter } from "./FabricClientAdapter";
+import {
+  Context,
+  OperationKeys,
+  enforceDBDecorators,
+  ValidationError,
+  InternalError,
+  reduceErrorsToPrint,
+  PrimaryKeyType,
+} from "@decaf-ts/db-decorators";
 
 /**
  * @description Repository implementation for Fabric client operations
@@ -43,5 +52,208 @@ export class FabricClientRepository<M extends Model> extends Repository<
 
   constructor(adapter?: FabricClientAdapter, clazz?: Constructor<M>) {
     super(adapter, clazz);
+  }
+
+  protected override async createPrefix(
+    model: M,
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ): Promise<[M, ...any[], ContextOf<FabricClientAdapter>]> {
+    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+      OperationKeys.CREATE,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const shouldRunHandlers =
+      contextArgs.context.get("ignoreHandlers") !== true;
+    const shouldValidate = !contextArgs.context.get("ignoreValidation");
+    model = new this.class(model);
+    if (shouldRunHandlers)
+      await enforceDBDecorators<M, Repository<M, FabricClientAdapter>, any>(
+        this,
+        contextArgs.context,
+        model,
+        OperationKeys.CREATE,
+        OperationKeys.ON
+      );
+
+    if (shouldValidate) {
+      const errors = await Promise.resolve(
+        model.hasErrors(
+          ...(contextArgs.context.get("ignoredValidationProperties") || [])
+        )
+      );
+      if (errors) throw new ValidationError(errors.toString());
+    }
+
+    return [model, ...contextArgs.args];
+  }
+
+  protected override async createAllPrefix(
+    models: M[],
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ): Promise<[M[], ...any[], ContextOf<FabricClientAdapter>]> {
+    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+      OperationKeys.CREATE,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const shouldRunHandlers =
+      contextArgs.context.get("ignoreHandlers") !== true;
+    const shouldValidate = !contextArgs.context.get("ignoreValidation");
+    if (!models.length) return [models, ...contextArgs.args];
+    const opts = Model.sequenceFor(models[0]);
+    let ids: (string | number | bigint | undefined)[] = [];
+    if (opts.type) {
+      if (!opts.name) opts.name = Sequence.pk(models[0]);
+      ids = await (
+        await this.adapter.Sequence(opts)
+      ).range(models.length, ...contextArgs.args);
+    } else {
+      ids = models.map((m, i) => {
+        if (typeof m[this.pk] === "undefined")
+          throw new InternalError(
+            `Primary key is not defined for model in position ${i}`
+          );
+        return m[this.pk] as string;
+      });
+    }
+
+    models = await Promise.all(
+      models.map(async (m, i) => {
+        m = new this.class(m);
+        if (opts.type) {
+          m[this.pk] = (
+            opts.type !== "String"
+              ? ids[i]
+              : opts.generated
+                ? ids[i]
+                : `${m[this.pk]}`.toString()
+          ) as M[keyof M];
+        }
+
+        if (shouldRunHandlers)
+          await enforceDBDecorators<M, Repository<M, FabricClientAdapter>, any>(
+            this,
+            contextArgs.context,
+            m,
+            OperationKeys.CREATE,
+            OperationKeys.ON
+          );
+        return m;
+      })
+    );
+
+    if (shouldValidate) {
+      const ignoredProps =
+        contextArgs.context.get("ignoredValidationProperties") || [];
+
+      const errors = await Promise.all(
+        models.map((m) => Promise.resolve(m.hasErrors(...ignoredProps)))
+      );
+
+      const errorMessages = reduceErrorsToPrint(errors);
+
+      if (errorMessages) throw new ValidationError(errorMessages);
+    }
+    return [models, ...contextArgs.args];
+  }
+
+  protected override async readPrefix(
+    key: PrimaryKeyType,
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ): Promise<[PrimaryKeyType, ...any[], ContextOf<FabricClientAdapter>]> {
+    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+      OperationKeys.READ,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const model: M = new this.class();
+    model[this.pk] = key as M[keyof M];
+    await enforceDBDecorators<M, Repository<M, FabricClientAdapter>, any>(
+      this,
+      contextArgs.context,
+      model,
+      OperationKeys.READ,
+      OperationKeys.ON
+    );
+    return [key, ...contextArgs.args];
+  }
+
+  protected override async readAllPrefix(
+    keys: PrimaryKeyType[],
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ): Promise<[PrimaryKeyType[], ...any[], ContextOf<FabricClientAdapter>]> {
+    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+      OperationKeys.READ,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+
+    await Promise.all(
+      keys.map(async (k) => {
+        const m = new this.class();
+        m[this.pk] = k as M[keyof M];
+        return enforceDBDecorators<M, Repository<M, FabricClientAdapter>, any>(
+          this,
+          contextArgs.context,
+          m,
+          OperationKeys.READ,
+          OperationKeys.ON
+        );
+      })
+    );
+    return [keys, ...contextArgs.args];
+  }
+
+  protected override async updatePrefix(
+    model: M,
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ): Promise<[M, ...args: any[], ContextOf<FabricClientAdapter>]> {
+    const contextArgs = await Context.args(
+      OperationKeys.UPDATE,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const shouldRunHandlers =
+      contextArgs.context.get("ignoreHandlers") !== true;
+    const shouldValidate = !contextArgs.context.get("ignoreValidation");
+    const pk = model[this.pk] as string;
+    if (!pk)
+      throw new InternalError(
+        `No value for the Id is defined under the property ${this.pk as string}`
+      );
+    const oldModel = await this.read(pk, ...contextArgs.args);
+    model = Model.merge(oldModel, model, this.class);
+    if (shouldRunHandlers)
+      await enforceDBDecorators(
+        this,
+        contextArgs.context as any,
+        model,
+        OperationKeys.UPDATE,
+        OperationKeys.ON,
+        oldModel
+      );
+
+    if (shouldValidate) {
+      const errors = await Promise.resolve(
+        model.hasErrors(
+          oldModel,
+          ...Model.relations(this.class),
+          ...(contextArgs.context.get("ignoredValidationProperties") || [])
+        )
+      );
+      if (errors) throw new ValidationError(errors.toString());
+    }
+    return [model, ...contextArgs.args];
   }
 }

@@ -8,7 +8,7 @@ import { uses } from "@decaf-ts/decoration";
 @table()
 @model()
 export class User extends Model {
-  @pk({ type: "Number" })
+  @pk({ type: "Number", generated: true })
   id!: number;
 
   @column()

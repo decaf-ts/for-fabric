@@ -425,7 +425,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>> {
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = (ctxArgs.shift() as Record<string, any>) || {};
+    const transient = {}; //(ctxArgs.shift() as Record<string, any>) || {}; TODO: Verify
     const { log } = this.logCtx(
       ctxArgs as ContextualArgs<FabricClientContext>,
       this.create
@@ -505,7 +505,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>> {
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = (ctxArgs.shift() as Record<string, any>) || {};
+    const transient = {}; //(ctxArgs.shift() as Record<string, any>) || {}; TODO: Verify
     const { log } = this.logCtx(
       ctxArgs as ContextualArgs<FabricClientContext>,
       this.updateAll
@@ -937,18 +937,18 @@ export class FabricClientAdapter extends CouchDBAdapter<
     );
     const identity = await getIdentity(
       config.mspId,
-      config.certCertOrDirectoryPath
+      config.certCertOrDirectoryPath as any
     );
     log.debug(`Retrieving signer key from ${config.keyCertOrDirectoryPath}`);
 
     let signer: Signer,
       close = () => {};
     if (!config.hsm) {
-      signer = await getSigner(config.keyCertOrDirectoryPath);
+      signer = await getSigner(config.keyCertOrDirectoryPath as any);
     } else {
       const hsm = new HSMSignerFactoryCustom(config.hsm.library);
       const identifier = hsm.getSKIFromCertificatePath(
-        config.certCertOrDirectoryPath
+        config.certCertOrDirectoryPath as any
       );
       const pkcs11Signer = hsm.newSigner({
         label: config.hsm.tokenLabel as string,
