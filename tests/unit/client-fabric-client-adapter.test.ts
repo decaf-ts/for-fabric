@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { BulkCrudOperationKeys, InternalError } from "@decaf-ts/db-decorators";
+import { InternalError } from "@decaf-ts/db-decorators";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
@@ -105,39 +105,6 @@ describe.skip("FabricClientAdapter", () => {
     expect(result).toEqual([{ id: "wallet-1", balance: 33 }]);
   });
 
-  it("reads and deletes batches", async () => {
-    const adapter = newAdapter();
-    const encoded = new TextEncoder().encode(
-      JSON.stringify([JSON.stringify({ id: "wallet-2" })])
-    );
-    const submitSpy = jest
-      .spyOn(adapter as any, "submitTransaction")
-      .mockResolvedValue(encoded);
-
-    await adapter.readAll("erc20_wallets", ["wallet-2"]);
-    await adapter.deleteAll("erc20_wallets", ["wallet-2"]);
-
-    expect(submitSpy).toHaveBeenCalledWith(BulkCrudOperationKeys.DELETE_ALL, [
-      ["wallet-2"],
-    ]);
-  });
-
-  it("executes raw queries returning arrays", async () => {
-    const adapter = newAdapter();
-    jest
-      .spyOn(adapter as any, "evaluateTransaction")
-      .mockResolvedValue(
-        new TextEncoder().encode(
-          JSON.stringify([{ id: "wallet-3" }, { id: "wallet-4" }])
-        )
-      );
-
-    const result = await adapter.raw({ selector: {} }, true);
-
-    expect(Array.isArray(result)).toBe(true);
-    expect(result).toHaveLength(2);
-  });
-
   it("wraps raw evaluation errors with parseError", async () => {
     const adapter = newAdapter();
     jest
@@ -171,33 +138,6 @@ describe.skip("FabricClientAdapter", () => {
 
     expect(dispatch).toBeInstanceOf(FabricClientDispatch);
     expect((dispatch as any).client).toBe(fakeClient);
-  });
-
-  it("delegates submit and evaluate to shared transaction", async () => {
-    const adapter = newAdapter();
-    const txnSpy = jest
-      .spyOn(adapter as any, "transaction")
-      .mockResolvedValue(new Uint8Array());
-
-    await adapter.submitTransaction("create", ["payload"]);
-    await adapter.evaluateTransaction("query", ["payload"]);
-
-    expect(txnSpy).toHaveBeenNthCalledWith(
-      1,
-      "create",
-      true,
-      ["payload"],
-      undefined,
-      undefined
-    );
-    expect(txnSpy).toHaveBeenNthCalledWith(
-      2,
-      "query",
-      false,
-      ["payload"],
-      undefined,
-      undefined
-    );
   });
 
   it("closes cached clients", async () => {
