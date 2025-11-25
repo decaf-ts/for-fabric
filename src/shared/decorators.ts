@@ -8,7 +8,6 @@ import {
   onRead,
   onUpdate,
   readonly,
-  RepositoryFlags,
   transient,
 } from "@decaf-ts/db-decorators";
 import { Model, required } from "@decaf-ts/decorator-validation";
@@ -87,13 +86,11 @@ export function Owner() {
 
 export async function ownedByOnCreate<
   M extends Model<boolean>,
-  R extends Repo<M, F, C>,
+  R extends Repo<M>,
   V,
-  F extends RepositoryFlags,
-  C extends Context<F>,
 >(
   this: R,
-  context: Context<F>,
+  context: Context<any>,
   data: V,
   key: keyof M,
   model: M
@@ -177,7 +174,7 @@ export async function segregatedDataOnCreate<M extends Model>(
       typeof d.collections === "function"
         ? d.collections(model)
         : d.collections;
-    await this.saveToCollection(context, collection, key, model[key]);
+    // await this.saveToCollection(context, collection, key, model[key]);
   }
 
   const { private, shared } = Model.segregate(model);
@@ -189,7 +186,6 @@ export async function segregatedDataOnRead<M extends Model>(
   data: SegregatedDataMetadata[],
   key: (keyof M)[],
   model: M
-  // id: string | symbol | number
 ): Promise<void> {}
 
 export async function segregatedDataOnUpdate<M extends Model>(
@@ -234,48 +230,49 @@ function segregated(
       meta.collections = [...collections];
       Metadata.set(constr as Constructor, key, meta);
     }
-
-    const decs = [
-      segregatedDec,
-      transient(),
-      onCreate(
-        segregatedDataOnCreate,
-        { collections: collection },
-        {
-          priority: 95,
-          group:
-            typeof collection === "string" ? collection : collection.toString(),
-        }
-      ),
-      onRead(
-        segregatedDataOnRead,
-        { collections: collection },
-        {
-          priority: 95,
-          group:
-            typeof collection === "string" ? collection : collection.toString(),
-        }
-      ),
-      onUpdate(
-        segregatedDataOnUpdate,
-        { collections: collection },
-        {
-          priority: 95,
-          group:
-            typeof collection === "string" ? collection : collection.toString(),
-        }
-      ),
-      onDelete(
-        segregatedDataOnDelete,
-        { collections: collection },
-        {
-          priority: 95,
-          group:
-            typeof collection === "string" ? collection : collection.toString(),
-        }
-      ),
-    ];
-    return apply(...decs)(target, propertyKey);
+    //
+    // const decs = [
+    //   segregatedDec,
+    //   transient(),
+    //   onCreate(
+    //     segregatedDataOnCreate,
+    //     { collections: collection },
+    //     {
+    //       priority: 95,
+    //       group:
+    //         typeof collection === "string" ? collection : collection.toString(),
+    //     }
+    //   ),
+    //   onRead(
+    //     segregatedDataOnRead,
+    //     { collections: collection },
+    //     {
+    //       priority: 95,
+    //       group:
+    //         typeof collection === "string" ? collection : collection.toString(),
+    //     }
+    //   ),
+    //   onUpdate(
+    //     segregatedDataOnUpdate,
+    //     { collections: collection },
+    //     {
+    //       priority: 95,
+    //       group:
+    //         typeof collection === "string" ? collection : collection.toString(),
+    //     }
+    //   ),
+    //   onDelete(
+    //     segregatedDataOnDelete,
+    //     { collections: collection },
+    //     {
+    //       priority: 95,
+    //       group:
+    //         typeof collection === "string" ? collection : collection.toString(),
+    //     }
+    //   ),
+    // ];
+    // return apply(...decs)(target, propertyKey);
+    return apply()(target, propertyKey);
   };
 }
 
