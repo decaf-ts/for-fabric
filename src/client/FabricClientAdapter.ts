@@ -25,7 +25,7 @@ import {
   SerializationError,
   BulkCrudOperationKeys,
 } from "@decaf-ts/db-decorators";
-import type { Context, PrimaryKeyType } from "@decaf-ts/db-decorators";
+import { Context, type PrimaryKeyType } from "@decaf-ts/db-decorators";
 import {
   Adapter,
   PersistenceKeys,
@@ -40,7 +40,7 @@ import type { FabricClientDispatch } from "./FabricClientDispatch";
 import { HSMSignerFactoryCustom } from "./fabric-hsm";
 import { type Constructor } from "@decaf-ts/decoration";
 
-export type FabricClientContext = Context<FabricFlags>;
+export class FabricClientContext extends Context<FabricFlags> {}
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
  * @summary The FabricAdapter extends CouchDBAdapter to provide a seamless interface for interacting with Hyperledger Fabric networks.
@@ -117,6 +117,25 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   constructor(config: PeerConfig, alias?: string) {
     super(config, FabricFlavour, alias);
+  }
+
+  override async context<M extends Model>(
+    operation:
+      | OperationKeys.CREATE
+      | OperationKeys.READ
+      | OperationKeys.UPDATE
+      | OperationKeys.DELETE
+      | string,
+    overrides: Partial<FabricFlags>,
+    model: Constructor<M> | Constructor<M>[],
+    ...args: any[]
+  ): Promise<FabricClientContext> {
+    const log = this.log.for(this.context);
+    log.debug(
+      `Creating new context for ${operation} operation on ${Array.isArray(model) ? model.map((m) => m.name) : model.name} model with flag overrides: ${JSON.stringify(overrides)}`
+    );
+    const flags = await this.flags(operation, model, overrides, ...args);
+    return new FabricClientContext().accumulate(flags) as FabricClientContext;
   }
 
   /**

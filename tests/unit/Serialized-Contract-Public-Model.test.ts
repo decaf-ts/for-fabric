@@ -1,101 +1,18 @@
 import { MiniLogger } from "@decaf-ts/logging";
-import { FabricContractContext } from "../../src/contracts/ContractContext";
 import { TestPublicModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
 import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
+import { getMockCtx } from "./Context.mock";
 
-const state: Record<string, any> = {};
-
-const ctx = {
-  stub: {
-    getCreator: async () => {
-      return {
-        idBytes: Buffer.from("creatorID"),
-        mspid: "MSPID",
-      };
-    },
-    getTransient: () => {
-      return {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        has: (item: any) => {
-          return false;
-        },
-      };
-    },
-    getMspID: () => {
-      return "Aeon";
-    },
-    setEvent: (name: string, payload: any): void => {
-      console.info(
-        `Event "${name}" triggered with payload of length ${payload.length}`
-      );
-    },
-    getDateTimestamp: () => {
-      return new Date();
-    },
-    createCompositeKey: (objectType: string, attributes: string[]) => {
-      return objectType + "_" + attributes.join("_");
-    },
-    getState: async (key: string) => {
-      if (key in state) return state[key];
-      return "";
-    },
-    putState: async (key: string, value: any) => {
-      state[key] = value;
-    },
-    deleteState: async (key: string) => {
-      if (key in state) {
-        delete state[key];
-        return;
-      }
-      throw new Error("Missing");
-    },
-    getQueryResultWithPagination: async (
-      query: string,
-      pageSize: number,
-      bookmark: string
-    ) => {
-      const keys = Object.keys(state);
-
-      let startIndex = 0;
-      if (bookmark) {
-        const index = keys.indexOf(bookmark);
-        startIndex = index >= 0 ? index + 1 : 0;
-      }
-
-      const paginatedKeys = keys.slice(startIndex, startIndex + pageSize);
-      let currentIndex = 0;
-
-      return {
-        iterator: {
-          async next() {
-            if (currentIndex < paginatedKeys.length) {
-              const key = paginatedKeys[currentIndex++];
-              return {
-                value: { key, value: state[key] },
-                done: false,
-              };
-            }
-            return { done: true };
-          },
-          async close() {
-            // No-op for mock
-          },
-        },
-      };
-    },
-  },
-  logging: {
-    getLogger(name: string) {
-      return new MiniLogger(name);
-    },
-  },
-  identity: {
-    getID: () => "id",
-    getMSPID: () => "Aeon",
-  },
-} as unknown as FabricContractContext;
+const logger = new MiniLogger("public-model-test") as any;
+if (typeof logger.for !== "function") {
+  logger.for = jest.fn().mockReturnValue(logger);
+}
+if (typeof logger.clear !== "function") {
+  logger.clear = jest.fn().mockReturnValue(logger);
+}
 
 describe("Tests Public contract", () => {
+  const ctx = getMockCtx();
   const contract = new TestPublicModelContract();
   it("should create model", async () => {
     const model = new TestPublicModel({

@@ -1,6 +1,4 @@
-import "reflect-metadata";
-
-import { AuthorizationError } from "@decaf-ts/core";
+import { AuthorizationError, Condition } from "@decaf-ts/core";
 import { BaseError, ValidationError } from "@decaf-ts/db-decorators";
 import {
   AllowanceError,
@@ -8,24 +6,26 @@ import {
   NotInitializedError,
 } from "../../src/shared/errors";
 import { TestERC20Contract } from "../assets/contract/test/TestERc20Contract";
-import type { FabricContractContext } from "../../src/contracts";
+import { Context } from "fabric-contract-api";
 import type {
   Allowance,
   ERC20Token,
   ERC20Wallet,
 } from "../../src/contracts/erc20/models";
+import { getMockCtx } from "./ContextMock";
 
 const clone = <T>(value: T): T =>
   JSON.parse(JSON.stringify(value)) as unknown as T;
 
 describe("FabricERC20Contract behaviors", () => {
   let contract: TestERC20Contract;
-  let ctx: FabricContractContext;
+  let ctx: Context;
   let ownerId: string;
   let tokens: ERC20Token[];
   let wallets: Record<string, ERC20Wallet>;
   let allowances: Allowance[];
   let observerUpdate: jest.Mock;
+  let buildContext: (overrides?: { id?: string; mspId?: string }) => Context;
 
   beforeAll(() => {
     contract = new TestERC20Contract();
@@ -38,43 +38,28 @@ describe("FabricERC20Contract behaviors", () => {
     allowances = [];
     observerUpdate = jest.fn();
 
-    ctx = {
-      stub: {
-        getMspID: () => "OrgMSP",
-        setEvent: jest.fn(),
-        getDateTimestamp: () => new Date(),
-        createCompositeKey: (type: string, attributes: string[]) =>
-          `${type}_${attributes.join("_")}`,
-        getTransient: () => new Map(),
-      },
-      clientIdentity: {
-        getID: () => ownerId,
-        getMSPID: () => "OrgMSP",
-      },
-    } as unknown as FabricContractContext;
+    ctx = getMockCtx();
 
     (contract as any).repo = {
       ObserverHandler: () => ({ updateObservers: observerUpdate }),
+      refresh: jest.fn().mockResolvedValue(undefined),
     };
 
-    jest.spyOn(contract as any, "logFor").mockReturnValue({
-      for: () => ({
-        info: jest.fn(),
-        verbose: jest.fn(),
-        error: jest.fn(),
-      }),
-    });
-
+    const tokenSelectResult = {
+      execute: jest.fn(async () => tokens.map(clone)),
+    };
     (contract as any).tokenRepository = {
-      selectWithContext: jest.fn(async () => ({
-        execute: jest.fn(async () => tokens.map(clone)),
-      })),
+      select: jest.fn(() => tokenSelectResult),
+      selectWithContext: jest.fn(async () => tokenSelectResult),
       create: jest.fn(async (token: ERC20Token) => {
         tokens.push({ ...token });
         return token;
       }),
     };
 
+    const walletSelectResult = {
+      execute: jest.fn(async () => Object.values(wallets).map(clone)),
+    };
     (contract as any).walletRepository = {
       read: jest.fn(async (id: string) => {
         const wallet = wallets[id];
@@ -91,37 +76,39 @@ describe("FabricERC20Contract behaviors", () => {
         wallets[wallet.id] = clone(wallet);
         return clone(wallet);
       }),
-      selectWithContext: jest.fn(async () => ({
-        execute: jest.fn(async () => Object.values(wallets).map(clone)),
-      })),
+      select: jest.fn(() => walletSelectResult),
+      selectWithContext: jest.fn(async () => walletSelectResult),
     };
 
-    const matchesCondition = (condition: any, entry: Allowance): boolean => {
-      if (!condition) return true;
+    const filterAllowances = (
+      condition: any,
+      entries: Allowance[]
+    ): Allowance[] => {
+      if (!condition) return entries;
       if (condition.operator === "AND") {
-        return (
-          matchesCondition(condition.attr1, entry) &&
-          matchesCondition(condition.comparison, entry)
+        return filterAllowances(
+          condition.comparison,
+          filterAllowances(condition.attr1, entries)
         );
       }
       if (condition.operator === "EQUAL") {
-        return (entry as any)[condition.attr1] === condition.comparison;
+        return entries.filter(
+          (entry) => (entry as any)[condition.attr1] === condition.comparison
+        );
       }
-      return true;
+      return entries;
     };
 
+    const allowanceSelectResult = {
+      execute: jest.fn(async () => allowances.map(clone)),
+      where: (condition: any) => ({
+        execute: jest.fn(async () =>
+          filterAllowances(condition, allowances).map(clone)
+        ),
+      }),
+    };
     (contract as any).allowanceRepository = {
-      selectWithContext: jest.fn(async () => ({
-        execute: jest.fn(async () => allowances.map(clone)),
-        where: (condition: any) => ({
-          execute: jest.fn(async () =>
-            allowances
-              .filter((allowance) => matchesCondition(condition, allowance))
-              .map(clone)
-          ),
-        }),
-      })),
-      create: jest.fn(async (allowance: Allowance) => {
+      create: jest.fn(async (allowance: Allowance, ...args: any[]) => {
         allowances.push({ ...allowance });
         return allowance;
       }),
@@ -162,10 +149,11 @@ describe("FabricERC20Contract behaviors", () => {
     expect(tokens[0]).toMatchObject({ name: "TestToken", owner: ownerId });
 
     await expect(
-      contract.Initialize(
-        ctx,
-        { name: "Other", symbol: "OT", decimals: 3 } as any
-      )
+      contract.Initialize(ctx, {
+        name: "Other",
+        symbol: "OT",
+        decimals: 3,
+      } as any)
     ).rejects.toThrow(AuthorizationError);
   });
 
@@ -301,9 +289,19 @@ describe("FabricERC20Contract behaviors", () => {
       spender: "spender",
       value: 15,
     } as Allowance);
+    const manualCondition = Condition.and(
+      Condition.attribute<Allowance>("owner").eq(ownerId),
+      Condition.attribute<Allowance>("spender").eq("spender")
+    );
+    await expect(
+      (contract as any).allowanceRepository
+        .select()
+        .where(manualCondition)
+        .execute(ctx)
+    ).resolves.toHaveLength(1);
 
     await expect(
-      (contract as any)._getAllowance(ctx, ownerId, "spender")
+      (contract as any)._getAllowance(ownerId, "spender", ctx)
     ).resolves.toMatchObject({ value: 15 });
     await expect(contract.Allowance(ctx, ownerId, "spender")).resolves.toBe(15);
 
@@ -325,13 +323,7 @@ describe("FabricERC20Contract behaviors", () => {
       value: 40,
     } as Allowance);
 
-    const spenderCtx = {
-      ...ctx,
-      clientIdentity: {
-        getID: () => "spender",
-        getMSPID: () => "OrgMSP",
-      },
-    } as FabricContractContext;
+    const spenderCtx = buildContext({ id: "spender" });
 
     await contract.TransferFrom(spenderCtx, ownerId, "receiver", 25);
 

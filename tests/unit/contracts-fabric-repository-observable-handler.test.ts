@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { OperationKeys, BulkCrudOperationKeys } from "@decaf-ts/db-decorators";
 import { FabricContractRepositoryObservableHandler } from "../../src/contracts/FabricContractRepositoryObservableHandler";
+import { FabricContractContext } from "../../src/contracts/ContractContext";
 import { generateFabricEventName } from "../../src/shared/events";
 
 jest.mock("../../src/shared/events", () => ({
@@ -16,16 +17,24 @@ describe("FabricContractRepositoryObservableHandler", () => {
   it("emits supported Fabric events with generated name", async () => {
     const handler = new FabricContractRepositoryObservableHandler();
     const stub = { setEvent: jest.fn() };
-    const ctx = { stub } as any;
+    const ctx = new FabricContractContext();
+    const logger = {
+      for: jest.fn().mockReturnThis(),
+      clear: jest.fn().mockReturnThis(),
+      info: jest.fn(),
+      error: jest.fn(),
+      verbose: jest.fn(),
+      debug: jest.fn(),
+    };
+    ctx.accumulate({ stub, logger } as any);
     const log = { debug: jest.fn() } as any;
 
     await handler.updateObservers(
-      log,
       "assets",
       OperationKeys.CREATE,
       "id-1",
-      ctx,
-      "owner1"
+      "owner1",
+      ctx
     );
 
     expect(generateFabricEventName).toHaveBeenCalledWith(
@@ -46,17 +55,25 @@ describe("FabricContractRepositoryObservableHandler", () => {
       OperationKeys.CREATE,
     ]);
     const stub = { setEvent: jest.fn() };
-    const ctx = { stub } as any;
+    const ctx = new FabricContractContext();
+    const logger = {
+      for: jest.fn().mockReturnThis(),
+      clear: jest.fn().mockReturnThis(),
+      info: jest.fn(),
+      error: jest.fn(),
+      verbose: jest.fn(),
+      debug: jest.fn(),
+    };
+    ctx.accumulate({ stub, logger } as any);
     const log = { debug: jest.fn() } as any;
 
     await handler.updateObservers(
-      log,
       "assets",
       BulkCrudOperationKeys.DELETE_ALL,
       "batch-1",
-      ctx,
       undefined,
-      { hello: "world" }
+      { hello: "world" },
+      ctx
     );
 
     expect(generateFabricEventName).not.toHaveBeenCalled();

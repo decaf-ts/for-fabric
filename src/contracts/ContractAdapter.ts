@@ -650,12 +650,34 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ctx: Ctx | FabricContractContext,
     ...args: any[]
   ): Promise<FabricContractFlags> {
-    const { log } = this.logCtx([ctx as FabricContractContext], this.flags);
-    return Object.assign(await super.flags(operation, model, flags, ...args), {
+    const ensureLogger = (logger?: ContractLogger) => {
+      const base =
+        logger ??
+        (this.log.for(this.flags) as ContractLogger);
+      if (typeof base.clear !== "function")
+        (base as any).clear = () => base;
+      if (typeof base.for !== "function")
+        (base as any).for = () => base;
+      return base;
+    };
+    const fabricCtx =
+      ctx instanceof FabricContractContext
+        ? (ctx.accumulate({
+            logger: ensureLogger(ctx.logger as ContractLogger),
+          }) as FabricContractContext)
+        : (new FabricContractContext().accumulate({
+            stub: ctx.stub,
+            identity: ctx.clientIdentity,
+            logger: ensureLogger(),
+          }) as FabricContractContext);
+    const baseFlags = Object.assign({}, flags, {
+      logger: fabricCtx.logger,
+    });
+    return Object.assign(await super.flags(operation, model, baseFlags, ...args), {
       stub: ctx.stub,
       identity: ((ctx as Ctx).clientIdentity ??
-        (ctx as FabricContractContext).identity!) as ClientIdentity,
-      logger: (ctx as FabricContractContext).logger ?? log,
+        fabricCtx.identity!) as ClientIdentity,
+      logger: fabricCtx.logger,
       correlationId: ctx.stub.getTxID(),
     });
   }

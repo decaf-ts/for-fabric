@@ -49,24 +49,60 @@ export function processModel<M extends Model>(adapter: any, model: M) {
 }
 
 export function hasPrivateData<M extends Model>(model: M) {
-  const metadata = getClassPrivateDataMetadata(model);
-  if (!metadata) return false;
-  return true;
+  return !!getClassPrivateDataMetadata(model);
 }
 
 export function getClassPrivateDataMetadata<M extends Model>(
   model: M
-): Record<string, any> {
-  return Metadata.get(
-    model.constructor as Constructor,
-    FabricModelKeys.PRIVATE
+): Record<string, any> | undefined {
+  const constr = model.constructor as Constructor;
+  const rootMetadata = Metadata.get(constr) || {};
+  if (rootMetadata && rootMetadata[FabricModelKeys.PRIVATE])
+    return rootMetadata[FabricModelKeys.PRIVATE];
+  if (
+    rootMetadata &&
+    rootMetadata[FabricModelKeys.FABRIC + FabricModelKeys.PRIVATE]
+  )
+    return rootMetadata[FabricModelKeys.FABRIC + FabricModelKeys.PRIVATE];
+  const flattened = Object.keys(rootMetadata || {}).reduce(
+    (accum: Record<string, any>, key) => {
+      if (key.includes(FabricModelKeys.PRIVATE)) {
+        const property = key.split(Metadata.splitter).pop();
+        if (property) accum[property] = Metadata.get(constr, key);
+      }
+      return accum;
+    },
+    {} as Record<string, any>
   );
+  if (Object.keys(flattened).length) return flattened;
+  const classKey = Metadata.key(
+    FabricModelKeys.FABRIC + FabricModelKeys.PRIVATE
+  );
+  const classMetadata =
+    Metadata.get(constr, classKey) ??
+    Metadata.get(constr, FabricModelKeys.PRIVATE);
+  if (classMetadata) return classMetadata;
+  const props = Metadata.properties(constr) || [];
+  const metadata: Record<string, any> = {};
+  for (const prop of props) {
+    const keys = [
+      Metadata.key(FabricModelKeys.PRIVATE, prop),
+      Metadata.key(classKey, prop),
+    ];
+    const propMetadata = keys
+      .map((key) => Metadata.get(constr, key))
+      .find(Boolean);
+    if (propMetadata) metadata[prop] = propMetadata;
+  }
+  return Object.keys(metadata).length ? metadata : undefined;
 }
 
 export function isModelPrivate<M extends Model>(model: M): boolean {
-  const metadata = getClassPrivateDataMetadata(model);
-  if (!metadata || metadata.isPrivate === undefined) return false;
-  return metadata.isPrivate;
+  const classMetadata = Metadata.get(
+    model.constructor as Constructor,
+    Metadata.key(FabricModelKeys.FABRIC + FabricModelKeys.PRIVATE)
+  );
+  return Boolean(classMetadata?.isPrivate);
 }
 
 export function modelToPrivate<M extends Model>(

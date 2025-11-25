@@ -371,9 +371,7 @@ export abstract class FabricCrudContract<M extends Model>
         case BulkCrudOperationKeys.DELETE_ALL:
           return method.name;
         default:
-          throw new InternalError(
-            `Unable to convert ${method.name} to an operation`
-          );
+          return method.name;
       }
     }
 

@@ -13,6 +13,7 @@ import type { SequenceOptions } from "@decaf-ts/core";
 import { UnsupportedError } from "@decaf-ts/core";
 import type { Logger } from "@decaf-ts/logging";
 import { prop } from "@decaf-ts/decoration";
+import { ClientIdentity } from "fabric-shim-api";
 
 @model()
 class TestModel extends Model {
@@ -27,11 +28,27 @@ class TestModel extends Model {
   }
 }
 
+const createContext = (identity?: Partial<ClientIdentity>) => {
+  const context = new FabricContractContext();
+  const logger = {
+    for: jest.fn().mockReturnThis(),
+    clear: jest.fn().mockReturnThis(),
+    info: jest.fn(),
+    error: jest.fn(),
+    verbose: jest.fn(),
+    debug: jest.fn(),
+  };
+  context.accumulate({
+    identity,
+    logger,
+  } as any);
+  return context;
+};
+
 describe("contracts/ContractAdapter helpers", () => {
   it("createdByOnFabricCreateUpdate assigns identity id to target property", async () => {
-    const context = new FabricContractContext();
     const clientIdentity = { getID: jest.fn().mockReturnValue("user::1") };
-    context.accumulate({ clientIdentity });
+    const context = createContext(clientIdentity as ClientIdentity);
 
     const model = new TestModel();
 

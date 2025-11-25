@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { model, Model } from "@decaf-ts/decorator-validation";
+import { model, Model, type ModelArg } from "@decaf-ts/decorator-validation";
 import { pk } from "@decaf-ts/core";
 import { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
@@ -13,6 +13,10 @@ import { FabricContractRepositoryObservableHandler } from "../../src/contracts/F
 class RepoTestModel extends Model {
   @pk()
   id!: string;
+
+  constructor(args?: ModelArg<RepoTestModel>) {
+    super(args);
+  }
 }
 
 describe("FabricContractRepository", () => {
@@ -44,7 +48,12 @@ describe("FabricContractRepository", () => {
       .spyOn(Repository.prototype, "updateObservers")
       .mockResolvedValue();
 
-    await repo.updateObservers("repo-test", OperationKeys.CREATE, "id-1", context);
+    await repo.updateObservers(
+      "repo-test",
+      OperationKeys.CREATE,
+      "id-1",
+      context
+    );
 
     expect(superSpy).toHaveBeenCalledWith(
       "repo-test",
@@ -64,7 +73,12 @@ describe("FabricContractRepository", () => {
       .spyOn(Repository.prototype, "updateObservers")
       .mockResolvedValue();
 
-    await repo.updateObservers("repo-test", OperationKeys.CREATE, "id-1", context);
+    await repo.updateObservers(
+      "repo-test",
+      OperationKeys.CREATE,
+      "id-1",
+      context
+    );
 
     expect(superSpy).not.toHaveBeenCalled();
   });

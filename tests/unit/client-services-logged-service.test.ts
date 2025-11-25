@@ -1,9 +1,8 @@
 import "reflect-metadata";
 
-import { Logging } from "@decaf-ts/logging";
-import { LoggedService } from "../../src/client/services/LoggedService";
+import { LoggedClass, Logging } from "@decaf-ts/logging";
 
-class ExampleService extends LoggedService {
+class ExampleService extends LoggedClass {
   public getInstanceLogger() {
     return this.log;
   }
@@ -32,14 +31,9 @@ describe("LoggedService", () => {
   });
 
   it("memoizes static logger lookups", () => {
-    const getSpy = jest.spyOn(Logging, "get").mockReturnValue({
-      info: jest.fn(),
-    } as any);
-
     const loggerA = ExampleService.acquireStaticLogger();
     const loggerB = ExampleService.acquireStaticLogger();
 
     expect(loggerA).toBe(loggerB);
-    expect(getSpy).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import { Adapter, UnsupportedError } from "@decaf-ts/core";
-import { InternalError } from "@decaf-ts/db-decorators";
+import { Context, InternalError } from "@decaf-ts/db-decorators";
 import type { Client } from "@grpc/grpc-js";
 import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
@@ -43,6 +43,20 @@ const createAdapterStub = () => {
   return adapter;
 };
 
+const createContext = () => {
+  const ctx = new Context();
+  const logger = {
+    for: jest.fn().mockReturnThis(),
+    clear: jest.fn().mockReturnThis(),
+    info: jest.fn(),
+    error: jest.fn(),
+    verbose: jest.fn(),
+    debug: jest.fn(),
+  };
+  ctx.accumulate({ logger } as any);
+  return ctx;
+};
+
 describe("FabricClientDispatch", () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -75,8 +89,9 @@ describe("FabricClientDispatch", () => {
 
   it("silently ignores updates when adapter is missing", async () => {
     const { dispatch } = createDispatch();
+    const context = createContext();
     await expect(
-      dispatch.updateObservers("wallets", "create", { id: "1" })
+      dispatch.updateObservers("wallets", "create", { id: "1" }, context)
     ).resolves.toBeUndefined();
   });
 
@@ -84,21 +99,22 @@ describe("FabricClientDispatch", () => {
     const { dispatch } = createDispatch();
     const adapter = createAdapterStub();
     dispatch["adapter"] = adapter;
+    const context = createContext();
 
-    await dispatch.updateObservers("wallets", "create", { id: "w-1" });
+    await dispatch.updateObservers("wallets", "create", "w-1", context);
     expect(adapter.refresh).toHaveBeenCalledWith(
       "wallets",
       "create",
       "w-1",
-      expect.objectContaining({ id: "w-1" })
+      context
     );
 
-    await dispatch.updateObservers("wallets", "create", {});
+    await dispatch.updateObservers("wallets", "create", undefined, context);
     expect(adapter.refresh).toHaveBeenLastCalledWith(
       "wallets",
       "create",
       undefined,
-      {}
+      context
     );
   });
 
@@ -107,9 +123,10 @@ describe("FabricClientDispatch", () => {
     const adapter = createAdapterStub();
     adapter.refresh.mockRejectedValue(new Error("boom"));
     dispatch["adapter"] = adapter;
+    const context = createContext();
 
     await expect(
-      dispatch.updateObservers("wallets", "create", { id: "w-2" })
+      dispatch.updateObservers("wallets", "create", { id: "w-2" }, context)
     ).rejects.toThrow(InternalError);
   });
 
@@ -165,7 +182,8 @@ describe("FabricClientDispatch", () => {
     expect(updateSpy).toHaveBeenCalledWith(
       "wallets",
       "create",
-      expect.objectContaining(eventPayload)
+      "doc-1",
+      expect.any(Context)
     );
   });
 
@@ -196,7 +214,8 @@ describe("FabricClientDispatch", () => {
     expect(updateSpy).toHaveBeenCalledWith(
       "WalletModel",
       "update",
-      expect.any(Object)
+      expect.any(Object),
+      expect.any(Context)
     );
   });
 

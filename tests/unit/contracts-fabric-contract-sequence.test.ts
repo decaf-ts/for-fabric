@@ -11,6 +11,15 @@ import { FabricContractContext } from "../../src/contracts/ContractContext";
 
 describe("FabricContractSequence", () => {
   const context = new FabricContractContext();
+  const logger = {
+    for: jest.fn().mockReturnThis(),
+    clear: jest.fn().mockReturnThis(),
+    info: jest.fn(),
+    error: jest.fn(),
+    verbose: jest.fn(),
+    debug: jest.fn(),
+  };
+  context.accumulate({ logger } as any);
   let repoStub: any;
   let forModelSpy: jest.SpyInstance;
 
@@ -38,7 +47,14 @@ describe("FabricContractSequence", () => {
         incrementBy: 1,
         startWith: 1,
       },
-      { alias: "default" } as any
+      {
+        alias: "default",
+        context: jest
+          .fn()
+          .mockImplementation(() => {
+            throw new InternalError("Context is required");
+          }),
+      } as any
     );
 
   it("throws when context missing", async () => {

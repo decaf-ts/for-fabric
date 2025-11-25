@@ -15,6 +15,15 @@ class StatementModel extends Model<boolean> {
 
 describe("FabricStatement", () => {
   const context = new FabricContractContext();
+  const logger = {
+    for: jest.fn().mockReturnThis(),
+    clear: jest.fn().mockReturnThis(),
+    info: jest.fn(),
+    error: jest.fn(),
+    verbose: jest.fn(),
+    debug: jest.fn(),
+  };
+  context.accumulate({ logger } as any);
 
   it("raw maps results through adapter when no field selector", async () => {
     const rows = [{ _id: "1", id: "1" }];
@@ -28,7 +37,7 @@ describe("FabricStatement", () => {
     );
     (statement as any).fromSelector = StatementModel;
 
-    const result = await statement.raw({ selector: {} });
+    const result = await statement.raw({ selector: {} }, context);
 
     expect(result).toEqual(rows);
     expect(adapterMock.raw).toHaveBeenCalledWith(

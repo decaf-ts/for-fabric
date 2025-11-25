@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
-import { InternalError } from "@decaf-ts/db-decorators";
+import { Context, InternalError } from "@decaf-ts/db-decorators";
+import { ERC20Wallet } from "../../src/contracts/erc20/models";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
@@ -63,8 +64,23 @@ describe("FabricClientAdapter", () => {
       `adapter-${Math.random().toString(36).slice(2)}`
     );
     attachLoggerSpies(adapter);
-    return adapter;
+  return adapter;
+};
+
+const createContext = () => {
+  const ctx = new Context();
+  const logger = {
+    for: jest.fn().mockReturnThis(),
+    clear: jest.fn().mockReturnThis(),
+    info: jest.fn(),
+    error: jest.fn(),
+    verbose: jest.fn(),
+    debug: jest.fn(),
   };
+  ctx.accumulate({ logger } as any);
+  return ctx;
+};
+
 
   it("decodes Uint8Array payloads", () => {
     const adapter = newAdapter();
@@ -80,13 +96,17 @@ describe("FabricClientAdapter", () => {
 
   it("rejects mismatched ids and models on createAll", async () => {
     const adapter = newAdapter();
+    const context = createContext();
     await expect(
-      adapter.createAll("erc20_wallets", ["wallet-1"], [], {})
+      adapter.createAll(ERC20Wallet, ["wallet-1"], [], {}, context)
     ).rejects.toThrow(InternalError);
   });
 
   it("parses createAll results", async () => {
     const adapter = newAdapter();
+    (adapter as any).serializer = {
+      serialize: jest.fn(() => JSON.stringify({ id: "wallet-1", balance: 33 })),
+    };
     jest
       .spyOn(adapter as any, "submitTransaction")
       .mockResolvedValue(
@@ -95,11 +115,14 @@ describe("FabricClientAdapter", () => {
         )
       );
 
+    const context = createContext();
+
     const result = await adapter.createAll(
-      "erc20_wallets",
+      ERC20Wallet,
       ["wallet-1"],
-      [{ id: "wallet-1", balance: 33 }],
-      {}
+      [new ERC20Wallet({ id: "wallet-1", balance: 33 })],
+      {},
+      context
     );
 
     expect(result).toEqual([{ id: "wallet-1", balance: 33 }]);
@@ -114,7 +137,11 @@ describe("FabricClientAdapter", () => {
       .spyOn(FabricClientAdapter as unknown as any, "parseError")
       .mockReturnValue(new Error("parsed"));
 
-    await expect(adapter.raw({ selector: {} }, true)).rejects.toThrow("parsed");
+    const context = createContext();
+
+    await expect(
+      adapter.raw({ selector: {} }, true, context)
+    ).rejects.toThrow("parsed");
   });
 
   it("caches gRPC clients", () => {

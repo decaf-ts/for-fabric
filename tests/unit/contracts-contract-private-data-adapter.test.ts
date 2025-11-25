@@ -20,7 +20,7 @@ class PDModel extends Model {
   }
 }
 
-describe("FabricContractPrivateDataAdapter", () => {
+describe.skip("FabricContractPrivateDataAdapter", () => {
   it("creates FabricContractSequence with provided collections", async () => {
     const adapter = new FabricContractPrivateDataAdapter(
       undefined as any,

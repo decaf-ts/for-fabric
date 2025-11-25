@@ -181,7 +181,9 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    *   FabricDispatch->>Observers: updateObservers(table, event, payload.id)
    *   Observers-->>FabricDispatch: Callbacks executed
    */
-  protected async handleEvents(): Promise<void> {
+  protected async handleEvents(
+    ctxArg?: FabricClientContext
+  ): Promise<void> {
     if (!this.listeningStack)
       throw new InternalError(
         `Event stack not initialized. Ensure that "startListening" is called before attempting this operation.`
@@ -190,7 +192,16 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
     if (!this.adapter || !this.adapter.config)
       throw new InternalError(`No adapter found. should be impossible`);
 
-    const { log, ctx } = this.logCtx([], this.handleEvents);
+    const ctx =
+      ctxArg ||
+      (await this.adapter.context(
+        OperationKeys.READ,
+        {
+          correlationId: this.adapter.config.chaincodeName,
+        },
+        (this.models && this.models[0]) || Model as unknown as Constructor
+      ));
+    const log = this.log.for(this.handleEvents);
 
     log.info(
       `Listening for incoming events on chaincode "${this.adapter.config.chaincodeName}" on channel "${this.adapter.config.channel}"...`
@@ -202,10 +213,13 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
         if (owner && owner !== this.adapter.config?.mspId) continue;
         const payload: { id: string } = this.parsePayload(evt.payload);
         try {
+          const targetModel = table
+            ? Model.get(table)
+            : Model.get(this.models[0].name);
+          const modelRef =
+            targetModel ?? (table || this.models[0]?.name);
           await this.updateObservers(
-            (table
-              ? Model.get(table)
-              : Model.get(this.models[0].name)) as Constructor,
+            modelRef as Constructor | string,
             event,
             payload.id as string,
             ctx
