@@ -177,7 +177,7 @@ export async function segregatedDataOnCreate<M extends Model>(
     // await this.saveToCollection(context, collection, key, model[key]);
   }
 
-  const { private, shared } = Model.segregate(model);
+  Model.segregate(model);
 }
 
 export async function segregatedDataOnRead<M extends Model>(

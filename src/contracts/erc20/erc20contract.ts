@@ -10,6 +10,7 @@ import { FabricContractAdapter } from "../ContractAdapter";
 import { Allowance, ERC20Token, ERC20Wallet } from "./models";
 import { Owner } from "../../shared/decorators";
 import { FabricContractRepository } from "../FabricContractRepository";
+import type { FabricContractContext } from "../ContractContext";
 import {
   BaseError,
   InternalError,
@@ -175,13 +176,18 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
    * @returns {Boolean} Return whether the transfer was successful or not
    */
   @Transaction()
-  async Transfer(ctx: Context, to: string, value: number): Promise<boolean> {
+  async Transfer(
+    context: Context,
+    to: string,
+    value: number
+  ): Promise<boolean> {
     // Check contract options are already set first to execute the function
-    await this.CheckInitialized(ctx);
+    await this.CheckInitialized(context);
+    const { ctx } = await this.logCtx([context], this.Transfer);
 
-    const from = ctx.clientIdentity.getID();
+    const from = ctx.identity.getID();
 
-    const transferResp = await this._transfer(ctx, from, to, value);
+    const transferResp = await this._transfer(from, to, value, ctx);
     if (!transferResp) {
       throw new InternalError("Failed to transfer");
     }
@@ -200,19 +206,20 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
    */
   @Transaction()
   async TransferFrom(
-    ctx: Context,
+    context: Context,
     from: string,
     to: string,
     value: number
   ): Promise<boolean> {
     // Check contract options are already set first to execute the function
-    await this.CheckInitialized(ctx);
+    await this.CheckInitialized(context);
+    const { ctx } = await this.logCtx([context], this.BurnFrom);
 
     // Retrieve the allowance of the spender
 
-    const spender = ctx.clientIdentity.getID();
+    const spender = ctx.identity.getID();
 
-    const allowance = await this._getAllowance(ctx, from, spender);
+    const allowance = await this._getAllowance(from, spender, ctx);
     if (!allowance || allowance.value < 0) {
       throw new AllowanceError(
         `spender ${spender} has no allowance from ${from}`
@@ -237,7 +244,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     await this.allowanceRepository.update(newAllowance, ctx);
 
     //Realize the transfer
-    const transferResp = await this._transfer(ctx, from, to, value);
+    const transferResp = await this._transfer(from, to, value, ctx);
     if (!transferResp) {
       throw new InternalError("Failed to transfer");
     }
@@ -245,8 +252,13 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     return true;
   }
 
-  async _transfer(ctx: Context, from: string, to: string, value: number) {
-    const logger = this.logFor(ctx).for(this._transfer);
+  async _transfer(
+    from: string,
+    to: string,
+    value: number,
+    ctx: FabricContractContext
+  ) {
+    const log = ctx.logger;
 
     if (from === to) {
       throw new AuthorizationError(
@@ -283,7 +295,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
           toWallet = new ERC20Wallet({
             id: to,
             balance: 0,
-            token: await this.TokenName(ctx),
+            token: await this.TokenName(ctx as any),
           });
           newToWallet = true;
         } else {
@@ -318,11 +330,16 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     // Emit the Transfer event
     const transferEvent = { from, to, value: value };
-    const eventHandler =
-      this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
-    eventHandler
-      .updateObservers("", ERC20Events.TRANSFER, "", transferEvent, ctx)
-      .catch((e) => lo);
+
+    this.repo
+      .refresh(
+        ERC20Token as any,
+        ERC20Events.TRANSFER,
+        "",
+        transferEvent,
+        ctx as unknown as FabricContractContext
+      )
+      .catch((e) => log.error(`Failed to notify transfer: ${e}`));
 
     return true;
   }
@@ -338,19 +355,19 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
    */
   @Transaction()
   async Approve(
-    ctx: Context,
+    context: Context,
     spender: string,
     value: number
   ): Promise<boolean> {
     // Check contract options are already set first to execute the function
-    await this.CheckInitialized(ctx);
-    const logger = this.logFor(ctx).for(this.Approve);
+    await this.CheckInitialized(context);
+    const { ctx, ctxArgs } = await this.logCtx([context], this.Approve);
 
-    const owner = ctx.clientIdentity.getID();
+    const owner = ctx.identity.getID();
 
-    let allowance = await this._getAllowance(ctx, owner, spender);
+    let allowance = await this._getAllowance(owner, spender, ctx);
 
-    const ownerWallet = await this.walletRepository.read(owner, ctx);
+    const ownerWallet = await this.walletRepository.read(owner, ...ctxArgs);
 
     if (ownerWallet.balance < value) {
       throw new BalanceError(`client account ${owner} has insufficient funds.`);
@@ -359,7 +376,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     if (allowance) {
       // Overwrite the allowance
       allowance.value = value;
-      await this.allowanceRepository.update(allowance, ctx);
+      await this.allowanceRepository.update(allowance, ...ctxArgs);
     } else {
       allowance = new Allowance({
         owner: owner,
@@ -367,21 +384,17 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
         value: value,
       });
 
-      await this.allowanceRepository.create(allowance, ctx);
+      await this.allowanceRepository.create(allowance, ...ctxArgs);
     }
 
     // Emit the Approval event
     const approvalEvent = { owner, spender, value: value };
-    const eventHandler =
-      this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
-    eventHandler.updateObservers(
-      logger,
-      "",
+    this.repo.refresh(
+      ERC20Token as any,
       ERC20Events.APPROVAL,
       "",
-      ctx,
-      "",
-      approvalEvent
+      approvalEvent,
+      ctx as unknown as FabricContractContext
     );
 
     return true;
@@ -395,16 +408,17 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
    * @param {String} spender The spender who are able to transfer the tokens
    * @returns {number} Return the amount of remaining tokens allowed to spent
    */
-  @Transaction()
+  @Transaction(false)
   async Allowance(
-    ctx: Context,
+    context: Context,
     owner: string,
     spender: string
   ): Promise<number> {
     // Check contract options are already set first to execute the function
-    await this.CheckInitialized(ctx);
+    await this.CheckInitialized(context);
+    const { ctx } = await this.logCtx([context], this.Allowance);
 
-    const allowance = await this._getAllowance(ctx, owner, spender);
+    const allowance = await this._getAllowance(owner, spender, ctx);
 
     if (!allowance) {
       throw new AllowanceError(
@@ -415,17 +429,19 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
   }
 
   async _getAllowance(
-    ctx: Context,
     owner: string,
-    spender: string
+    spender: string,
+    ctx: FabricContractContext
   ): Promise<Allowance> {
     const allowanceCondition = Condition.and(
       Condition.attribute<Allowance>("owner").eq(owner),
       Condition.attribute<Allowance>("spender").eq(spender)
     );
 
-    const select = await this.allowanceRepository.select();
-    const allowance = await select.where(allowanceCondition).execute(ctx);
+    const allowance = await this.allowanceRepository
+      .select()
+      .where(allowanceCondition)
+      .execute(ctx);
     return allowance?.[0];
   }
 
@@ -441,17 +457,17 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
    * @param {String} totalSupply The totalSupply of the token
    */
   @Transaction()
-  async Initialize(ctx: Context, token: ERC20Token) {
+  async Initialize(context: Context, token: ERC20Token) {
+    const { ctx } = await this.logCtx([context], this.Initialize);
     // Check contract options are not already set, client is not authorized to change them once intitialized
-    const select = await this.tokenRepository.select();
-    const tokens = await select.execute(ctx);
+    const tokens = await this.tokenRepository.select().execute(ctx);
     if (tokens.length > 0) {
       throw new AuthorizationError(
         "contract options are already set, client is not authorized to change them"
       );
     }
 
-    token.owner = ctx.clientIdentity.getID();
+    token.owner = ctx.identity.getID();
 
     await this.tokenRepository.create(token, ctx);
 
@@ -460,9 +476,9 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
   // Checks that contract options have been already initialized
   @Transaction(false)
-  async CheckInitialized(ctx: Context) {
-    const select = await this.tokenRepository.select();
-    const tokens = await select.execute(ctx);
+  async CheckInitialized(context: Context) {
+    const { ctx } = await this.logCtx([context], this.CheckInitialized);
+    const tokens = await this.tokenRepository.select().execute(ctx);
     if (tokens.length == 0) {
       throw new NotInitializedError(
         "contract options need to be set before calling any function, call Initialize() to initialize contract"
@@ -479,14 +495,14 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
    */
   @Owner()
   @Transaction()
-  async Mint(ctx: Context, amount: number): Promise<void> {
+  async Mint(context: Context, amount: number): Promise<void> {
     // Check contract options are already set first to execute the function
-    await this.CheckInitialized(ctx);
+    await this.CheckInitialized(context);
 
-    const logger = this.logFor(ctx).for(this.Mint);
+    const { ctx } = await this.logCtx([context], this.Mint);
 
     // Get ID of submitting client identity
-    const minter = ctx.clientIdentity.getID();
+    const minter = ctx.identity.getID();
 
     if (amount <= 0) {
       throw new ValidationError("mint amount must be a positive integer");
@@ -512,7 +528,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
           const newWallet = new ERC20Wallet({
             id: minter,
             balance: amount,
-            token: await this.TokenName(ctx),
+            token: await this.TokenName(context),
           });
           await this.walletRepository.create(newWallet, ctx);
         } else {
@@ -527,10 +543,13 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     const transferEvent = { from: "0x0", to: minter, value: amount };
     const eventHandler =
       this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
-    eventHandler.updateObservers(ERC20Token, ERC20Events.TRANSFER, "", [
+    eventHandler.updateObservers(
+      ERC20Token,
+      ERC20Events.TRANSFER,
+      "",
       transferEvent,
-      ctx,
-    ]);
+      ctx as unknown as FabricContractContext
+    );
   }
 
   /**
@@ -542,13 +561,13 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
    */
   @Owner()
   @Transaction()
-  async Burn(ctx: Context, amount: number): Promise<void> {
+  async Burn(context: Context, amount: number): Promise<void> {
     // Check contract options are already set first to execute the function
-    await this.CheckInitialized(ctx);
+    await this.CheckInitialized(context);
 
-    const logger = this.logFor(ctx).for(this.Burn);
+    const { log, ctx } = await this.logCtx([context], this.Burn);
 
-    const minter = ctx.clientIdentity.getID();
+    const minter = ctx.identity.getID();
 
     const minterWallet = await this.walletRepository.read(minter, ctx);
 
@@ -566,20 +585,18 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     await this.walletRepository.update(updatedminter, ctx);
 
-    logger.info(`${amount} tokens were burned`);
+    log.info(`${amount} tokens were burned`);
 
     // Emit the Transfer event
     const transferEvent = { from: minter, to: "0x0", value: amount };
     const eventHandler =
       this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
     eventHandler.updateObservers(
-      logger,
-      "",
+      ERC20Token,
       ERC20Events.TRANSFER,
       "",
-      ctx,
-      "",
-      transferEvent
+      transferEvent,
+      ctx as unknown as FabricContractContext
     );
   }
 
@@ -593,11 +610,15 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
    */
   @Owner()
   @Transaction()
-  async BurnFrom(ctx: Context, account: string, amount: number): Promise<void> {
+  async BurnFrom(
+    context: Context,
+    account: string,
+    amount: number
+  ): Promise<void> {
     // Check contract options are already set first to execute the function
-    await this.CheckInitialized(ctx);
+    await this.CheckInitialized(context);
 
-    const logger = this.logFor(ctx).for(this.BurnFrom);
+    const { log, ctx } = await this.logCtx([context], this.BurnFrom);
 
     const accountWallet = await this.walletRepository.read(account, ctx);
 
@@ -615,20 +636,18 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
 
     await this.walletRepository.update(updatedaccount, ctx);
 
-    logger.info(`${amount} tokens were berned from ${account}`);
+    log.info(`${amount} tokens were burned from ${account}`);
 
     // Emit the Transfer event
     const transferEvent = { from: account, to: "0x0", value: amount };
     const eventHandler =
       this.repo.ObserverHandler() as FabricContractRepositoryObservableHandler;
     eventHandler.updateObservers(
-      logger,
-      "",
+      ERC20Token,
       ERC20Events.TRANSFER,
       "",
-      ctx,
-      "",
-      transferEvent
+      transferEvent,
+      ctx as unknown as FabricContractContext
     );
   }
 
@@ -638,7 +657,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
    * @param {Context} ctx the transaction context
    * @returns {Number} Returns the account balance
    */
-  @Transaction()
+  @Transaction(false)
   async ClientAccountBalance(ctx: Context): Promise<number> {
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
@@ -658,13 +677,14 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
   // ClientAccountID returns the id of the requesting client's account.
   // In this implementation, the client account ID is the clientId itself.
   // Users can use this function to get their own account id, which they can then give to others as the payment address
-  @Transaction()
-  async ClientAccountID(ctx: Context) {
+  @Transaction(false)
+  async ClientAccountID(context: Context) {
     // Check contract options are already set first to execute the function
-    await this.CheckInitialized(ctx);
+    await this.CheckInitialized(context);
+    const { ctx } = await this.logCtx([context], this.ClientAccountID);
 
     // Get ID of submitting client identity
-    const clientAccountID = ctx.clientIdentity.getID();
+    const clientAccountID = ctx.identity.getID();
     return clientAccountID;
   }
 }

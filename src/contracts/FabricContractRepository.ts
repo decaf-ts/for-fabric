@@ -6,13 +6,13 @@ import {
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
-import { CouchDBAdapter } from "@decaf-ts/for-couchdb";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
 import { Context } from "fabric-contract-api";
 import { ContractLogger } from "./logging";
 import { Logging } from "@decaf-ts/logging";
 import { Constructor } from "@decaf-ts/decoration";
+import type { FabricContractAdapter } from "./ContractAdapter";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -80,10 +80,10 @@ import { Constructor } from "@decaf-ts/decoration";
  */
 export class FabricContractRepository<M extends Model> extends Repository<
   M,
-  CouchDBAdapter<any, void, FabricContractContext>
+  FabricContractAdapter
 > {
   constructor(
-    adapter?: CouchDBAdapter<any, void, FabricContractContext>,
+    adapter?: FabricContractAdapter,
     clazz?: Constructor<M>,
     protected trackedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
   ) {
@@ -114,7 +114,6 @@ export class FabricContractRepository<M extends Model> extends Repository<
    * @return {ObserverHandler} The observer handler
    */
   override ObserverHandler(): ObserverHandler {
-    this.select().execute();
     return new FabricContractRepositoryObservableHandler();
   }
 

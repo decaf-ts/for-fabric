@@ -1,9 +1,4 @@
-import {
-  CouchDBAdapter,
-  CouchDBKeys,
-  CouchDBRepository,
-  MangoQuery,
-} from "@decaf-ts/for-couchdb";
+import { CouchDBAdapter, CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
 import { list, Model, required, type } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
@@ -44,9 +39,10 @@ import {
   JoinTableOptions,
   JoinTableMultipleColumnsOptions,
   relation,
-  ContextualArgs,
   PreparedModel,
+  Repository,
 } from "@decaf-ts/core";
+import type { ContextualArgs, MaybeContextualArg } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
   ChaincodeStub,
@@ -276,9 +272,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @return {Constructor<Repository<M, MangoQuery, FabricContractAdapter, FabricContractFlags, FabricContractContext>>} The repository constructor
    */
   override repository<
-    R extends CouchDBRepository<
+    R extends Repository<
       any,
-      CouchDBAdapter<any, void, FabricContractContext>
+      Adapter<any, void, MangoQuery, FabricContractContext>
     >,
   >(): Constructor<R> {
     return FabricContractRepository as unknown as Constructor<R>;
@@ -654,12 +650,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ctx: Ctx | FabricContractContext,
     ...args: any[]
   ): Promise<FabricContractFlags> {
+    const { log } = this.logCtx([ctx as FabricContractContext], this.flags);
     return Object.assign(await super.flags(operation, model, flags, ...args), {
       stub: ctx.stub,
       identity: ((ctx as Ctx).clientIdentity ??
         (ctx as FabricContractContext).identity!) as ClientIdentity,
-      logger:
-        (ctx as FabricContractContext).logger ?? this.logFor([ctx] as Ctx),
+      logger: (ctx as FabricContractContext).logger ?? log,
       correlationId: ctx.stub.getTxID(),
     });
   }
@@ -768,10 +764,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
    */
   async raw<R>(
     rawInput: MangoQuery,
-    docsOnly: boolean,
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<R> {
-    const { ctx, log } = this.logCtx(args, this.raw);
+    const ctxArgs = [...(args as unknown as any[])];
+    const docsOnly =
+      typeof ctxArgs[0] === "boolean" ? (ctxArgs.shift() as boolean) : false;
+    const { ctx, log } = this.logCtx(
+      ctxArgs as ContextualArgs<FabricContractContext>,
+      this.raw
+    );
     const { stub } = ctx;
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
@@ -925,28 +926,40 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
-    ...args: [...any, FabricContractContext]
+    ...args: MaybeContextualArg<FabricContractContext>
   ) {
     const { ctxArgs } = this.logCtx(args, this.createPrefix);
     const record: Record<string, any> = {};
     record[CouchDBKeys.TABLE] = Model.tableName(tableName);
     Object.assign(record, model);
 
-    return [tableName, id, record, ...ctxArgs];
+    return [tableName, id, record, ...ctxArgs] as [
+      Constructor<M>,
+      PrimaryKeyType,
+      Record<string, any>,
+      ...any[],
+      FabricContractContext,
+    ];
   }
 
   override updatePrefix<M extends Model>(
     tableName: Constructor<M>,
-    id: string | number,
+    id: PrimaryKeyType,
     model: Record<string, any>,
-    ...args: [...any, FabricContractContext]
-  ): (string | number | Record<string, any>)[] {
-    const ctx: FabricContractContext = args.pop();
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): any[] {
+    const { ctxArgs } = this.logCtx(args, this.updatePrefix);
     const record: Record<string, any> = {};
     record[CouchDBKeys.TABLE] = Model.tableName(tableName);
     Object.assign(record, model);
 
-    return [tableName, id, record, ctx];
+    return [tableName, id, record, ...ctxArgs] as [
+      Constructor<M>,
+      PrimaryKeyType,
+      Record<string, any>,
+      ...any[],
+      FabricContractContext,
+    ];
   }
 
   protected override createAllPrefix<M extends Model>(

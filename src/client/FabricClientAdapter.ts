@@ -6,7 +6,7 @@ import {
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
 import { Model, type Serializer } from "@decaf-ts/decorator-validation";
-import { debug, final } from "@decaf-ts/logging";
+import { debug, final, Logging } from "@decaf-ts/logging";
 import { type FabricFlags, type PeerConfig } from "../shared/types";
 import {
   connect,
@@ -20,29 +20,25 @@ import {
 import { getIdentity, getSigner } from "./fabric-fs";
 import {
   BaseError,
-  Context,
   InternalError,
   OperationKeys,
   SerializationError,
   BulkCrudOperationKeys,
-  PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
+import type { Context, PrimaryKeyType } from "@decaf-ts/db-decorators";
 import {
   Adapter,
-  ContextualArgs,
-  MaybeContextualArg,
   PersistenceKeys,
-  pk,
   PreparedModel,
   Repository,
 } from "@decaf-ts/core";
+import type { ContextualArgs, MaybeContextualArg } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import type { FabricClientDispatch } from "./FabricClientDispatch";
 import { HSMSignerFactoryCustom } from "./fabric-hsm";
 import { type Constructor } from "@decaf-ts/decoration";
-import tableName = module;
 
 export type FabricClientContext = Context<FabricFlags>;
 /**
@@ -108,6 +104,8 @@ export class FabricClientAdapter extends CouchDBAdapter<
 
   private static serializer = new ClientSerializer();
 
+  protected static log = Logging.for(FabricClientAdapter);
+
   protected readonly serializer: Serializer<any> =
     FabricClientAdapter.serializer;
 
@@ -131,13 +129,13 @@ export class FabricClientAdapter extends CouchDBAdapter<
     return FabricClientAdapter.decoder.decode(data);
   }
 
-  override repository(): Constructor<
-    Repository<
+  override repository<
+    R extends Repository<
       any,
-      Adapter<PeerConfig, Client, MangoQuery, Context<FabricFlags>>
-    >
-  > {
-    return FabricClientRepository;
+      Adapter<PeerConfig, Client, MangoQuery, FabricClientContext>
+    >,
+  >(): Constructor<R> {
+    return FabricClientRepository as unknown as Constructor<R>;
   }
 
   /**
@@ -153,12 +151,16 @@ export class FabricClientAdapter extends CouchDBAdapter<
     clazz: Constructor<M>,
     ids: PrimaryKeyType[],
     models: Record<string, any>[],
-    transient: Record<string, any>,
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>[]> {
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
-    const { log } = this.logCtx(args, this.createAll);
+    const ctxArgs = [...(args as unknown as any[])];
+    const transient = ctxArgs.shift() as Record<string, any>;
+    const { log } = this.logCtx(
+      ctxArgs as ContextualArgs<FabricClientContext>,
+      this.createAll
+    );
     const tableName = Model.tableName(clazz);
 
     log.info(`adding ${ids.length} entries to ${tableName} table`);
@@ -220,12 +222,16 @@ export class FabricClientAdapter extends CouchDBAdapter<
     clazz: Constructor<M>,
     ids: PrimaryKeyType[],
     models: Record<string, any>[],
-    transient: Record<string, any>,
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>[]> {
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
-    const { log } = this.logCtx(args, this.updateAll);
+    const ctxArgs = [...(args as unknown as any[])];
+    const transient = ctxArgs.shift() as Record<string, any>;
+    const { log } = this.logCtx(
+      ctxArgs as ContextualArgs<FabricClientContext>,
+      this.updateAll
+    );
     const tableName = Model.tableName(clazz);
     log.info(`updating ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
@@ -397,10 +403,14 @@ export class FabricClientAdapter extends CouchDBAdapter<
     clazz: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
-    transient: Record<string, any>,
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>> {
-    const { log } = this.logCtx(args, this.create);
+    const ctxArgs = [...(args as unknown as any[])];
+    const transient = (ctxArgs.shift() as Record<string, any>) || {};
+    const { log } = this.logCtx(
+      ctxArgs as ContextualArgs<FabricClientContext>,
+      this.create
+    );
     const tableName = Model.tableName(clazz);
     log.verbose(`adding entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
@@ -473,10 +483,14 @@ export class FabricClientAdapter extends CouchDBAdapter<
     clazz: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
-    transient: Record<string, any>,
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>> {
-    const { log } = this.logCtx(args, this.updateAll);
+    const ctxArgs = [...(args as unknown as any[])];
+    const transient = (ctxArgs.shift() as Record<string, any>) || {};
+    const { log } = this.logCtx(
+      ctxArgs as ContextualArgs<FabricClientContext>,
+      this.updateAll
+    );
     const tableName = Model.tableName(clazz);
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
@@ -499,12 +513,13 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   @debug()
   @final()
-  async delete(
-    tableName: string,
-    id: string | number
+  override async delete<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    ...args: ContextualArgs<FabricClientContext>
   ): Promise<Record<string, any>> {
-    const log = this.log.for(this.delete);
-    if (typeof tableName !== "string") tableName = (tableName as any).name;
+    const { log } = this.logCtx(args, this.delete);
+    const tableName = Model.tableName(clazz);
     log.verbose(`deleting entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
@@ -512,7 +527,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
       [id.toString()],
       undefined,
       undefined,
-      tableName
+      clazz.name
     );
     return this.serializer.deserialize(this.decode(result));
   }
@@ -543,12 +558,25 @@ export class FabricClientAdapter extends CouchDBAdapter<
    *   FabricAdapter-->>Client: processed result
    */
   @debug()
-  async raw<V>(
+  override async raw<V>(
     rawInput: MangoQuery,
-    process: boolean,
-    tableName?: string
+    ...args: ContextualArgs<FabricClientContext>
   ): Promise<V> {
-    const log = this.log.for(this.raw);
+    const ctxArgs = [...(args as unknown as any[])];
+    if (typeof ctxArgs[0] === "boolean") {
+      ctxArgs.shift();
+    }
+    let tableName: string | Constructor<any> | undefined;
+    if (
+      ctxArgs.length &&
+      (typeof ctxArgs[0] === "string" || typeof ctxArgs[0] === "function")
+    ) {
+      tableName = ctxArgs.shift();
+    }
+    const { log } = this.logCtx(
+      ctxArgs as ContextualArgs<FabricClientContext>,
+      this.raw
+    );
     log.info(`Performing raw  query on table`);
     log.debug(`processing raw input for query: ${JSON.stringify(rawInput)}`);
     let input: string;
@@ -561,7 +589,8 @@ export class FabricClientAdapter extends CouchDBAdapter<
     }
     let transactionResult: any;
     try {
-      if (typeof tableName !== "string") tableName = (tableName as any).name;
+      if (typeof tableName !== "string")
+        tableName = (tableName as Constructor<any> | undefined)?.name;
       transactionResult = await this.evaluateTransaction(
         "query",
         [input],
@@ -708,8 +737,11 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string} [reason] - Optional reason for the error
    * @return {BaseError} The parsed error
    */
-  override parseError(err: Error | string, reason?: string): BaseError {
-    return FabricClientAdapter.parseError(err, reason);
+  override parseError<E extends BaseError>(
+    err: Error | string,
+    reason?: string
+  ): E {
+    return FabricClientAdapter.parseError<E>(err, reason);
   }
 
   /**
@@ -811,7 +843,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @return {Network} The Network instance
    */
   static getNetwork(gateway: Gateway, channelName: string): Network {
-    const log = this.log.for(this.getNetwork);
+    const log = Logging.for(this.getNetwork);
     let network: Network;
     try {
       log.debug(`Connecting to channel ${channelName}`);
@@ -880,7 +912,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    *   FabricAdapter-->>Caller: gateway
    */
   static async getConnection(client: Client, config: PeerConfig) {
-    const log = this.log.for(this.getConnection);
+    const log = Logging.for(this.getConnection);
     log.debug(
       `Retrieving Peer Identity for ${config.mspId} under ${config.certCertOrDirectoryPath}`
     );
@@ -965,11 +997,12 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string} [reason] - Optional reason for the error
    * @return {BaseError} The parsed error
    */
-  protected static override parseError(
+  protected static override parseError<E extends BaseError>(
     err: Error | string,
     reason?: string
-  ): BaseError {
-    return super.parseError(err, reason);
+  ): E {
+    // TODO
+    return super.parseError(err, reason) as E;
   }
 }
 

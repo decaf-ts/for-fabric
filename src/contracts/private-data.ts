@@ -1,6 +1,5 @@
 import { InternalError, SerializationError } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
-import { Repository } from "@decaf-ts/core";
 import { FabricModelKeys } from "../shared/constants";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
 
@@ -18,7 +17,10 @@ export function processModel<M extends Model>(adapter: any, model: M) {
     return Object.entries(model).reduce(
       (accum: Record<string, any>, [key, val]) => {
         if (typeof val === "undefined") return accum;
-        const mappedProp = Repository.column(model, key);
+        const mappedProp = Model.columnName(
+          model.constructor as Constructor,
+          key as any
+        );
         if (adapter.isReserved(mappedProp))
           throw new InternalError(`Property name ${mappedProp} is reserved`);
         accum[mappedProp] = val;

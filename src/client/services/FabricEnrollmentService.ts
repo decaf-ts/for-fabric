@@ -26,7 +26,7 @@ import {
   IdentityResponse,
 } from "../../shared/fabric-types";
 import { RegistrationError } from "../../shared/errors";
-import { LoggedClass } from "@decaf-ts/logging";
+import { LoggedClass, Logging } from "@decaf-ts/logging";
 
 /**
  * @description Hyperledger Fabric CA identity types.
@@ -365,7 +365,9 @@ export class FabricEnrollmentService extends LoggedClass {
     mspId: string
   ): Identity {
     const { certificate, key, rootCertificate } = enrollment;
-    const log = this.log.for(this.identityFromEnrollment);
+    const log = Logging.for(FabricEnrollmentService, {}).for(
+      this.identityFromEnrollment
+    );
     log.debug(
       `Generating Identity from certificate ${certificate} in msp ${mspId}`
     );

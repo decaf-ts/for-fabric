@@ -1,15 +1,19 @@
 import { FabricContractAdapter } from "../ContractAdapter";
 import { Context, Contract, Context as Ctx } from "fabric-contract-api";
 import { Model, Serializer } from "@decaf-ts/decorator-validation";
-import { Repository } from "@decaf-ts/core";
+import { ContextualizedArgs, LoggerOf, Repository } from "@decaf-ts/core";
 import { FabricContractRepository } from "../FabricContractRepository";
 import { DeterministicSerializer } from "../../shared/DeterministicSerializer";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { Checkable, healthcheck } from "../../shared/interfaces/Checkable";
-import { ContractLogger } from "../logging";
-import { Logging } from "@decaf-ts/logging";
 import { Constructor } from "@decaf-ts/decoration";
 import { FabricContractContext } from "../ContractContext";
+import {
+  BulkCrudOperationKeys,
+  InternalError,
+  OperationKeys,
+} from "@decaf-ts/db-decorators";
+import { FabricFlags } from "../../shared/index";
 
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode
@@ -87,20 +91,6 @@ export abstract class FabricCrudContract<M extends Model>
     super(name);
     this.repo = Repository.forModel(clazz);
   }
-  //
-  // /**
-  //  * @description Creates a logger for a specific chaincode context
-  //  * @summary Returns a ContractLogger instance configured for the current context
-  //  * @param {Ctx} ctx - The Fabric chaincode context
-  //  * @return {ContractLogger} The logger instance
-  //  */
-  // public logFor(ctx: Context): ContractLogger {
-  //   return Logging.for(FabricCrudContract.name, {}, ctx) as ContractLogger;
-  // }
-
-  protected logCtx(ctx: Context, op: string) {
-    return FabricCrudContract.adapter.context();
-  }
 
   /**
    * @description Creates a single model in the state database
@@ -115,18 +105,18 @@ export abstract class FabricCrudContract<M extends Model>
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
-    const log = this.logFor(ctx).for(this.create);
+    const { log, ctxArgs } = await this.logCtx([...args, ctx], this.create);
 
-    if (typeof model === "string") model = this.deserialize<M>(model) as any;
+    if (typeof model === "string") model = this.deserialize<M>(model) as M;
 
     log.info(`Creating model: ${JSON.stringify(model)}`);
 
     const transient = this.getTransientData(ctx);
 
     log.info(`Merging transient data...`);
-    model = (this.repo as any).merge(model as M, transient);
+    model = Model.merge(model, transient, this.clazz) as M;
 
-    return this.repo.create(model as unknown as M, ctx, ...args);
+    return this.repo.create(model, ...ctxArgs);
   }
 
   /**
@@ -142,11 +132,11 @@ export abstract class FabricCrudContract<M extends Model>
     key: string | number,
     ...args: any[]
   ): Promise<M | string> {
-    const log = this.logFor(ctx).for(this.read);
+    const { log, ctxArgs } = await this.logCtx([...args, ctx], this.read);
 
     log.info(`reading entry with pk ${key} `);
 
-    return this.repo.read(key, ctx, ...args);
+    return this.repo.read(key, ...ctxArgs);
   }
 
   protected getTransientData(ctx: Ctx): any {
@@ -177,18 +167,17 @@ export abstract class FabricCrudContract<M extends Model>
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
-    const log = this.logFor(ctx).for(this.update);
+    const { log, ctxArgs } = await this.logCtx([...args, ctx], this.update);
 
-    if (typeof model === "string") model = this.deserialize<M>(model) as any;
+    if (typeof model === "string") model = this.deserialize<M>(model) as M;
 
     log.info(`Updating model: ${JSON.stringify(model)}`);
 
     const transient = this.getTransientData(ctx);
 
     log.info(`Merging transient data...`);
-    model = (this.repo as any).merge(model as M, transient);
-
-    return this.repo.update(model as unknown as M, ctx, ...args);
+    model = Model.merge(model, transient, this.clazz) as M;
+    return this.repo.update(model, ...ctxArgs);
   }
 
   /**
@@ -204,9 +193,9 @@ export abstract class FabricCrudContract<M extends Model>
     key: string | number,
     ...args: any[]
   ): Promise<M | string> {
-    const log = this.logFor(ctx).for(this.delete);
+    const { log, ctxArgs } = await this.logCtx([...args, ctx], this.delete);
     log.info(`deleting entry with pk ${key} `);
-    return this.repo.delete(String(key), ctx, ...args);
+    return this.repo.delete(String(key), ...ctxArgs);
   }
 
   /**
@@ -222,8 +211,9 @@ export abstract class FabricCrudContract<M extends Model>
     keys: string | string[] | number[],
     ...args: any[]
   ): Promise<M[] | string> {
+    const { ctxArgs } = await this.logCtx([...args, ctx], this.readAll);
     if (typeof keys === "string") keys = JSON.parse(keys) as string[];
-    return this.repo.deleteAll(keys, ctx, ...args);
+    return this.repo.deleteAll(keys, ...ctxArgs);
   }
 
   /**
@@ -239,8 +229,9 @@ export abstract class FabricCrudContract<M extends Model>
     keys: string | string[] | number[],
     ...args: any[]
   ): Promise<M[] | string> {
+    const { ctxArgs } = await this.logCtx([...args, ctx], this.readAll);
     if (typeof keys === "string") keys = JSON.parse(keys) as string[];
-    return this.repo.readAll(keys, ctx, ...args);
+    return this.repo.readAll(keys, ...ctxArgs);
   }
 
   /**
@@ -256,14 +247,14 @@ export abstract class FabricCrudContract<M extends Model>
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    const log = this.logFor(ctx).for(this.updateAll);
+    const { log, ctxArgs } = await this.logCtx([...args, ctx], this.updateAll);
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
         .map((m) => this.deserialize(m))
         .map((m) => new this.clazz(m)) as any;
 
     log.info(`updating ${models.length} entries to the table`);
-    return this.repo.updateAll(models as unknown as M[], ctx, ...args);
+    return this.repo.updateAll(models as unknown as M[], ...ctxArgs);
   }
 
   /**
@@ -276,14 +267,15 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<any>} Promise resolving to the query results
    */
   async raw(
-    ctx: Ctx,
+    ctx: Ctx | FabricContractContext,
     rawInput: MangoQuery | string,
     docsOnly: boolean,
     ...args: any[]
   ): Promise<any | string> {
+    const { ctxArgs } = await this.logCtx([...args, ctx], this.raw);
     if (typeof rawInput === "string")
       rawInput = JSON.parse(rawInput) as MangoQuery;
-    return this.repo.raw(rawInput, docsOnly, ctx, ...args);
+    return FabricCrudContract.adapter.raw(rawInput, docsOnly, ...ctxArgs);
   }
 
   protected serialize(model: M): string {
@@ -297,14 +289,14 @@ export abstract class FabricCrudContract<M extends Model>
   }
 
   protected async init(ctx: Ctx): Promise<void> {
-    const log = this.logFor(ctx).for(this.init);
+    const { log } = await this.logCtx([ctx], this.init);
     log.info(`Running contract initialization...`);
     this.initialized = true;
     log.info(`Contract initialization completed.`);
   }
 
   async healthcheck(ctx: Ctx): Promise<string | healthcheck> {
-    const log = this.logFor(ctx).for(this.healthcheck);
+    const { log } = await this.logCtx([ctx], this.healthcheck);
     log.info(`Running Healthcheck: ${this.initialized}...`);
     return { healthcheck: this.initialized };
   }
@@ -322,7 +314,7 @@ export abstract class FabricCrudContract<M extends Model>
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    const log = this.logFor(ctx).for(this.createAll);
+    const { log } = await this.logCtx([...args, ctx], this.createAll);
 
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
@@ -331,5 +323,77 @@ export abstract class FabricCrudContract<M extends Model>
 
     log.info(`adding ${models.length} entries to the table`);
     return this.repo.createAll(models as unknown as M[], ctx, ...args);
+  }
+
+  protected async logCtx<ARGS extends any[]>(
+    args: ARGS,
+    method: ((...args: any[]) => any) | string
+  ): Promise<ContextualizedArgs<FabricContractContext, ARGS>> {
+    return FabricCrudContract.logCtx(args, method as any);
+  }
+
+  protected static logCtx<ARGS extends any[]>(
+    this: any,
+    args: ARGS,
+    method: string
+  ): Promise<ContextualizedArgs<FabricContractContext, ARGS>>;
+  protected static logCtx<ARGS extends any[]>(
+    this: any,
+    args: ARGS,
+    method: (...args: any[]) => any
+  ): Promise<ContextualizedArgs<FabricContractContext, ARGS>>;
+  protected static async logCtx<ARGS extends any[]>(
+    this: any,
+    args: ARGS,
+    method: ((...args: any[]) => any) | string
+  ): Promise<ContextualizedArgs<FabricContractContext, ARGS>> {
+    if (args.length < 1) throw new InternalError("No context provided");
+    const ctx = args.pop() as FabricContractContext | Context;
+    if (ctx instanceof FabricContractContext)
+      return {
+        ctx,
+        log: ctx.logger.clear().for(this).for(method),
+        ctxArgs: [...args, ctx],
+      };
+    if (!(ctx instanceof Context))
+      throw new InternalError("No valid context provided");
+
+    function getOp() {
+      if (typeof method === "string") return method;
+      switch (method.name) {
+        case OperationKeys.CREATE:
+        case OperationKeys.READ:
+        case OperationKeys.UPDATE:
+        case OperationKeys.DELETE:
+        case BulkCrudOperationKeys.CREATE_ALL:
+        case BulkCrudOperationKeys.READ_ALL:
+        case BulkCrudOperationKeys.UPDATE_ALL:
+        case BulkCrudOperationKeys.DELETE_ALL:
+          return method.name;
+        default:
+          throw new InternalError(
+            `Unable to convert ${method.name} to an operation`
+          );
+      }
+    }
+
+    const context = await FabricCrudContract.adapter.context(
+      getOp(),
+      this.clazz,
+      {
+        correlationId: ctx.stub.getTxID(),
+      } as any,
+      ctx
+    );
+    const log = (
+      this
+        ? context.logger.for(this).for(method)
+        : context.logger.clear().for(this).for(method)
+    ) as LoggerOf<FabricContractContext>;
+    return {
+      ctx: context,
+      log: log,
+      ctxArgs: [...args, context],
+    };
   }
 }

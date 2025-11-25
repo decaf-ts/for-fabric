@@ -9,8 +9,7 @@ import {
 } from "@decaf-ts/logging";
 import { LoggingConfig } from "@decaf-ts/logging";
 import { Context as Ctx } from "fabric-contract-api";
-import { FabricContractContext } from "./ContractContext";
-import { MissingContextError } from "../shared/errors";
+import { InternalError } from "@decaf-ts/db-decorators";
 
 /**
  * @description Logger implementation for Fabric chaincode contracts
@@ -51,19 +50,11 @@ export class ContractLogger extends MiniLogger {
   constructor(
     context: string,
     conf: Partial<LoggingConfig> | undefined,
-    ctx?: Ctx | FabricContractContext
+    ctx?: Ctx
   ) {
     super(context, conf);
-
-    if (!ctx) {
-      this.logger = new MiniLogger(context, conf);
-    } else if (ctx instanceof FabricContractContext) {
-      throw new MissingContextError(
-        "Receiving incorrect context... It should be the contract context!!!"
-      );
-    } else {
-      this.logger = ctx.logging.getLogger(context) as unknown as Logger;
-    }
+    if (!ctx) throw new InternalError(`Context not provided`);
+    this.logger = ctx.logging.getLogger(context) as unknown as Logger;
   }
 
   /**
@@ -103,7 +94,7 @@ export class ContractLogger extends MiniLogger {
         method = this.logger.silly;
         break;
       default:
-        throw new Error("Invalid log level");
+        throw new InternalError("Invalid log level");
     }
     method.call(this.logger, this.createLog(level, msg, stack));
   }
@@ -120,11 +111,15 @@ export class ContractLogger extends MiniLogger {
  * @memberOf module:fabric.contracts
  */
 const factory: LoggerFactory = (
-  object: string,
-  config: Partial<LoggingConfig> | undefined,
-  ctx: Ctx
+  object?: string,
+  config?: Partial<LoggingConfig>,
+  ctx?: Ctx
 ) => {
-  return new ContractLogger(object, config || {}, ctx as any);
+  return new ContractLogger(
+    object || ContractLogger.name,
+    config || {},
+    ctx as Ctx
+  );
 };
 
 // Set the factory as the default logger factory

@@ -1,19 +1,8 @@
-import {
-  Adapter,
-  ContextOf,
-  MaybeContextualArg,
-  Repository,
-} from "@decaf-ts/core";
+import { Repository } from "@decaf-ts/core";
+import type { FlagsOf } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
-import { MangoQuery } from "@decaf-ts/for-couchdb";
-import {
-  Context,
-  OperationKeys,
-  RepositoryFlags,
-} from "@decaf-ts/db-decorators";
-import { FabricFlags } from "../shared";
 import { Constructor } from "@decaf-ts/decoration";
-import { FabricContractContext } from "../contracts/index";
+import type { FabricClientAdapter } from "./FabricClientAdapter";
 
 /**
  * @description Repository implementation for Fabric client operations
@@ -45,17 +34,14 @@ import { FabricContractContext } from "../contracts/index";
  */
 export class FabricClientRepository<M extends Model> extends Repository<
   M,
-  Adapter<any, any, MangoQuery, Context<FabricFlags>>
+  FabricClientAdapter
 > {
-  override _overrides = {
+  override _overrides?: Partial<FlagsOf<FabricClientAdapter>> = {
     ignoreValidation: true,
     ignoreHandlers: true,
   };
 
-  constructor(
-    adapter: Adapter<any, any, MangoQuery, Context<FabricFlags>>,
-    clazz?: Constructor<M>
-  ) {
+  constructor(adapter?: FabricClientAdapter, clazz?: Constructor<M>) {
     super(adapter, clazz);
   }
 }

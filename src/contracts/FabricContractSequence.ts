@@ -4,12 +4,9 @@ import {
   NotFoundError,
   OperationKeys,
 } from "@decaf-ts/db-decorators";
-import {
-  Adapter,
-  MaybeContextualArg,
-  Repository,
-  SequenceOptions,
-} from "@decaf-ts/core";
+import { Repository, SequenceOptions } from "@decaf-ts/core";
+import type { Adapter, MaybeContextualArg } from "@decaf-ts/core";
+import type { MangoQuery } from "@decaf-ts/for-couchdb";
 import { Sequence } from "@decaf-ts/core";
 import { SequenceModel } from "../shared/model/Sequence";
 import { FabricContractRepository } from "./FabricContractRepository";
@@ -28,7 +25,7 @@ export class FabricContractSequence extends Sequence {
 
   constructor(
     options: SequenceOptions,
-    adapter: Adapter<any, void, FabricContractContext>
+    adapter: Adapter<any, any, MangoQuery, FabricContractContext>
   ) {
     super(options, adapter);
     this.repo = Repository.forModel(SequenceModel, adapter.alias) as any;

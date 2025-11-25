@@ -1,9 +1,7 @@
 import { FabricCrudContract } from "./crud-contract";
 import { Model } from "@decaf-ts/decorator-validation";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
-import { Context, Context as Ctx, Transaction } from "fabric-contract-api";
-import { ContractLogger } from "../logging";
-import { Logging } from "@decaf-ts/logging";
+import { Context as Ctx, Transaction } from "fabric-contract-api";
 import { Constructor } from "@decaf-ts/decoration";
 
 /**
@@ -25,19 +23,9 @@ export class SerializedCrudContract<
     super(name, clazz);
   }
 
-  /**
-   * @description Creates a logger for a specific chaincode context
-   * @summary Returns a ContractLogger instance configured for the current context
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @return {ContractLogger} The logger instance
-   */
-  public override logFor(ctx: Context): ContractLogger {
-    return Logging.for(SerializedCrudContract, {}, ctx) as ContractLogger;
-  }
-
   @Transaction()
   override async create(ctx: Ctx, model: string): Promise<string> {
-    const log = this.logFor(ctx).for(this.create);
+    const { log } = await this.logCtx([ctx], this.create);
     log.info(`Creating model: ${model}`);
 
     const m = this.deserialize<M>(model);
@@ -48,21 +36,21 @@ export class SerializedCrudContract<
 
   @Transaction(false)
   override async read(ctx: Ctx, key: string): Promise<string> {
-    const log = this.logFor(ctx).for(this.read);
+    const { log } = await this.logCtx([ctx], this.read);
     log.info(`Reading id: ${key}`);
     return this.serialize((await super.read(ctx, key)) as M);
   }
 
   @Transaction()
   override async update(ctx: Ctx, model: string): Promise<string> {
-    const log = this.logFor(ctx).for(this.update);
+    const { log } = await this.logCtx([ctx], this.update);
     log.info(`Updating model: ${model}`);
     return this.serialize((await super.update(ctx, model)) as M);
   }
 
   @Transaction()
   override async delete(ctx: Ctx, key: string): Promise<string> {
-    const log = this.logFor(ctx).for(this.delete);
+    const { log } = await this.logCtx([ctx], this.delete);
     log.info(`Deleting id: ${key}`);
     return this.serialize((await super.delete(ctx, key)) as M);
   }
@@ -70,7 +58,7 @@ export class SerializedCrudContract<
   @Transaction()
   override async deleteAll(ctx: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
-    const log = this.logFor(ctx).for(this.deleteAll);
+    const { log } = await this.logCtx([ctx], this.deleteAll);
 
     log.info(`deleting ${parsedKeys.length} entries from the table`);
 
@@ -85,7 +73,7 @@ export class SerializedCrudContract<
   override async readAll(ctx: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
 
-    const log = this.logFor(ctx).for(this.readAll);
+    const { log } = await this.logCtx([ctx], this.readAll);
     log.info(`reading ${parsedKeys.length} entries from the table`);
 
     return JSON.stringify(
@@ -97,7 +85,7 @@ export class SerializedCrudContract<
 
   @Transaction()
   override async updateAll(ctx: Ctx, models: string): Promise<string> {
-    const log = this.logFor(ctx).for(this.updateAll);
+    const { log } = await this.logCtx([ctx], this.updateAll);
     const list: string[] = JSON.parse(models);
     const modelList: M[] = list
       .map((m) => this.deserialize(m))
@@ -113,10 +101,11 @@ export class SerializedCrudContract<
 
   @Transaction(false)
   override async raw(
-    ctx: Ctx,
+    context: Ctx,
     rawInput: string,
     docsOnly: boolean
   ): Promise<any> {
+    const { ctx } = await this.logCtx([context], this.raw);
     const parsedInput: MangoQuery = JSON.parse(rawInput);
     return super.raw(ctx, parsedInput, docsOnly);
   }
@@ -133,8 +122,8 @@ export class SerializedCrudContract<
   }
 
   @Transaction()
-  override async createAll(ctx: Ctx, models: string): Promise<string> {
-    const log = this.logFor(ctx).for(this.createAll);
+  override async createAll(context: Ctx, models: string): Promise<string> {
+    const { log } = await this.logCtx([context], this.createAll);
     const list: string[] = JSON.parse(models);
     const modelList: M[] = list
       .map((m) => this.deserialize(m))
@@ -142,7 +131,7 @@ export class SerializedCrudContract<
 
     log.info(`Adding ${modelList.length} entries to the table`);
     return JSON.stringify(
-      ((await super.createAll(ctx, modelList)) as M[]).map(
+      ((await super.createAll(context, modelList)) as M[]).map(
         (m) => this.serialize(m) as string
       )
     );
