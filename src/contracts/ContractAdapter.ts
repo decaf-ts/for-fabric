@@ -327,20 +327,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     let model: Record<string, any>;
     try {
       const composedKey = stub.createCompositeKey(tableName, [String(id)]);
-
-      const results = await this.readState(composedKey, ctx);
-      log.info(JSON.stringify(results));
-      if (results.length < 1) {
-        log.debug(`No record found for id ${id} in ${tableName} table`);
-        throw new NotFoundError(
-          `No record found for id ${id} in ${tableName} table`
-        );
-      } else if (results.length < 2) {
-        log.info(`No record found for id ${id} in ${tableName} table`);
-        model = results.pop() as Record<string, any>;
-      } else {
-        model = this.mergeModels(results);
-      }
+      model = await this.readState(composedKey, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
