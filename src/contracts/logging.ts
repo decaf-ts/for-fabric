@@ -45,7 +45,7 @@ export class ContractLogger extends MiniLogger {
   /**
    * @description The underlying Fabric logger instance
    */
-  protected logger: Logger;
+  protected logger!: Logger;
 
   constructor(
     context: string,
@@ -53,11 +53,12 @@ export class ContractLogger extends MiniLogger {
     ctx?: Ctx
   ) {
     super(context, conf);
-    //
-    // if (!ctx) {
-    //   this.logger = new MiniLogger(context, conf);
-    if (!ctx) throw new InternalError(`Context not provided`);
-    this.logger = ctx.logging.getLogger(context) as unknown as Logger;
+
+    if (!ctx) {
+      this.logger = new MiniLogger(context, conf);
+    } else {
+      this.logger = ctx.logging.getLogger(context) as unknown as Logger;
+    }
   }
 
   /**
