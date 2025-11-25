@@ -13,7 +13,6 @@ import {
   InternalError,
   OperationKeys,
 } from "@decaf-ts/db-decorators";
-import { FabricFlags } from "../../shared/index";
 
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode
@@ -325,19 +324,19 @@ export abstract class FabricCrudContract<M extends Model>
     return this.repo.createAll(models as unknown as M[], ctx, ...args);
   }
 
-  protected async logCtx<ARGS extends any[]>(
+  async logCtx<ARGS extends any[]>(
     args: ARGS,
     method: ((...args: any[]) => any) | string
   ): Promise<ContextualizedArgs<FabricContractContext, ARGS>> {
-    return FabricCrudContract.logCtx(args, method as any);
+    return FabricCrudContract.logCtx.bind(this)(args, method as any);
   }
 
-  protected static logCtx<ARGS extends any[]>(
+  protected static async logCtx<ARGS extends any[]>(
     this: any,
     args: ARGS,
     method: string
   ): Promise<ContextualizedArgs<FabricContractContext, ARGS>>;
-  protected static logCtx<ARGS extends any[]>(
+  protected static async logCtx<ARGS extends any[]>(
     this: any,
     args: ARGS,
     method: (...args: any[]) => any
@@ -375,12 +374,14 @@ export abstract class FabricCrudContract<M extends Model>
       }
     }
 
+    const overrides = {
+      correlationId: ctx.stub.getTxID(),
+    };
+
     const context = await FabricCrudContract.adapter.context(
       getOp(),
+      overrides as any,
       this.clazz,
-      {
-        correlationId: ctx.stub.getTxID(),
-      } as any,
       ctx
     );
     const log = (

@@ -8,7 +8,6 @@
 export * from "./crud";
 export * from "./erc20";
 export * from "./ContractAdapter";
-export * from "./ContractPrivateDataAdapter";
 export * from "./ContractContext";
 export * from "./FabricContractRepository";
 export * from "./FabricContractRepositoryObservableHandler";

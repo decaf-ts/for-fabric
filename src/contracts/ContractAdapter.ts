@@ -25,7 +25,6 @@ import {
   Property as FabricProperty,
 } from "fabric-contract-api";
 import { Logger, Logging } from "@decaf-ts/logging";
-import { ContractLogger } from "./logging";
 import {
   PersistenceKeys,
   RelationsMetadata,
@@ -71,7 +70,7 @@ import {
   propMetadata,
   Metadata,
 } from "@decaf-ts/decoration";
-import { MISSING_PRIVATE_DATA_REGEX } from "./private-data";
+import { ContractLogger } from "./logging";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -240,24 +239,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
   private static textDecoder = new TextDecoder("utf8");
 
   protected static readonly serializer = new SimpleDeterministicSerializer();
-
-  /**
-   * @description Creates a logger for a specific chaincode context
-   * @summary Returns a ContractLogger instance configured for the current context
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @return {ContractLogger} The logger instance
-   */
-  public override logFor(ctx: Ctx | FabricContractContext): ContractLogger {
-    if ((ctx as FabricContractContext).logger)
-      return (ctx as FabricContractContext).logger as ContractLogger;
-    return Logging.for(
-      FabricContractAdapter,
-      {
-        correlationId: ctx.stub.getTxID(),
-      },
-      ctx
-    ) as ContractLogger;
-  }
 
   /**
    * @description Context constructor for this adapter
@@ -651,35 +632,34 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ...args: any[]
   ): Promise<FabricContractFlags> {
     const ensureLogger = (logger?: ContractLogger) => {
-      const base =
-        logger ??
-        (this.log.for(this.flags) as ContractLogger);
-      if (typeof base.clear !== "function")
-        (base as any).clear = () => base;
-      if (typeof base.for !== "function")
-        (base as any).for = () => base;
+      const base = logger ?? (this.log.for(this.flags) as ContractLogger);
+      if (typeof base.clear !== "function") (base as any).clear = () => base;
+      if (typeof base.for !== "function") (base as any).for = () => base;
       return base;
     };
     const fabricCtx =
       ctx instanceof FabricContractContext
         ? (ctx.accumulate({
             logger: ensureLogger(ctx.logger as ContractLogger),
-          }) as FabricContractContext)
+          }) as unknown as FabricContractContext)
         : (new FabricContractContext().accumulate({
             stub: ctx.stub,
             identity: ctx.clientIdentity,
             logger: ensureLogger(),
-          }) as FabricContractContext);
+          }) as unknown as FabricContractContext);
     const baseFlags = Object.assign({}, flags, {
       logger: fabricCtx.logger,
     });
-    return Object.assign(await super.flags(operation, model, baseFlags, ...args), {
-      stub: ctx.stub,
-      identity: ((ctx as Ctx).clientIdentity ??
-        fabricCtx.identity!) as ClientIdentity,
-      logger: fabricCtx.logger,
-      correlationId: ctx.stub.getTxID(),
-    });
+    return Object.assign(
+      await super.flags(operation, model, baseFlags, ...args),
+      {
+        stub: ctx.stub,
+        identity: ((ctx as Ctx).clientIdentity ??
+          fabricCtx.identity!) as ClientIdentity,
+        logger: fabricCtx.logger,
+        correlationId: ctx.stub.getTxID(),
+      }
+    );
   }
 
   /**
@@ -788,13 +768,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     rawInput: MangoQuery,
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<R> {
-    const ctxArgs = [...(args as unknown as any[])];
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.raw);
     const docsOnly =
       typeof ctxArgs[0] === "boolean" ? (ctxArgs.shift() as boolean) : false;
-    const { ctx, log } = this.logCtx(
-      ctxArgs as ContextualArgs<FabricContractContext>,
-      this.raw
-    );
+
     const { stub } = ctx;
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
@@ -1035,12 +1012,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     err: Error | string,
     reason?: string
   ): E {
-    if (
-      MISSING_PRIVATE_DATA_REGEX.test(
-        typeof err === "string" ? err : err.message
-      )
-    )
-      return new UnauthorizedPrivateDataAccess(err) as E;
+    // if (
+    //   MISSING_PRIVATE_DATA_REGEX.test(
+    //     typeof err === "string" ? err : err.message
+    //   )
+    // )
+    //   return new UnauthorizedPrivateDataAccess(err) as E;
     return super.parseError(err, reason);
   }
 
