@@ -65,15 +65,6 @@ export class FabricContractContext extends Context<FabricContractFlags> {
    * @return {ClientIdentity} The client identity
    */
   get identity(): ClientIdentity {
-    return this.get("clientIdentity");
-  }
-
-  /**
-   * @description Gets the logger
-   * @summary Returns the logger instance for the current context
-   * @return {any} The logger instance
-   */
-  get logger() {
-    return this.get("logger");
+    return this.get("identity");
   }
 }

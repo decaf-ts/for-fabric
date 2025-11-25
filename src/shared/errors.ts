@@ -135,3 +135,9 @@ export class NotInitializedError extends BaseError {
     super(NotInitializedError.name, msg, 409);
   }
 }
+
+export class MissingPKCSS11Lib extends InternalError {
+  constructor(msg: string | Error) {
+    super(msg, MissingPKCSS11Lib.name, 500);
+  }
+}

@@ -2,7 +2,7 @@
   "trailingComma": "es5",
   "max-len": {
     "tabWidth": 2,
-    "code": 100,
+    "code": 250,
     "ignoreComments": true,
     "ignoreTrailingComments": true
   }

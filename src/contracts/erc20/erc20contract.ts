@@ -79,8 +79,8 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
     // Check contract options are already set first to execute the function
     await this.CheckInitialized(ctx);
 
-    const select = await this.tokenRepository.selectWithContext(undefined, ctx);
-    const token = (await select.execute())[0];
+    const select = await this.tokenRepository.select();
+    const token = (await select.execute(ctx))[0];
 
     return token.name;
   }

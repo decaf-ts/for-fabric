@@ -1,8 +1,13 @@
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
-import { EventIds, ObserverHandler } from "@decaf-ts/core";
+import {
+  Adapter,
+  ContextualArgs,
+  EventIds,
+  ObserverHandler,
+} from "@decaf-ts/core";
 import { generateFabricEventName } from "../shared/events";
-import { Logger } from "@decaf-ts/logging";
-import { Context } from "fabric-contract-api";
+import { FabricContractContext } from "./ContractContext";
+import { Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Observer handler for Fabric chaincode events
@@ -76,15 +81,18 @@ export class FabricContractRepositoryObservableHandler extends ObserverHandler {
    * @return {Promise<void>} Promise that resolves when the event is emitted
    */
   override async updateObservers(
-    log: Logger,
-    table: string,
+    clazz: string | Constructor<any>,
     event: OperationKeys | BulkCrudOperationKeys | string,
     id: EventIds,
-    ctx: Context,
-    owner?: string,
-    payload?: object | string | undefined
+    ...args: ContextualArgs<FabricContractContext>
   ): Promise<void> {
+    const { log, ctx } = Adapter.logCtx<FabricContractContext>(
+      args,
+      this.updateObservers
+    );
     const { stub } = ctx;
+    const [owner, payload] = args;
+    const table = typeof clazz === "string" ? clazz : clazz.name;
     if (this.supportedEvents.indexOf(event) !== -1) {
       log.debug(`Emitting ${event} event`);
       const eventName = generateFabricEventName(table, event, owner);

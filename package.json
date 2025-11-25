@@ -1,6 +1,6 @@
 {
   "name": "@decaf-ts/for-fabric",
-  "version": "0.0.16",
+  "version": "0.1.1",
   "description": "template for ts projects",
   "type": "module",
   "exports": {
@@ -54,8 +54,9 @@
     "test:integration": "jest --testPathPattern=\"/tests/(integration)\" --passWithNoTests --detectOpenHandles",
     "test:all": "jest --testPathPattern=\"/tests/unit\" --passWithNoTests --detectOpenHandles --runInBand",
     "test:circular": "dpdm -T --no-warning --no-tree ./src/index.ts",
-    "coverage": "rimraf ./workdocs/reports/data/*.json && npm run test:all -- --coverage --config=./workdocs/reports/jest.coverage.config.ts",
+    "coverage": "rimraf ./workdocs/reports/data/*.json && npm run test:unit -- --coverage --config=./workdocs/reports/jest.coverage.config.ts",
     "lint": "eslint .",
+    "build:contract": "node ./lib/bin/build-contract.cjs compile-global-contract --dev --debug",
     "lint-fix": "eslint --fix .",
     "prepare-pr": "npm run lint-fix && npm run build:prod && npm run coverage && npm run docs",
     "prepare-release": "npm run build:prod && npm run coverage && npm run docs",
@@ -66,6 +67,8 @@
     "docs": "npx rimraf ./docs && mkdir docs && npx build-scripts --docs",
     "infrastructure:up": "docker compose -f ./docker/infrastructure/docker-compose.yaml up -d",
     "infrastructure:down": "docker compose -f ./docker/infrastructure/docker-compose.yaml down --rmi local -v",
+    "infrastructure-hsm:up": "docker compose -f ./docker/infrastructure/docker-compose-hsm.yaml up -d",
+    "infrastructure-hsm:down": "docker compose -f ./docker/infrastructure/docker-compose-hsm.yaml down --rmi local -v",
     "publish-docs": "docker run -it --rm --user $(id -u):$(id -g) -v \"$(pwd)/workdocs/confluence:/content\" -e ATLASSIAN_API_TOKEN=$(cat .confluence-token) ghcr.io/markdown-confluence/publish:latest",
     "copy-storage": "sudo cp -R docker/infrastructure/storage docker/docker-data/ && sudo chmod -R 755 docker/docker-data",
     "repo:init": "codex exec \"$(cat ./.codex/prompts/repo-setup.md)\nbase_path is `./`, initialize the repository\" -s workspace-write",
@@ -119,6 +122,7 @@
     "@decaf-ts/injectable-decorators": "latest",
     "@decaf-ts/logging": "latest",
     "@decaf-ts/transactional-decorators": "latest",
+    "@peculiar/x509": "^1.14.2",
     "json-stringify-deterministic": "^1.0.12",
     "sort-keys-recursive": "^2.1.10"
   },
@@ -126,7 +130,6 @@
     "@grpc/grpc-js": "^1.13.3",
     "@hyperledger/fabric-gateway": "^1.7.1",
     "@peculiar/webcrypto": "^1.5.0",
-    "@peculiar/x509": "^1.13.0",
     "fabric-ca-client": "^2.2.20",
     "fabric-common": "^2.2.20",
     "fabric-contract-api": "^2.5.8",

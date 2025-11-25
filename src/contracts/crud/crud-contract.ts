@@ -8,9 +8,6 @@ import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { Checkable, healthcheck } from "../../shared/interfaces/Checkable";
 import { ContractLogger } from "../logging";
 import { Logging } from "@decaf-ts/logging";
-import { isModelPrivate, modelToPrivate } from "../private-data";
-import { FabricContractPrivateDataAdapter } from "../ContractPrivateDataAdapter";
-import { FabricFlavour } from "../../shared/constants";
 import { Constructor } from "@decaf-ts/decoration";
 
 /**
@@ -68,7 +65,7 @@ export abstract class FabricCrudContract<M extends Model>
   /**
    * @description Shared adapter instance for all contract instances
    */
-  protected static adapter: FabricContractAdapter;
+  protected static adapter: FabricContractAdapter = new FabricContractAdapter();
 
   protected readonly repo: FabricContractRepository<M>;
 
@@ -87,25 +84,7 @@ export abstract class FabricCrudContract<M extends Model>
     protected readonly clazz: Constructor<M>
   ) {
     super(name);
-    FabricCrudContract.adapter = this.getAdapter(clazz);
-    this.repo = Repository.forModel(clazz, FabricCrudContract.adapter.alias);
-  }
-
-  protected getAdapter(clazz: Constructor<M>): FabricContractAdapter {
-    const instance = new clazz();
-
-    if (isModelPrivate(instance)) {
-      const pvt = modelToPrivate(instance);
-      const collections = Object.keys(pvt.private!);
-
-      return new FabricContractPrivateDataAdapter(
-        undefined,
-        "fabric-private-data-adapter",
-        collections
-      );
-    } else {
-      return new FabricContractAdapter(undefined, FabricFlavour);
-    }
+    this.repo = Repository.forModel(clazz);
   }
 
   /**

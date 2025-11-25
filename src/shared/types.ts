@@ -69,7 +69,7 @@ export type FabricFlags = RepositoryFlags;
  * @property {string} caName - Path to the directory containing certificates
  * @property {string} tlsCertPath - Path to the TLS certificate
  * @property {string} caCert - Endpoint URL for the peer
- * @property {string} caKey - Host alias for the peer
+ * @property {string} [caKey] - Host alias for the peer or directory containing the admin private key
  * @memberOf module:for-fabric.shared
  */
 export type CAConfig = {
@@ -77,7 +77,7 @@ export type CAConfig = {
   tls?: TLSOptions;
   caName: string;
   caCert: string;
-  caKey: string;
+  caKey?: string;
   hsm?: HSMOptions;
 };
 

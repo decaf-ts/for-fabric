@@ -3,6 +3,26 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Debug Jest (Global)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "jest",
+        "--runInBand",
+        "--coverage",
+        "--detectOpenHandles",
+        "--watchAll=false",
+        "--testNamePattern",
+        "test test$",
+        "--runTestsByPath",
+        "${workspaceFolder}/tests/integration/Global-Contract.test.ts"
+      ],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
       "type": "node",
       "request": "launch",
       "name": "Run All Jest Tests with Coverage",

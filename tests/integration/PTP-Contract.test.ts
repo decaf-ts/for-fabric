@@ -51,19 +51,23 @@ describe("Test PTP", () => {
 
   beforeAll(async () => {
     // Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`);
+    execSync(`npm run infrastructure:up`, { stdio: "inherit" });
 
     // Ensure Infrastructure is ready
     await ensureInfrastructureBooted();
 
-    if(!skip) {
-      execSync(`cp -r  ${path.join(__dirname, "../assets/contract", contractFolderName)} ${path.join(__dirname, "../../docker/infrastructure/chaincode")}/`)
+    if (!skip) {
+      execSync(
+        `cp -r  ${path.join(__dirname, "../assets/contract", contractFolderName)} ${path.join(__dirname, "../../docker/infrastructure/chaincode")}/`
+      );
       deployContract(contractFolderName, contractName);
       commitChaincode(contractName);
     }
 
     // Copy client config to local directory for testing purposes
-    execSync(`docker cp org-a:/weaver/client/. docker/docker-data`);
+    execSync(`docker cp org-a:/weaver/client/. docker/docker-data`, {
+      stdio: "inherit",
+    });
 
     peerConfig = {
       cryptoPath: "./docker/infrastructure/crypto-config",
@@ -146,7 +150,7 @@ describe("Test PTP", () => {
     //   }
     //   expect(failedInitialize).toBe(true);
     // }
-    console.log("test")
+    console.log("test");
   });
 
   // it("Gets token name", async () => {

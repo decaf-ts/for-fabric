@@ -1,4 +1,9 @@
-import { CouchDBAdapter, CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
+import {
+  CouchDBAdapter,
+  CouchDBKeys,
+  CouchDBRepository,
+  MangoQuery,
+} from "@decaf-ts/for-couchdb";
 import { list, Model, required, type } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
@@ -15,6 +20,7 @@ import {
   onDelete,
   onUpdate,
   OperationKeys,
+  PrimaryKeyType,
   readonly,
   SerializationError,
 } from "@decaf-ts/db-decorators";
@@ -28,7 +34,6 @@ import { ContractLogger } from "./logging";
 import {
   PersistenceKeys,
   RelationsMetadata,
-  Repository,
   Sequence,
   SequenceOptions,
   UnsupportedError,
@@ -39,6 +44,8 @@ import {
   JoinTableOptions,
   JoinTableMultipleColumnsOptions,
   relation,
+  ContextualArgs,
+  PreparedModel,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -49,10 +56,7 @@ import {
 } from "fabric-shim-api";
 import { FabricStatement } from "./FabricContractStatement";
 import { FabricContractSequence } from "./FabricContractSequence";
-import {
-  MissingContextError,
-  UnauthorizedPrivateDataAccess,
-} from "../shared/errors";
+import { UnauthorizedPrivateDataAccess } from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
 import {
@@ -111,7 +115,7 @@ export async function createdByOnFabricCreateUpdate<
   model: M
 ): Promise<void> {
   try {
-    const user = context.get("clientIdentity") as ClientIdentity;
+    const user = context.get("identity") as ClientIdentity;
     model[key] = user.getID() as M[typeof key];
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (e: unknown) {
@@ -152,11 +156,10 @@ export async function createdByOnFabricCreateUpdate<
 export async function pkFabricOnCreate<
   M extends Model,
   R extends FabricContractRepository<M>,
-  V extends SequenceOptions,
 >(
   this: R,
   context: FabricContractContext,
-  data: V,
+  data: SequenceOptions,
   key: keyof M,
   model: M
 ): Promise<void> {
@@ -248,7 +251,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {Ctx} ctx - The Fabric chaincode context
    * @return {ContractLogger} The logger instance
    */
-  public logFor(ctx: Ctx | FabricContractContext): ContractLogger {
+  public override logFor(ctx: Ctx | FabricContractContext): ContractLogger {
     if ((ctx as FabricContractContext).logger)
       return (ctx as FabricContractContext).logger as ContractLogger;
     return Logging.for(
@@ -272,16 +275,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @template M - Type extending Model
    * @return {Constructor<Repository<M, MangoQuery, FabricContractAdapter, FabricContractFlags, FabricContractContext>>} The repository constructor
    */
-  override repository<M extends Model>(): Constructor<
-    Repository<
-      M,
-      MangoQuery,
-      Adapter<any, any, MangoQuery, FabricContractFlags, FabricContractContext>,
-      FabricContractFlags,
-      FabricContractContext
-    >
-  > {
-    return FabricContractRepository;
+  override repository<
+    R extends CouchDBRepository<
+      any,
+      CouchDBAdapter<any, void, FabricContractContext>
+    >,
+  >(): Constructor<R> {
+    return FabricContractRepository as unknown as Constructor<R>;
   }
 
   /**
@@ -308,15 +308,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
    * @return {Promise<Record<string, any>>} Promise resolving to the created record
    */
-  override async create(
-    tableName: string,
-    id: string | number,
+  override async create<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
     model: Record<string, any>,
-    ctx: FabricContractContext
+    ...args: ContextualArgs<FabricContractContext>
   ): Promise<Record<string, any>> {
-    const { stub, logger } = ctx;
-    const log = logger.for(this.create);
-
+    const { ctx, log } = this.logCtx(args, this.create);
+    const { stub } = ctx;
+    const tableName = Model.tableName(clazz);
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
       const composedKey = stub.createCompositeKey(tableName, [String(id)]);
@@ -336,13 +336,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
    * @return {Promise<Record<string, any>>} Promise resolving to the retrieved record
    */
-  override async read(
-    tableName: string,
-    id: string | number,
-    ctx: FabricContractContext
+  override async read<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    ...args: ContextualArgs<FabricContractContext>
   ): Promise<Record<string, any>> {
-    const { stub, logger } = ctx;
-    const log = logger.for(this.read);
+    const { ctx, log } = this.logCtx(args, this.read);
+    const { stub } = ctx;
+    const tableName = Model.tableName(clazz);
 
     let model: Record<string, any>;
     try {
@@ -378,14 +379,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
    * @return {Promise<Record<string, any>>} Promise resolving to the updated record
    */
-  override async update(
-    tableName: string,
-    id: string | number,
+  override async update<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
     model: Record<string, any>,
-    ctx: FabricContractContext
+    ...args: ContextualArgs<FabricContractContext>
   ): Promise<Record<string, any>> {
-    const { stub, logger } = ctx;
-    const log = logger.for(this.update);
+    const { ctx, log } = this.logCtx(args, this.update);
+    const { stub } = ctx;
+    const tableName = Model.tableName(clazz);
 
     try {
       log.verbose(`updating entry to ${tableName} table with pk ${id}`);
@@ -406,17 +408,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @param {...any[]} args - Additional arguments, including the chaincode stub and logger
    * @return {Promise<Record<string, any>>} Promise resolving to the deleted record
    */
-  async delete(
-    tableName: string,
-    id: string | number,
-    ctx: FabricContractContext
+  async delete<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    ...args: ContextualArgs<FabricContractContext>
   ): Promise<Record<string, any>> {
-    const { stub, logger } = ctx;
-    const log = logger.for(this.delete);
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.delete);
+    const { stub } = ctx;
+    const tableName = Model.tableName(clazz);
     let model: Record<string, any>;
     try {
       const composedKey = stub.createCompositeKey(tableName, [String(id)]);
-      model = await this.read(tableName, id, ctx);
+      model = await this.read(clazz, id, ...ctxArgs);
       log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
       await this.deleteState(composedKey, ctx);
     } catch (e: unknown) {
@@ -653,9 +656,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ): Promise<FabricContractFlags> {
     return Object.assign(await super.flags(operation, model, flags, ...args), {
       stub: ctx.stub,
-      identity:
-        (ctx as Ctx).clientIdentity ?? (ctx as FabricContractContext).identity!,
-      logger: (ctx as FabricContractContext).logger ?? this.logFor(ctx as Ctx),
+      identity: ((ctx as Ctx).clientIdentity ??
+        (ctx as FabricContractContext).identity!) as ClientIdentity,
+      logger:
+        (ctx as FabricContractContext).logger ?? this.logFor([ctx] as Ctx),
+      correlationId: ctx.stub.getTxID(),
     });
   }
 
@@ -764,10 +769,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
   async raw<R>(
     rawInput: MangoQuery,
     docsOnly: boolean,
-    ...args: [...any, FabricContractContext]
+    ...args: ContextualArgs<FabricContractContext>
   ): Promise<R> {
-    const { stub, logger } = args.pop();
-    const log = logger.for(this.raw);
+    const { ctx, log } = this.logCtx(args, this.raw);
+    const { stub } = ctx;
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
     if (limit || skip) {
@@ -801,61 +806,43 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return results;
   }
 
-  override Statement<M extends Model>(
-    ctx?: FabricContractContext
-  ): FabricStatement<M, any> {
-    if (!ctx) {
-      throw new MissingContextError("Context is required");
-    }
-    return new FabricStatement(this, ctx);
+  override Statement<M extends Model>(): FabricStatement<M, any> {
+    return new FabricStatement(this);
   }
 
   override async Sequence(options: SequenceOptions): Promise<Sequence> {
     return new FabricContractSequence(options, this);
   }
 
-  override async createAll(
-    tableName: string,
-    id: (string | number)[],
+  override async createAll<M extends Model>(
+    tableName: Constructor<M>,
+    id: PrimaryKeyType[],
     model: Record<string, any>[],
-    ...args: [...any, FabricContractContext]
+    ...args: ContextualArgs<FabricContractContext>
   ): Promise<Record<string, any>[]> {
     if (id.length !== model.length)
       throw new InternalError("Ids and models must have the same length");
-
-    const ctx = args.pop();
-    const { logger } = ctx;
-    const log = logger.for(this.createAll);
-    log.info(`Creating ${id.length} entries ${tableName} table`);
-    log.debug(`pks: ${id}`);
-
+    const { log, ctxArgs } = this.logCtx(args, this.createAll);
+    const tableLabel = Model.tableName(tableName);
+    log.debug(`Creating ${id.length} entries ${tableLabel} table`);
     return Promise.all(
-      id.map(async (i, index) => {
-        return this.create(tableName, i, model[index], ctx);
-      })
+      id.map((i, count) => this.create(tableName, i, model[count], ...ctxArgs))
     );
   }
 
-  override async updateAll(
-    tableName: string,
-    id: string[] | number[],
+  override async updateAll<M extends Model>(
+    tableName: Constructor<M>,
+    id: PrimaryKeyType[],
     model: Record<string, any>[],
-    ...args: [...any, FabricContractContext]
+    ...args: ContextualArgs<FabricContractContext>
   ): Promise<Record<string, any>[]> {
     if (id.length !== model.length)
       throw new InternalError("Ids and models must have the same length");
-
-    const ctx = args.pop();
-    const { logger } = ctx;
-
-    const log = logger.for(this.createAll);
-    log.info(`Updating ${id.length} entries ${tableName} table`);
-    log.debug(`pks: ${id}`);
-
+    const { log, ctxArgs } = this.logCtx(args, this.updateAll);
+    const tableLabel = Model.tableName(tableName);
+    log.debug(`Updating ${id.length} entries ${tableLabel} table`);
     return Promise.all(
-      id.map(async (i, index) => {
-        return this.update(tableName, i, model[index], ctx);
-      })
+      id.map((i, count) => this.update(tableName, i, model[count], ...ctxArgs))
     );
   }
 
@@ -867,23 +854,17 @@ export class FabricContractAdapter extends CouchDBAdapter<
    */
   override prepare<M extends Model>(
     model: M,
-    pk: keyof M,
-    tableName: string,
-    ctx: FabricContractContext
-  ): {
-    record: Record<string, any>;
-    id: string;
-    transient?: Record<string, any>;
-  } {
-    const { logger } = ctx;
-    // const { stub, logger } = args.pop();
-    const log = logger.for(this.prepare);
+    ...args: ContextualArgs<FabricContractContext>
+  ): PreparedModel {
+    const { log } = this.logCtx(args, this.prepare);
 
+    const tableName = Model.tableName(model.constructor as any);
+    const pk = Model.pk(model.constructor as any);
     const split = Model.segregate(model);
     const result = Object.entries(split.model).reduce(
       (accum: Record<string, any>, [key, val]) => {
         if (typeof val === "undefined") return accum;
-        const mappedProp = Repository.column(model, key);
+        const mappedProp = Model.columnName(model, key as any);
         if (this.isReserved(mappedProp))
           throw new InternalError(`Property name ${mappedProp} is reserved`);
         accum[mappedProp] = val;
@@ -891,50 +872,36 @@ export class FabricContractAdapter extends CouchDBAdapter<
       },
       {}
     );
-    // if ((model as any)[PersistenceKeys.METADATA]) {
-    //   log.silly(
-    //     `Passing along persistence metadata for ${(model as any)[PersistenceKeys.METADATA]}`
-    //   );
-    //   Object.defineProperty(result, PersistenceKeys.METADATA, {
-    //     enumerable: false,
-    //     writable: false,
-    //     configurable: true,
-    //     value: (model as any)[PersistenceKeys.METADATA],
-    //   });
-    // }
 
-    log.silly(`Preparing record for ${tableName} table with pk ${model[pk]}`);
+    log.silly(
+      `Preparing record for ${tableName} table with pk ${(model as any)[pk]}`
+    );
 
     return {
       record: result,
-      id: model[pk] as string,
+      id: (model as any)[pk] as string,
       transient: split.transient,
     };
   }
 
   override revert<M extends Model>(
     obj: Record<string, any>,
-    clazz: string | Constructor<M>,
-    pk: keyof M,
-    id: string | number,
-    transient: Record<string, any> | FabricContractContext | undefined,
-    ctx?: FabricContractContext
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    transient?: Record<string, any>,
+    ...args: ContextualArgs<FabricContractContext>
   ): M {
-    if (!ctx) {
-      ctx = transient as FabricContractContext;
-      transient = undefined;
-    }
-    const { logger } = ctx;
-    const log = logger.for(this.revert);
+    const { log } = this.logCtx(args, this.revert);
     const ob: Record<string, any> = {};
+    const pk = Model.pk(clazz);
     ob[pk as string] = id;
     const m = (
       typeof clazz === "string" ? Model.build(ob, clazz) : new clazz(ob)
     ) as M;
     log.silly(`Rebuilding model ${m.constructor.name} id ${id}`);
-    const metadata = obj[PersistenceKeys.METADATA];
     const result = Object.keys(m).reduce((accum: M, key) => {
-      (accum as Record<string, any>)[key] = obj[Repository.column(accum, key)];
+      (accum as Record<string, any>)[key] =
+        obj[Model.columnName(accum, key as any)];
       return accum;
     }, m);
 
@@ -951,52 +918,40 @@ export class FabricContractAdapter extends CouchDBAdapter<
       });
     }
 
-    if (metadata) {
-      log.silly(
-        `Passing along ${this.flavour} persistence metadata for ${m.constructor.name} id ${id}: ${metadata}`
-      );
-      Object.defineProperty(result, PersistenceKeys.METADATA, {
-        enumerable: false,
-        configurable: false,
-        writable: false,
-        value: metadata,
-      });
-    }
-
     return result;
   }
 
-  override createPrefix(
-    tableName: string,
-    id: string | number,
+  override createPrefix<M extends Model>(
+    tableName: Constructor<M>,
+    id: PrimaryKeyType,
     model: Record<string, any>,
     ...args: [...any, FabricContractContext]
   ) {
-    const ctx: FabricContractContext = args.pop();
+    const { ctxArgs } = this.logCtx(args, this.createPrefix);
     const record: Record<string, any> = {};
-    record[CouchDBKeys.TABLE] = tableName;
+    record[CouchDBKeys.TABLE] = Model.tableName(tableName);
     Object.assign(record, model);
 
-    return [tableName, id, record, ctx];
+    return [tableName, id, record, ...ctxArgs];
   }
 
-  override updatePrefix(
-    tableName: string,
+  override updatePrefix<M extends Model>(
+    tableName: Constructor<M>,
     id: string | number,
     model: Record<string, any>,
     ...args: [...any, FabricContractContext]
   ): (string | number | Record<string, any>)[] {
     const ctx: FabricContractContext = args.pop();
     const record: Record<string, any> = {};
-    record[CouchDBKeys.TABLE] = tableName;
+    record[CouchDBKeys.TABLE] = Model.tableName(tableName);
     Object.assign(record, model);
 
     return [tableName, id, record, ctx];
   }
 
-  protected override createAllPrefix(
-    tableName: string,
-    ids: string[] | number[],
+  protected override createAllPrefix<M extends Model>(
+    tableName: Constructor<M>,
+    ids: PrimaryKeyType[],
     models: Record<string, any>[],
     ...args: [...any, FabricContractContext]
   ): (string | string[] | number[] | Record<string, any>[])[] {
@@ -1015,9 +970,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return [tableName, ids, records, ctx as any];
   }
 
-  protected override updateAllPrefix(
-    tableName: string,
-    ids: string[] | number[],
+  protected override updateAllPrefix<M extends Model>(
+    tableName: Constructor<M>,
+    ids: PrimaryKeyType[],
     models: Record<string, any>[],
     ...args: [...any, FabricContractContext]
   ) {
@@ -1035,17 +990,23 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return [tableName, ids, records, ctx as any];
   }
 
-  override parseError(err: Error | string, reason?: string): BaseError {
+  override parseError<E extends BaseError>(
+    err: Error | string,
+    reason?: string
+  ): E {
     return FabricContractAdapter.parseError(reason || err);
   }
 
-  static override parseError(err: Error | string, reason?: string): BaseError {
+  static override parseError<E extends BaseError>(
+    err: Error | string,
+    reason?: string
+  ): E {
     if (
       MISSING_PRIVATE_DATA_REGEX.test(
         typeof err === "string" ? err : err.message
       )
     )
-      return new UnauthorizedPrivateDataAccess(err);
+      return new UnauthorizedPrivateDataAccess(err) as E;
     return super.parseError(err, reason);
   }
 
@@ -1086,7 +1047,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
               required(),
               readonly(),
               propMetadata(Metadata.key(DBKeys.ID, attr), options),
-              onCreate(pkFabricOnCreate, options, groupsort)
+              onCreate(pkFabricOnCreate as any, options, groupsort)
             )(obj, attr);
           };
         },
@@ -1139,9 +1100,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
         prop(),
         relation(PersistenceKeys.ONE_TO_ONE, meta),
         type([clazz, String, Number, BigInt]),
-        onCreate(oneToOneOnCreate, meta),
-        onUpdate(oneToOneOnUpdate, meta),
-        onDelete(oneToOneOnDelete, meta),
+        onCreate(oneToOneOnCreate as any, meta),
+        onUpdate(oneToOneOnUpdate as any, meta),
+        onDelete(oneToOneOnDelete as any, meta),
         afterAny(pop, meta),
         propMetadata(PersistenceKeys.ONE_TO_ONE, meta)
       );
@@ -1172,9 +1133,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
         prop(),
         relation(PersistenceKeys.ONE_TO_MANY, metadata),
         list([clazz as Constructor<M>, String, Number]),
-        onCreate(oneToManyOnCreate, metadata),
+        onCreate(oneToManyOnCreate as any, metadata),
         onUpdate(oneToManyOnUpdate, metadata),
-        onDelete(oneToManyOnDelete, metadata),
+        onDelete(oneToManyOnDelete as any, metadata),
         afterAny(pop, metadata),
         propMetadata(PersistenceKeys.ONE_TO_MANY, metadata)
       );

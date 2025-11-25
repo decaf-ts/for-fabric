@@ -2,25 +2,14 @@ import {
   Repository,
   ObserverHandler,
   EventIds,
-  WhereOption,
+  MaybeContextualArg,
 } from "@decaf-ts/core";
-import { FabricContractAdapter } from "./ContractAdapter";
-import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
-import {
-  ConflictError,
-  Context as Ctx,
-  enforceDBDecorators,
-  InternalError,
-  ValidationError,
-} from "@decaf-ts/db-decorators";
-import { MangoQuery } from "@decaf-ts/for-couchdb";
+import { CouchDBAdapter } from "@decaf-ts/for-couchdb";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
 import { Context } from "fabric-contract-api";
-import { Context as CTX } from "@decaf-ts/db-decorators";
-import { FabricContractSequence } from "./FabricContractSequence";
 import { ContractLogger } from "./logging";
 import { Logging } from "@decaf-ts/logging";
 import { Constructor } from "@decaf-ts/decoration";
@@ -91,13 +80,10 @@ import { Constructor } from "@decaf-ts/decoration";
  */
 export class FabricContractRepository<M extends Model> extends Repository<
   M,
-  MangoQuery,
-  FabricContractAdapter,
-  FabricContractFlags,
-  FabricContractContext
+  CouchDBAdapter<any, void, FabricContractContext>
 > {
   constructor(
-    adapter?: FabricContractAdapter,
+    adapter?: CouchDBAdapter<any, void, FabricContractContext>,
     clazz?: Constructor<M>,
     protected trackedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
   ) {
@@ -123,200 +109,12 @@ export class FabricContractRepository<M extends Model> extends Repository<
   }
 
   /**
-   * @description Creates a single model in the state database
-   * @summary Prepares, creates, and reverts a model using the adapter
-   * @param {M} model - The model to create
-   * @param {...any[]} args - Additional arguments, including the chaincode context
-   * @return {Promise<M>} Promise resolving to the created model
-   */
-  override async create(model: M, ...args: any[]): Promise<M> {
-    if (args.length !== 1) throw new InternalError(`Missing context`);
-    const ctx = args[args.length - 1] as FabricContractContext;
-    const log = this.logFor(ctx).for(this.create);
-    log.info(`Preparing model: ${JSON.stringify(model)}`);
-    // eslint-disable-next-line prefer-const
-    let { record, id, transient } = this.adapter.prepare(
-      model,
-      this.pk,
-      this.tableName,
-      ctx
-    );
-    log.info(`Creating model: ${JSON.stringify(model)}`);
-    record = await this.adapter.create(this.tableName, id, record, ctx);
-    log.info(`Reverting model: ${JSON.stringify(model)}`);
-    return this.adapter.revert<M>(
-      record,
-      this.class,
-      this.pk,
-      id,
-      ctx && ctx.get("rebuildWithTransient") ? transient : undefined,
-      ctx
-    );
-  }
-
-  override async read(
-    id: string | number | bigint,
-    ...args: any[]
-  ): Promise<M> {
-    if (args.length !== 1) throw new InternalError(`Missing context`);
-    const ctx = args[args.length - 1] as FabricContractContext;
-    const m = await this.adapter.read(this.tableName, id as string, ctx);
-    return this.adapter.revert<M>(m, this.class, this.pk, id as string, ctx);
-  }
-
-  /**
-   * @description Deletes a model from the database by ID.
-   * @summary Removes a model instance from the database using its primary key.
-   * @param {string|number|bigint} id - The primary key of the model to delete.
-   * @param {...any[]} args - Additional arguments.
-   * @return {Promise<M>} The deleted model instance.
-   */
-  override async delete(id: string, ...args: any[]) {
-    if (args.length !== 1) throw new InternalError(`Missing context`);
-    const ctx = args[args.length - 1] as FabricContractContext;
-    const m = await this.adapter.delete(this.tableName, id, ctx);
-    return this.adapter.revert(m, this.class, this.pk, id, ctx);
-  }
-
-  /**
-   * @description Updates a single model in the state database
-   * @summary Prepares, updates, and reverts a model using the adapter
-   * @param {M} model - The model to update
-   * @param {...any[]} args - Additional arguments, including the chaincode context
-   * @return {Promise<M>} Promise resolving to the updated model
-   */
-  override async update(model: M, ...args: any[]): Promise<M> {
-    if (args.length !== 1) throw new InternalError(`Missing context`);
-    const ctx = args[args.length - 1] as FabricContractContext;
-    const log = this.logFor(ctx).for(this.update);
-    log.info(`Preparing model: ${JSON.stringify(model)}`);
-    // eslint-disable-next-line prefer-const
-    let { record, id, transient } = this.adapter.prepare(
-      model,
-      this.pk,
-      this.tableName,
-      ctx
-    );
-    log.info(`Updating model: ${JSON.stringify(model)}`);
-    record = await this.adapter.update(this.tableName, id, record, ctx);
-    let c: FabricContractContext | undefined = undefined;
-    if (args.length) c = args[args.length - 1] as FabricContractContext;
-    log.info(`Reverting model: ${JSON.stringify(model)}`);
-    return this.adapter.revert<M>(
-      record,
-      this.class,
-      this.pk,
-      id,
-      c && c.get("rebuildWithTransient") ? transient : undefined,
-      ctx
-    );
-  }
-
-  /**
    * @description Gets the observer handler for this repository
    * @summary Returns a FabricContractRepositoryObservableHandler instance
    * @return {ObserverHandler} The observer handler
    */
   override ObserverHandler(): ObserverHandler {
     return new FabricContractRepositoryObservableHandler();
-  }
-
-  /**
-   * @description Creates multiple models in the state database
-   * @summary Prepares, creates, and reverts multiple models using the adapter
-   * @param {M[]} models - The models to create
-   * @param {...any[]} args - Additional arguments, including the chaincode context
-   * @return {Promise<M[]>} Promise resolving to the created models
-   */
-  override async createAll(models: M[], ...args: any[]): Promise<M[]> {
-    if (args.length !== 1) throw new InternalError(`Missing context`);
-    const ctx = args[args.length - 1] as FabricContractContext;
-    if (!models.length) return models;
-    const prepared = models.map((m) =>
-      this.adapter.prepare(m, this.pk, this.tableName, ctx)
-    );
-    const ids = prepared.map((p) => p.id);
-    let records = prepared.map((p) => p.record);
-    const transients = prepared.map((p) => p.transient).filter((e) => !!e);
-    let c: FabricContractContext | undefined = undefined;
-    if (args.length) c = args[args.length - 1] as FabricContractContext;
-    records = await this.adapter.createAll(
-      this.tableName,
-      ids,
-      records,
-      ...(args as [...any[], FabricContractContext])
-    );
-    return records.map((r, i) =>
-      this.adapter.revert(
-        r,
-        this.class,
-        this.pk,
-        ids[i] as string | number,
-        c && c.get("rebuildWithTransient") ? transients : undefined,
-        ctx
-      )
-    );
-  }
-
-  /**
-   * @description Updates multiple models in the state database
-   * @summary Prepares, updates, and reverts multiple models using the adapter
-   * @param {M[]} models - The models to update
-   * @param {...any[]} args - Additional arguments, including the chaincode context
-   * @return {Promise<M[]>} Promise resolving to the updated models
-   */
-  override async updateAll(models: M[], ...args: any[]): Promise<M[]> {
-    if (args.length !== 1) throw new InternalError(`Missing context`);
-    const ctx = args[args.length - 1] as FabricContractContext;
-    if (!models.length) return models;
-    const records = models.map((m) =>
-      this.adapter.prepare(m, this.pk, this.tableName, ctx)
-    );
-    const transients = records.map((p) => p.transient).filter((e) => !!e);
-    let c: FabricContractContext | undefined = undefined;
-    if (args.length) c = args[args.length - 1] as FabricContractContext;
-
-    const updated = await this.adapter.updateAll(
-      this.tableName,
-      records.map((r) => r.id),
-      records.map((r) => r.record),
-      ...(args as [...any[], FabricContractContext])
-    );
-    return updated.map((u, i) =>
-      this.adapter.revert(
-        u,
-        this.class,
-        this.pk,
-        records[i].id,
-        c && c.get("rebuildWithTransient") ? transients : undefined,
-        ctx
-      )
-    );
-  }
-
-  /**
-   * @description Executes a raw query against the state database
-   * @summary Delegates to the adapter's raw method
-   * @param {MangoQuery} rawInput - The Mango Query to execute
-   * @param {boolean} docsOnly - Whether to return only documents
-   * @param {...any[]} args - Additional arguments, including the chaincode context
-   * @return {Promise<any>} Promise resolving to the query results
-   */
-  async raw(rawInput: MangoQuery, docsOnly: boolean, ...args: any[]) {
-    const ctx = args.pop();
-    const transformedArgs = await CTX.args(
-      "QUERY" as OperationKeys.CREATE,
-      this.class,
-      [ctx],
-      this["adapter"] as any,
-      {}
-    );
-
-    return this.adapter.raw(
-      rawInput,
-      docsOnly,
-      ...(transformedArgs.args as [FabricContractContext])
-    );
   }
 
   /**
@@ -330,137 +128,12 @@ export class FabricContractRepository<M extends Model> extends Repository<
    * @return {Promise<void>} Promise that resolves when observers are updated
    */
   override async updateObservers(
-    table: string,
+    table: Constructor<M> | string,
     event: OperationKeys | BulkCrudOperationKeys | string,
     id: EventIds,
-    ctx: FabricContractContext,
-    ...args: any[]
+    ...args: MaybeContextualArg<FabricContractContext>
   ): Promise<void> {
     if (!this.trackedEvents || this.trackedEvents.indexOf(event) !== -1)
-      return await super.updateObservers(table, event, id, ctx, ...args);
-  }
-
-  async selectWithContext<S extends readonly (keyof M)[]>(
-    selector?: readonly [...S],
-    ctx?: FabricContractContext | Context
-  ): Promise<WhereOption<M, M[]> | WhereOption<M, Pick<M, S[number]>[]>> {
-    let contextArgs: any;
-    if (ctx instanceof FabricContractContext) {
-      contextArgs.context = ctx;
-    } else {
-      contextArgs = await Ctx.args(
-        OperationKeys.CREATE,
-        this.class,
-        [ctx],
-        this.adapter,
-        this._overrides || {}
-      );
-    }
-    if (!selector) {
-      return this.adapter
-        .Statement<M>(contextArgs.context as FabricContractContext)
-        .select()
-        .from(this.class);
-    }
-    return this.adapter
-      .Statement<M>(contextArgs.context as FabricContractContext)
-      .select(selector)
-      .from(this.class);
-  }
-
-  /**
-   * @description Prepares multiple models for creation.
-   * @summary Validates multiple models and prepares them for creation in the database.
-   * @param {M[]} models - The models to create.
-   * @param {...any[]} args - Additional arguments.
-   * @return The prepared models and context arguments.
-   * @throws {ValidationError} If any model fails validation.
-   */
-  protected override async createAllPrefix(models: M[], ...args: any[]) {
-    const ctx = args[args.length - 1] as Context;
-
-    const contextArgs = await Ctx.args(
-      OperationKeys.CREATE,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    if (!models.length) return [models, ...contextArgs.args];
-    const opts = Repository.getSequenceOptions(models[0]);
-    let ids: (string | number | bigint | undefined)[] = [];
-    if (opts.type) {
-      if (!opts.name) opts.name = FabricContractSequence.pk(models[0]);
-      ids = await (
-        (await this.adapter.Sequence(opts)) as FabricContractSequence
-      ).range(models.length, ctx as unknown as FabricContractContext);
-    } else {
-      ids = models.map((m, i) => {
-        if (typeof m[this.pk] === "undefined")
-          throw new InternalError(
-            `Primary key is not defined for model in position ${i}`
-          );
-        return m[this.pk] as string;
-      });
-    }
-
-    models = await Promise.all(
-      models.map(async (m, i) => {
-        m = new this.class(m);
-        if (opts.type) m[this.pk] = ids[i] as M[keyof M];
-        await enforceDBDecorators(
-          this,
-          contextArgs.context,
-          m,
-          OperationKeys.CREATE,
-          OperationKeys.ON
-        );
-        return m;
-      })
-    );
-
-    const ignoredProps =
-      contextArgs.context.get("ignoredValidationProperties") || [];
-
-    const errors = await Promise.all(
-      models.map((m) => Promise.resolve(m.hasErrors(...ignoredProps)))
-    );
-
-    const errorMessages = errors.reduce((accum: string | undefined, e, i) => {
-      if (e)
-        accum =
-          typeof accum === "string"
-            ? accum + `\n - ${i}: ${e.toString()}`
-            : ` - ${i}: ${e.toString()}`;
-      return accum;
-    }, undefined);
-
-    if (errorMessages) throw new ValidationError(errorMessages);
-    return [models, ...contextArgs.args];
-  }
-
-  protected override async createPrefix(
-    model: M,
-    ...args: any[]
-  ): Promise<[M, ...any[]]> {
-    const result = await super.createPrefix(model, ...args);
-    const id = result[0][this.pk];
-    try {
-      const res = await this.read(String(id), ...args);
-      if (res) {
-        throw new ConflictError(
-          `Conflict detected while creating model with id: ${id} already exists`
-        );
-      }
-    } catch (e) {
-      if ((e as any).code === 404) {
-        this.logFor(args[args.length - 1]).info(
-          `Record entry with pk ${id} does not exist, creating it now...`
-        );
-      } else {
-        throw e;
-      }
-    }
-    return result;
+      return await super.updateObservers(table, event, id, ...args);
   }
 }

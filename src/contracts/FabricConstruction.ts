@@ -9,8 +9,9 @@ import {
   repositoryFromTypeMetadata,
 } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
-import { FabricContractFlags } from "./types";
-import { Context, InternalError } from "@decaf-ts/db-decorators";
+import { ContextOfRepository, InternalError } from "@decaf-ts/db-decorators";
+import { FabricContractRepository } from "./FabricContractRepository";
+import { FabricContractContext } from "./ContractContext";
 
 /**
  * @description Handles one-to-one relationship creation
@@ -64,13 +65,11 @@ import { Context, InternalError } from "@decaf-ts/db-decorators";
  */
 export async function oneToOneOnCreate<
   M extends Model,
-  R extends Repo<M, F, C>,
+  R extends FabricContractRepository<M>,
   V extends RelationsMetadata,
-  F extends FabricContractFlags,
-  C extends Context<F>,
 >(
   this: R,
-  context: Context<F>,
+  context: FabricContractContext,
   data: V,
   key: keyof M,
   model: M
@@ -152,13 +151,11 @@ export async function oneToOneOnCreate<
  */
 export async function oneToOneOnUpdate<
   M extends Model,
-  R extends Repo<M, F, C>,
+  R extends FabricContractRepository<M>,
   V extends RelationsMetadata,
-  F extends FabricContractFlags,
-  C extends Context<F>,
 >(
   this: R,
-  context: Context<F>,
+  context: FabricContractContext,
   data: V,
   key: keyof M,
   model: M
@@ -238,13 +235,11 @@ export async function oneToOneOnUpdate<
  */
 export async function oneToOneOnDelete<
   M extends Model,
-  R extends Repo<M, F, C>,
+  R extends FabricContractRepository<M>,
   V extends RelationsMetadata,
-  F extends FabricContractFlags,
-  C extends Context<F>,
 >(
   this: R,
-  context: Context<F>,
+  context: FabricContractContext,
   data: V,
   key: keyof M,
   model: M
@@ -262,14 +257,14 @@ export async function oneToOneOnDelete<
     deleted = await innerRepo.delete(model[key] as string, context);
   else
     deleted = await innerRepo.delete(
-      (model[key] as M)[innerRepo.pk as keyof M] as string,
+      (model[key] as M)[Model.pk(innerRepo.class) as keyof M] as string,
       context
     );
   await cacheModelForPopulate(
     context,
     model,
     key,
-    deleted[innerRepo.pk] as string,
+    deleted[Model.pk(innerRepo.class)] as string,
     deleted
   );
 }
@@ -330,13 +325,11 @@ export async function oneToOneOnDelete<
  */
 export async function oneToManyOnCreate<
   M extends Model,
-  R extends Repo<M, F, C>,
+  R extends FabricContractRepository<M>,
   V extends RelationsMetadata,
-  F extends FabricContractFlags,
-  C extends Context<F>,
 >(
   this: R,
-  context: Context<F>,
+  context: FabricContractContext,
   data: V,
   key: keyof M,
   model: M
@@ -422,13 +415,11 @@ export async function oneToManyOnCreate<
  */
 export async function oneToManyOnDelete<
   M extends Model,
-  R extends Repo<M, F, C>,
+  R extends FabricContractRepository<M>,
   V extends RelationsMetadata,
-  F extends FabricContractFlags,
-  C extends Context<F>,
 >(
   this: R,
-  context: Context<F>,
+  context: FabricContractContext,
   data: V,
   key: keyof M,
   model: M
@@ -449,7 +440,9 @@ export async function oneToManyOnDelete<
 
   const uniqueValues = new Set([
     ...(isInstantiated
-      ? values.map((v: Record<string, any>) => v[repo.pk as string])
+      ? values.map(
+          (v: Record<string, any>) => v[Model.pk(this.class) as string]
+        )
       : values),
   ]);
 
@@ -516,13 +509,11 @@ export async function oneToManyOnDelete<
  */
 export async function populate<
   M extends Model,
-  R extends Repo<M, F, C>,
+  R extends Repo<M>,
   V extends RelationsMetadata,
-  F extends FabricContractFlags,
-  C extends Context<F>,
 >(
   this: R,
-  context: Context<F>,
+  context: ContextOfRepository<R>,
   data: V,
   key: keyof M,
   model: M
@@ -533,7 +524,7 @@ export async function populate<
   if (typeof nested === "undefined" || (isArr && nested.length === 0)) return;
 
   async function fetchPopulateValues(
-    c: Context<F>,
+    c: ContextOfRepository<R>,
     model: M,
     propName: string,
     propKeyValues: any[],

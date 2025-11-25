@@ -8,10 +8,9 @@ import {
   MangoQuery,
   MangoSelector,
 } from "@decaf-ts/for-couchdb";
-import { FabricContractAdapter } from "./ContractAdapter";
 import { FabricContractContext } from "./ContractContext";
 import { CouchDBStatement } from "@decaf-ts/for-couchdb";
-import { Condition, OrderDirection, Repository } from "@decaf-ts/core";
+import { Condition, OrderDirection } from "@decaf-ts/core";
 import { Metadata } from "@decaf-ts/decoration";
 import { DBKeys } from "@decaf-ts/db-decorators";
 
@@ -41,17 +40,17 @@ import { DBKeys } from "@decaf-ts/db-decorators";
  */
 export class FabricStatement<M extends Model, R> extends CouchDBStatement<
   M,
+  CouchDBAdapter<any, void, FabricContractContext>,
   R
 > {
-  constructor(
-    adapter: FabricContractAdapter,
-    private readonly ctx: FabricContractContext
-  ) {
-    super(adapter as unknown as CouchDBAdapter<any, any, any, any>);
+  constructor(adapter: CouchDBAdapter<any, void, FabricContractContext>) {
+    super(adapter);
   }
 
-  override async raw<R>(rawInput: MangoQuery): Promise<R> {
-    const results: any[] = await this.adapter.raw(rawInput, true, this.ctx);
+  override async raw<R>(rawInput: MangoQuery, ...args: any[]): Promise<R> {
+    const { ctx } = this.logCtx(args, this.raw);
+
+    const results: any[] = await this.adapter.raw(rawInput, true, ctx);
 
     const pkAttr = Model.pk(this.fromSelector);
     const type = Metadata.get(
@@ -60,14 +59,14 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
     )?.type;
 
     if (!this.selectSelector)
-      return results.map((r) => this.processRecord(r, pkAttr, type)) as R;
+      return results.map((r) => this.processRecord(r, pkAttr, type, ctx)) as R;
     return results as R;
   }
 
   override build(): MangoQuery {
     const selectors: MangoSelector = {};
     selectors[CouchDBKeys.TABLE] = {};
-    selectors[CouchDBKeys.TABLE] = Repository.table(this.fromSelector);
+    selectors[CouchDBKeys.TABLE] = Model.tableName(this.fromSelector);
     const query: MangoQuery = { selector: selectors };
     if (this.selectSelector) query.fields = this.selectSelector as string[];
 

@@ -20,7 +20,7 @@ export interface FabricContractFlags extends RepositoryFlags {
   /**
    * @description Client identity for the transaction submitter
    */
-  clientIdentity: ClientIdentity;
+  identity: ClientIdentity;
 
   /**
    * @description Logger instance for the contract

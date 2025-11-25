@@ -1,19 +1,28 @@
 import {
   Adapter,
+  ContextualArgs,
   Dispatch,
-  Repository,
+  EventIds,
   UnsupportedError,
 } from "@decaf-ts/core";
 import { PeerConfig } from "../shared/types";
 import { Client } from "@grpc/grpc-js";
-import { FabricClientAdapter } from "./FabricClientAdapter";
-import { InternalError } from "@decaf-ts/db-decorators";
+import {
+  FabricClientAdapter,
+  FabricClientContext,
+} from "./FabricClientAdapter";
+import {
+  BulkCrudOperationKeys,
+  InternalError,
+  OperationKeys,
+} from "@decaf-ts/db-decorators";
 import {
   ChaincodeEvent,
   CloseableAsyncIterable,
 } from "@hyperledger/fabric-gateway";
 import { parseEventName } from "../shared/events";
 import { Model } from "@decaf-ts/decorator-validation";
+import { Constructor } from "@decaf-ts/decoration";
 
 /**
  * @description Event dispatcher for Hyperledger Fabric chaincode events
@@ -63,7 +72,7 @@ import { Model } from "@decaf-ts/decorator-validation";
  *     FabricDispatch-->>Client: callback(id)
  *   end
  */
-export class FabricClientDispatch extends Dispatch {
+export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
   /**
    * @description Event listening stack for chaincode events
    */
@@ -132,23 +141,20 @@ export class FabricClientDispatch extends Dispatch {
    * @return {Promise<void>} A promise that resolves when all observers have been notified
    */
   override async updateObservers(
-    table: string,
-    event: string,
-    payload: any
+    model: Constructor<any> | string,
+    event: OperationKeys | BulkCrudOperationKeys | string,
+    id: EventIds,
+    ...args: ContextualArgs<FabricClientContext>
   ): Promise<void> {
+    const { log, ctxArgs } = this.logCtx(args, this.updateObservers);
     if (!this.adapter) {
-      this.log.verbose(
-        `No adapter observed for dispatch; skipping observer update for ${table}:${event}`
+      log.verbose(
+        `No adapter observed for dispatch; skipping observer update for ${typeof model === "string" ? model : Model.tableName(model)}:${event}`
       );
       return;
     }
     try {
-      await this.adapter.refresh(
-        table,
-        event,
-        payload.id ? payload.id : undefined,
-        payload
-      );
+      await this.adapter.refresh(model, event, id, ...ctxArgs);
     } catch (e: unknown) {
       throw new InternalError(`Failed to refresh dispatch: ${e}`);
     }
@@ -184,7 +190,8 @@ export class FabricClientDispatch extends Dispatch {
     if (!this.adapter || !this.adapter.config)
       throw new InternalError(`No adapter found. should be impossible`);
 
-    const log = this.log.for(this.handleEvents);
+    const { log, ctx } = this.logCtx([], this.handleEvents);
+
     log.info(
       `Listening for incoming events on chaincode "${this.adapter.config.chaincodeName}" on channel "${this.adapter.config.channel}"...`
     );
@@ -196,9 +203,12 @@ export class FabricClientDispatch extends Dispatch {
         const payload: { id: string } = this.parsePayload(evt.payload);
         try {
           await this.updateObservers(
-            table ? table : Repository.table(Model.get(this.models[0].name)),
+            (table
+              ? Model.get(table)
+              : Model.get(this.models[0].name)) as Constructor,
             event,
-            payload
+            payload.id as string,
+            ctx
           );
         } catch (e: unknown) {
           log.error(

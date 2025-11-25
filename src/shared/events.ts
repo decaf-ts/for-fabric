@@ -40,7 +40,11 @@ export function generateFabricEventName(
  *   end
  * @memberOf module:for-fabric.shared
  */
-export function parseEventName(name: string) {
+export function parseEventName(name: string): {
+  table?: string;
+  event: OperationKeys | BulkCrudOperationKeys | string;
+  owner?: string;
+} {
   const parts = name.split("_");
   if (parts.length < 2 || parts.length > 3)
     return { table: undefined, event: name, owner: undefined };

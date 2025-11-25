@@ -2,54 +2,36 @@ import {
   Context,
   InternalError,
   NotFoundError,
-  RepositoryFlags,
+  OperationKeys,
 } from "@decaf-ts/db-decorators";
-import { Adapter, Repository, SequenceOptions } from "@decaf-ts/core";
+import {
+  Adapter,
+  MaybeContextualArg,
+  Repository,
+  SequenceOptions,
+} from "@decaf-ts/core";
 import { Sequence } from "@decaf-ts/core";
-import { MangoQuery } from "@decaf-ts/for-couchdb";
-import { FabricContractContext } from "./ContractContext";
+import { SequenceModel } from "../shared/model/Sequence";
 import { FabricContractRepository } from "./FabricContractRepository";
-import { MissingContextError } from "../shared/errors";
-import { CustomizableSequence } from "./PrivateSequence";
-import { privateData } from "../shared/decorators";
-
+import { FabricContractContext } from "./ContractContext";
 /**
- * @description Abstract implementation of a Sequence for Fabric contracts
- * @summary Provides the basic functionality for sequences backed by the FabricContractRepository storing values in CouchDB-like state, including current, next and range operations.
- * @param {SequenceOptions} options - Sequence configuration such as name, type, startWith and incrementBy
- * @return {void}
- * @class FabricContractSequence
- * @example
- * const seq = new FabricContractDBSequence({ name: 'orderSeq', type: 'Number', incrementBy: 1, startWith: 1 }, adapter);
- * const next = await seq.next(ctx); // 1
- * const [a,b,c] = await seq.range(3, ctx); // [2,3,4]
- * @mermaid
- * sequenceDiagram
- *   participant App
- *   participant Sequence
- *   participant Repo
- *   App->>Sequence: next(ctx)
- *   Sequence->>Repo: read(name, ctx)
- *   Repo-->>Sequence: current
- *   Sequence->>Repo: update(current+inc)
- *   Repo-->>Sequence: saved
- *   Sequence-->>App: next value
+ * @summary Abstract implementation of a Sequence
+ * @description provides the basic functionality for {@link Sequence}s
+ *
+ * @param {SequenceOptions} options
+ *
+ * @class CouchDBSequence
+ * @implements Sequence
  */
 export class FabricContractSequence extends Sequence {
-  protected repo: FabricContractRepository<CustomizableSequence>;
+  protected repo: FabricContractRepository<SequenceModel>;
 
   constructor(
     options: SequenceOptions,
-    adapter: Adapter<any, any, MangoQuery, any, any>,
-    collections?: string[]
+    adapter: Adapter<any, void, FabricContractContext>
   ) {
-    super(options);
-
-    for (const collection of collections || []) {
-      privateData(collection)(CustomizableSequence);
-    }
-
-    this.repo = Repository.forModel(CustomizableSequence, adapter.alias);
+    super(options, adapter);
+    this.repo = Repository.forModel(SequenceModel, adapter.alias) as any;
   }
 
   /**
@@ -57,15 +39,18 @@ export class FabricContractSequence extends Sequence {
    * @protected
    */
   async current(
-    ctx?: Context<RepositoryFlags>
+    ...args: MaybeContextualArg<any>
   ): Promise<string | number | bigint> {
-    if (!ctx) throw new MissingContextError("Context is required");
+    const contextArgs = await Context.args<any, any>(
+      OperationKeys.READ,
+      SequenceModel,
+      args,
+      this.adapter
+    );
+    const ctx = contextArgs.context;
     const { name, startWith } = this.options;
     try {
-      const sequence: CustomizableSequence = await this.repo.read(
-        name as string,
-        ctx
-      );
+      const sequence: SequenceModel = await this.repo.read(name as string, ctx);
       return this.parse(sequence.current as string | number);
     } catch (e: any) {
       if (e instanceof NotFoundError) {
@@ -88,16 +73,6 @@ export class FabricContractSequence extends Sequence {
   }
 
   /**
-   * @summary Parses the {@link Sequence} value
-   *
-   * @protected
-   * @param value
-   */
-  private parse(value: string | number | bigint): string | number | bigint {
-    return Sequence.parseValue(this.options.type, value);
-  }
-
-  /**
    * @summary increments the sequence
    * @description Sequence specific implementation
    *
@@ -107,10 +82,9 @@ export class FabricContractSequence extends Sequence {
    */
   private async increment(
     current: string | number | bigint,
-    count?: number,
-    ctx?: FabricContractContext
+    count: number | undefined,
+    ctx: Context<any>
   ): Promise<string | number | bigint> {
-    if (!ctx) throw new MissingContextError("Context is required");
     const { type, incrementBy, name } = this.options;
     let next: string | number | bigint;
     const toIncrementBy = count || incrementBy;
@@ -128,16 +102,16 @@ export class FabricContractSequence extends Sequence {
       default:
         throw new InternalError("Should never happen");
     }
-    let seq: CustomizableSequence;
+    let seq: SequenceModel;
     try {
       seq = await this.repo.update(
-        new CustomizableSequence({ id: name, current: next }),
+        new SequenceModel({ id: name, current: next }),
         ctx
       );
     } catch (e: any) {
       if (!(e instanceof NotFoundError)) throw e;
       seq = await this.repo.create(
-        new CustomizableSequence({ id: name, current: next }),
+        new SequenceModel({ id: name, current: next }),
         ctx
       );
     }
@@ -146,34 +120,58 @@ export class FabricContractSequence extends Sequence {
   }
 
   /**
-   * @summary Generates the next value in th sequence
-   * @description calls {@link Sequence#parse} on the current value
-   * followed by {@link Sequence#increment}
-   *
+   * @description Gets the next value in the sequence
+   * @summary Retrieves the current value of the sequence and increments it by the
+   * configured increment amount. This is the main method used to get a new sequential value.
+   * @return A promise that resolves to the next value in the sequence
    */
-  async next(ctx?: FabricContractContext): Promise<number | string | bigint> {
-    if (!ctx) throw new MissingContextError("Context is required");
-    const current = await this.current(ctx);
-    return this.increment(current, undefined, ctx);
+  async next(
+    ...argz: MaybeContextualArg<any>
+  ): Promise<number | string | bigint> {
+    const contextArgs = await Context.args(
+      OperationKeys.UPDATE,
+      SequenceModel,
+      argz,
+      this.adapter
+    );
+    const { context, args } = contextArgs;
+    const current = await this.current(...args);
+    return this.increment(current, undefined, context);
   }
 
+  /**
+   * @description Generates a range of sequential values
+   * @summary Retrieves a specified number of sequential values from the sequence.
+   * This is useful when you need to allocate multiple IDs at once.
+   * The method increments the sequence by the total amount needed and returns all values in the range.
+   * @param {number} count - The number of sequential values to generate
+   * @return A promise that resolves to an array of sequential values
+   */
   async range(
     count: number,
-    ctx?: FabricContractContext
+    ...argz: MaybeContextualArg<any>
   ): Promise<(number | string | bigint)[]> {
-    if (!ctx) throw new MissingContextError("Context is required");
-    const current = (await this.current(ctx)) as number;
-    const incrementBy = this.parse(this.options.incrementBy) as number;
+    const contextArgs = await Context.args(
+      OperationKeys.UPDATE,
+      SequenceModel,
+      argz,
+      this.adapter
+    );
+    const { context, args } = contextArgs;
+    const current = (await this.current(...args)) as number;
+    const incrementBy = this.parse(
+      this.options.incrementBy as number
+    ) as number;
     const next: string | number | bigint = await this.increment(
       current,
       (this.parse(count) as number) * incrementBy,
-      ctx
+      context
     );
     const range: (number | string | bigint)[] = [];
     for (let i: number = 1; i <= count; i++) {
       range.push(current + incrementBy * (this.parse(i) as number));
     }
-    if (range[range.length - 1] !== next)
+    if (range[range.length - 1] !== next && this.options.type !== "String")
       throw new InternalError("Miscalculation of range");
     return range;
   }
