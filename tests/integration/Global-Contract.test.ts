@@ -26,9 +26,14 @@ describe("Tests global contract implementation", () => {
   let userRepository: FabricClientRepository<User>;
   let productRepository: FabricClientRepository<Product>;
 
-  const useHsm = true;
+  const useHsm = false;
 
   beforeAll(async () => {
+    //Creates hsm folder
+    fs.mkdirSync(
+      path.join(__dirname, "../../docker/infrastructure/storage/softhsm/orghsm")
+    );
+
     // Boot infrastructure for testing
     execSync(`npm run infrastructure${useHsm ? "-hsm" : ""}:up`, {
       stdio: "inherit",
