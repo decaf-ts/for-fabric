@@ -53,6 +53,9 @@ export class ContractLogger extends MiniLogger {
     ctx?: Ctx
   ) {
     super(context, conf);
+    //
+    // if (!ctx) {
+    //   this.logger = new MiniLogger(context, conf);
     if (!ctx) throw new InternalError(`Context not provided`);
     this.logger = ctx.logging.getLogger(context) as unknown as Logger;
   }
