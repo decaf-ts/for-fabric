@@ -30,7 +30,6 @@ import {
   RelationsMetadata,
   Repository,
   Sequence,
-  sequenceNameForModel,
   SequenceOptions,
   UnsupportedError,
   Adapter,
@@ -154,10 +153,9 @@ export async function pkFabricOnCreate<
   M extends Model,
   R extends FabricContractRepository<M>,
   V extends SequenceOptions,
-  F extends FabricContractFlags,
 >(
   this: R,
-  context: Context<F>,
+  context: FabricContractContext,
   data: V,
   key: keyof M,
   model: M
@@ -178,7 +176,7 @@ export async function pkFabricOnCreate<
       value: value,
     });
   };
-  if (!data.name) data.name = sequenceNameForModel(model, "pk");
+  if (!data.name) data.name = Model.sequenceName(model, "pk");
   let sequence: FabricContractSequence;
   try {
     sequence = (await this.adapter.Sequence(data)) as FabricContractSequence;
@@ -232,7 +230,6 @@ export async function pkFabricOnCreate<
 export class FabricContractAdapter extends CouchDBAdapter<
   any,
   void,
-  FabricContractFlags,
   FabricContractContext
 > {
   protected override getClient(): void {

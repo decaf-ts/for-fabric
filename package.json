@@ -118,7 +118,6 @@
     "@decaf-ts/for-couchdb": "latest",
     "@decaf-ts/injectable-decorators": "latest",
     "@decaf-ts/logging": "latest",
-    "@decaf-ts/reflection": "latest",
     "@decaf-ts/transactional-decorators": "latest",
     "json-stringify-deterministic": "^1.0.12",
     "sort-keys-recursive": "^2.1.10"
