@@ -99,13 +99,15 @@ export class FabricContractRepository<M extends Model> extends Repository<
   public logFor(ctx: Context | FabricContractContext): ContractLogger {
     if ((ctx as FabricContractContext).logger)
       return (ctx as FabricContractContext).logger as ContractLogger;
-    return Logging.for(
+    const l = Logging.for(
       this as any,
       {
         correlationId: ctx.stub.getTxID(),
       },
       ctx
     ) as ContractLogger;
+    l.info(`REPOSITORY LOG_CTX`);
+    return l;
   }
 
   /**

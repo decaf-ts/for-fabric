@@ -292,6 +292,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<Record<string, any>> {
     const { ctx, log } = this.logCtx(args, this.create);
+    log.info(`in ADAPTER create with args ${args}`);
     const { stub } = ctx;
     const tableName = Model.tableName(clazz);
     try {
@@ -319,6 +320,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<Record<string, any>> {
     const { ctx, log } = this.logCtx(args, this.read);
+    log.info(`in ADAPTER read with args ${args}`);
     const { stub } = ctx;
     const tableName = Model.tableName(clazz);
 
@@ -327,14 +329,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
       const composedKey = stub.createCompositeKey(tableName, [String(id)]);
 
       const results = await this.readState(composedKey, ctx);
-
+      log.info(JSON.stringify(results));
       if (results.length < 1) {
         log.debug(`No record found for id ${id} in ${tableName} table`);
         throw new NotFoundError(
           `No record found for id ${id} in ${tableName} table`
         );
       } else if (results.length < 2) {
-        log.debug(`No record found for id ${id} in ${tableName} table`);
+        log.info(`No record found for id ${id} in ${tableName} table`);
         model = results.pop() as Record<string, any>;
       } else {
         model = this.mergeModels(results);

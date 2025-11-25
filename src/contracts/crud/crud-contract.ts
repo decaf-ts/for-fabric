@@ -105,6 +105,7 @@ export abstract class FabricCrudContract<M extends Model>
     ...args: any[]
   ): Promise<string | M> {
     const { log, ctxArgs } = await this.logCtx([...args, ctx], this.create);
+    log.info(`CONTRACT CREATE, ${ctxArgs}`);
 
     if (typeof model === "string") model = this.deserialize<M>(model) as M;
 

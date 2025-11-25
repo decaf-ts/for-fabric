@@ -67,4 +67,8 @@ export class FabricContractContext extends Context<FabricContractFlags> {
   get identity(): ClientIdentity {
     return this.get("identity");
   }
+
+  override toString() {
+    return `fabric ctx: ${JSON.stringify(this.cache)}`;
+  }
 }
