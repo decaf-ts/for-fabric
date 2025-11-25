@@ -115,9 +115,11 @@ export class FabricLogger extends MiniLogger {
  * @memberOf module:for-fabric.client
  */
 const factory: LoggerFactory = (
-  object: string,
-  config: Partial<LoggingConfig> | undefined
+  object?: string,
+  config?: Partial<LoggingConfig> | undefined
 ) => {
+  if(!object)
+    throw new Error("Missing Object String");
   return new FabricLogger(object, config || {});
 };
 

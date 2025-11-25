@@ -120,10 +120,12 @@ export class ContractLogger extends MiniLogger {
  * @memberOf module:fabric.contracts
  */
 const factory: LoggerFactory = (
-  object: string,
-  config: Partial<LoggingConfig> | undefined,
-  ctx: Ctx
+  object?: string,
+  config?: Partial<LoggingConfig> | undefined,
+  ctx?: Ctx
 ) => {
+  if(!object)
+    throw new Error("Missing Object String");
   return new ContractLogger(object, config || {}, ctx as any);
 };
 

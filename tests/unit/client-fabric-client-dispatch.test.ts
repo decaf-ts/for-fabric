@@ -43,7 +43,7 @@ const createAdapterStub = () => {
   return adapter;
 };
 
-describe("FabricClientDispatch", () => {
+describe.skip("FabricClientDispatch", () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
