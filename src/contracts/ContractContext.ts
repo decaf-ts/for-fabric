@@ -69,6 +69,6 @@ export class FabricContractContext extends Context<FabricContractFlags> {
   }
 
   override toString() {
-    return `fabric ctx: ${JSON.stringify(this.cache)}`;
+    return `fabric ctx${this.stub ? " with stub" : "without stub"}`;
   }
 }
