@@ -186,7 +186,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.CREATE_ALL,
-      [ids, models.map((m) => this.serializer.serialize(m, clazz.name))],
+      [ids, models.map((m) => this.serializer.serialize(m))],
       transient,
       undefined,
       tableName
@@ -257,7 +257,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
 
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.UPDATE_ALL,
-      [ids, models.map((m) => this.serializer.serialize(m, clazz.name))],
+      [ids, models.map((m) => this.serializer.serialize(m))],
       transient,
       undefined,
       clazz.name
@@ -435,7 +435,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
       OperationKeys.CREATE,
-      [this.serializer.serialize(model, clazz.name)],
+      [this.serializer.serialize(model)],
       transient,
       undefined,
       clazz.name
@@ -515,7 +515,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
       OperationKeys.UPDATE,
-      [this.serializer.serialize(model, clazz.name)],
+      [this.serializer.serialize(model)],
       transient,
       undefined,
       clazz.name
