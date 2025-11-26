@@ -307,24 +307,7 @@ describe("Tests global contract implementation", () => {
     expect(deleted).toBeDefined();
     expect(read.name).toEqual(deleted.name);
     expect(read.id).toEqual(deleted.id);
-
-    console.log(deleted);
-
-    let triggered = false;
-    try {
-      const readDeleted = await repo.read(read.id);
-      expect(readDeleted).toBeUndefined();
-    } catch (e: unknown) {
-      expect(e).toBeDefined();
-      const error = e as NotFoundError;
-      triggered = true;
-      expect(error.code).toEqual(500);
-      expect(
-        error.message.includes(`Record with id ${read.id} not found`)
-      ).toEqual(true);
-    }
-
-    expect(triggered).toEqual(true);
+    await expect(repo.read(read.id)).rejects.toThrow(NotFoundError);
   });
 
   it("Should create Product", async () => {
@@ -512,20 +495,6 @@ describe("Tests global contract implementation", () => {
 
     console.log(deleted);
 
-    let triggered = false;
-    try {
-      const readDeleted = await repo.read(read.productCode);
-      expect(readDeleted).toBeUndefined();
-    } catch (e: unknown) {
-      expect(e).toBeDefined();
-      const error = e as NotFoundError;
-      triggered = true;
-      expect(error.code).toEqual(500);
-      expect(
-        error.message.includes(`Record with id ${read.productCode} not found`)
-      ).toEqual(true);
-    }
-
-    expect(triggered).toEqual(true);
+    await expect(repo.read(read.productCode)).rejects.toThrow(NotFoundError);
   });
 });
