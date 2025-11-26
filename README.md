@@ -3,6 +3,8 @@
 
 Chaincode-side building blocks for Hyperledger Fabric written in TypeScript. This module provides repositories, CRUD contracts (object and serialized JSON), an ERC20 sample contract, Fabric-backed sequences, event emission, and context-aware logging. It adapts DECAF’s data-access patterns to Fabric’s world-state so you can write smart contracts with the same Repository/Model abstractions used elsewhere in DECAF.
 
+> Release docs refreshed on 2025-11-26. See [workdocs/reports/RELEASE_NOTES.md](./workdocs/reports/RELEASE_NOTES.md) for ticket summaries.
+
 
 ![Licence](https://img.shields.io/github/license/decaf-ts/for-fabric.svg?style=plastic)
 ![GitHub language count](https://img.shields.io/github/languages/count/decaf-ts/for-fabric?style=plastic)
@@ -622,6 +624,9 @@ These patterns are mirrored in the examples above to ensure correctness and cons
   - strategy;
   - builder;
   - etc;
+
+## Release Documentation Hooks
+Stay aligned with the automated release pipeline by reviewing [Release Notes](./workdocs/reports/RELEASE_NOTES.md) and [Dependencies](./workdocs/reports/DEPENDENCIES.md) after trying these recipes (updated on 2025-11-26).
 
 
 ### Related
