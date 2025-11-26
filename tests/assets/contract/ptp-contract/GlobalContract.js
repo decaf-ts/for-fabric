@@ -1,8 +1,8 @@
 (function (global, factory) {
-    typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@decaf-ts/for-fabric'), require('@decaf-ts/decorator-validation'), require('fabric-contract-api'), require('@decaf-ts/core'), require('@decaf-ts/for-fabric/contracts'), require('@decaf-ts/db-decorators'), require('@decaf-ts/reflection'), require('@decaf-ts/for-typeorm'), require('@decaf-ts/for-fabric/shared')) :
-    typeof define === 'function' && define.amd ? define(['exports', '@decaf-ts/for-fabric', '@decaf-ts/decorator-validation', 'fabric-contract-api', '@decaf-ts/core', '@decaf-ts/for-fabric/contracts', '@decaf-ts/db-decorators', '@decaf-ts/reflection', '@decaf-ts/for-typeorm', '@decaf-ts/for-fabric/shared'], factory) :
-    (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory((global.GlobalContract = global.GlobalContract || {}, global.GlobalContract.js = {}), global.forFabric, global.decoratorValidation, global.fabricContractApi, global.core, global.contracts$1, global.dbDecorators, global.reflection, global.forTypeorm, global.shared));
-})(this, (function (exports, forFabric, decoratorValidation, fabricContractApi, core, contracts$1, dbDecorators, reflection, forTypeorm, shared) { 'use strict';
+    typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('@decaf-ts/for-fabric'), require('@decaf-ts/decorator-validation'), require('fabric-contract-api'), require('@decaf-ts/core'), require('@decaf-ts/for-fabric/contracts'), require('@decaf-ts/db-decorators'), require('@decaf-ts/reflection'), require('@decaf-ts/decoration'), require('@decaf-ts/for-typeorm'), require('@decaf-ts/for-fabric/shared')) :
+    typeof define === 'function' && define.amd ? define(['exports', '@decaf-ts/for-fabric', '@decaf-ts/decorator-validation', 'fabric-contract-api', '@decaf-ts/core', '@decaf-ts/for-fabric/contracts', '@decaf-ts/db-decorators', '@decaf-ts/reflection', '@decaf-ts/decoration', '@decaf-ts/for-typeorm', '@decaf-ts/for-fabric/shared'], factory) :
+    (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory((global.GlobalContract = global.GlobalContract || {}, global.GlobalContract.js = {}), global.forFabric, global.decoratorValidation, global.fabricContractApi, global.core, global.contracts$1, global.dbDecorators, global.reflection, global.decoration, null, global.shared));
+})(this, (function (exports, forFabric, decoratorValidation, fabricContractApi, core, contracts$1, dbDecorators, reflection, decoration, forTypeorm, shared) { 'use strict';
 
     /******************************************************************************
     Copyright (c) Microsoft Corporation.
@@ -86,7 +86,7 @@
         __metadata("design:paramtypes", [String])
     ], GtinValidator);
     const gtin = (message = GTIN_VALIDATION_ERROR_MESSAGE) => {
-        return reflection.apply(decoratorValidation.required(), dbDecorators.readonly(), decoratorValidation.propMetadata(decoratorValidation.Validation.key(GTIN_VALIDATION_KEY), {
+        return reflection.apply(decoratorValidation.required(), dbDecorators.readonly(), decoration.propMetadata(decoratorValidation.Validation.key(GTIN_VALIDATION_KEY), {
             message: message,
             types: ["string", "number"],
             async: false,
@@ -361,92 +361,6 @@
         UserGroup["READ"] = "read";
         UserGroup["WRITE"] = "write";
     })(UserGroup || (UserGroup = {}));
-    const DBFlavour = forTypeorm.TypeORMFlavour;
-
-    let GtinOwner = class GtinOwner extends core.BaseModel {
-        constructor(model) {
-            super(model);
-        }
-    };
-    __decorate([
-        decoratorValidation.description("GTIN code identifying the product."),
-        core.pk({ type: "String", generated: false }),
-        gtin(),
-        __metadata("design:type", String)
-    ], GtinOwner.prototype, "productCode", void 0);
-    __decorate([
-        decoratorValidation.description("Entity that owns or is responsible for the GTIN."),
-        core.column(),
-        decoratorValidation.required(),
-        shared.OwnedBy(),
-        __metadata("design:type", String)
-    ], GtinOwner.prototype, "ownedBy", void 0);
-    GtinOwner = __decorate([
-        decoratorValidation.description("Defines the ownership information for a specific GTIN."),
-        core.uses(shared.FabricFlavour),
-        dbDecorators.BlockOperations([dbDecorators.OperationKeys.DELETE]),
-        core.table(TableNames.GtinOwner),
-        decoratorValidation.model(),
-        __metadata("design:paramtypes", [Object])
-    ], GtinOwner);
-
-    var GtinOwnerContract_1;
-    fabricContractApi.Object()(decoratorValidation.Model);
-    fabricContractApi.Object()(core.BaseModel);
-    let GtinOwnerContract = GtinOwnerContract_1 = class GtinOwnerContract extends contracts$1.SerializedCrudContract {
-        constructor() {
-            super(GtinOwnerContract_1.name, GtinOwner);
-        }
-    };
-    GtinOwnerContract = GtinOwnerContract_1 = __decorate([
-        fabricContractApi.Info({
-            title: "GtinOwnerContract",
-            description: "Contract managing the Gtin Owners",
-        }),
-        __metadata("design:paramtypes", [])
-    ], GtinOwnerContract);
-
-    let Audit = class Audit extends core.BaseModel {
-        constructor(model) {
-            super(model);
-        }
-    };
-    __decorate([
-        core.pk(),
-        decoratorValidation.description("Unique identifier of the audit record."),
-        __metadata("design:type", String)
-    ], Audit.prototype, "id", void 0);
-    __decorate([
-        core.column(),
-        decoratorValidation.required(),
-        dbDecorators.readonly(),
-        decoratorValidation.description("Identifier of the user who performed the action."),
-        __metadata("design:type", String)
-    ], Audit.prototype, "userId", void 0);
-    __decorate([
-        core.column(),
-        decoratorValidation.required(),
-        dbDecorators.readonly(),
-        decoratorValidation.type(String.name),
-        decoratorValidation.description("Group or role of the user who performed the action."),
-        __metadata("design:type", String)
-    ], Audit.prototype, "userGroup", void 0);
-    __decorate([
-        core.column(),
-        decoratorValidation.required(),
-        dbDecorators.readonly(),
-        decoratorValidation.type(String.name),
-        decoratorValidation.description("Type of action performed by the user."),
-        __metadata("design:type", String)
-    ], Audit.prototype, "action", void 0);
-    Audit = __decorate([
-        decoratorValidation.description("Logs user activity for auditing purposes."),
-        core.uses(DBFlavour),
-        dbDecorators.BlockOperations([dbDecorators.OperationKeys.UPDATE, dbDecorators.OperationKeys.DELETE]),
-        core.table(TableNames.Audit),
-        decoratorValidation.model(),
-        __metadata("design:paramtypes", [Object])
-    ], Audit);
 
     class ToolkitBaseModel extends decoratorValidation.Model {
         constructor(arg) {
@@ -468,6 +382,49 @@
         __metadata("design:type", Number)
     ], ToolkitBaseModel.prototype, "version", void 0);
 
+    let GtinOwner = class GtinOwner extends ToolkitBaseModel {
+        constructor(model) {
+            super(model);
+        }
+    };
+    __decorate([
+        core.pk({ type: "String", generated: false }),
+        gtin(),
+        dbDecorators.readonly(),
+        __metadata("design:type", String)
+    ], GtinOwner.prototype, "productCode", void 0);
+    __decorate([
+        core.column(),
+        decoratorValidation.required(),
+        shared.OwnedBy(),
+        __metadata("design:type", String)
+    ], GtinOwner.prototype, "ownedBy", void 0);
+    GtinOwner = __decorate([
+        decoration.uses(shared.FabricFlavour),
+        core.table(TableNames.GtinOwner),
+        decoratorValidation.model()
+        // @BlockOperations([OperationKeys.DELETE])
+        ,
+        __metadata("design:paramtypes", [Object])
+    ], GtinOwner);
+
+    var GtinOwnerContract_1;
+    fabricContractApi.Object()(decoratorValidation.Model);
+    fabricContractApi.Object()(core.BaseModel);
+    let GtinOwnerContract = GtinOwnerContract_1 = class GtinOwnerContract extends contracts$1.SerializedCrudContract {
+        constructor() {
+            super(GtinOwnerContract_1.name, GtinOwner);
+        }
+    };
+    GtinOwnerContract = GtinOwnerContract_1 = __decorate([
+        fabricContractApi.Info({
+            title: "GtinOwnerContract",
+            description: "Contract managing the Gtin Owners",
+        }),
+        __metadata("design:paramtypes", [])
+    ], GtinOwnerContract);
+
+    // @BlockOperations([OperationKeys.DELETE])
     let Product = class Product extends ToolkitBaseModel {
         // @oneToMany(() => ProductStrength, {update: Cascade.CASCADE, delete: Cascade.NONE}, false)
         // strengths!: ProductStrength[];
@@ -529,12 +486,72 @@
         __metadata("design:type", String)
     ], Product.prototype, "healthcarePractitionerInfo", void 0);
     Product = __decorate([
-        core.uses(shared.FabricFlavour),
-        core.table(TableNames.Product),
+        decoration.uses(shared.FabricFlavour),
+        core.table("Product"),
         decoratorValidation.model(),
-        dbDecorators.BlockOperations([dbDecorators.OperationKeys.DELETE]),
         __metadata("design:paramtypes", [Object])
     ], Product);
+
+    var ProductContract_1;
+    console.log("Forcing Fabric Crud Contract before models to trigger adaptor decorators override:", forFabric.FabricCrudContract);
+    fabricContractApi.Object()(decoratorValidation.Model);
+    fabricContractApi.Object()(core.BaseModel);
+    fabricContractApi.Object()(ToolkitBaseModel);
+    fabricContractApi.Object()(Product);
+    let ProductContract = ProductContract_1 = class ProductContract extends contracts$1.SerializedCrudContract {
+        constructor() {
+            super(ProductContract_1.name, Product);
+        }
+    };
+    ProductContract = ProductContract_1 = __decorate([
+        fabricContractApi.Info({
+            title: "ProductContract",
+            description: "Contract managing the Products",
+        }),
+        __metadata("design:paramtypes", [])
+    ], ProductContract);
+
+    let Audit = class Audit extends core.BaseModel {
+        constructor(model) {
+            super(model);
+        }
+    };
+    __decorate([
+        core.pk({ type: "String", generated: false }),
+        decoration.description("Unique identifier of the audit record."),
+        __metadata("design:type", String)
+    ], Audit.prototype, "id", void 0);
+    __decorate([
+        core.column(),
+        decoratorValidation.required(),
+        dbDecorators.readonly(),
+        decoration.description("Identifier of the user who performed the action."),
+        __metadata("design:type", String)
+    ], Audit.prototype, "userId", void 0);
+    __decorate([
+        core.column(),
+        decoratorValidation.required(),
+        dbDecorators.readonly(),
+        decoratorValidation.type(String),
+        decoration.description("Group or role of the user who performed the action."),
+        __metadata("design:type", String)
+    ], Audit.prototype, "userGroup", void 0);
+    __decorate([
+        core.column(),
+        decoratorValidation.required(),
+        dbDecorators.readonly(),
+        decoratorValidation.type(String),
+        decoration.description("Type of action performed by the user."),
+        __metadata("design:type", String)
+    ], Audit.prototype, "action", void 0);
+    Audit = __decorate([
+        decoration.description("Logs user activity for auditing purposes."),
+        decoration.uses(shared.FabricFlavour),
+        dbDecorators.BlockOperations([dbDecorators.OperationKeys.UPDATE, dbDecorators.OperationKeys.DELETE]),
+        core.table(TableNames.Audit),
+        decoratorValidation.model(),
+        __metadata("design:paramtypes", [Object])
+    ], Audit);
 
     let Batch = class Batch extends ToolkitBaseModel {
         // TODO -> Uncomment and fix
@@ -556,139 +573,139 @@
     __decorate([
         core.pk({ type: "String", generated: false }),
         dbDecorators.composed(["productCode", "batchNumber"], ":", true),
-        decoratorValidation.description("Unique identifier composed of product code and batch number."),
+        decoration.description("Unique identifier composed of product code and batch number."),
         __metadata("design:type", String)
     ], Batch.prototype, "id", void 0);
     __decorate([
         core.manyToOne(() => Product, { update: core.Cascade.NONE, delete: core.Cascade.NONE }, false),
         gtin(),
         dbDecorators.readonly(),
-        decoratorValidation.description("Code of the product associated with this batch."),
+        decoration.description("Code of the product associated with this batch."),
         __metadata("design:type", String)
     ], Batch.prototype, "productCode", void 0);
     __decorate([
         core.column(),
         dbDecorators.readonly(),
         decoratorValidation.pattern(BatchPattern),
-        decoratorValidation.description("Batch number assigned to the product."),
+        decoration.description("Batch number assigned to the product."),
         __metadata("design:type", String)
     ], Batch.prototype, "batchNumber", void 0);
     __decorate([
         decoratorValidation.required(),
         decoratorValidation.date(DatePattern),
         core.column(),
-        decoratorValidation.description("Date when the batch expires."),
+        decoration.description("Date when the batch expires."),
         __metadata("design:type", Date)
     ], Batch.prototype, "expiryDate", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Import license number for this batch."),
+        decoration.description("Import license number for this batch."),
         __metadata("design:type", String)
     ], Batch.prototype, "importLicenseNumber", void 0);
     __decorate([
         core.column(),
         decoratorValidation.date(DatePattern),
-        decoratorValidation.description("Date when the batch was manufactured."),
+        decoration.description("Date when the batch was manufactured."),
         __metadata("design:type", String)
     ], Batch.prototype, "dateOfManufacturing", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Name of the product manufacturer."),
+        decoration.description("Name of the product manufacturer."),
         __metadata("design:type", String)
     ], Batch.prototype, "manufacturerName", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Manufacturer address line 1."),
+        decoration.description("Manufacturer address line 1."),
         __metadata("design:type", String)
     ], Batch.prototype, "manufacturerAddress1", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Manufacturer address line 2."),
+        decoration.description("Manufacturer address line 2."),
         __metadata("design:type", String)
     ], Batch.prototype, "manufacturerAddress2", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Manufacturer address line 3."),
+        decoration.description("Manufacturer address line 3."),
         __metadata("design:type", String)
     ], Batch.prototype, "manufacturerAddress3", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Manufacturer address line 4."),
+        decoration.description("Manufacturer address line 4."),
         __metadata("design:type", String)
     ], Batch.prototype, "manufacturerAddress4", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Manufacturer address line 5."),
+        decoration.description("Manufacturer address line 5."),
         __metadata("design:type", String)
     ], Batch.prototype, "manufacturerAddress5", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Indicates whether this batch has been recalled."),
+        decoration.description("Indicates whether this batch has been recalled."),
         __metadata("design:type", Boolean)
     ], Batch.prototype, "batchRecall", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Name of the site where the product was packaged."),
+        decoration.description("Name of the site where the product was packaged."),
         __metadata("design:type", String)
     ], Batch.prototype, "packagingSiteName", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Version of the electronic product information leaflet."),
+        decoration.description("Version of the electronic product information leaflet."),
         __metadata("design:type", Number)
     ], Batch.prototype, "epiLeafletVersion", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Enables expiry date verification feature."),
+        decoration.description("Enables expiry date verification feature."),
         __metadata("design:type", Boolean)
     ], Batch.prototype, "flagEnableEXPVerification", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Allows checking for expired batches."),
+        decoration.description("Allows checking for expired batches."),
         __metadata("design:type", Boolean)
     ], Batch.prototype, "flagEnableExpiredEXPCheck", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Custom message displayed for this batch."),
+        decoration.description("Custom message displayed for this batch."),
         __metadata("design:type", String)
     ], Batch.prototype, "batchMessage", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Enables display of recall messages for this batch."),
+        decoration.description("Enables display of recall messages for this batch."),
         __metadata("design:type", Boolean)
     ], Batch.prototype, "flagEnableBatchRecallMessage", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Message shown when the batch is recalled."),
+        decoration.description("Message shown when the batch is recalled."),
         __metadata("design:type", String)
     ], Batch.prototype, "recallMessage", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Enables ACF batch verification feature."),
+        decoration.description("Enables ACF batch verification feature."),
         __metadata("design:type", Boolean)
     ], Batch.prototype, "flagEnableACFBatchCheck", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("URL for ACF batch verification."),
+        decoration.description("URL for ACF batch verification."),
         __metadata("design:type", String)
     ], Batch.prototype, "acfBatchCheckURL", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Enables serial number (SN) verification feature."),
+        decoration.description("Enables serial number (SN) verification feature."),
         __metadata("design:type", Boolean)
     ], Batch.prototype, "flagEnableSNVerification", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Identifier of the ACDC authentication feature (SSI)."),
+        decoration.description("Identifier of the ACDC authentication feature (SSI)."),
         __metadata("design:type", String)
     ], Batch.prototype, "acdcAuthFeatureSSI", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Indicates if serial number validation was reset."),
+        decoration.description("Indicates if serial number validation was reset."),
         __metadata("design:type", Boolean)
     ], Batch.prototype, "snValidReset", void 0);
     Batch = __decorate([
-        decoratorValidation.description("Represents a product batch"),
-        core.uses(DBFlavour),
+        decoration.description("Represents a product batch"),
+        decoration.uses(shared.FabricFlavour),
         dbDecorators.BlockOperations([dbDecorators.OperationKeys.DELETE]),
         core.table(TableNames.Batch),
         decoratorValidation.model(),
@@ -702,29 +719,29 @@
     };
     __decorate([
         core.pk(),
-        decoratorValidation.description("Unique identifier of the leaflet file."),
+        decoration.description("Unique identifier of the leaflet file."),
         __metadata("design:type", String)
     ], LeafletFile.prototype, "id", void 0);
     __decorate([
         core.manyToOne(() => Leaflet, { update: core.Cascade.NONE, delete: core.Cascade.NONE }, false),
-        decoratorValidation.description("Identifier of the leaflet this file belongs to."),
+        decoration.description("Identifier of the leaflet this file belongs to."),
         __metadata("design:type", String)
     ], LeafletFile.prototype, "leafletId", void 0);
     __decorate([
         core.column(),
         decoratorValidation.required(),
-        decoratorValidation.description("Name of the file, including its extension."),
+        decoration.description("Name of the file, including its extension."),
         __metadata("design:type", String)
     ], LeafletFile.prototype, "filename", void 0);
     __decorate([
         core.column(),
         decoratorValidation.required(),
-        decoratorValidation.description("Base64-encoded content of the file."),
+        decoration.description("Base64-encoded content of the file."),
         __metadata("design:type", String)
     ], LeafletFile.prototype, "fileContent", void 0);
     LeafletFile = __decorate([
-        decoratorValidation.description("Represents an additional file associated with a leaflet, such as a PDF or image."),
-        core.uses(DBFlavour),
+        decoration.description("Represents an additional file associated with a leaflet, such as a PDF or image."),
+        decoration.uses(shared.FabricFlavour),
         core.table(TableNames.LeafletFile),
         decoratorValidation.model(),
         __metadata("design:paramtypes", [Object])
@@ -738,22 +755,29 @@
     __decorate([
         core.pk({ type: "String", generated: false }),
         dbDecorators.composed(["productCode", "batchNumber", "lang"], ":", true),
-        decoratorValidation.description("Unique identifier composed of product code, batch number, and language."),
+        decoration.description("Unique identifier composed of product code, batch number, and language."),
         __metadata("design:type", String)
     ], Leaflet.prototype, "id", void 0);
     __decorate([
-        core.manyToOne(() => Product, { update: core.Cascade.CASCADE, delete: core.Cascade.CASCADE }, false),
         gtin(),
+        core.manyToOne(() => Product, { update: core.Cascade.CASCADE, delete: core.Cascade.CASCADE }, false),
         decoratorValidation.required(),
         dbDecorators.readonly(),
-        decoratorValidation.description("GTIN code of the product associated with this leaflet."),
+        decoration.description("GTIN code of the product associated with this leaflet."),
         __metadata("design:type", String)
     ], Leaflet.prototype, "productCode", void 0);
     __decorate([
-        core.manyToOne(() => Batch, { update: core.Cascade.CASCADE, delete: core.Cascade.CASCADE }, false),
-        decoratorValidation.pattern(BatchPattern),
+        core.column(),
+        decoratorValidation.pattern(BatchPattern)
+        //TODO: Uncomment when implemented in couch and FK relationshipacept composed one
+        // @manyToOne(
+        //   () => Batch,
+        //   { update: Cascade.CASCADE, delete: Cascade.CASCADE },
+        //   false
+        // )
+        ,
         dbDecorators.readonly(),
-        decoratorValidation.description("Batch number linked to the product, if applicable."),
+        decoration.description("Batch number linked to the product, if applicable."),
         __metadata("design:type", String)
     ], Leaflet.prototype, "batchNumber", void 0);
     __decorate([
@@ -761,23 +785,23 @@
         decoratorValidation.required(),
         decoratorValidation.pattern(LanguagesPattern),
         dbDecorators.readonly(),
-        decoratorValidation.description("Language code of the leaflet (e.g., 'en', 'pt', 'es')."),
+        decoration.description("Language code of the leaflet (e.g., 'en', 'pt', 'es')."),
         __metadata("design:type", String)
     ], Leaflet.prototype, "lang", void 0);
     __decorate([
         core.column(),
         decoratorValidation.required(),
-        decoratorValidation.description("Main XML content of the electronic leaflet."),
+        decoration.description("Main XML content of the electronic leaflet."),
         __metadata("design:type", String)
     ], Leaflet.prototype, "xmlFileContent", void 0);
     __decorate([
         core.oneToMany(() => LeafletFile, { update: core.Cascade.CASCADE, delete: core.Cascade.CASCADE }, false),
-        decoratorValidation.description("List of additional files linked to the leaflet, such as PDFs or images."),
+        decoration.description("List of additional files linked to the leaflet, such as PDFs or images."),
         __metadata("design:type", Array)
     ], Leaflet.prototype, "otherFilesContent", void 0);
     Leaflet = __decorate([
-        decoratorValidation.description("Represents the ePI leaflet linked to a specific product, batch, and language."),
-        core.uses(DBFlavour),
+        decoration.description("Represents the ePI leaflet linked to a specific product, batch, and language."),
+        decoration.uses(shared.FabricFlavour),
         core.table(TableNames.Leaflet),
         decoratorValidation.model(),
         __metadata("design:paramtypes", [Object])
@@ -791,46 +815,46 @@
     __decorate([
         core.pk({ type: "String", generated: false }),
         dbDecorators.composed(["productCode", "marketId"], ":", true),
-        decoratorValidation.description("Unique identifier composed of product code and market ID."),
+        decoration.description("Unique identifier composed of product code and market ID."),
         __metadata("design:type", String)
     ], ProductMarket.prototype, "id", void 0);
     __decorate([
         core.manyToOne(() => Product, { update: core.Cascade.NONE, delete: core.Cascade.NONE }, false),
-        decoratorValidation.description("GTIN code of the product associated with this market entry."),
+        decoration.description("GTIN code of the product associated with this market entry."),
         __metadata("design:type", String)
     ], ProductMarket.prototype, "productCode", void 0);
     __decorate([
         core.column(),
         decoratorValidation.required(),
         decoratorValidation.pattern(ProductMarketPattern),
-        decoratorValidation.description("Identifier of the market where the product is registered or sold."),
+        decoration.description("Identifier of the market where the product is registered or sold."),
         __metadata("design:type", String)
     ], ProductMarket.prototype, "marketId", void 0);
     __decorate([
         core.column(),
         decoratorValidation.minlength(2),
         decoratorValidation.maxlength(2),
-        decoratorValidation.description("Two-letter national code (ISO format) representing the market's country."),
+        decoration.description("Two-letter national code (ISO format) representing the market's country."),
         __metadata("design:type", String)
     ], ProductMarket.prototype, "nationalCode", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Name of the Marketing Authorization Holder (MAH)."),
+        decoration.description("Name of the Marketing Authorization Holder (MAH)."),
         __metadata("design:type", String)
     ], ProductMarket.prototype, "mahName", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Name of the legal entity responsible for the product in this market."),
+        decoration.description("Name of the legal entity responsible for the product in this market."),
         __metadata("design:type", String)
     ], ProductMarket.prototype, "legalEntityName", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Address of the Marketing Authorization Holder or responsible legal entity."),
+        decoration.description("Address of the Marketing Authorization Holder or responsible legal entity."),
         __metadata("design:type", String)
     ], ProductMarket.prototype, "mahAddress", void 0);
     ProductMarket = __decorate([
-        decoratorValidation.description("Links a product to a specific market."),
-        core.uses(DBFlavour),
+        decoration.description("Links a product to a specific market."),
+        decoration.uses(shared.FabricFlavour),
         core.table(TableNames.ProductMarket),
         decoratorValidation.model(),
         __metadata("design:paramtypes", [Object])
@@ -843,56 +867,84 @@
     };
     __decorate([
         core.pk(),
-        decoratorValidation.description("Unique identifier of the product strength."),
+        decoration.description("Unique identifier of the product strength."),
         __metadata("design:type", String)
     ], ProductStrength.prototype, "id", void 0);
     __decorate([
         core.manyToOne(() => Product, { update: core.Cascade.NONE, delete: core.Cascade.NONE }, false),
-        decoratorValidation.description("Product code associated with this strength entry."),
+        decoration.description("Product code associated with this strength entry."),
         __metadata("design:type", String)
     ], ProductStrength.prototype, "productCode", void 0);
     __decorate([
         core.column(),
         decoratorValidation.required(),
-        decoratorValidation.description("Product concentration or dosage (e.g., 500mg, 10%)."),
+        decoration.description("Product concentration or dosage (e.g., 500mg, 10%)."),
         __metadata("design:type", String)
     ], ProductStrength.prototype, "strength", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Active substance related to this product strength."),
+        decoration.description("Active substance related to this product strength."),
         __metadata("design:type", String)
     ], ProductStrength.prototype, "substance", void 0);
     __decorate([
         core.column(),
-        decoratorValidation.description("Legal entity name responsible for the product."),
+        decoration.description("Legal entity name responsible for the product."),
         __metadata("design:type", String)
     ], ProductStrength.prototype, "legalEntityName", void 0);
     ProductStrength = __decorate([
-        core.uses(DBFlavour),
+        decoration.uses(shared.FabricFlavour),
         core.table(TableNames.ProductStrength),
         decoratorValidation.model(),
-        decoratorValidation.description("Represents the product’s strength and composition details."),
+        decoration.description("Represents the product’s strength and composition details."),
         __metadata("design:paramtypes", [Object])
     ], ProductStrength);
 
-    var ProductContract_1;
+    var AuditContract_1;
+    console.log("Forcing Fabric Crud Contract before models to trigger adaptor decorators override:", forFabric.FabricCrudContract);
     fabricContractApi.Object()(decoratorValidation.Model);
     fabricContractApi.Object()(core.BaseModel);
-    let ProductContract = ProductContract_1 = class ProductContract extends contracts$1.SerializedCrudContract {
+    fabricContractApi.Object()(ToolkitBaseModel);
+    fabricContractApi.Object()(Audit);
+    let AuditContract = AuditContract_1 = class AuditContract extends contracts$1.SerializedCrudContract {
         constructor() {
-            super(ProductContract_1.name, Product);
+            super(AuditContract_1.name, Audit);
         }
     };
-    ProductContract = ProductContract_1 = __decorate([
+    AuditContract = AuditContract_1 = __decorate([
         fabricContractApi.Info({
-            title: "ProductContract",
-            description: "Contract managing the Products",
+            title: "AuditContract",
+            description: "Contract managing the Audits",
         }),
         __metadata("design:paramtypes", [])
-    ], ProductContract);
+    ], AuditContract);
+
+    var BatchContract_1;
+    console.log("Forcing Fabric Crud Contract before models to trigger adaptor decorators override:", forFabric.FabricCrudContract);
+    fabricContractApi.Object()(decoratorValidation.Model);
+    fabricContractApi.Object()(core.BaseModel);
+    fabricContractApi.Object()(ToolkitBaseModel);
+    fabricContractApi.Object()(Product);
+    fabricContractApi.Object()(Batch);
+    let BatchContract = BatchContract_1 = class BatchContract extends contracts$1.SerializedCrudContract {
+        constructor() {
+            super(BatchContract_1.name, Batch);
+        }
+    };
+    BatchContract = BatchContract_1 = __decorate([
+        fabricContractApi.Info({
+            title: "BatchContract",
+            description: "Contract managing the Batches",
+        }),
+        __metadata("design:paramtypes", [])
+    ], BatchContract);
 
     console.log(forFabric.FabricCrudContract.name);
-    const contracts = [GtinOwnerContract, ProductContract];
+    const contracts = [
+        ProductContract,
+        AuditContract,
+        BatchContract,
+        GtinOwnerContract,
+    ];
 
     exports.contracts = contracts;
 
