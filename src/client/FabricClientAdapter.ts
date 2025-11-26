@@ -553,9 +553,9 @@ export class FabricClientAdapter extends CouchDBAdapter<
     const { ctxArgs } = this.logCtx(args, this.updatePrefix);
     const record: Record<string, any> = {};
     record[CouchDBKeys.TABLE] = tableName;
-    record[CouchDBKeys.ID] = this.generateId(tableName, id);
+    // record[CouchDBKeys.ID] = this.generateId(tableName, id);
     Object.assign(record, model);
-    return [tableName, id, record, ...ctxArgs];
+    return [clazz, id, record, ...ctxArgs];
   }
 
   /**
