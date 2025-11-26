@@ -28,6 +28,7 @@ import {
 import { Context, type PrimaryKeyType } from "@decaf-ts/db-decorators";
 import {
   Adapter,
+  ContextOf,
   PersistenceKeys,
   PreparedModel,
   Repository,
@@ -155,6 +156,76 @@ export class FabricClientAdapter extends CouchDBAdapter<
     >,
   >(): Constructor<R> {
     return FabricClientRepository as unknown as Constructor<R>;
+  }
+
+  protected override createPrefix<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    model: Record<string, any>,
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ): [Constructor<M>, PrimaryKeyType, Record<string, any>, ...any[], Context] {
+    const { ctxArgs } = this.logCtx(args, this.createPrefix);
+    const tableName = Model.tableName(clazz);
+    const record: Record<string, any> = {};
+    record[CouchDBKeys.TABLE] = tableName;
+    // record[CouchDBKeys.ID] = this.generateId(tableName, id as any);
+    Object.assign(record, model);
+    return [clazz, id, record, ...ctxArgs];
+  }
+
+  /**
+   * @description Prepares multiple records for creation
+   * @summary Adds necessary CouchDB fields to multiple records before creation
+   * @param {string} tableName - The name of the table
+   * @param {string[]|number[]} ids - The IDs of the records
+   * @param models - The models to prepare
+   * @return A tuple containing the tableName, ids, and prepared records
+   * @throws {InternalError} If ids and models arrays have different lengths
+   */
+  protected override createAllPrefix<M extends Model>(
+    clazz: Constructor<M>,
+    ids: string[] | number[],
+    models: Record<string, any>[],
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ) {
+    const tableName = Model.tableName(clazz);
+    if (ids.length !== models.length)
+      throw new InternalError("Ids and models must have the same length");
+    const { ctxArgs } = this.logCtx(args, this.createAllPrefix);
+    const records = ids.map((id, count) => {
+      const record: Record<string, any> = {};
+      record[CouchDBKeys.TABLE] = tableName;
+      // record[CouchDBKeys.ID] = this.generateId(tableName, id);
+      Object.assign(record, models[count]);
+      return record;
+    });
+    return [clazz, ids, records, ...ctxArgs];
+  }
+
+  protected override updateAllPrefix<M extends Model>(
+    clazz: Constructor<M>,
+    ids: PrimaryKeyType[],
+    models: Record<string, any>[],
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ) {
+    const tableName = Model.tableName(clazz);
+    if (ids.length !== models.length)
+      throw new InternalError("Ids and models must have the same length");
+    const { ctxArgs } = this.logCtx(args, this.updateAllPrefix);
+    const records = ids.map((id, count) => {
+      const record: Record<string, any> = {};
+      record[CouchDBKeys.TABLE] = tableName;
+      // record[CouchDBKeys.ID] = this.generateId(tableName, id);
+      // // const rev = models[count][PersistenceKeys.METADATA];
+      // if (!rev)
+      //   throw new InternalError(
+      //     `No revision number found for record with id ${id}`
+      //   );
+      // Object.assign(record, models[count]);
+      // record[CouchDBKeys.REV] = rev;
+      return record;
+    });
+    return [clazz, ids, records, ...ctxArgs];
   }
 
   /**
