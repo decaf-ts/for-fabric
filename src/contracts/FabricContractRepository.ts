@@ -8,9 +8,6 @@ import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
 import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
-import { Context } from "fabric-contract-api";
-import { ContractLogger } from "./logging";
-import { Logging } from "@decaf-ts/logging";
 import { Constructor } from "@decaf-ts/decoration";
 import type { FabricContractAdapter } from "./ContractAdapter";
 
@@ -88,26 +85,6 @@ export class FabricContractRepository<M extends Model> extends Repository<
     protected trackedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
   ) {
     super(adapter, clazz);
-  }
-
-  /**
-   * @description Creates a logger for a specific chaincode context
-   * @summary Returns a ContractLogger instance configured for the current context
-   * @param {Ctx} ctx - The Fabric chaincode context
-   * @return {ContractLogger} The logger instance
-   */
-  public logFor(ctx: Context | FabricContractContext): ContractLogger {
-    if ((ctx as FabricContractContext).logger)
-      return (ctx as FabricContractContext).logger as ContractLogger;
-    const l = Logging.for(
-      this as any,
-      {
-        correlationId: ctx.stub.getTxID(),
-      },
-      ctx
-    ) as ContractLogger;
-    l.info(`REPOSITORY LOG_CTX`);
-    return l;
   }
 
   /**

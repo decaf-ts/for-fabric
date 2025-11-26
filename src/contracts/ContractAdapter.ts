@@ -4,7 +4,9 @@ import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
   afterAny,
+  BadRequestError,
   BaseError,
+  ConflictError,
   Context,
   DBKeys,
   GroupSort,
@@ -40,6 +42,13 @@ import {
   relation,
   PreparedModel,
   Repository,
+  QueryError,
+  PagingError,
+  MigrationError,
+  ObserverError,
+  AuthorizationError,
+  ForbiddenError,
+  ConnectionError,
 } from "@decaf-ts/core";
 import type { ContextualArgs, MaybeContextualArg } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
@@ -399,7 +408,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const { stub, logger } = ctx;
     const log = logger.for(this.deleteState);
     await stub.deleteState(id);
-    log.trace(`Deleted state for id ${id}`);
   }
 
   forPrivate(collection: string): FabricContractAdapter {
@@ -997,17 +1005,32 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return FabricContractAdapter.parseError(reason || err);
   }
 
-  static override parseError<E extends BaseError>(
-    err: Error | string,
-    reason?: string
-  ): E {
+  static override parseError<E extends BaseError>(err: Error | string): E {
     // if (
     //   MISSING_PRIVATE_DATA_REGEX.test(
     //     typeof err === "string" ? err : err.message
     //   )
     // )
     //   return new UnauthorizedPrivateDataAccess(err) as E;
-    return super.parseError(err, reason);
+    const msg = typeof err === "string" ? err : err.message;
+    if (msg.includes(NotFoundError.name)) return new NotFoundError(err) as E;
+    if (msg.includes(ConflictError.name)) return new ConflictError(err) as E;
+    if (msg.includes(BadRequestError.name))
+      return new BadRequestError(err) as E;
+    if (msg.includes(QueryError.name)) return new QueryError(err) as E;
+    if (msg.includes(PagingError.name)) return new PagingError(err) as E;
+    if (msg.includes(UnsupportedError.name))
+      return new UnsupportedError(err) as E;
+    if (msg.includes(MigrationError.name)) return new MigrationError(err) as E;
+    if (msg.includes(ObserverError.name)) return new ObserverError(err) as E;
+    if (msg.includes(AuthorizationError.name))
+      return new AuthorizationError(err) as E;
+    if (msg.includes(ForbiddenError.name)) return new ForbiddenError(err) as E;
+    if (msg.includes(ConnectionError.name))
+      return new ConnectionError(err) as E;
+    if (msg.includes(SerializationError.name))
+      return new SerializationError(err) as E;
+    return new InternalError(err) as E;
   }
 
   /**
