@@ -256,4 +256,18 @@ export class FabricClientRepository<M extends Model> extends Repository<
     }
     return [model, ...contextArgs.args];
   }
+
+  override async update(
+    model: M,
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ): Promise<M> {
+    const { ctxArgs, log, ctx } = this.logCtx(args, this.update);
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient } = this.adapter.prepare(model, ctx);
+    log.debug(
+      `updating ${this.class.name} in table ${Model.tableName(this.class)} with id ${id}`
+    );
+    record = await this.adapter.update(this.class, id, record, ...ctxArgs);
+    return this.adapter.revert<M>(record, this.class, id, transient, ctx);
+  }
 }

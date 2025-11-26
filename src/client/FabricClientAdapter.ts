@@ -186,7 +186,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.CREATE_ALL,
-      [ids, models.map((m) => this.serializer.serialize(m))],
+      [ids, models.map((m) => this.serializer.serialize(m, clazz.name))],
       transient,
       undefined,
       tableName
@@ -257,7 +257,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
 
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.UPDATE_ALL,
-      [ids, models.map((m) => this.serializer.serialize(m))],
+      [ids, models.map((m) => this.serializer.serialize(m, clazz.name))],
       transient,
       undefined,
       clazz.name
@@ -435,7 +435,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
       OperationKeys.CREATE,
-      [this.serializer.serialize(model)],
+      [this.serializer.serialize(model, clazz.name)],
       transient,
       undefined,
       clazz.name
@@ -510,12 +510,13 @@ export class FabricClientAdapter extends CouchDBAdapter<
       ctxArgs as ContextualArgs<FabricClientContext>,
       this.updateAll
     );
+    log.info(`CLIENT UPDATE class : ${typeof clazz}`);
     const tableName = Model.tableName(clazz);
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
       OperationKeys.UPDATE,
-      [this.serializer.serialize(model)],
+      [this.serializer.serialize(model, clazz.name || clazz)], // TODO should be receving class but is receiving string
       transient,
       undefined,
       clazz.name
