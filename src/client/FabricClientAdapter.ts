@@ -24,14 +24,25 @@ import {
   OperationKeys,
   SerializationError,
   BulkCrudOperationKeys,
+  NotFoundError,
+  ConflictError,
+  BadRequestError,
 } from "@decaf-ts/db-decorators";
 import { Context, type PrimaryKeyType } from "@decaf-ts/db-decorators";
 import {
   Adapter,
+  AuthorizationError,
+  ConnectionError,
   ContextOf,
+  ForbiddenError,
+  MigrationError,
+  ObserverError,
+  PagingError,
   PersistenceKeys,
   PreparedModel,
+  QueryError,
   Repository,
+  UnsupportedError,
 } from "@decaf-ts/core";
 import type { ContextualArgs, MaybeContextualArg } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
@@ -1092,8 +1103,31 @@ export class FabricClientAdapter extends CouchDBAdapter<
     err: Error | string,
     reason?: string
   ): E {
-    // TODO
-    return super.parseError(err, reason) as E;
+    // if (
+    //   MISSING_PRIVATE_DATA_REGEX.test(
+    //     typeof err === "string" ? err : err.message
+    //   )
+    // )
+    //   return new UnauthorizedPrivateDataAccess(err) as E;
+    const msg = typeof err === "string" ? err : err.message;
+    if (msg.includes(NotFoundError.name)) return new NotFoundError(err) as E;
+    if (msg.includes(ConflictError.name)) return new ConflictError(err) as E;
+    if (msg.includes(BadRequestError.name))
+      return new BadRequestError(err) as E;
+    if (msg.includes(QueryError.name)) return new QueryError(err) as E;
+    if (msg.includes(PagingError.name)) return new PagingError(err) as E;
+    if (msg.includes(UnsupportedError.name))
+      return new UnsupportedError(err) as E;
+    if (msg.includes(MigrationError.name)) return new MigrationError(err) as E;
+    if (msg.includes(ObserverError.name)) return new ObserverError(err) as E;
+    if (msg.includes(AuthorizationError.name))
+      return new AuthorizationError(err) as E;
+    if (msg.includes(ForbiddenError.name)) return new ForbiddenError(err) as E;
+    if (msg.includes(ConnectionError.name))
+      return new ConnectionError(err) as E;
+    if (msg.includes(SerializationError.name))
+      return new SerializationError(err) as E;
+    return new InternalError(err) as E;
   }
 }
 
