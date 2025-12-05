@@ -5,7 +5,11 @@ import {
 } from "@decaf-ts/for-couchdb";
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
-import { Model, type Serializer } from "@decaf-ts/decorator-validation";
+import {
+  Model,
+  ModelConstructor,
+  type Serializer,
+} from "@decaf-ts/decorator-validation";
 import { debug, final, Logging } from "@decaf-ts/logging";
 import { type FabricFlags, type PeerConfig } from "../shared/types";
 import {
@@ -51,6 +55,11 @@ import { ClientSerializer } from "../shared/ClientSerializer";
 import type { FabricClientDispatch } from "./FabricClientDispatch";
 import { HSMSignerFactoryCustom } from "./fabric-hsm";
 import { type Constructor } from "@decaf-ts/decoration";
+import {
+  generateModelIndexes,
+  readModelFolders,
+  writeIndexes,
+} from "./indexes/index";
 
 export class FabricClientContext extends Context<FabricFlags> {}
 /**
@@ -179,7 +188,6 @@ export class FabricClientAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(clazz);
     const record: Record<string, any> = {};
     record[CouchDBKeys.TABLE] = tableName;
-    // record[CouchDBKeys.ID] = this.generateId(tableName, id as any);
     Object.assign(record, model);
     return [clazz, id, record, ...ctxArgs];
   }
@@ -206,7 +214,6 @@ export class FabricClientAdapter extends CouchDBAdapter<
     const records = ids.map((id, count) => {
       const record: Record<string, any> = {};
       record[CouchDBKeys.TABLE] = tableName;
-      // record[CouchDBKeys.ID] = this.generateId(tableName, id);
       Object.assign(record, models[count]);
       return record;
     });
@@ -223,17 +230,9 @@ export class FabricClientAdapter extends CouchDBAdapter<
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
     const { ctxArgs } = this.logCtx(args, this.updateAllPrefix);
-    const records = ids.map((id, count) => {
+    const records = ids.map(() => {
       const record: Record<string, any> = {};
       record[CouchDBKeys.TABLE] = tableName;
-      // record[CouchDBKeys.ID] = this.generateId(tableName, id);
-      // // const rev = models[count][PersistenceKeys.METADATA];
-      // if (!rev)
-      //   throw new InternalError(
-      //     `No revision number found for record with id ${id}`
-      //   );
-      // Object.assign(record, models[count]);
-      // record[CouchDBKeys.REV] = rev;
       return record;
     });
     return [clazz, ids, records, ...ctxArgs];
@@ -477,16 +476,41 @@ export class FabricClientAdapter extends CouchDBAdapter<
   }
 
   /**
-   * @description Creates an index for a model
-   * @summary This method is not implemented for Fabric and will throw an error
-   * @template M - Type extending Model
-   * @param {Constructor<M>} models - The model constructor
-   * @return {Promise<void>} Promise that will throw an error
+   * @description Creates indexes for the given models
+   * @summary Abstract method that must be implemented to create database indexes for the specified models
+   * @template M - The model type
+   * @param {...Constructor<M>} models - The model constructors to create indexes for
+   * @return {Promise<void>} A promise that resolves when all indexes are created
    */
   @debug()
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected index<M>(models: Constructor<M>): Promise<void> {
-    throw new Error();
+  protected async index<M extends Model>(
+    ...args: MaybeContextualArg<
+      FabricClientContext,
+      [string, ...(Constructor<M> | string)[]]
+    >
+  ): Promise<void> {
+    const { log } = this.logCtx(args, this.index);
+    const outDir: string = args.shift();
+    const models: ModelConstructor<any>[] = (
+      await Promise.all(
+        args.map(async (m) => {
+          const isFolder = typeof m === "string";
+          if (isFolder) {
+            log.verbose(`Loading models from ${m}...`);
+            return await readModelFolders(m);
+          }
+          return m;
+        })
+      )
+    ).flat();
+    const result: Record<string, any> = {};
+    for (const m of models) {
+      log.verbose(`Extracting indexes for table ${Model.tableName(m)}`);
+      generateModelIndexes(m, result);
+    }
+    log.verbose(`Found ${Object.keys(result).length} indexes to create`);
+    log.debug(`Indexes: ${JSON.stringify(result)}`);
+    writeIndexes(Object.values(result), outDir);
   }
 
   /**
@@ -1101,6 +1125,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   protected static override parseError<E extends BaseError>(
     err: Error | string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     reason?: string
   ): E {
     // if (

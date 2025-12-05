@@ -1,0 +1,159 @@
+import { IndexMetadata, OrderDirection } from "@decaf-ts/core";
+import { Constructor, Metadata } from "@decaf-ts/decoration";
+import { CouchDBKeys } from "@decaf-ts/for-couchdb";
+import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
+import { normalizeImport } from "../../shared/index";
+
+export type Index = {
+  index: {
+    fields: string[] | { [k: string]: OrderDirection };
+  };
+  ddoc?: string;
+  name: string;
+  type: "json";
+};
+
+function getIndexReference(
+  name: string[],
+  direction?: OrderDirection,
+  compositions?: string[]
+) {
+  return [
+    ...name.map((n) => (n === CouchDBKeys.TABLE ? "table" : n)),
+    ...(compositions || []),
+    ...(direction ? [direction] : []),
+    "index",
+  ].join(Metadata.splitter);
+}
+
+function addIndex(
+  accum: Record<string, any>,
+  fields: string[],
+  direction?: OrderDirection,
+  compositions?: string[]
+) {
+  const name = getIndexReference(fields, direction, compositions);
+
+  let f: string[] | { [k: string]: OrderDirection }[] = [
+    ...fields,
+    ...(compositions || []),
+  ];
+
+  if (direction)
+    f = f.reduce((accum: { [k: string]: OrderDirection }[], el: string) => {
+      const entry: Record<string, any> = {};
+      entry[el] = direction;
+      accum.push(entry);
+      return accum;
+    }, []);
+
+  const index: Index = {
+    index: {
+      fields: f,
+    },
+    name: name,
+    ddoc: name,
+    type: "json",
+  } as Index;
+
+  accum[name] = index;
+}
+
+export function generateModelIndexes<M extends Model>(
+  m: Constructor<M>,
+  accum?: Record<string, any>
+): Index[] {
+  const tableName = getIndexReference([CouchDBKeys.TABLE]);
+  const indexes: Record<string, Index> = accum || {};
+  indexes[tableName] = {
+    index: {
+      fields: [CouchDBKeys.TABLE],
+    },
+    name: tableName,
+    ddoc: tableName,
+    type: "json",
+  };
+
+  const result: Record<string, any> = {};
+
+  const modelIndexes = Model.indexes(m);
+  for (const prop of Object.keys(modelIndexes)) {
+    for (const [key, dec] of Object.entries(modelIndexes[prop])) {
+      const directions = (dec as IndexMetadata)
+        .directions as unknown as OrderDirection[];
+      const compositions = (dec as IndexMetadata).compositions;
+      const fields = [key, CouchDBKeys.TABLE];
+
+      addIndex(result, fields);
+      if (compositions && compositions.length)
+        addIndex(result, fields, undefined, compositions);
+      if (directions && directions.length) {
+        directions.forEach((d) => {
+          addIndex(result, fields, d);
+          if (compositions && compositions.length)
+            addIndex(result, fields, d, compositions);
+        });
+      }
+    }
+  }
+
+  return Object.values(result);
+}
+
+export async function readModelFolders(
+  ...folders: string[]
+): Promise<ModelConstructor<any>[]> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("fs");
+  // // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // const path = require("path");
+
+  const result: ModelConstructor<any>[] = [];
+
+  for (const folder of folders) {
+    const files = fs
+      .readdirSync(folder, {
+        withFileTypes: true,
+        recursive: true,
+      })
+      .filter((f: any) => f.isFile());
+    for (const file of files) {
+      const exports = await normalizeImport(import(file));
+      const values = Object.values(exports).filter((e) => {
+        try {
+          const m = new (e as Constructor)();
+          return m instanceof Model;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (e: unknown) {
+          return false;
+        }
+      }) as ModelConstructor<any>[];
+      result.push(...values);
+    }
+  }
+  return result;
+}
+
+export function writeIndexes(indexes: Index[], p: string = process.cwd()) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("fs");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require("path");
+
+  function ensureDirectoryExistence(filePath: string) {
+    const dirname: string = path.dirname(filePath) as string;
+    if (fs.existsSync(dirname)) {
+      return true;
+    }
+    ensureDirectoryExistence(dirname);
+    fs.mkdirSync(dirname);
+  }
+
+  indexes.forEach((index) => {
+    const file = path.resolve(
+      path.join(p, `./META-INF/statedb/couchdb/indexes/${index.name}.json`)
+    );
+    ensureDirectoryExistence(file);
+    fs.writeFileSync(file, JSON.stringify(index, undefined, 2));
+  });
+}
