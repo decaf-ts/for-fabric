@@ -12,7 +12,6 @@
 //   processModel,
 // } from "./private-data";
 // import { UnauthorizedPrivateDataAccess } from "../shared/errors";
-// import { FabricContractSequence } from "./FabricContractSequence";
 // import { Sequence, SequenceOptions } from "@decaf-ts/core";
 // import { FabricContractContext } from "./ContractContext";
 // import { CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
@@ -31,10 +30,6 @@
 //   ) {
 //     super(scope, alias);
 //     this.collections = collections || [];
-//   }
-//
-//   override async Sequence(options: SequenceOptions): Promise<Sequence> {
-//     return new FabricContractSequence(options, this, this.collections);
 //   }
 //
 //   /**

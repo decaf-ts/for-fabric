@@ -59,7 +59,6 @@ import {
   StateQueryResponse,
 } from "fabric-shim-api";
 import { FabricStatement } from "./FabricContractStatement";
-import { FabricContractSequence } from "./FabricContractSequence";
 import { UnauthorizedPrivateDataAccess } from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
@@ -184,9 +183,9 @@ export async function pkFabricOnCreate<
     });
   };
   if (!data.name) data.name = Model.sequenceName(model, "pk");
-  let sequence: FabricContractSequence;
+  let sequence: Sequence;
   try {
-    sequence = (await this.adapter.Sequence(data)) as FabricContractSequence;
+    sequence = (await this.adapter.Sequence(data)) as Sequence;
   } catch (e: any) {
     throw new InternalError(
       `Failed to instantiate Sequence ${data.name}: ${e}`
@@ -805,10 +804,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
   override Statement<M extends Model>(): FabricStatement<M, any> {
     return new FabricStatement(this);
-  }
-
-  override async Sequence(options: SequenceOptions): Promise<Sequence> {
-    return new FabricContractSequence(options, this);
   }
 
   override async createAll<M extends Model>(

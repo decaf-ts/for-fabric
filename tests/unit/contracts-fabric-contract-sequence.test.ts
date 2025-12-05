@@ -1,11 +1,7 @@
 import "reflect-metadata";
 
-import { Repository } from "@decaf-ts/core";
-import {
-  InternalError,
-  NotFoundError,
-} from "@decaf-ts/db-decorators";
-import { FabricContractSequence } from "../../src/contracts/FabricContractSequence";
+import { Repository, Sequence, SequenceOptions } from "@decaf-ts/core";
+import { InternalError, NotFoundError } from "@decaf-ts/db-decorators";
 import { CustomizableSequence } from "../../src/contracts/PrivateSequence";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
 
@@ -21,6 +17,7 @@ describe("FabricContractSequence", () => {
   };
   context.accumulate({ logger } as any);
   let repoStub: any;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let forModelSpy: jest.SpyInstance;
 
   beforeEach(() => {
@@ -40,20 +37,18 @@ describe("FabricContractSequence", () => {
   });
 
   const createSequence = () =>
-    new FabricContractSequence(
+    new Sequence(
       {
         name: "test-seq",
         type: "Number",
         incrementBy: 1,
         startWith: 1,
-      },
+      } as SequenceOptions,
       {
         alias: "default",
-        context: jest
-          .fn()
-          .mockImplementation(() => {
-            throw new InternalError("Context is required");
-          }),
+        context: jest.fn().mockImplementation(() => {
+          throw new InternalError("Context is required");
+        }),
       } as any
     );
 
