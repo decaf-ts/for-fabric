@@ -24,68 +24,68 @@ export class SerializedCrudContract<
   }
 
   @Transaction()
-  override async create(ctx: Ctx, model: string): Promise<string> {
-    const { log } = await this.logCtx([ctx], this.create);
+  override async create(context: Ctx, model: string): Promise<string> {
+    const { log, ctx } = await this.logCtx([context], this.create);
     log.info(`Creating model: ${model}`);
 
     const m = this.deserialize<M>(model);
 
     log.info(`Model deserialized: ${JSON.stringify(m)}`);
-    return this.serialize((await super.create(ctx, m)) as M);
+    return this.serialize((await super.create(ctx as any, m)) as M);
   }
 
   @Transaction(false)
-  override async read(ctx: Ctx, key: string): Promise<string> {
-    const { log } = await this.logCtx([ctx], this.read);
+  override async read(context: Ctx, key: string): Promise<string> {
+    const { log, ctx } = await this.logCtx([context], this.read);
     log.info(`Reading id: ${key}`);
-    return this.serialize((await super.read(ctx, key)) as M);
+    return this.serialize((await super.read(ctx as any, key)) as M);
   }
 
   @Transaction()
-  override async update(ctx: Ctx, model: string): Promise<string> {
-    const { log } = await this.logCtx([ctx], this.update);
+  override async update(context: Ctx, model: string): Promise<string> {
+    const { log, ctx } = await this.logCtx([context], this.update);
     log.info(`Updating model: ${model}`);
-    return this.serialize((await super.update(ctx, model)) as M);
+    return this.serialize((await super.update(ctx as any, model)) as M);
   }
 
   @Transaction()
-  override async delete(ctx: Ctx, key: string): Promise<string> {
-    const { log } = await this.logCtx([ctx], this.delete);
+  override async delete(context: Ctx, key: string): Promise<string> {
+    const { log, ctx } = await this.logCtx([context], this.delete);
     log.info(`Deleting id: ${key}`);
-    return this.serialize((await super.delete(ctx, key)) as M);
+    return this.serialize((await super.delete(ctx as any, key)) as M);
   }
 
   @Transaction()
-  override async deleteAll(ctx: Ctx, keys: string): Promise<string> {
+  override async deleteAll(context: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
-    const { log } = await this.logCtx([ctx], this.deleteAll);
+    const { log, ctx } = await this.logCtx([context], this.deleteAll);
 
     log.info(`deleting ${parsedKeys.length} entries from the table`);
 
     return JSON.stringify(
-      ((await super.deleteAll(ctx, parsedKeys)) as M[]).map(
+      ((await super.deleteAll(ctx as any, parsedKeys)) as M[]).map(
         (m) => this.serialize(m) as string
       )
     );
   }
 
   @Transaction(false)
-  override async readAll(ctx: Ctx, keys: string): Promise<string> {
+  override async readAll(context: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
 
-    const { log } = await this.logCtx([ctx], this.readAll);
+    const { log, ctx } = await this.logCtx([context], this.readAll);
     log.info(`reading ${parsedKeys.length} entries from the table`);
 
     return JSON.stringify(
-      ((await super.readAll(ctx, parsedKeys)) as M[]).map((m) =>
+      ((await super.readAll(ctx as any, parsedKeys)) as M[]).map((m) =>
         this.serialize(m)
       )
     );
   }
 
   @Transaction()
-  override async updateAll(ctx: Ctx, models: string): Promise<string> {
-    const { log } = await this.logCtx([ctx], this.updateAll);
+  override async updateAll(context: Ctx, models: string): Promise<string> {
+    const { log, ctx } = await this.logCtx([context], this.updateAll);
     const list: string[] = JSON.parse(models);
     const modelList: M[] = list
       .map((m) => this.deserialize(m))
@@ -93,7 +93,7 @@ export class SerializedCrudContract<
 
     log.info(`Updating ${modelList.length} entries to the table`);
     return JSON.stringify(
-      ((await super.updateAll(ctx, modelList)) as M[]).map(
+      ((await super.updateAll(ctx as any, modelList)) as M[]).map(
         (m) => this.serialize(m) as string
       )
     );
@@ -116,9 +116,11 @@ export class SerializedCrudContract<
   }
 
   @Transaction(false)
-  override async healthcheck(ctx: Ctx): Promise<string> {
+  override async healthcheck(context: Ctx): Promise<string> {
+    const { log, ctx } = await this.logCtx([context], this.updateAll);
+    log.debug(`Running Healthcheck: ${this.initialized}...`);
     //TODO: TRIM NOT WORKING CHECK LATER
-    return JSON.stringify(await super.healthcheck(ctx));
+    return JSON.stringify(await super.healthcheck(ctx as any));
   }
 
   @Transaction()

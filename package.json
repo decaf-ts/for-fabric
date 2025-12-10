@@ -6,19 +6,23 @@
   "exports": {
     ".": {
       "require": "./lib/index.cjs",
-      "import": "./lib/esm/index.js"
+      "import": "./lib/esm/index.js",
+      "types": "./lib/index.d.ts"
     },
     "./client": {
       "require": "./lib/client/index.cjs",
-      "import": "./lib/esm/client/index.js"
+      "import": "./lib/esm/client/index.js",
+      "types": "./lib/client/index.d.ts"
     },
     "./contracts": {
       "require": "./lib/contracts/index.cjs",
-      "import": "./lib/esm/contracts/index.js"
+      "import": "./lib/esm/contracts/index.js",
+      "types": "./lib/contracts/index.d.ts"
     },
     "./shared": {
       "require": "./lib/shared/index.cjs",
-      "import": "./lib/esm/shared/index.js"
+      "import": "./lib/esm/shared/index.js",
+      "types": "./lib/shared/index.d.ts"
     }
   },
   "types": "lib/index.d.ts",

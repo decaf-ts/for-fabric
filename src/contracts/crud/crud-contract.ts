@@ -12,6 +12,7 @@ import {
   BulkCrudOperationKeys,
   InternalError,
   OperationKeys,
+  PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
 
 /**
@@ -100,7 +101,7 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M>} Promise resolving to the created model
    */
   async create(
-    ctx: Ctx,
+    ctx: Ctx | FabricContractContext,
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
@@ -128,8 +129,8 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M>} Promise resolving to the retrieved model
    */
   async read(
-    ctx: Ctx,
-    key: string | number,
+    ctx: Ctx | FabricContractContext,
+    key: PrimaryKeyType | string,
     ...args: any[]
   ): Promise<M | string> {
     const { log, ctxArgs } = await this.logCtx([...args, ctx], this.read);
@@ -139,7 +140,7 @@ export abstract class FabricCrudContract<M extends Model>
     return this.repo.read(key, ...ctxArgs);
   }
 
-  protected getTransientData(ctx: Ctx): any {
+  protected getTransientData(ctx: Ctx | FabricContractContext): any {
     const transientMap = ctx.stub.getTransient();
     let transient: any = {};
 
@@ -163,7 +164,7 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M>} Promise resolving to the updated model
    */
   async update(
-    ctx: Ctx,
+    ctx: Ctx | FabricContractContext,
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
@@ -189,8 +190,8 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M>} Promise resolving to the deleted model
    */
   async delete(
-    ctx: Ctx,
-    key: string | number,
+    ctx: Ctx | FabricContractContext,
+    key: PrimaryKeyType | string,
     ...args: any[]
   ): Promise<M | string> {
     const { log, ctxArgs } = await this.logCtx([...args, ctx], this.delete);
@@ -207,8 +208,8 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M[]>} Promise resolving to the deleted models
    */
   async deleteAll(
-    ctx: Ctx,
-    keys: string | string[] | number[],
+    ctx: Ctx | FabricContractContext,
+    keys: PrimaryKeyType[] | string,
     ...args: any[]
   ): Promise<M[] | string> {
     const { ctxArgs } = await this.logCtx([...args, ctx], this.readAll);
@@ -225,8 +226,8 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M[]>} Promise resolving to the retrieved models
    */
   async readAll(
-    ctx: Ctx,
-    keys: string | string[] | number[],
+    ctx: Ctx | FabricContractContext,
+    keys: PrimaryKeyType[] | string,
     ...args: any[]
   ): Promise<M[] | string> {
     const { ctxArgs } = await this.logCtx([...args, ctx], this.readAll);
@@ -243,7 +244,7 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M[]>} Promise resolving to the updated models
    */
   async updateAll(
-    ctx: Ctx,
+    ctx: Ctx | FabricContractContext,
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
@@ -288,14 +289,16 @@ export abstract class FabricCrudContract<M extends Model>
     ).deserialize(str);
   }
 
-  protected async init(ctx: Ctx): Promise<void> {
+  protected async init(ctx: Ctx | FabricContractContext): Promise<void> {
     const { log } = await this.logCtx([ctx], this.init);
-    log.info(`Running contract initialization...`);
+    log.info(`Running contract ${this.getName()} initialization...`);
     this.initialized = true;
     log.info(`Contract initialization completed.`);
   }
 
-  async healthcheck(ctx: Ctx): Promise<string | healthcheck> {
+  async healthcheck(
+    ctx: Ctx | FabricContractContext
+  ): Promise<string | healthcheck> {
     const { log } = await this.logCtx([ctx], this.healthcheck);
     log.info(`Running Healthcheck: ${this.initialized}...`);
     return { healthcheck: this.initialized };
@@ -310,7 +313,7 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M[]>} Promise resolving to the created models
    */
   async createAll(
-    ctx: Ctx,
+    ctx: Ctx | FabricContractContext,
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {

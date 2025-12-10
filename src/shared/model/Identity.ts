@@ -1,4 +1,4 @@
-import { BaseModel, Cascade, oneToOne, pk } from "@decaf-ts/core";
+import { BaseModel, Cascade, index, oneToOne, pk } from "@decaf-ts/core";
 import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
 import { IdentityCredentials } from "./IdentityCredentials";
 import { IdentityType } from "../constants";
@@ -42,6 +42,7 @@ export class Identity extends BaseModel {
    * @summary The MSP ID corresponding to the organization that issued this identity
    */
   @required()
+  @index()
   mspId?: string = undefined;
 
   /**
