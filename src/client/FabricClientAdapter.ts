@@ -701,14 +701,6 @@ export class FabricClientAdapter extends Adapter<
     log.info(
       `Performing prepared statement ${rawInput.method} on table ${Model.tableName(rawInput.class)}`
     );
-    let input: string;
-    try {
-      input = JSON.stringify(rawInput);
-    } catch (e: any) {
-      throw new SerializationError(
-        `Failed to process raw input for query: ${e}`
-      );
-    }
     let transactionResult: any;
     try {
       transactionResult = await this.evaluateTransaction(

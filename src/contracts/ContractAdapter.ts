@@ -632,13 +632,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
         correlationId: ctx.stub.getTxID(),
       });
     } else {
-      const LOG = !(ctx instanceof FabricContractContext)
-        ? (ctx as Ctx).logging.getLogger()
-        : ctx.logger;
-      LOG.info(`In flags`);
-      LOG.info(`${operation} - ${model.name}`);
-      LOG.info(`flags: ${Object.keys(flags)}`);
-      LOG.info(`ctx: ${ctx.constructor.name}`);
       Object.assign(baseFlags, {
         identity: ctx.clientIdentity,
         logger: new ContractLogger(this as any, undefined, ctx),

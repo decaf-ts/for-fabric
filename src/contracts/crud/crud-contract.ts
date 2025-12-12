@@ -337,8 +337,6 @@ export abstract class FabricCrudContract<M extends Model>
   }
 
   protected async init(ctx: Ctx | FabricContractContext): Promise<void> {
-    const LOG = (ctx as Ctx).logging.getLogger("tst");
-    LOG.info("in init");
     const { log } = await this.logCtx([ctx], this.init);
     log.info(`Running contract ${this.getName()} initialization...`);
     this.initialized = true;
@@ -348,8 +346,6 @@ export abstract class FabricCrudContract<M extends Model>
   async healthcheck(
     ctx: Ctx | FabricContractContext
   ): Promise<string | healthcheck> {
-    const LOG = (ctx as Ctx).logging.getLogger("test");
-    LOG.info("in healthcheck");
     const { log } = await this.logCtx([ctx], this.healthcheck);
     log.info(`Running Healthcheck: ${this.initialized}...`);
     return { healthcheck: this.initialized };
@@ -435,11 +431,7 @@ export abstract class FabricCrudContract<M extends Model>
     if (!(ctx instanceof Context))
       throw new InternalError("No valid context provided");
 
-    const LOG = ctx.logging.getLogger();
     function getOp() {
-      LOG.info(
-        `Getting op for ${typeof method === "string" ? method : method.name}`
-      );
       if (typeof method === "string") return method;
       switch (method.name) {
         case OperationKeys.CREATE:
@@ -459,18 +451,12 @@ export abstract class FabricCrudContract<M extends Model>
     const overrides = {
       correlationId: ctx.stub.getTxID(),
     };
-    LOG.info(`Getting context with ${Object.keys(overrides)} and ctx`);
     const context = await FabricCrudContract.adapter.context(
       getOp(),
       overrides as any,
       this.clazz,
       ctx
     );
-    LOG.info(`Got ctx`);
-    if (context.stub) LOG.info(`stub ok`);
-    if (context.identity) LOG.info(`identity ok`);
-    if (context.logger) LOG.info(`logger ok`);
-    if (context.stub) LOG.info(`stub ok`);
 
     const log = (
       this
