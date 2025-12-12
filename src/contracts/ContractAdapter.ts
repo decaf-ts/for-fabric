@@ -636,9 +636,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
         ? (ctx as Ctx).logging.getLogger()
         : ctx.logger;
       LOG.info(`In flags`);
-      LOG.info(
-        `${operation} - ${model.name} - ${JSON.stringify(flags)} - ${JSON.stringify(ctx)}`
-      );
+      LOG.info(`${operation} - ${model.name}`);
       LOG.info(`flags: ${Object.keys(flags)}`);
       LOG.info(`ctx: ${ctx.constructor.name}`);
       Object.assign(baseFlags, {

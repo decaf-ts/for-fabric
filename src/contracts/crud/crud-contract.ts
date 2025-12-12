@@ -466,9 +466,12 @@ export abstract class FabricCrudContract<M extends Model>
       this.clazz,
       ctx
     );
-    LOG.info(
-      `retrieve ctx: stub: ${!!context.stub}, identity: ${!!context.identity}, logger: ${context.logger instanceof ContractLogger}`
-    );
+    LOG.info(`Got ctx`);
+    if (context.stub) LOG.info(`stub ok`);
+    if (context.identity) LOG.info(`identity ok`);
+    if (context.logger) LOG.info(`logger ok`);
+    if (context.stub) LOG.info(`stub ok`);
+
     const log = (
       this
         ? context.logger.for(this).for(method)
