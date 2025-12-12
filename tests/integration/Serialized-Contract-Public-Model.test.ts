@@ -100,7 +100,7 @@ describe("Test Serialized Crud Contract With Public Model", () => {
     commitChaincode(contractName, contract_sequence, version);
   });
 
-  it.only("Deploys contract corretly", async () => {
+  it("Deploys contract corretly", async () => {
     console.log("start");
   });
 
