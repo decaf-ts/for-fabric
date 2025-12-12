@@ -1,4 +1,10 @@
-import { Repository, Sequence } from "@decaf-ts/core";
+import {
+  OrderDirection,
+  Paginator,
+  PersistenceKeys,
+  Repository,
+  Sequence,
+} from "@decaf-ts/core";
 import type { ContextOf, FlagsOf, MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
@@ -54,6 +60,99 @@ export class FabricClientRepository<M extends Model> extends Repository<
     super(adapter, clazz);
   }
 
+  override async paginateBy(
+    key: keyof M,
+    order: OrderDirection,
+    size: number,
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ): Promise<Paginator<M, M[], any>> {
+    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+      "paginateBy",
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.paginateBy);
+    log.verbose(
+      `paginating ${Model.tableName(this.class)} with page size ${size}`
+    );
+    return (await this.statement(
+      this.paginateBy.name,
+      key,
+      order,
+      size,
+      ...ctxArgs
+    )) as any;
+  }
+
+  override async listBy(
+    key: keyof M,
+    order: OrderDirection,
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ) {
+    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+      "list",
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.listBy);
+    log.verbose(
+      `listing ${Model.tableName(this.class)} by ${key as string} ${order}`
+    );
+    return (await this.statement(
+      this.listBy.name,
+      key,
+      order,
+      ...ctxArgs
+    )) as any;
+  }
+
+  override async findOneBy(
+    key: keyof M,
+    value: any,
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ): Promise<M[]> {
+    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+      "findOneBy",
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.findOneBy);
+    log.verbose(
+      `finding ${Model.tableName(this.class)} with ${key as string} ${value}`
+    );
+    return (await this.statement(
+      this.findOneBy.name,
+      key,
+      value,
+      ...ctxArgs
+    )) as any;
+  }
+
+  override async statement(
+    name: string,
+    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+  ): Promise<any> {
+    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+      "statement",
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.statement);
+    log.verbose(`Executing prepared statement ${name}`);
+    return this.adapter.evaluateTransaction(
+      PersistenceKeys.STATEMENT,
+      ...ctxArgs
+    );
+  }
+
   protected override async createPrefix(
     model: M,
     ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
@@ -65,11 +164,10 @@ export class FabricClientRepository<M extends Model> extends Repository<
       this.adapter,
       this._overrides || {}
     );
-    const shouldRunHandlers =
-      contextArgs.context.get("ignoreHandlers") !== true;
-    const shouldValidate = !contextArgs.context.get("ignoreValidation");
+    const ignoreHandlers = contextArgs.context.get("ignoreHandlers");
+    const ignoreValidate = contextArgs.context.get("ignoreValidation");
     model = new this.class(model);
-    if (shouldRunHandlers)
+    if (!ignoreHandlers)
       await enforceDBDecorators<M, Repository<M, FabricClientAdapter>, any>(
         this,
         contextArgs.context,
@@ -78,7 +176,7 @@ export class FabricClientRepository<M extends Model> extends Repository<
         OperationKeys.ON
       );
 
-    if (shouldValidate) {
+    if (!ignoreValidate) {
       const errors = await Promise.resolve(
         model.hasErrors(
           ...(contextArgs.context.get("ignoredValidationProperties") || [])
@@ -101,9 +199,8 @@ export class FabricClientRepository<M extends Model> extends Repository<
       this.adapter,
       this._overrides || {}
     );
-    const shouldRunHandlers =
-      contextArgs.context.get("ignoreHandlers") !== true;
-    const shouldValidate = !contextArgs.context.get("ignoreValidation");
+    const ignoreHandlers = contextArgs.context.get("ignoreHandlers");
+    const ignoreValidate = contextArgs.context.get("ignoreValidation");
     if (!models.length) return [models, ...contextArgs.args];
     const opts = Model.sequenceFor(models[0]);
     let ids: (string | number | bigint | undefined)[] = [];
@@ -135,7 +232,7 @@ export class FabricClientRepository<M extends Model> extends Repository<
           ) as M[keyof M];
         }
 
-        if (shouldRunHandlers)
+        if (!ignoreHandlers)
           await enforceDBDecorators<M, Repository<M, FabricClientAdapter>, any>(
             this,
             contextArgs.context,
@@ -147,7 +244,7 @@ export class FabricClientRepository<M extends Model> extends Repository<
       })
     );
 
-    if (shouldValidate) {
+    if (!ignoreValidate) {
       const ignoredProps =
         contextArgs.context.get("ignoredValidationProperties") || [];
 
@@ -224,9 +321,8 @@ export class FabricClientRepository<M extends Model> extends Repository<
       this.adapter,
       this._overrides || {}
     );
-    const shouldRunHandlers =
-      contextArgs.context.get("ignoreHandlers") !== true;
-    const shouldValidate = !contextArgs.context.get("ignoreValidation");
+    const ignoreHandlers = contextArgs.context.get("ignoreHandlers");
+    const ignoreValidate = contextArgs.context.get("ignoreValidation");
     const pk = model[this.pk] as string;
     if (!pk)
       throw new InternalError(
@@ -234,7 +330,7 @@ export class FabricClientRepository<M extends Model> extends Repository<
       );
     const oldModel = await this.read(pk, ...contextArgs.args);
     model = Model.merge(oldModel, model, this.class);
-    if (shouldRunHandlers)
+    if (!ignoreHandlers)
       await enforceDBDecorators(
         this,
         contextArgs.context as any,
@@ -244,7 +340,7 @@ export class FabricClientRepository<M extends Model> extends Repository<
         oldModel
       );
 
-    if (shouldValidate) {
+    if (!ignoreValidate) {
       const errors = await Promise.resolve(
         model.hasErrors(
           oldModel,

@@ -45,7 +45,7 @@ describe("Test enrollement", () => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let clientAdapter: FabricClientAdapter;
   let enrollmentService: FabricEnrollmentService;
-  let TestModelRepository: Repo<TestPublicModel, any, any, any, any>;
+  let TestModelRepository: Repo<TestPublicModel>;
 
   beforeAll(async () => {
     //Boot infrastructure for testing

@@ -1,4 +1,4 @@
-import { ModelArg } from "@decaf-ts/decorator-validation";
+import { type ModelArg } from "@decaf-ts/decorator-validation";
 import { createdBy, updatedBy } from "@decaf-ts/core";
 import { description, uses } from "@decaf-ts/decoration";
 import { FabricFlavour } from "../constants";

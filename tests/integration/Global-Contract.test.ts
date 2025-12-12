@@ -22,6 +22,7 @@ describe("Tests global contract implementation", () => {
   const contractName = "global";
   let caConfig: CAConfig;
   let peerConfig: PeerConfig;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let userAdapter: FabricClientAdapter;
   let userRepository: FabricClientRepository<User>;
   let productRepository: FabricClientRepository<Product>;

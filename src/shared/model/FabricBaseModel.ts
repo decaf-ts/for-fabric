@@ -1,12 +1,11 @@
-import { Model, ModelArg } from "@decaf-ts/decorator-validation";
-import {createdAt, updatedAt} from "@decaf-ts/core"
-import {version} from "@decaf-ts/db-decorators"
+import { Model, type ModelArg } from "@decaf-ts/decorator-validation";
+import { createdAt, updatedAt } from "@decaf-ts/core";
+import { version } from "@decaf-ts/db-decorators";
 import { description, uses } from "@decaf-ts/decoration";
 import { FabricFlavour } from "../constants";
 
 @uses(FabricFlavour)
 export class FabricBaseModel extends Model {
-
   @description("Stores the original timestamp of creation")
   @createdAt()
   createdAt!: Date;
@@ -22,5 +21,4 @@ export class FabricBaseModel extends Model {
   constructor(arg?: ModelArg<FabricBaseModel>) {
     super(arg);
   }
-
 }

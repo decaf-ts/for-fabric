@@ -38,11 +38,11 @@ export function random(sample: string[], n: number): string {
 export function randomName(n: number): string {
   const sample =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
-  return random(sample, n);
+  return random(sample as any, n);
 }
 export function randomNif(n: number): string {
   const sample = "1234567890";
-  return random(sample, n);
+  return random(sample as any, n);
 }
 
 export function didInfrastructureBoot(

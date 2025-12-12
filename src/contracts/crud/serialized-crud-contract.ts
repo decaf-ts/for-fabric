@@ -100,6 +100,12 @@ export class SerializedCrudContract<
   }
 
   @Transaction(false)
+  override async statement(context: Ctx, method: string) {
+    const { ctx } = await this.logCtx([context], this.statement);
+    return super.statement(ctx, method);
+  }
+
+  @Transaction(false)
   override async raw(
     context: Ctx,
     rawInput: string,

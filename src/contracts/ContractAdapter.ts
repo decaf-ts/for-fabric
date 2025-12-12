@@ -26,7 +26,7 @@ import {
   Object as FabricObject,
   Property as FabricProperty,
 } from "fabric-contract-api";
-import { Logger, Logging } from "@decaf-ts/logging";
+import { Logger } from "@decaf-ts/logging";
 import {
   PersistenceKeys,
   RelationsMetadata,
@@ -49,6 +49,8 @@ import {
   AuthorizationError,
   ForbiddenError,
   ConnectionError,
+  ContextualizedArgs,
+  LoggerOf,
 } from "@decaf-ts/core";
 import type { ContextualArgs, MaybeContextualArg } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
@@ -59,7 +61,6 @@ import {
   StateQueryResponse,
 } from "fabric-shim-api";
 import { FabricStatement } from "./FabricContractStatement";
-import { UnauthorizedPrivateDataAccess } from "../shared/errors";
 import { FabricFlavour } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
 import {
@@ -252,7 +253,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @description Context constructor for this adapter
    * @summary Overrides the base Context constructor with FabricContractContext
    */
-  override Context = FabricContractContext;
+  protected override readonly Context: Constructor<FabricContractContext> =
+    FabricContractContext;
 
   /**
    * @description Gets the repository constructor for this adapter
@@ -263,7 +265,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   override repository<
     R extends Repository<
       any,
-      Adapter<any, void, MangoQuery, FabricContractContext>
+      Adapter<any, void, MangoQuery, Context<FabricContractFlags>>
     >,
   >(): Constructor<R> {
     return FabricContractRepository as unknown as Constructor<R>;
@@ -297,11 +299,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     clazz: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
-    ...args: ContextualArgs<FabricContractContext>
+    ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
-    const { ctx, log } = this.logCtx(args, this.create);
+    const { ctx, log, stub } = this.logCtx(args, this.create);
     log.info(`in ADAPTER create with args ${args}`);
-    const { stub } = ctx;
     const tableName = Model.tableName(clazz);
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
@@ -325,11 +326,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
   override async read<M extends Model>(
     clazz: Constructor<M>,
     id: PrimaryKeyType,
-    ...args: ContextualArgs<FabricContractContext>
+    ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
-    const { ctx, log } = this.logCtx(args, this.read);
+    const { ctx, log, stub } = this.logCtx(args, this.read);
     log.info(`in ADAPTER read with args ${args}`);
-    const { stub } = ctx;
     const tableName = Model.tableName(clazz);
 
     let model: Record<string, any>;
@@ -357,10 +357,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     clazz: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
-    ...args: ContextualArgs<FabricContractContext>
+    ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
-    const { ctx, log } = this.logCtx(args, this.update);
-    const { stub } = ctx;
+    const { ctx, log, stub } = this.logCtx(args, this.update);
     const tableName = Model.tableName(clazz);
 
     try {
@@ -385,10 +384,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
   async delete<M extends Model>(
     clazz: Constructor<M>,
     id: PrimaryKeyType,
-    ...args: ContextualArgs<FabricContractContext>
+    ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
-    const { ctx, log, ctxArgs } = this.logCtx(args, this.delete);
-    const { stub } = ctx;
+    const { ctx, log, ctxArgs, stub } = this.logCtx(args, this.delete);
     const tableName = Model.tableName(clazz);
     let model: Record<string, any>;
     try {
@@ -404,8 +402,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   protected async deleteState(id: string, ctx: FabricContractContext) {
-    const { stub, logger } = ctx;
-    const log = logger.for(this.deleteState);
+    const { stub } = this.logCtx([ctx], this.deleteState);
     await stub.deleteState(id);
   }
 
@@ -522,8 +519,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ) {
     let data: Buffer;
 
-    const { stub, logger } = ctx;
-    const log = logger.for(this.putState);
+    const { stub, log } = this.logCtx([ctx], this.putState);
     try {
       data = Buffer.from(
         FabricContractAdapter.serializer.serialize(model as Model)
@@ -542,8 +538,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   protected async readState(id: string, ctx: FabricContractContext) {
     let result: any;
 
-    const { stub, logger } = ctx;
-    const log = logger.for(this.readState);
+    const { stub, log } = this.logCtx([ctx], this.readState);
     const res: string = (await stub.getState(id)).toString();
 
     if (!res) throw new NotFoundError(`Record with id ${id} not found`);
@@ -627,35 +622,40 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ctx: Ctx | FabricContractContext,
     ...args: any[]
   ): Promise<FabricContractFlags> {
-    const ensureLogger = (logger?: ContractLogger) => {
-      const base = logger ?? (this.log.for(this.flags) as ContractLogger);
-      if (typeof base.clear !== "function") (base as any).clear = () => base;
-      if (typeof base.for !== "function") (base as any).for = () => base;
-      return base;
+    const baseFlags = {
+      stub: ctx.stub,
     };
-    const fabricCtx =
-      ctx instanceof FabricContractContext
-        ? (ctx.accumulate({
-            logger: ensureLogger(ctx.logger as ContractLogger),
-          }) as unknown as FabricContractContext)
-        : (new FabricContractContext().accumulate({
-            stub: ctx.stub,
-            identity: ctx.clientIdentity,
-            logger: ensureLogger(),
-          }) as unknown as FabricContractContext);
-    const baseFlags = Object.assign({}, flags, {
-      logger: fabricCtx.logger,
-    });
-    return Object.assign(
-      await super.flags(operation, model, baseFlags, ...args),
-      {
-        stub: ctx.stub,
-        identity: ((ctx as Ctx).clientIdentity ??
-          fabricCtx.identity!) as ClientIdentity,
-        logger: fabricCtx.logger,
+    if (ctx instanceof FabricContractContext) {
+      Object.assign(baseFlags, {
+        logger: ctx.logger,
+        identity: ctx.identity,
         correlationId: ctx.stub.getTxID(),
-      }
-    );
+      });
+    } else {
+      const LOG = !(ctx instanceof FabricContractContext)
+        ? (ctx as Ctx).logging.getLogger()
+        : ctx.logger;
+      LOG.info(`In flags`);
+      LOG.info(
+        `${operation} - ${model.name} - ${JSON.stringify(flags)} - ${JSON.stringify(ctx)}`
+      );
+      LOG.info(`flags: ${Object.keys(flags)}`);
+      LOG.info(`ctx: ${ctx.constructor.name}`);
+      Object.assign(baseFlags, {
+        identity: ctx.clientIdentity,
+        logger: new ContractLogger(this as any, undefined, ctx),
+        correlationId: ctx.stub.getTxID(),
+      });
+    }
+
+    flags = (await super.flags(
+      operation,
+      model,
+      baseFlags as any,
+      ...args
+    )) as FabricContractFlags;
+
+    return flags as FabricContractFlags;
   }
 
   /**
@@ -764,11 +764,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     rawInput: MangoQuery,
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<R> {
-    const { ctx, log, ctxArgs } = this.logCtx(args, this.raw);
+    const { log, ctxArgs, stub } = this.logCtx(args, this.raw);
     const docsOnly =
       typeof ctxArgs[0] === "boolean" ? (ctxArgs.shift() as boolean) : false;
 
-    const { stub } = ctx;
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
     if (limit || skip) {
@@ -803,7 +802,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   override Statement<M extends Model>(): FabricStatement<M, any> {
-    return new FabricStatement(this);
+    return new FabricStatement(this as any);
   }
 
   override async createAll<M extends Model>(
@@ -998,6 +997,60 @@ export class FabricContractAdapter extends CouchDBAdapter<
     reason?: string
   ): E {
     return FabricContractAdapter.parseError(reason || err);
+  }
+
+  override logCtx<ARGS extends any[]>(
+    args: ARGS,
+    method: ((...args: any[]) => any) | string
+  ): ContextualizedArgs<FabricContractContext, ARGS> & {
+    stub: ChaincodeStub;
+    identity: ClientIdentity;
+  } {
+    return FabricContractAdapter.logCtx.call(this, args, method as any) as any;
+  }
+
+  static override logCtx<ARGS extends any[]>(
+    this: any,
+    args: ARGS,
+    method: string
+  ): ContextualizedArgs<FabricContractContext, ARGS> & {
+    stub: ChaincodeStub;
+    identity: ClientIdentity;
+  };
+  static override logCtx<ARGS extends any[]>(
+    this: any,
+    args: ARGS,
+    method: (...args: any[]) => any
+  ): ContextualizedArgs<FabricContractContext, ARGS> & {
+    stub: ChaincodeStub;
+    identity: ClientIdentity;
+  };
+  static override logCtx<ARGS extends any[]>(
+    this: any,
+    args: ARGS,
+    method: ((...args: any[]) => any) | string
+  ): ContextualizedArgs<FabricContractContext, ARGS> & {
+    stub: ChaincodeStub;
+    identity: ClientIdentity;
+  } {
+    if (args.length < 1) throw new InternalError("No context provided");
+    const ctx = args.pop() as FabricContractContext;
+    if (!(ctx instanceof Context))
+      throw new InternalError("No context provided");
+    if (args.filter((a) => a instanceof Context).length > 1)
+      throw new Error("here");
+    const log = (
+      this
+        ? ctx.logger.for(this).for(method)
+        : ctx.logger.clear().for(this).for(method)
+    ) as LoggerOf<FabricContractContext>;
+    return {
+      ctx: ctx,
+      log: method ? (log.for(method) as LoggerOf<FabricContractContext>) : log,
+      stub: ctx.stub,
+      identity: ctx.identity,
+      ctxArgs: [...args, ctx],
+    };
   }
 
   static override parseError<E extends BaseError>(err: Error | string): E {

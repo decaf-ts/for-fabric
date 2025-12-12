@@ -3,6 +3,7 @@ import {
   ObserverHandler,
   EventIds,
   MaybeContextualArg,
+  ContextualArgs,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -110,7 +111,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
     table: Constructor<M> | string,
     event: OperationKeys | BulkCrudOperationKeys | string,
     id: EventIds,
-    ...args: MaybeContextualArg<FabricContractContext>
+    ...args: ContextualArgs<FabricContractContext>
   ): Promise<void> {
     if (!this.trackedEvents || this.trackedEvents.indexOf(event) !== -1)
       return await super.updateObservers(table, event, id, ...args);

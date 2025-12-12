@@ -23,3 +23,7 @@
 /docker/docker-data
 /global
 /indexes
+
+
+/tests/integration/chaincodeTrackers/*
+/tests/integration/chaincodeTrackers/.gitkeep

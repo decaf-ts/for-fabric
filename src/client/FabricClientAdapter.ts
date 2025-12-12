@@ -1,8 +1,4 @@
-import {
-  CouchDBAdapter,
-  CouchDBKeys,
-  type MangoQuery,
-} from "@decaf-ts/for-couchdb";
+import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
 import {
@@ -47,6 +43,7 @@ import {
   QueryError,
   Repository,
   UnsupportedError,
+  Statement,
 } from "@decaf-ts/core";
 import type { ContextualArgs, MaybeContextualArg } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
@@ -60,6 +57,8 @@ import {
   readModelFolders,
   writeIndexes,
 } from "./indexes/index";
+import { FabricClientStatement } from "./FabricClientStatement";
+import { type FabricQuery } from "./types";
 
 export class FabricClientContext extends Context<FabricFlags> {}
 /**
@@ -113,9 +112,10 @@ export class FabricClientContext extends Context<FabricFlags> {}
  *   FabricAdapter->>FabricAdapter: serializer.deserialize(decodedResult)
  *   FabricAdapter-->>Client: deserializedResult
  */
-export class FabricClientAdapter extends CouchDBAdapter<
+export class FabricClientAdapter extends Adapter<
   PeerConfig,
   Client,
+  FabricQuery,
   FabricClientContext
 > {
   /**
@@ -138,6 +138,14 @@ export class FabricClientAdapter extends CouchDBAdapter<
    */
   constructor(config: PeerConfig, alias?: string) {
     super(config, FabricFlavour, alias);
+  }
+
+  override Statement<M extends Model>(): Statement<
+    M,
+    Adapter<PeerConfig, Client, any, any>,
+    any
+  > {
+    return new FabricClientStatement(this);
   }
 
   override async context<M extends Model>(
@@ -172,13 +180,13 @@ export class FabricClientAdapter extends CouchDBAdapter<
   override repository<
     R extends Repository<
       any,
-      Adapter<PeerConfig, Client, MangoQuery, FabricClientContext>
+      Adapter<PeerConfig, Client, FabricQuery, FabricClientContext>
     >,
   >(): Constructor<R> {
     return FabricClientRepository as unknown as Constructor<R>;
   }
 
-  protected override createPrefix<M extends Model>(
+  protected createPrefix<M extends Model>(
     clazz: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
@@ -201,7 +209,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @return A tuple containing the tableName, ids, and prepared records
    * @throws {InternalError} If ids and models arrays have different lengths
    */
-  protected override createAllPrefix<M extends Model>(
+  protected createAllPrefix<M extends Model>(
     clazz: Constructor<M>,
     ids: string[] | number[],
     models: Record<string, any>[],
@@ -220,7 +228,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     return [clazz, ids, records, ...ctxArgs];
   }
 
-  protected override updateAllPrefix<M extends Model>(
+  protected updateAllPrefix<M extends Model>(
     clazz: Constructor<M>,
     ids: PrimaryKeyType[],
     models: Record<string, any>[],
@@ -578,7 +586,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
     return this.serializer.deserialize(this.decode(result));
   }
 
-  override updatePrefix<M extends Model>(
+  updatePrefix<M extends Model>(
     clazz: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
@@ -684,27 +692,15 @@ export class FabricClientAdapter extends CouchDBAdapter<
    *   FabricAdapter-->>Client: processed result
    */
   @debug()
-  override async raw<V>(
-    rawInput: MangoQuery,
+  async raw<V>(
+    rawInput: FabricQuery,
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<V> {
-    const ctxArgs = [...(args as unknown as any[])];
-    if (typeof ctxArgs[0] === "boolean") {
-      ctxArgs.shift();
-    }
-    let tableName: string | Constructor<any> | undefined;
-    if (
-      ctxArgs.length &&
-      (typeof ctxArgs[0] === "string" || typeof ctxArgs[0] === "function")
-    ) {
-      tableName = ctxArgs.shift();
-    }
-    const { log } = this.logCtx(
-      ctxArgs as ContextualArgs<FabricClientContext>,
-      this.raw
+    const { log, ctxArgs } = this.logCtx(args, this.raw);
+    const tableName = (rawInput.class as Constructor).name;
+    log.info(
+      `Performing prepared statement ${rawInput.method} on table ${Model.tableName(rawInput.class)}`
     );
-    log.info(`Performing raw  query on table`);
-    log.debug(`processing raw input for query: ${JSON.stringify(rawInput)}`);
     let input: string;
     try {
       input = JSON.stringify(rawInput);
@@ -715,11 +711,9 @@ export class FabricClientAdapter extends CouchDBAdapter<
     }
     let transactionResult: any;
     try {
-      if (typeof tableName !== "string")
-        tableName = (tableName as Constructor<any> | undefined)?.name;
       transactionResult = await this.evaluateTransaction(
-        "query",
-        [input],
+        PersistenceKeys.STATEMENT,
+        [rawInput.method, ...rawInput.args, rawInput.params],
         undefined,
         undefined,
         tableName
@@ -863,11 +857,8 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string} [reason] - Optional reason for the error
    * @return {BaseError} The parsed error
    */
-  override parseError<E extends BaseError>(
-    err: Error | string,
-    reason?: string
-  ): E {
-    return FabricClientAdapter.parseError<E>(err, reason);
+  override parseError<E extends BaseError>(err: Error | string): E {
+    return FabricClientAdapter.parseError<E>(err);
   }
 
   /**
@@ -1123,11 +1114,7 @@ export class FabricClientAdapter extends CouchDBAdapter<
    * @param {string} [reason] - Optional reason for the error
    * @return {BaseError} The parsed error
    */
-  protected static override parseError<E extends BaseError>(
-    err: Error | string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    reason?: string
-  ): E {
+  protected static parseError<E extends BaseError>(err: Error | string): E {
     // if (
     //   MISSING_PRIVATE_DATA_REGEX.test(
     //     typeof err === "string" ? err : err.message
