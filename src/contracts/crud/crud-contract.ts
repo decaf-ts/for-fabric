@@ -459,7 +459,7 @@ export abstract class FabricCrudContract<M extends Model>
     const overrides = {
       correlationId: ctx.stub.getTxID(),
     };
-    LOG.info(`Getting context with ${JSON.stringify(overrides)} and ctx`);
+    LOG.info(`Getting context with ${Object.keys(overrides)} and ctx`);
     const context = await FabricCrudContract.adapter.context(
       getOp(),
       overrides as any,
