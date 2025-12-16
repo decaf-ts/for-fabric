@@ -32,6 +32,7 @@ import { type PrimaryKeyType } from "@decaf-ts/db-decorators";
 import {
   Context,
   Adapter,
+  AdapterFlags,
   AuthorizationError,
   ConnectionError,
   ContextOf,
@@ -50,7 +51,6 @@ import {
   MaybeContextualArg,
   ContextualArgs,
 } from "@decaf-ts/core";
-import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import { FabricClientDispatch } from "./FabricClientDispatch";
@@ -64,6 +64,7 @@ import {
 import { FabricClientStatement } from "./FabricClientStatement";
 import { type FabricQuery } from "./types";
 import { FabricClientPaginator } from "./FabricClientPaginator";
+import { FabricClientRepository } from "./FabricClientRepository";
 
 export class FabricClientContext extends Context<FabricFlags> {}
 
@@ -146,12 +147,10 @@ export class FabricClientAdapter extends Adapter<
     super(config, FabricFlavour, alias);
   }
 
-  override Statement<M extends Model>(): Statement<
-    M,
-    Adapter<PeerConfig, Client, any, any>,
-    any
-  > {
-    return new FabricClientStatement(this);
+  override Statement<M extends Model>(
+    overrides?: Partial<AdapterFlags>
+  ): Statement<M, FabricClientAdapter, any, FabricQuery> {
+    return new FabricClientStatement(this, overrides);
   }
 
   Paginator<M extends Model>(
@@ -204,7 +203,7 @@ export class FabricClientAdapter extends Adapter<
     clazz: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+    ...args: MaybeContextualArg<FabricClientContext>
   ): [Constructor<M>, PrimaryKeyType, Record<string, any>, ...any[], Context] {
     const { ctxArgs } = this.logCtx(args, this.createPrefix);
     const tableName = Model.tableName(clazz);
@@ -227,7 +226,7 @@ export class FabricClientAdapter extends Adapter<
     clazz: Constructor<M>,
     ids: string[] | number[],
     models: Record<string, any>[],
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+    ...args: MaybeContextualArg<FabricClientContext>
   ) {
     const tableName = Model.tableName(clazz);
     if (ids.length !== models.length)
@@ -246,7 +245,7 @@ export class FabricClientAdapter extends Adapter<
     clazz: Constructor<M>,
     ids: PrimaryKeyType[],
     models: Record<string, any>[],
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+    ...args: MaybeContextualArg<FabricClientContext>
   ) {
     const tableName = Model.tableName(clazz);
     if (ids.length !== models.length)
@@ -706,11 +705,13 @@ export class FabricClientAdapter extends Adapter<
    *   FabricAdapter-->>Client: processed result
    */
   @debug()
-  async raw<V>(
+  async raw<V, D extends boolean>(
     rawInput: FabricQuery,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    docsOnly: D = true as D,
     ...args: ContextualArgs<FabricClientContext>
   ): Promise<V> {
-    const { log, ctxArgs } = this.logCtx(args, this.raw);
+    const { log } = this.logCtx(args, this.raw);
     const tableName = (rawInput.class as Constructor).name;
     log.info(
       `Performing prepared statement ${rawInput.method} on table ${Model.tableName(rawInput.class)}`
@@ -1152,6 +1153,11 @@ export class FabricClientAdapter extends Adapter<
     return new InternalError(err) as E;
   }
 }
+
+type _FabricClientAdapterContext = ContextOf<FabricClientAdapter>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _fabricClientAdapterContextCheck: _FabricClientAdapterContext =
+  new FabricClientContext();
 
 FabricClientAdapter.decoration();
 Adapter.setCurrent(FabricFlavour);

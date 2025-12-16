@@ -118,18 +118,12 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    * @param {Adapter<any, any, any, any>} observer - The adapter to observe
    * @return {void}
    */
-  override observe(observer: FabricClientAdapter): void {
+  override observe(observer: Adapter<any, any, any>): void {
     if (!(observer instanceof FabricClientAdapter))
       throw new UnsupportedError(
         "Only FabricClientAdapter can be observed by dispatch"
       );
-    this.adapter = observer;
-    this.models = Adapter.models(this.adapter.alias);
-    this.initialize().then(() =>
-      this.log.verbose(
-        `Dispatch initialized for ${this.adapter!.alias} adapter`
-      )
-    );
+    super.observe(observer as FabricClientAdapter);
   }
 
   /**
@@ -181,9 +175,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    *   FabricDispatch->>Observers: updateObservers(table, event, payload.id)
    *   Observers-->>FabricDispatch: Callbacks executed
    */
-  protected async handleEvents(
-    ctxArg?: FabricClientContext
-  ): Promise<void> {
+  protected async handleEvents(ctxArg?: FabricClientContext): Promise<void> {
     if (!this.listeningStack)
       throw new InternalError(
         `Event stack not initialized. Ensure that "startListening" is called before attempting this operation.`
@@ -199,7 +191,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
         {
           correlationId: this.adapter.config.chaincodeName,
         },
-        (this.models && this.models[0]) || Model as unknown as Constructor
+        (this.models && this.models[0]) || (Model as unknown as Constructor)
       ));
     const log = this.log.for(this.handleEvents);
 
@@ -216,8 +208,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
           const targetModel = table
             ? Model.get(table)
             : Model.get(this.models[0].name);
-          const modelRef =
-            targetModel ?? (table || this.models[0]?.name);
+          const modelRef = targetModel ?? (table || this.models[0]?.name);
           await this.updateObservers(
             modelRef as Constructor | string,
             event,

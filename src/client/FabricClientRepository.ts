@@ -6,10 +6,13 @@ import {
   Sequence,
   Context,
 } from "@decaf-ts/core";
-import type { ContextOf, FlagsOf, MaybeContextualArg } from "@decaf-ts/core";
+import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
-import type { FabricClientAdapter } from "./FabricClientAdapter";
+import {
+  FabricClientAdapter,
+  FabricClientContext,
+} from "./FabricClientAdapter";
 import {
   OperationKeys,
   enforceDBDecorators,
@@ -51,11 +54,13 @@ export class FabricClientRepository<M extends Model> extends Repository<
   M,
   FabricClientAdapter
 > {
-  override _overrides?: Partial<FlagsOf<FabricClientAdapter>> = {
+  protected override _overrides = Object.assign({}, super["_overrides"], {
     ignoreValidation: true,
     ignoreHandlers: true,
-    a,
-  };
+    allowRawStatements: false,
+    forcePrepareSimpleQueries: true,
+    forcePrepareComplexQueries: true,
+  });
 
   constructor(adapter?: FabricClientAdapter, clazz?: Constructor<M>) {
     super(adapter, clazz);
@@ -65,9 +70,9 @@ export class FabricClientRepository<M extends Model> extends Repository<
     key: keyof M,
     order: OrderDirection,
     size: number,
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+    ...args: MaybeContextualArg<FabricClientContext>
   ): Promise<Paginator<M, M[], any>> {
-    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+    const contextArgs = await Context.args<M, FabricClientContext>(
       "paginateBy",
       this.class,
       args,
@@ -90,9 +95,9 @@ export class FabricClientRepository<M extends Model> extends Repository<
   override async listBy(
     key: keyof M,
     order: OrderDirection,
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+    ...args: MaybeContextualArg<FabricClientContext>
   ) {
-    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+    const contextArgs = await Context.args<M, FabricClientContext>(
       "list",
       this.class,
       args,
@@ -114,9 +119,9 @@ export class FabricClientRepository<M extends Model> extends Repository<
   override async findOneBy(
     key: keyof M,
     value: any,
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
-  ): Promise<M[]> {
-    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+    ...args: MaybeContextualArg<FabricClientContext>
+  ): Promise<M> {
+    const contextArgs = await Context.args<M, FabricClientContext>(
       "findOneBy",
       this.class,
       args,
@@ -132,33 +137,33 @@ export class FabricClientRepository<M extends Model> extends Repository<
       key,
       value,
       ...ctxArgs
-    )) as any;
+    )) as M;
   }
 
   override async statement(
     name: string,
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+    ...args: MaybeContextualArg<FabricClientContext>
   ): Promise<any> {
-    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+    const contextArgs = await Context.args<M, FabricClientContext>(
       "statement",
       this.class,
       args,
       this.adapter,
       this._overrides || {}
     );
-    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.statement);
+    const { log, ctx } = this.logCtx(contextArgs.args, this.statement);
     log.verbose(`Executing prepared statement ${name}`);
     return this.adapter.evaluateTransaction(
       PersistenceKeys.STATEMENT,
-      ...ctxArgs
+      contextArgs.args
     );
   }
 
   protected override async createPrefix(
     model: M,
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
-  ): Promise<[M, ...any[], ContextOf<FabricClientAdapter>]> {
-    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+    ...args: MaybeContextualArg<FabricClientContext>
+  ): Promise<[M, ...any[], FabricClientContext]> {
+    const contextArgs = await Context.args<M, FabricClientContext>(
       OperationKeys.CREATE,
       this.class,
       args,
@@ -191,9 +196,9 @@ export class FabricClientRepository<M extends Model> extends Repository<
 
   protected override async createAllPrefix(
     models: M[],
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
-  ): Promise<[M[], ...any[], ContextOf<FabricClientAdapter>]> {
-    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+    ...args: MaybeContextualArg<FabricClientContext>
+  ): Promise<[M[], ...any[], FabricClientContext]> {
+    const contextArgs = await Context.args<M, FabricClientContext>(
       OperationKeys.CREATE,
       this.class,
       args,
@@ -262,9 +267,9 @@ export class FabricClientRepository<M extends Model> extends Repository<
 
   protected override async readPrefix(
     key: PrimaryKeyType,
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
-  ): Promise<[PrimaryKeyType, ...any[], ContextOf<FabricClientAdapter>]> {
-    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+    ...args: MaybeContextualArg<FabricClientContext>
+  ): Promise<[PrimaryKeyType, ...any[], FabricClientContext]> {
+    const contextArgs = await Context.args<M, FabricClientContext>(
       OperationKeys.READ,
       this.class,
       args,
@@ -285,9 +290,9 @@ export class FabricClientRepository<M extends Model> extends Repository<
 
   protected override async readAllPrefix(
     keys: PrimaryKeyType[],
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
-  ): Promise<[PrimaryKeyType[], ...any[], ContextOf<FabricClientAdapter>]> {
-    const contextArgs = await Context.args<M, ContextOf<FabricClientAdapter>>(
+    ...args: MaybeContextualArg<FabricClientContext>
+  ): Promise<[PrimaryKeyType[], ...any[], FabricClientContext]> {
+    const contextArgs = await Context.args<M, FabricClientContext>(
       OperationKeys.READ,
       this.class,
       args,
@@ -313,8 +318,8 @@ export class FabricClientRepository<M extends Model> extends Repository<
 
   protected override async updatePrefix(
     model: M,
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
-  ): Promise<[M, ...args: any[], ContextOf<FabricClientAdapter>]> {
+    ...args: MaybeContextualArg<FabricClientContext>
+  ): Promise<[M, ...args: any[], FabricClientContext]> {
     const contextArgs = await Context.args(
       OperationKeys.UPDATE,
       this.class,
@@ -356,7 +361,7 @@ export class FabricClientRepository<M extends Model> extends Repository<
 
   override async update(
     model: M,
-    ...args: MaybeContextualArg<ContextOf<FabricClientAdapter>>
+    ...args: MaybeContextualArg<FabricClientContext>
   ): Promise<M> {
     const { ctxArgs, log, ctx } = this.logCtx(args, this.update);
     // eslint-disable-next-line prefer-const
