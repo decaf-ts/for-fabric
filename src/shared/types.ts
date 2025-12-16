@@ -1,6 +1,6 @@
-import { RepositoryFlags } from "@decaf-ts/db-decorators";
 import { TLSOptions } from "fabric-ca-client";
 import { Model } from "@decaf-ts/decorator-validation";
+import { AdapterFlags } from "@decaf-ts/core";
 
 export type HSMOptions = {
   library: string;
@@ -58,7 +58,7 @@ export type PeerConfig = {
  * @extends {RepositoryFlags}
  * @memberOf module:for-fabric.shared
  */
-export type FabricFlags = RepositoryFlags;
+export type FabricFlags = AdapterFlags;
 
 /**
  * @description Configuration for connecting to a Hyperledger Fabric peer

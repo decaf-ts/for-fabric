@@ -100,9 +100,19 @@ export class SerializedCrudContract<
   }
 
   @Transaction(false)
-  override async statement(context: Ctx, method: string) {
-    const { ctx } = await this.logCtx([context], this.statement);
-    return super.statement(ctx, method);
+  override async statement(context: Ctx, method: string, ...args: string[]) {
+    const { ctx, log } = await this.logCtx([...args, context], this.statement);
+    args = args.map((a) => {
+      try {
+        return JSON.parse(a);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (e: unknown) {
+        return a;
+      }
+    });
+    log.info(`calling prepared statement ${method}`);
+    log.debug(`with args ${args}`);
+    return super.statement(ctx, method, ...args);
   }
 
   @Transaction(false)

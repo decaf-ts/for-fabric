@@ -20,7 +20,6 @@ import {
   PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
 import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
-import { ContractLogger } from "../logging";
 
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode

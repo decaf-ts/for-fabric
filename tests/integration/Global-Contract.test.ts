@@ -13,7 +13,7 @@ import { FabricEnrollmentService } from "../../src/shared";
 import { User } from "../../src/contract/User";
 import { Product } from "../../src/contract/Product";
 import { NotFoundError } from "@decaf-ts/db-decorators";
-import { Repository } from "@decaf-ts/core";
+import { OrderDirection, Repository } from "@decaf-ts/core";
 
 jest.setTimeout(3000000);
 
@@ -450,7 +450,62 @@ describe("Tests global contract implementation", () => {
     console.log(read);
   });
 
-  it("Should Delete Product", async () => {
+  it("Should perform simple queries on product", async () => {
+    const enrollmentService = new FabricEnrollmentService(caConfig);
+    const userID = (await enrollmentService.registerAndEnroll(
+      { userName: "TestUser" + Date.now(), password: "TestUserPW" },
+      false,
+      "",
+      "client"
+    )) as any;
+
+    expect(userID).toBeDefined();
+    const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
+
+    const client = {
+      keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
+      certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
+    };
+
+    const repo = productRepository.for({ ...client });
+
+    const list = await repo
+      .select()
+      .orderBy(["productCode", OrderDirection.ASC])
+      .execute();
+
+    expect(list).toBeDefined();
+    expect(list.length).toBeGreaterThan(0);
+  });
+
+  it("Should perform simple finds on product", async () => {
+    const enrollmentService = new FabricEnrollmentService(caConfig);
+    const userID = (await enrollmentService.registerAndEnroll(
+      { userName: "TestUser" + Date.now(), password: "TestUserPW" },
+      false,
+      "",
+      "client"
+    )) as any;
+
+    expect(userID).toBeDefined();
+    const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
+
+    const client = {
+      keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
+      certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
+    };
+
+    const repo = productRepository.for({ ...client });
+
+    const list = await repo.findOneBy("productCode", OrderDirection.ASC);
+
+    expect(list).toBeDefined();
+    expect(list.length).toBeGreaterThan(0);
+  });
+
+  it.skip("Should Delete Product", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },

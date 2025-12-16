@@ -7,7 +7,6 @@ import {
   BadRequestError,
   BaseError,
   ConflictError,
-  Context,
   DBKeys,
   GroupSort,
   InternalError,
@@ -51,6 +50,8 @@ import {
   ConnectionError,
   ContextualizedArgs,
   LoggerOf,
+  Context,
+  RawResult,
 } from "@decaf-ts/core";
 import type { ContextualArgs, MaybeContextualArg } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
@@ -751,13 +752,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
    *   FabricContractAdapter->>FabricContractAdapter: resultIterator(log, iterator)
    *   FabricContractAdapter-->>Caller: results
    */
-  async raw<R>(
+  async raw<R, D extends boolean>(
     rawInput: MangoQuery,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    docsOnly: D = true as D,
     ...args: ContextualArgs<FabricContractContext>
-  ): Promise<R> {
-    const { log, ctxArgs, stub } = this.logCtx(args, this.raw);
-    const docsOnly =
-      typeof ctxArgs[0] === "boolean" ? (ctxArgs.shift() as boolean) : false;
+  ): Promise<RawResult<R, D>> {
+    const { log, stub } = this.logCtx(args, this.raw);
 
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
@@ -786,10 +787,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const results = (await this.resultIterator(log, iterator)) as R;
     log.debug(
-      `returning {0} results`,
-      `${Array.isArray(results) ? results.length : 1}`
+      `returning ${Array.isArray(results) ? results.length : 1} results`
     );
-    return results;
+    return results as any;
   }
 
   override Statement<M extends Model>(): FabricStatement<M, any> {

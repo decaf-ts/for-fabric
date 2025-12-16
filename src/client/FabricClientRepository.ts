@@ -4,13 +4,13 @@ import {
   PersistenceKeys,
   Repository,
   Sequence,
+  Context,
 } from "@decaf-ts/core";
 import type { ContextOf, FlagsOf, MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
 import type { FabricClientAdapter } from "./FabricClientAdapter";
 import {
-  Context,
   OperationKeys,
   enforceDBDecorators,
   ValidationError,
@@ -54,6 +54,7 @@ export class FabricClientRepository<M extends Model> extends Repository<
   override _overrides?: Partial<FlagsOf<FabricClientAdapter>> = {
     ignoreValidation: true,
     ignoreHandlers: true,
+    a,
   };
 
   constructor(adapter?: FabricClientAdapter, clazz?: Constructor<M>) {

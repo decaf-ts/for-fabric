@@ -28,8 +28,9 @@ import {
   ConflictError,
   BadRequestError,
 } from "@decaf-ts/db-decorators";
-import { Context, type PrimaryKeyType } from "@decaf-ts/db-decorators";
+import { type PrimaryKeyType } from "@decaf-ts/db-decorators";
 import {
+  Context,
   Adapter,
   AuthorizationError,
   ConnectionError,
@@ -44,12 +45,15 @@ import {
   Repository,
   UnsupportedError,
   Statement,
+  PreparedStatement,
+  Paginator,
+  MaybeContextualArg,
+  ContextualArgs,
 } from "@decaf-ts/core";
-import type { ContextualArgs, MaybeContextualArg } from "@decaf-ts/core";
 import { FabricClientRepository } from "./FabricClientRepository";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
-import type { FabricClientDispatch } from "./FabricClientDispatch";
+import { FabricClientDispatch } from "./FabricClientDispatch";
 import { HSMSignerFactoryCustom } from "./fabric-hsm";
 import { type Constructor } from "@decaf-ts/decoration";
 import {
@@ -59,8 +63,10 @@ import {
 } from "./indexes/index";
 import { FabricClientStatement } from "./FabricClientStatement";
 import { type FabricQuery } from "./types";
+import { FabricClientPaginator } from "./FabricClientPaginator";
 
 export class FabricClientContext extends Context<FabricFlags> {}
+
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
  * @summary The FabricAdapter extends CouchDBAdapter to provide a seamless interface for interacting with Hyperledger Fabric networks.
@@ -146,6 +152,14 @@ export class FabricClientAdapter extends Adapter<
     any
   > {
     return new FabricClientStatement(this);
+  }
+
+  Paginator<M extends Model>(
+    query: PreparedStatement<any> | FabricQuery,
+    size: number,
+    clazz: Constructor<M>
+  ): Paginator<M, any, FabricQuery> {
+    return new FabricClientPaginator(this, query, size, clazz);
   }
 
   override async context<M extends Model>(
@@ -705,7 +719,11 @@ export class FabricClientAdapter extends Adapter<
     try {
       transactionResult = await this.evaluateTransaction(
         PersistenceKeys.STATEMENT,
-        [rawInput.method, ...rawInput.args, rawInput.params],
+        [
+          rawInput.method,
+          ...rawInput.args,
+          JSON.stringify(rawInput.params || {}),
+        ],
         undefined,
         undefined,
         tableName
