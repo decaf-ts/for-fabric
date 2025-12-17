@@ -7,7 +7,7 @@ import {
   ModelArg,
   required,
 } from "@decaf-ts/decorator-validation";
-import { OwnedBy } from "../../../../src/shared/decorators";
+import { ownedBy } from "../../../../src/shared/decorators";
 
 @table("tst_user")
 @model()
@@ -26,7 +26,7 @@ export class TestPublicModel extends Model {
   @required()
   nif!: string;
 
-  @OwnedBy()
+  @ownedBy()
   owner!: string;
 
   constructor(arg?: ModelArg<TestPublicModel>) {

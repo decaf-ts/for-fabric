@@ -32,8 +32,8 @@ import {
   NotFoundError,
   ConflictError,
   BadRequestError,
+  type PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
-import { type PrimaryKeyType } from "@decaf-ts/db-decorators";
 import {
   Context,
   Adapter,
@@ -439,6 +439,30 @@ export class FabricClientAdapter extends Adapter<
       private: split.private,
       shared: split.shared,
     };
+  }
+
+  override revert<M extends Model>(
+    obj: Record<string, any>,
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    transient?: Record<string, any>,
+    ...args: ContextualArgs<Context<FabricFlags>>
+  ): M {
+    const { log } = this.logCtx(args, this.revert);
+    if (transient) {
+      log.verbose(
+        `re-adding transient properties: ${Object.keys(transient).join(", ")}`
+      );
+      Object.entries(transient as Record<string, any>).forEach(([key, val]) => {
+        if (key in obj)
+          throw new InternalError(
+            `Transient property ${key} already exists on model ${typeof clazz === "string" ? clazz : clazz.name}. should be impossible`
+          );
+        (obj as M)[key as keyof M] = val;
+      });
+    }
+
+    return new (clazz as Constructor<M>)(obj);
   }
 
   /**

@@ -119,7 +119,7 @@ export async function ownedByOnCreate<
   setOwnedByKeyValue(model, key as string, owner);
 }
 
-export function OwnedBy() {
+export function ownedBy() {
   const key = getFabricModelKey(FabricModelKeys.OWNEDBY);
 
   function ownedBy() {
