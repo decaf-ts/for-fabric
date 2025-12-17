@@ -1,25 +1,22 @@
 import {
   MaybeContextualArg,
-  OrderDirection,
   Paginator,
   PreparedStatement,
-  QueryClause,
   UnsupportedError,
 } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
-import { FabricQuery } from "./types";
 import { Constructor } from "@decaf-ts/decoration";
-import { toCamelCase, toPascalCase } from "@decaf-ts/logging";
 import { FabricClientAdapter } from "./FabricClientAdapter";
+import { MangoQuery } from "@decaf-ts/for-couchdb";
 
 export class FabricClientPaginator<M extends Model> extends Paginator<
   M,
   M,
-  FabricQuery
+  MangoQuery
 > {
   constructor(
     adapter: FabricClientAdapter,
-    query: FabricQuery | PreparedStatement<any>,
+    query: MangoQuery | PreparedStatement<any>,
     size: number,
     clazz: Constructor<M>
   ) {
@@ -27,7 +24,7 @@ export class FabricClientPaginator<M extends Model> extends Paginator<
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected prepare(rawStatement: FabricQuery): FabricQuery {
+  protected prepare(rawStatement: MangoQuery): MangoQuery {
     throw new UnsupportedError(
       `Raw query access must be implemented by a subclass. only prepared statements are natively available`
     );

@@ -1,6 +1,7 @@
 import { TLSOptions } from "fabric-ca-client";
 import { Model } from "@decaf-ts/decorator-validation";
 import { AdapterFlags } from "@decaf-ts/core";
+import { Logger } from "@decaf-ts/logging";
 
 export type HSMOptions = {
   library: string;
@@ -52,15 +53,6 @@ export type PeerConfig = {
 };
 
 /**
- * @description Flags for Fabric operations
- * @summary Combines repository flags with peer configuration overrides
- * @interface FabricFlags
- * @extends {RepositoryFlags}
- * @memberOf module:for-fabric.shared
- */
-export type FabricFlags = AdapterFlags;
-
-/**
  * @description Configuration for connecting to a Hyperledger Fabric peer
  * @summary Contains all the necessary parameters to establish a connection to a Fabric peer and interact with chaincode
  * @typedef {Object} CAConfig
@@ -99,4 +91,8 @@ export type SegregatedModel<M extends Model> = {
   transient?: Record<keyof M, any>;
   private?: Record<keyof M, any>;
   shared?: Record<keyof M, any>;
+};
+
+export type FabricFlags<LOG extends Logger = Logger> = AdapterFlags<LOG> & {
+  segregated?: string;
 };

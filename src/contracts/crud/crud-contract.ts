@@ -1,7 +1,9 @@
 import { FabricContractAdapter } from "../ContractAdapter";
-import { Context, Contract, Context as Ctx } from "fabric-contract-api";
+import { Contract, Context as Ctx } from "fabric-contract-api";
 import { Model, Serializer } from "@decaf-ts/decorator-validation";
 import {
+  Condition,
+  Context,
   ContextualizedArgs,
   LoggerOf,
   OrderDirection,
@@ -100,33 +102,37 @@ export abstract class FabricCrudContract<M extends Model>
 
   async listBy(
     ctx: Ctx | FabricContractContext,
-    key: keyof M,
+    key: string | keyof M,
     order: string,
     ...args: any[]
   ) {
     const { ctxArgs } = await this.logCtx([...args, ctx], this.listBy);
-    return this.repo.listBy(key, order as OrderDirection, ...ctxArgs);
+    return this.repo.listBy(
+      key as keyof M,
+      order as OrderDirection,
+      ...ctxArgs
+    );
   }
 
   async paginateBy(
     ctx: Ctx | FabricContractContext,
-    key: keyof M,
+    key: string | keyof M,
     order: string,
     size: number,
     ...args: any[]
   ) {
     const { ctxArgs } = await this.logCtx([...args, ctx], this.paginateBy);
-    return this.repo.paginateBy(key, order as any, size, ...ctxArgs);
+    return this.repo.paginateBy(key as keyof M, order as any, size, ...ctxArgs);
   }
 
   async findOneBy(
     ctx: Ctx | FabricContractContext,
-    key: keyof M,
+    key: string | keyof M,
     value: any,
     ...args: any[]
   ) {
     const { ctxArgs } = await this.logCtx([...args, ctx], this.findOneBy);
-    return this.repo.findOneBy(key, value, ...ctxArgs);
+    return this.repo.findOneBy(key as keyof M, value, ...ctxArgs);
   }
 
   async statement(
@@ -305,6 +311,36 @@ export abstract class FabricCrudContract<M extends Model>
   }
 
   /**
+   * @description Executes a query with the specified conditions and options.
+   * @summary Provides a simplified way to query the database with common query parameters.
+   * @param {Condition<M>} condition - The condition to filter records.
+   * @param orderBy - The field to order results by.
+   * @param {OrderDirection} [order=OrderDirection.ASC] - The sort direction.
+   * @param {number} [limit] - Optional maximum number of results to return.
+   * @param {number} [skip] - Optional number of results to skip.
+   * @return {Promise<M[]>} The query results as model instances.
+   */
+  async query(
+    context: Ctx | FabricContractContext,
+    condition: Condition<M> | string,
+    orderBy: string | keyof M,
+    order: OrderDirection | string = OrderDirection.ASC,
+    limit?: number,
+    skip?: number,
+    ...args: any[]
+  ): Promise<M[]> {
+    const { ctxArgs } = await this.logCtx([...args, context], this.query);
+    return this.repo.query(
+      condition as Condition<M>,
+      orderBy as keyof M,
+      order as OrderDirection,
+      limit,
+      skip,
+      ...ctxArgs
+    );
+  }
+
+  /**
    * @description Executes a raw query against the state database
    * @summary Delegates to the repository's raw method
    * @param {Ctx} ctx - The Fabric chaincode context
@@ -427,7 +463,7 @@ export abstract class FabricCrudContract<M extends Model>
         identity: ctx.identity,
       };
 
-    if (!(ctx instanceof Context))
+    if (!(ctx instanceof Ctx))
       throw new InternalError("No valid context provided");
 
     function getOp() {

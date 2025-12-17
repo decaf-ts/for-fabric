@@ -4,13 +4,11 @@ import {
   Dispatch,
   EventIds,
   UnsupportedError,
+  Context,
 } from "@decaf-ts/core";
-import { PeerConfig } from "../shared/types";
+import { FabricFlags, PeerConfig } from "../shared/types";
 import { Client } from "@grpc/grpc-js";
-import {
-  FabricClientAdapter,
-  FabricClientContext,
-} from "./FabricClientAdapter";
+import { FabricClientAdapter } from "./FabricClientAdapter";
 import {
   BulkCrudOperationKeys,
   InternalError,
@@ -138,7 +136,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
     model: Constructor<any> | string,
     event: OperationKeys | BulkCrudOperationKeys | string,
     id: EventIds,
-    ...args: ContextualArgs<FabricClientContext>
+    ...args: ContextualArgs<Context<FabricFlags>>
   ): Promise<void> {
     const { log, ctxArgs } = this.logCtx(args, this.updateObservers);
     if (!this.adapter) {
@@ -175,7 +173,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    *   FabricDispatch->>Observers: updateObservers(table, event, payload.id)
    *   Observers-->>FabricDispatch: Callbacks executed
    */
-  protected async handleEvents(ctxArg?: FabricClientContext): Promise<void> {
+  protected async handleEvents(ctxArg?: Context<FabricFlags>): Promise<void> {
     if (!this.listeningStack)
       throw new InternalError(
         `Event stack not initialized. Ensure that "startListening" is called before attempting this operation.`

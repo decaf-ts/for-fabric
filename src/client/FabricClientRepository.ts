@@ -1,26 +1,16 @@
 import {
   OrderDirection,
-  Paginator,
   PersistenceKeys,
   Repository,
-  Sequence,
   Context,
+  ContextOf,
+  PreparedStatementKeys,
 } from "@decaf-ts/core";
 import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
-import {
-  FabricClientAdapter,
-  FabricClientContext,
-} from "./FabricClientAdapter";
-import {
-  OperationKeys,
-  enforceDBDecorators,
-  ValidationError,
-  InternalError,
-  reduceErrorsToPrint,
-  PrimaryKeyType,
-} from "@decaf-ts/db-decorators";
+import { type FabricClientAdapter } from "./FabricClientAdapter";
+import { PrimaryKeyType } from "@decaf-ts/db-decorators";
 
 /**
  * @description Repository implementation for Fabric client operations
@@ -50,19 +40,19 @@ import {
  *   Adapter-->>Repo: result
  *   Repo-->>App: model
  */
-export class FabricClientRepository<M extends Model> extends Repository<
-  M,
-  FabricClientAdapter
-> {
+export class FabricClientRepository<
+  M extends Model,
+  A extends FabricClientAdapter,
+> extends Repository<M, A> {
   protected override _overrides = Object.assign({}, super["_overrides"], {
-    ignoreValidation: true,
+    ignoreValidation: false,
     ignoreHandlers: true,
     allowRawStatements: false,
     forcePrepareSimpleQueries: true,
     forcePrepareComplexQueries: true,
   });
 
-  constructor(adapter?: FabricClientAdapter, clazz?: Constructor<M>) {
+  constructor(adapter?: A, clazz?: Constructor<M>) {
     super(adapter, clazz);
   }
 
@@ -70,10 +60,10 @@ export class FabricClientRepository<M extends Model> extends Repository<
     key: keyof M,
     order: OrderDirection,
     size: number,
-    ...args: MaybeContextualArg<FabricClientContext>
-  ): Promise<Paginator<M, M[], any>> {
-    const contextArgs = await Context.args<M, FabricClientContext>(
-      "paginateBy",
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ) {
+    const contextArgs = await Context.args(
+      PreparedStatementKeys.PAGE_BY,
       this.class,
       args,
       this.adapter,
@@ -83,21 +73,17 @@ export class FabricClientRepository<M extends Model> extends Repository<
     log.verbose(
       `paginating ${Model.tableName(this.class)} with page size ${size}`
     );
-    return (await this.statement(
-      this.paginateBy.name,
-      key,
-      order,
-      size,
-      ...ctxArgs
-    )) as any;
+    return this.select()
+      .orderBy([key, order])
+      .paginate(size, ...ctxArgs);
   }
 
   override async listBy(
     key: keyof M,
     order: OrderDirection,
-    ...args: MaybeContextualArg<FabricClientContext>
+    ...args: MaybeContextualArg<ContextOf<A>>
   ) {
-    const contextArgs = await Context.args<M, FabricClientContext>(
+    const contextArgs = await Context.args(
       "list",
       this.class,
       args,
@@ -111,7 +97,32 @@ export class FabricClientRepository<M extends Model> extends Repository<
     return (await this.statement(
       this.listBy.name,
       key,
-      order,
+      { direction: order },
+      ...ctxArgs
+    )) as any;
+  }
+
+  override async findBy(
+    key: keyof M,
+    value: any,
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<M[]> {
+    const contextArgs = await Context.args(
+      PreparedStatementKeys.FIND_BY,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.findBy);
+    log.verbose(
+      `finding all ${Model.tableName(this.class)} with ${key as string} ${value}`
+    );
+    return (await this.statement(
+      this.findBy.name,
+      key,
+      value,
+      {},
       ...ctxArgs
     )) as any;
   }
@@ -119,10 +130,10 @@ export class FabricClientRepository<M extends Model> extends Repository<
   override async findOneBy(
     key: keyof M,
     value: any,
-    ...args: MaybeContextualArg<FabricClientContext>
+    ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<M> {
-    const contextArgs = await Context.args<M, FabricClientContext>(
-      "findOneBy",
+    const contextArgs = await Context.args(
+      PreparedStatementKeys.FIND_ONE_BY,
       this.class,
       args,
       this.adapter,
@@ -130,28 +141,29 @@ export class FabricClientRepository<M extends Model> extends Repository<
     );
     const { log, ctxArgs } = this.logCtx(contextArgs.args, this.findOneBy);
     log.verbose(
-      `finding ${Model.tableName(this.class)} with ${key as string} ${value}`
+      `finding One ${Model.tableName(this.class)} with ${key as string} ${value}`
     );
     return (await this.statement(
       this.findOneBy.name,
       key,
       value,
+      {},
       ...ctxArgs
-    )) as M;
+    )) as any;
   }
 
   override async statement(
     name: string,
-    ...args: MaybeContextualArg<FabricClientContext>
+    ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<any> {
-    const contextArgs = await Context.args<M, FabricClientContext>(
-      "statement",
+    const contextArgs = await Context.args(
+      PersistenceKeys.STATEMENT,
       this.class,
       args,
       this.adapter,
       this._overrides || {}
     );
-    const { log, ctx } = this.logCtx(contextArgs.args, this.statement);
+    const { log } = this.logCtx(contextArgs.args, this.statement);
     log.verbose(`Executing prepared statement ${name}`);
     return this.adapter.evaluateTransaction(
       PersistenceKeys.STATEMENT,
@@ -159,209 +171,29 @@ export class FabricClientRepository<M extends Model> extends Repository<
     );
   }
 
-  protected override async createPrefix(
+  override async create(
     model: M,
-    ...args: MaybeContextualArg<FabricClientContext>
-  ): Promise<[M, ...any[], FabricClientContext]> {
-    const contextArgs = await Context.args<M, FabricClientContext>(
-      OperationKeys.CREATE,
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<M> {
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.create);
+    log.debug(
+      `Creating new ${this.class.name} in table ${Model.tableName(this.class)}`
+    );
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient } = this.adapter.prepare(model, ctx);
+    record = await this.adapter.create(
       this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
+      id,
+      record,
+      transient,
+      ...ctxArgs
     );
-    const ignoreHandlers = contextArgs.context.get("ignoreHandlers");
-    const ignoreValidate = contextArgs.context.get("ignoreValidation");
-    model = new this.class(model);
-    if (!ignoreHandlers)
-      await enforceDBDecorators<M, Repository<M, FabricClientAdapter>, any>(
-        this,
-        contextArgs.context,
-        model,
-        OperationKeys.CREATE,
-        OperationKeys.ON
-      );
-
-    if (!ignoreValidate) {
-      const errors = await Promise.resolve(
-        model.hasErrors(
-          ...(contextArgs.context.get("ignoredValidationProperties") || [])
-        )
-      );
-      if (errors) throw new ValidationError(errors.toString());
-    }
-
-    return [model, ...contextArgs.args];
-  }
-
-  protected override async createAllPrefix(
-    models: M[],
-    ...args: MaybeContextualArg<FabricClientContext>
-  ): Promise<[M[], ...any[], FabricClientContext]> {
-    const contextArgs = await Context.args<M, FabricClientContext>(
-      OperationKeys.CREATE,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    const ignoreHandlers = contextArgs.context.get("ignoreHandlers");
-    const ignoreValidate = contextArgs.context.get("ignoreValidation");
-    if (!models.length) return [models, ...contextArgs.args];
-    const opts = Model.sequenceFor(models[0]);
-    let ids: (string | number | bigint | undefined)[] = [];
-    if (opts.type) {
-      if (!opts.name) opts.name = Sequence.pk(models[0]);
-      ids = await (
-        await this.adapter.Sequence(opts)
-      ).range(models.length, ...contextArgs.args);
-    } else {
-      ids = models.map((m, i) => {
-        if (typeof m[this.pk] === "undefined")
-          throw new InternalError(
-            `Primary key is not defined for model in position ${i}`
-          );
-        return m[this.pk] as string;
-      });
-    }
-
-    models = await Promise.all(
-      models.map(async (m, i) => {
-        m = new this.class(m);
-        if (opts.type) {
-          m[this.pk] = (
-            opts.type !== "String"
-              ? ids[i]
-              : opts.generated
-                ? ids[i]
-                : `${m[this.pk]}`.toString()
-          ) as M[keyof M];
-        }
-
-        if (!ignoreHandlers)
-          await enforceDBDecorators<M, Repository<M, FabricClientAdapter>, any>(
-            this,
-            contextArgs.context,
-            m,
-            OperationKeys.CREATE,
-            OperationKeys.ON
-          );
-        return m;
-      })
-    );
-
-    if (!ignoreValidate) {
-      const ignoredProps =
-        contextArgs.context.get("ignoredValidationProperties") || [];
-
-      const errors = await Promise.all(
-        models.map((m) => Promise.resolve(m.hasErrors(...ignoredProps)))
-      );
-
-      const errorMessages = reduceErrorsToPrint(errors);
-
-      if (errorMessages) throw new ValidationError(errorMessages);
-    }
-    return [models, ...contextArgs.args];
-  }
-
-  protected override async readPrefix(
-    key: PrimaryKeyType,
-    ...args: MaybeContextualArg<FabricClientContext>
-  ): Promise<[PrimaryKeyType, ...any[], FabricClientContext]> {
-    const contextArgs = await Context.args<M, FabricClientContext>(
-      OperationKeys.READ,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    const model: M = new this.class();
-    model[this.pk] = key as M[keyof M];
-    await enforceDBDecorators<M, Repository<M, FabricClientAdapter>, any>(
-      this,
-      contextArgs.context,
-      model,
-      OperationKeys.READ,
-      OperationKeys.ON
-    );
-    return [key, ...contextArgs.args];
-  }
-
-  protected override async readAllPrefix(
-    keys: PrimaryKeyType[],
-    ...args: MaybeContextualArg<FabricClientContext>
-  ): Promise<[PrimaryKeyType[], ...any[], FabricClientContext]> {
-    const contextArgs = await Context.args<M, FabricClientContext>(
-      OperationKeys.READ,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-
-    await Promise.all(
-      keys.map(async (k) => {
-        const m = new this.class();
-        m[this.pk] = k as M[keyof M];
-        return enforceDBDecorators<M, Repository<M, FabricClientAdapter>, any>(
-          this,
-          contextArgs.context,
-          m,
-          OperationKeys.READ,
-          OperationKeys.ON
-        );
-      })
-    );
-    return [keys, ...contextArgs.args];
-  }
-
-  protected override async updatePrefix(
-    model: M,
-    ...args: MaybeContextualArg<FabricClientContext>
-  ): Promise<[M, ...args: any[], FabricClientContext]> {
-    const contextArgs = await Context.args(
-      OperationKeys.UPDATE,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    const ignoreHandlers = contextArgs.context.get("ignoreHandlers");
-    const ignoreValidate = contextArgs.context.get("ignoreValidation");
-    const pk = model[this.pk] as string;
-    if (!pk)
-      throw new InternalError(
-        `No value for the Id is defined under the property ${this.pk as string}`
-      );
-    const oldModel = await this.read(pk, ...contextArgs.args);
-    model = Model.merge(oldModel, model, this.class);
-    if (!ignoreHandlers)
-      await enforceDBDecorators(
-        this,
-        contextArgs.context as any,
-        model,
-        OperationKeys.UPDATE,
-        OperationKeys.ON,
-        oldModel
-      );
-
-    if (!ignoreValidate) {
-      const errors = await Promise.resolve(
-        model.hasErrors(
-          oldModel,
-          ...Model.relations(this.class),
-          ...(contextArgs.context.get("ignoredValidationProperties") || [])
-        )
-      );
-      if (errors) throw new ValidationError(errors.toString());
-    }
-    return [model, ...contextArgs.args];
+    return this.adapter.revert<M>(record, this.class, id, transient, ctx);
   }
 
   override async update(
     model: M,
-    ...args: MaybeContextualArg<FabricClientContext>
+    ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<M> {
     const { ctxArgs, log, ctx } = this.logCtx(args, this.update);
     // eslint-disable-next-line prefer-const
@@ -369,7 +201,73 @@ export class FabricClientRepository<M extends Model> extends Repository<
     log.debug(
       `updating ${this.class.name} in table ${Model.tableName(this.class)} with id ${id}`
     );
-    record = await this.adapter.update(this.class, id, record, ...ctxArgs);
+    record = await this.adapter.update(
+      this.class,
+      id,
+      record,
+      transient,
+      ...ctxArgs
+    );
     return this.adapter.revert<M>(record, this.class, id, transient, ctx);
+  }
+
+  override async createAll(
+    models: M[],
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<M[]> {
+    if (!models.length) return models;
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.createAll);
+    log.debug(
+      `Creating ${models.length} new ${this.class.name} in table ${Model.tableName(this.class)}`
+    );
+
+    const prepared = models.map((m) => this.adapter.prepare(m, ctx));
+    const ids = prepared.map((p) => p.id);
+    let records = prepared.map((p) => p.record);
+    const transient = prepared.map((p) => p.transient);
+    records = await this.adapter.createAll(
+      this.class,
+      ids as PrimaryKeyType[],
+      records,
+      transient,
+      ...ctxArgs
+    );
+    return records.map((r, i) =>
+      this.adapter.revert(
+        r,
+        this.class,
+        ids[i],
+        ctx.get("rebuildWithTransient") ? prepared[i].transient : undefined,
+        ctx
+      )
+    );
+  }
+
+  override async updateAll(
+    models: M[],
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<M[]> {
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.updateAll);
+    log.debug(
+      `Updating ${models.length} new ${this.class.name} in table ${Model.tableName(this.class)}`
+    );
+
+    const records = models.map((m) => this.adapter.prepare(m, ctx));
+    const updated = await this.adapter.updateAll(
+      this.class,
+      records.map((r) => r.id),
+      records.map((r) => r.record),
+      records.map((r) => r.transient),
+      ...ctxArgs
+    );
+    return updated.map((u, i) =>
+      this.adapter.revert(
+        u,
+        this.class,
+        records[i].id,
+        ctx.get("rebuildWithTransient") ? records[i].transient : undefined,
+        ctx
+      )
+    );
   }
 }

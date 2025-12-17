@@ -2,7 +2,6 @@ import {
   Repository,
   ObserverHandler,
   EventIds,
-  MaybeContextualArg,
   ContextualArgs,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";

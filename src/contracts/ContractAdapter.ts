@@ -530,9 +530,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
         `Failed to serialize record with id ${id}: ${e}`
       );
     }
-    await stub.putState(id.toString(), data);
-    log.silly(`state stored under id ${id}`);
 
+    const collection = ctx.get("segregated");
+    if (collection) await stub.putPrivateData(collection, id.toString(), data);
+    else await stub.putState(id.toString(), data);
+
+    log.silly(
+      `state stored${collection ? ` in ${collection} collection` : ""} under id ${id}`
+    );
     return model;
   }
 
@@ -540,11 +545,19 @@ export class FabricContractAdapter extends CouchDBAdapter<
     let result: any;
 
     const { stub, log } = this.logCtx([ctx], this.readState);
-    const res: string = (await stub.getState(id)).toString();
+    let res: string;
+    const collection = ctx.get("segregated");
+    if (collection)
+      res = (await stub.getPrivateData(collection, id.toString())).toString();
+    else res = (await stub.getState(id.toString())).toString();
 
-    if (!res) throw new NotFoundError(`Record with id ${id} not found`);
-
-    log.silly(`Read state for id ${id}`);
+    if (!res)
+      throw new NotFoundError(
+        `Record with id ${id}${collection ? ` in ${collection} collection` : ""} not found`
+      );
+    log.silly(
+      `state retrieved from${collection ? ` ${collection} collection` : ""} under id ${id}`
+    );
     try {
       result = FabricContractAdapter.serializer.deserialize(res.toString());
     } catch (e: unknown) {
@@ -557,12 +570,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
   protected async queryResult(
     stub: ChaincodeStub,
     rawInput: any,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     ...args: any[]
   ): Promise<Iterators.StateQueryIterator> {
-    return (await stub.getQueryResult(
-      JSON.stringify(rawInput)
-    )) as Iterators.StateQueryIterator;
+    const { ctx } = this.logCtx(args, this.readState);
+    let res: Iterators.StateQueryIterator;
+    const collection = ctx.get("segregated");
+    if (collection)
+      res = await stub.getPrivateDataQueryResult(
+        collection,
+        JSON.stringify(rawInput)
+      );
+    else res = await stub.getQueryResult(JSON.stringify(rawInput));
+
+    return res;
   }
 
   protected async queryResultPaginated(
@@ -570,14 +591,35 @@ export class FabricContractAdapter extends CouchDBAdapter<
     rawInput: any,
     limit: number = 250,
     skip?: number,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ...args: any[]
   ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
-    return (await stub.getQueryResultWithPagination(
-      JSON.stringify(rawInput),
-      limit,
-      skip?.toString()
-    )) as StateQueryResponse<Iterators.StateQueryIterator>;
+    const { ctx } = this.logCtx(args, this.readState);
+    let res: StateQueryResponse<Iterators.StateQueryIterator>;
+    const collection = ctx.get("segregated");
+    if (collection) {
+      rawInput.selector = {
+        ...rawInput.selector,
+        _id: skip ? { $gt: skip.toString() } : { $gte: "" },
+      };
+      const it = await stub.getPrivateDataQueryResult(
+        collection,
+        JSON.stringify(rawInput)
+      );
+      res = {
+        iterator: it,
+        metadata: {
+          fetchedRecordsCount: limit,
+          bookmark: "",
+        },
+      };
+    } else
+      res = await stub.getQueryResultWithPagination(
+        JSON.stringify(rawInput),
+        limit,
+        skip?.toString()
+      );
+
+    return res;
   }
 
   protected mergeModels(results: Record<string, any>[]): Record<string, any> {
@@ -625,6 +667,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ): Promise<FabricContractFlags> {
     const baseFlags = {
       stub: ctx.stub,
+      segregated: false,
     };
     if (ctx instanceof FabricContractContext) {
       Object.assign(baseFlags, {
@@ -1026,6 +1069,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   } {
     if (args.length < 1) throw new InternalError("No context provided");
     const ctx = args.pop() as FabricContractContext;
+
     if (!(ctx instanceof Context))
       throw new InternalError("No context provided");
     if (args.filter((a) => a instanceof Context).length > 1)

@@ -1,4 +1,4 @@
-import { Context } from "@decaf-ts/db-decorators";
+import { Context } from "@decaf-ts/core";
 import { FabricContractFlags } from "./types";
 import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
 

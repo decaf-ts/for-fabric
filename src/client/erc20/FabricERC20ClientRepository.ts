@@ -1,12 +1,9 @@
 import { FabricClientRepository } from "../FabricClientRepository";
 import { ERC20Token, ERC20Wallet } from "../../contracts/erc20/models";
 import { Model, Serializer } from "@decaf-ts/decorator-validation";
-import {
-  FabricClientAdapter,
-  FabricClientContext,
-} from "../FabricClientAdapter";
+import { FabricClientAdapter } from "../FabricClientAdapter";
 import { ClientSerializer } from "../../shared/ClientSerializer";
-import { ContextualArgs, EventIds, Sequence } from "@decaf-ts/core";
+import { ContextOf, ContextualArgs, EventIds, Sequence } from "@decaf-ts/core";
 import {
   BulkCrudOperationKeys,
   InternalError,
@@ -17,7 +14,9 @@ import { Constructor } from "@decaf-ts/decoration";
  * Repository for interacting with ERC20 contracts on a Hyperledger Fabric network.
  * Extends the base FabricClientRepository class and utilizes the ClientSerializer for data serialization.
  */
-export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wallet> {
+export class FabricERC20ClientRepository<
+  A extends FabricClientAdapter,
+> extends FabricClientRepository<ERC20Wallet, A> {
   private static serializer = new ClientSerializer();
 
   protected readonly serializer: Serializer<any> =
@@ -39,7 +38,7 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
     table: Constructor<M> | string,
     event: OperationKeys | BulkCrudOperationKeys | string,
     id: EventIds,
-    ...args: ContextualArgs<FabricClientContext>
+    ...args: ContextualArgs<ContextOf<A>>
   ): Promise<void> {
     if (!this.observerHandler)
       throw new InternalError(
@@ -85,7 +84,7 @@ export class FabricERC20ClientRepository extends FabricClientRepository<ERC20Wal
     return FabricERC20ClientRepository.decoder.decode(data);
   }
 
-  constructor(adapter?: FabricClientAdapter) {
+  constructor(adapter?: A) {
     super(adapter, ERC20Wallet);
   }
 

@@ -3,6 +3,8 @@ import { Model } from "@decaf-ts/decorator-validation";
 import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { Context as Ctx, Transaction } from "fabric-contract-api";
 import { Constructor } from "@decaf-ts/decoration";
+import { Condition, OrderDirection } from "@decaf-ts/core";
+import { SerializationError } from "@decaf-ts/db-decorators";
 
 /**
  * @description CRUD contract variant that serializes/deserializes payloads
@@ -116,14 +118,69 @@ export class SerializedCrudContract<
   }
 
   @Transaction(false)
+  override async listBy(
+    context: Ctx,
+    key: string,
+    order: string,
+    ...args: string[]
+  ) {
+    const { ctx } = await this.logCtx([...args, context], this.listBy);
+    return super.listBy(ctx, key as keyof M, order as OrderDirection);
+  }
+
+  @Transaction(false)
+  override async paginateBy(
+    context: Ctx,
+    key: string,
+    order: string,
+    size: number,
+    ...args: string[]
+  ) {
+    const { ctx } = await this.logCtx([...args, context], this.paginateBy);
+    return super.paginateBy(ctx, key, order as any, size);
+  }
+
+  @Transaction(false)
+  override async findOneBy(
+    context: Ctx,
+    key: string,
+    value: string,
+    ...args: string[]
+  ) {
+    const { ctx } = await this.logCtx([...args, context], this.paginateBy);
+    return super.findOneBy(ctx, key, value, ...args);
+  }
+
+  // @Transaction(false)
+  override async query(
+    context: Ctx,
+    condition: string,
+    orderBy: string,
+    order: string,
+    limit?: number,
+    skip?: number,
+    ...args: string[]
+  ): Promise<M[]> {
+    const { ctx } = await this.logCtx([context], this.query);
+    let cond: Condition<any>;
+    try {
+      cond = Condition.from(JSON.parse(condition));
+    } catch (e: unknown) {
+      throw new SerializationError(`Invalid condition: ${e}`);
+    }
+    return super.query(ctx, cond, orderBy, order as any, limit, skip, ...args);
+  }
+
+  // @Transaction(false)
   override async raw(
     context: Ctx,
     rawInput: string,
-    docsOnly: boolean
+    docsOnly: boolean,
+    ...args: string[]
   ): Promise<any> {
     const { ctx } = await this.logCtx([context], this.raw);
     const parsedInput: MangoQuery = JSON.parse(rawInput);
-    return super.raw(ctx, parsedInput, docsOnly);
+    return super.raw(ctx, parsedInput, docsOnly, ...args);
   }
 
   @Transaction()

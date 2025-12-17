@@ -1,25 +1,33 @@
-import { AuthorizationError, Repo, Context } from "@decaf-ts/core";
+import {
+  AuthorizationError,
+  Repo,
+  Context,
+  UnsupportedError,
+  Repository,
+} from "@decaf-ts/core";
 import {
   InternalError,
   NotFoundError,
   onCreate,
+  onDelete,
+  onRead,
+  onUpdate,
   readonly,
+  transient,
 } from "@decaf-ts/db-decorators";
 import { Model, required } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
-import { Context as HLContext } from "fabric-contract-api";
+import type { Context as HLContext } from "fabric-contract-api";
 import { FabricERC20Contract } from "../contracts/erc20/erc20contract";
 import {
   apply,
   Constructor,
   Decoration,
+  metadata,
   Metadata,
   propMetadata,
 } from "@decaf-ts/decoration";
-import {
-  FabricContractContext,
-  FabricContractRepository,
-} from "../contracts/index";
+import { FabricFlags } from "./types";
 
 /**
  * Decorator for marking methods that require ownership authorization.
@@ -150,8 +158,8 @@ export type SegregatedDataMetadata = {
 };
 
 export async function segregatedDataOnCreate<M extends Model>(
-  this: FabricContractRepository<M>,
-  context: FabricContractContext,
+  this: Repository<M, any>,
+  context: Context<FabricFlags>,
   data: SegregatedDataMetadata[],
   keys: (keyof M)[],
   model: M
@@ -161,31 +169,87 @@ export async function segregatedDataOnCreate<M extends Model>(
       `Segregated data keys and metadata length mismatch`
     );
 
-  let key: string, d: SegregatedDataMetadata;
-  for (let i = 0; i < keys.length; i++) {
-    key = keys[i] as string;
-    d = data[i];
-    const collection =
-      typeof d.collections === "function"
-        ? d.collections(model)
-        : d.collections;
-    // await this.saveToCollection(context, collection, key, model[key]);
-  }
+  const collectionResolver = data[0].collections;
+  const collection =
+    typeof collectionResolver === "string"
+      ? collectionResolver
+      : collectionResolver(model);
 
-  Model.segregate(model);
+  const rebuilt = keys.reduce(
+    (acc: Record<keyof M, any>, k, i) => {
+      const c =
+        typeof data[i].collections === "string"
+          ? data[i].collections
+          : data[i].collections(model);
+      if (c !== collection)
+        throw new UnsupportedError(
+          `Segregated data collection mismatch: ${c} vs ${collection}`
+        );
+      acc[k] = model[k];
+      return acc;
+    },
+    {} as Record<keyof M, any>
+  );
+
+  const toCreate = new this.class(rebuilt);
+
+  // const segregated = Model.segregate(model);
+
+  const created = await this.override({ segregated: collection } as any).create(
+    toCreate,
+    context
+  );
+  Object.assign(model, created);
 }
 
 export async function segregatedDataOnRead<M extends Model>(
-  this: FabricContractRepository<M>,
-  context: FabricContractContext,
+  this: Repository<M, any>,
+  context: Context<FabricFlags>,
   data: SegregatedDataMetadata[],
-  key: (keyof M)[],
+  keys: (keyof M)[],
   model: M
-): Promise<void> {}
+): Promise<void> {
+  if (keys.length !== data.length)
+    throw new InternalError(
+      `Segregated data keys and metadata length mismatch`
+    );
+
+  const collectionResolver = data[0].collections;
+  const collection =
+    typeof collectionResolver === "string"
+      ? collectionResolver
+      : collectionResolver(model);
+
+  const rebuilt = keys.reduce(
+    (acc: Record<keyof M, any>, k, i) => {
+      const c =
+        typeof data[i].collections === "string"
+          ? data[i].collections
+          : data[i].collections(model);
+      if (c !== collection)
+        throw new UnsupportedError(
+          `Segregated data collection mismatch: ${c} vs ${collection}`
+        );
+      acc[k] = model[k];
+      return acc;
+    },
+    {} as Record<keyof M, any>
+  );
+
+  const toCreate = new this.class(rebuilt);
+
+  // const segregated = Model.segregate(model);
+
+  const created = await this.override({ segregated: collection } as any).create(
+    toCreate,
+    context
+  );
+  Object.assign(model, created);
+}
 
 export async function segregatedDataOnUpdate<M extends Model>(
-  this: FabricContractRepository<M>,
-  context: FabricContractContext,
+  this: Repository<M, any>,
+  context: Context<FabricFlags>,
   data: SegregatedDataMetadata[],
   key: keyof M[],
   model: M,
@@ -194,11 +258,11 @@ export async function segregatedDataOnUpdate<M extends Model>(
 
 export async function segregatedDataOnDelete<
   M extends Model,
-  R extends FabricContractRepository<M>,
+  R extends Repository<M, any>,
   V extends SegregatedDataMetadata,
 >(
   this: R,
-  context: FabricContractContext,
+  context: Context<FabricFlags>,
   data: V[],
   key: keyof M[],
   model: M
@@ -225,49 +289,65 @@ function segregated(
       meta.collections = [...collections];
       Metadata.set(constr as Constructor, key, meta);
     }
-    //
-    // const decs = [
-    //   segregatedDec,
-    //   transient(),
-    //   onCreate(
-    //     segregatedDataOnCreate,
-    //     { collections: collection },
-    //     {
-    //       priority: 95,
-    //       group:
-    //         typeof collection === "string" ? collection : collection.toString(),
-    //     }
-    //   ),
-    //   onRead(
-    //     segregatedDataOnRead,
-    //     { collections: collection },
-    //     {
-    //       priority: 95,
-    //       group:
-    //         typeof collection === "string" ? collection : collection.toString(),
-    //     }
-    //   ),
-    //   onUpdate(
-    //     segregatedDataOnUpdate,
-    //     { collections: collection },
-    //     {
-    //       priority: 95,
-    //       group:
-    //         typeof collection === "string" ? collection : collection.toString(),
-    //     }
-    //   ),
-    //   onDelete(
-    //     segregatedDataOnDelete,
-    //     { collections: collection },
-    //     {
-    //       priority: 95,
-    //       group:
-    //         typeof collection === "string" ? collection : collection.toString(),
-    //     }
-    //   ),
-    // ];
-    // return apply(...decs)(target, propertyKey);
-    return apply()(target, propertyKey);
+    const decs: any[] = [];
+    if (!propertyKey) {
+      // decorated at the class level
+      Metadata.properties(target as Constructor)?.forEach((p) =>
+        segregated(collection, type)(target, p)
+      );
+      return metadata(type, true)(target);
+    } else {
+      decs.push(
+        transient(),
+        segregatedDec,
+        onCreate(
+          segregatedDataOnCreate,
+          { collections: collection },
+          {
+            priority: 95,
+            group:
+              typeof collection === "string"
+                ? collection
+                : collection.toString(),
+          }
+        ),
+        onRead(
+          segregatedDataOnRead as any,
+          { collections: collection },
+          {
+            priority: 95,
+            group:
+              typeof collection === "string"
+                ? collection
+                : collection.toString(),
+          }
+        ),
+        onUpdate(
+          segregatedDataOnUpdate as any,
+          { collections: collection },
+          {
+            priority: 95,
+            group:
+              typeof collection === "string"
+                ? collection
+                : collection.toString(),
+          }
+        ),
+        onDelete(
+          segregatedDataOnDelete as any,
+          { collections: collection },
+          {
+            priority: 95,
+            group:
+              typeof collection === "string"
+                ? collection
+                : collection.toString(),
+          }
+        )
+      );
+    }
+    return apply(...decs)(target, propertyKey);
+    // return apply()(target, propertyKey);
   };
 }
 

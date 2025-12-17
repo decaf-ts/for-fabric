@@ -5,6 +5,7 @@ import { Constructor, Metadata } from "@decaf-ts/decoration";
 // import { SerializationError } from "../repository/errors";
 import { FabricModelKeys } from "../constants";
 import { SegregatedModel } from "../types";
+import { DBKeys, SerializationError } from "@decaf-ts/db-decorators";
 
 Model.prototype.isShared = function isShared<M extends Model>(
   this: M
@@ -24,49 +25,61 @@ Model.prototype.segregate = function segregate<M extends Model>(
   return Model.segregate(this);
 };
 
-//
-// (Model as any).toTransient = function toTransient<M extends Model>(model: M) {
-//   if (!Metadata.isTransient(model)) return { model: model };
-//   const decoratedProperties = Metadata.validatableProperties(
-//     model.constructor as any
-//   );
-//
-//   const transientProps = Metadata.get(
-//     model.constructor as any,
-//     DBKeys.TRANSIENT
-//   );
-//
-//   const result = {
-//     model: {} as Record<string, any>,
-//     transient: {} as Record<string, any>,
-//   };
-//   for (const key of decoratedProperties) {
-//     const isTransient = Object.keys(transientProps).includes(key);
-//     if (isTransient) {
-//       result.transient = result.transient || {};
-//       try {
-//         result.transient[key] = model[key as keyof M];
-//       } catch (e: unknown) {
-//         throw new SerializationError(
-//           `Failed to serialize transient property ${key}: ${e}`
-//         );
-//       }
-//     } else {
-//       result.model = result.model || {};
-//       result.model[key] = (model as Record<string, any>)[key];
-//     }
-//   }
-//
-//   result.model = Model.build(result.model, model.constructor.name);
-//   return result as { model: M; transient?: Record<string, any> };
-// };
-
-const seg = Model.segregate;
-
 (Model as any).segregate = function segregate<M extends Model>(
   model: M
 ): SegregatedModel<M> {
-  return seg.call(Model, model) as SegregatedModel<M>;
+  if (!Model.isTransient(model)) return { model: model };
+  const decoratedProperties = Metadata.validatableProperties(
+    model.constructor as any
+  );
+
+  const transientProps = Metadata.get(
+    model.constructor as any,
+    DBKeys.TRANSIENT
+  );
+  const privateProperties = Metadata.get(
+    model.constructor as any,
+    FabricModelKeys.PRIVATE
+  );
+  const sharedProperties = Metadata.get(
+    model.constructor as any,
+    FabricModelKeys.PRIVATE
+  );
+
+  const result: SegregatedModel<M> = {
+    model: {} as Record<keyof M, any>,
+    transient: {} as Record<keyof M, any>,
+    private: {} as Record<keyof M, any>,
+    shared: {} as Record<keyof M, any>,
+  };
+
+  const transientKeys = Object.keys(transientProps);
+  const privateKeys = Object.keys(privateProperties);
+  const sharedKeys = Object.keys(sharedProperties);
+
+  for (const key of decoratedProperties) {
+    const isTransient = transientKeys.includes(key);
+    const isPrivate = privateKeys.includes(key);
+    const isShared = sharedKeys.includes(key);
+    if (isTransient) {
+      result.transient = result.transient || ({} as any);
+      (result.transient as any)[key] = model[key as keyof M];
+      if (isPrivate) {
+        result.private = result.private || ({} as any);
+        (result.private as any)[key] = model[key as keyof M];
+      }
+      if (isShared) {
+        result.shared = result.shared || ({} as any);
+        (result.shared as any)[key] = model[key as keyof M];
+      }
+    } else {
+      result.model = result.model || {};
+      (result.model as any)[key] = (model as Record<string, any>)[key];
+    }
+  }
+
+  result.model = Model.build(result.model, model.constructor.name);
+  return result as SegregatedModel<M>;
 }.bind(Model);
 
 (Model as any).isPrivate = function isPrivate<M extends Model>(

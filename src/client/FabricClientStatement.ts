@@ -5,20 +5,20 @@ import {
   UnsupportedError,
 } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
-import { FabricQuery } from "./types";
 import { FabricClientAdapter } from "./FabricClientAdapter";
+import { MangoQuery } from "@decaf-ts/for-couchdb";
 
 export class FabricClientStatement<M extends Model, R> extends Statement<
   M,
   FabricClientAdapter,
   R,
-  FabricQuery
+  MangoQuery
 > {
   constructor(adapter: FabricClientAdapter, overrides?: Partial<AdapterFlags>) {
     super(adapter, overrides);
   }
 
-  protected override build(): FabricQuery {
+  protected override build(): MangoQuery {
     throw new UnsupportedError(
       `This method is only called is prepared statements are not used. If so, a dedicated implementation for the native queries used is required`
     );
@@ -29,7 +29,7 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
     condition: Condition<M>,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ...args: any[]
-  ): FabricQuery {
+  ): MangoQuery {
     throw new UnsupportedError(
       `This method is only called is prepared statements are not used. Is so, a dedicated implementation for the native queries used is required`
     );

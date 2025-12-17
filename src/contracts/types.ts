@@ -1,6 +1,6 @@
-import { AdapterFlags } from "@decaf-ts/core";
 import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
 import { Logger } from "@decaf-ts/logging";
+import { FabricFlags } from "../shared/index";
 
 /**
  * @description Flags for Fabric chaincode contract operations
@@ -11,7 +11,7 @@ import { Logger } from "@decaf-ts/logging";
  * @interface FabricContractFlags
  * @memberOf module:fabric.contracts
  */
-export interface FabricContractFlags extends AdapterFlags {
+export interface FabricContractFlags extends FabricFlags {
   /**
    * @description Chaincode stub for interacting with the ledger
    */
