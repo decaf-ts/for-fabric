@@ -141,3 +141,9 @@ export class MissingPKCSS11Lib extends InternalError {
     super(msg, MissingPKCSS11Lib.name, 500);
   }
 }
+
+export class EndorsementError extends InternalError {
+  constructor(message: string | Error) {
+    super(message, EndorsementError.name, 500);
+  }
+}

@@ -45,7 +45,7 @@ export class FabricClientRepository<
   A extends FabricClientAdapter,
 > extends Repository<M, A> {
   protected override _overrides = Object.assign({}, super["_overrides"], {
-    ignoreValidation: false,
+    ignoreValidation: true,
     ignoreHandlers: true,
     allowRawStatements: false,
     forcePrepareSimpleQueries: true,
