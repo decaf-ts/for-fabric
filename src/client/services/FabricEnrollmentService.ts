@@ -171,8 +171,6 @@ export class FabricEnrollmentService extends LoggedClass {
     // eslint-disable-next-line prefer-const
     let { trustedRoots, verify } = tls as TLSOptions;
 
-    verify = false;
-
     const root = (trustedRoots as string[])[0] as string;
     log.debug(`Retrieving CA certificate from ${root}. cwd: ${process.cwd()}`);
 
