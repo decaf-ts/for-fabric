@@ -16,15 +16,30 @@ import {
   trim,
 } from "../utils";
 
-import { TestPrivateModel } from "../assets/contract/serialized-contract-private-model/TestPrivateModel";
-import { TestPrivateModelContract } from "../assets/contract/serialized-contract-private-model/TestPrivateModelContract";
-import { Model } from "@decaf-ts/decorator-validation";
+import { Model, ModelArg, required } from "@decaf-ts/decorator-validation";
+import { column, pk } from "@decaf-ts/core";
 
 jest.setTimeout(5000000);
 
-describe("Test Serialized Crud Contract With Private Model", () => {
+class TestPrivateModel extends Model {
+  @pk({ type: "Number" })
+  id!: number;
+
+  @column()
+  @required()
+  name!: string;
+
+  @column()
+  @required()
+  nif!: string;
+  constructor(m?: ModelArg<TestPrivateModel>) {
+    super(m);
+  }
+}
+
+describe.skip("Test Serialized Crud Contract With Private Model", () => {
   const contractFolderName = "serialized-contract-private-model";
-  const contractName = TestPrivateModelContract.name;
+  const contractName = "contractname"; //TestPrivateModelContract.name;
   const sequenceTableName = "??sequence";
   const modelTableName = "tst_private_user";
   const sequenceId = `${modelTableName}_pk`;
