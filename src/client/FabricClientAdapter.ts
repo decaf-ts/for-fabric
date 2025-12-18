@@ -56,11 +56,6 @@ import { ClientSerializer } from "../shared/ClientSerializer";
 import { FabricClientDispatch } from "./FabricClientDispatch";
 import { HSMSignerFactoryCustom } from "./fabric-hsm";
 import { type Constructor } from "@decaf-ts/decoration";
-import {
-  generateModelIndexes,
-  readModelFolders,
-  writeIndexes,
-} from "./indexes/index";
 import { FabricClientStatement } from "./FabricClientStatement";
 import { FabricClientPaginator } from "./FabricClientPaginator";
 import { FabricClientRepository } from "./FabricClientRepository";
@@ -478,44 +473,6 @@ export class FabricClientAdapter extends Adapter<
     }
 
     return new (clazz as Constructor<M>)(obj);
-  }
-
-  /**
-   * @description Creates indexes for the given models
-   * @summary Abstract method that must be implemented to create database indexes for the specified models
-   * @template M - The model type
-   * @param {...Constructor<M>} models - The model constructors to create indexes for
-   * @return {Promise<void>} A promise that resolves when all indexes are created
-   */
-  @debug()
-  protected async index<M extends Model>(
-    ...args: MaybeContextualArg<
-      Context<FabricClientFlags>,
-      [string, ...(Constructor<M> | string)[]]
-    >
-  ): Promise<void> {
-    const { log } = this.logCtx(args, this.index);
-    const outDir: string = args.shift();
-    const models: ModelConstructor<any>[] = (
-      await Promise.all(
-        args.map(async (m) => {
-          const isFolder = typeof m === "string";
-          if (isFolder) {
-            log.verbose(`Loading models from ${m}...`);
-            return await readModelFolders(m);
-          }
-          return m;
-        })
-      )
-    ).flat();
-    const result: Record<string, any> = {};
-    for (const m of models) {
-      log.verbose(`Extracting indexes for table ${Model.tableName(m)}`);
-      generateModelIndexes(m, result);
-    }
-    log.verbose(`Found ${Object.keys(result).length} indexes to create`);
-    log.debug(`Indexes: ${JSON.stringify(result)}`);
-    writeIndexes(Object.values(result), outDir);
   }
 
   /**

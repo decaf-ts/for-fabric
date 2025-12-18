@@ -50,6 +50,7 @@ describe("Tests global contract implementation", () => {
     );
     if (!fs.existsSync(location)) {
       execSync("npm run build:contract", { stdio: "inherit" });
+      execSync("npm run extract:indexes", { stdio: "inherit" });
       execSync(
         `cp -r  ${path.join(__dirname, "../..", contractFolderName)} ${path.join(__dirname, "../../docker/infrastructure/chaincode")}/`,
         { stdio: "inherit" }
@@ -479,6 +480,32 @@ describe("Tests global contract implementation", () => {
     expect(list.length).toBeGreaterThan(0);
   });
 
+  it("Should perform simple queries on product via listBy", async () => {
+    const enrollmentService = new FabricEnrollmentService(caConfig);
+    const userID = (await enrollmentService.registerAndEnroll(
+      { userName: "TestUser" + Date.now(), password: "TestUserPW" },
+      false,
+      "",
+      "client"
+    )) as any;
+
+    expect(userID).toBeDefined();
+    const credentials = userID.credentials;
+    expect(credentials).toBeDefined();
+
+    const client = {
+      keyCertOrDirectoryPath: Buffer.from(credentials.privateKey!),
+      certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
+    };
+
+    const repo = productRepository.for({ ...client } as any);
+
+    const list = await repo.listBy("productCode", OrderDirection.ASC);
+
+    expect(list).toBeDefined();
+    expect(list.length).toBeGreaterThan(0);
+  });
+
   it("Should perform simple finds on product", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
@@ -499,7 +526,7 @@ describe("Tests global contract implementation", () => {
 
     const repo = productRepository.for({ ...client });
 
-    const list = await repo.findOneBy("productCode", OrderDirection.ASC);
+    const list = await repo.findBy("productCode", 1);
 
     expect(list).toBeDefined();
     expect(list.length).toBeGreaterThan(0);

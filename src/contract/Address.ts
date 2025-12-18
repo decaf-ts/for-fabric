@@ -12,6 +12,7 @@ import {
   createdBy,
   updatedAt,
   updatedBy,
+  index,
 } from "@decaf-ts/core";
 import { uses } from "@decaf-ts/decoration";
 import { FabricFlavour, ownedBy } from "../shared/index";
@@ -25,6 +26,7 @@ export class Address extends Model {
 
   @column()
   @required()
+  @index(["asc", "desc"])
   city!: string;
 
   @column()
@@ -37,6 +39,7 @@ export class Address extends Model {
 
   @column()
   @createdAt()
+  @index()
   createdAt!: Date;
 
   @column()
@@ -45,6 +48,7 @@ export class Address extends Model {
 
   @column()
   @createdBy()
+  @index(["asc", "desc"])
   createdBy!: string;
 
   @column()
@@ -53,6 +57,7 @@ export class Address extends Model {
 
   @column()
   @ownedBy()
+  @index()
   msp!: string;
 
   constructor(arg?: ModelArg<Address>) {

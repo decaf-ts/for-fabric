@@ -46,6 +46,7 @@ describe("Tests bulk and query operations", () => {
     );
     if (!fs.existsSync(location)) {
       execSync("npm run build:contract", { stdio: "inherit" });
+      execSync("npm run extract:indexes", { stdio: "inherit" });
       execSync(
         `cp -r  ${path.join(__dirname, "../..", contractFolderName)} ${path.join(__dirname, "../../docker/infrastructure/chaincode")}/`,
         { stdio: "inherit" }

@@ -18,6 +18,7 @@ import {
   reduceErrorsToPrint,
   enforceDBDecorators,
 } from "@decaf-ts/db-decorators";
+import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 
 /**
  * @description Repository implementation for Fabric client operations
@@ -104,7 +105,7 @@ export class FabricClientRepository<
     return (await this.statement(
       this.listBy.name,
       key,
-      { direction: order },
+      order,
       ...ctxArgs
     )) as any;
   }
@@ -129,7 +130,6 @@ export class FabricClientRepository<
       this.findBy.name,
       key,
       value,
-      {},
       ...ctxArgs
     )) as any;
   }
@@ -154,7 +154,6 @@ export class FabricClientRepository<
       this.findOneBy.name,
       key,
       value,
-      {},
       ...ctxArgs
     )) as any;
   }
@@ -172,10 +171,26 @@ export class FabricClientRepository<
     );
     const { log, ctx } = this.logCtx(contextArgs.args, this.statement);
     log.verbose(`Executing prepared statement ${name}`);
-    return this.adapter.evaluateTransaction(ctx, PersistenceKeys.STATEMENT, [
-      name,
-      JSON.stringify(contextArgs.args),
-    ]);
+    const result = JSON.parse(
+      this.adapter.decode(
+        await this.adapter.evaluateTransaction(ctx, PersistenceKeys.STATEMENT, [
+          name,
+          JSON.stringify(contextArgs.args),
+        ])
+      )
+    );
+    if (Array.isArray(result)) {
+      return result.map((r: any) =>
+        (r as any)[CouchDBKeys.TABLE] &&
+        (r as any)[CouchDBKeys.TABLE] === Model.tableName(this.class)
+          ? new this.class(r)
+          : r
+      );
+    }
+    return (result as any)[CouchDBKeys.TABLE] &&
+      (result as any)[CouchDBKeys.TABLE] === Model.tableName(this.class)
+      ? new this.class(result)
+      : result;
   }
 
   override async create(

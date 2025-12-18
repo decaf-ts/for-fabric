@@ -3,6 +3,7 @@ import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
 import { normalizeImport } from "../../shared/index";
+import path from "path";
 
 export type Index = {
   index: {
@@ -78,11 +79,11 @@ export function generateModelIndexes<M extends Model>(
 
   const modelIndexes = Model.indexes(m);
   for (const prop of Object.keys(modelIndexes)) {
-    for (const [key, dec] of Object.entries(modelIndexes[prop])) {
+    for (const [, dec] of Object.entries(modelIndexes[prop])) {
       const directions = (dec as IndexMetadata)
         .directions as unknown as OrderDirection[];
       const compositions = (dec as IndexMetadata).compositions;
-      const fields = [key, CouchDBKeys.TABLE];
+      const fields = [prop, CouchDBKeys.TABLE];
 
       addIndex(result, fields);
       if (compositions && compositions.length)
@@ -97,7 +98,28 @@ export function generateModelIndexes<M extends Model>(
     }
   }
 
+  Object.entries(result).forEach(([key, value]) => {
+    indexes[key] = value;
+  });
   return Object.values(result);
+}
+
+export function readModelFile(file: any) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require("path");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const exports = require(path.join(process.cwd(), file.parentPath, file.name));
+
+  const values = Object.values(exports).filter((e) => {
+    try {
+      const m = new (e as Constructor)();
+      return m instanceof Model;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e: unknown) {
+      return false;
+    }
+  }) as ModelConstructor<any>[];
+  return values;
 }
 
 export async function readModelFolders(
@@ -105,6 +127,8 @@ export async function readModelFolders(
 ): Promise<ModelConstructor<any>[]> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require("path");
   // // eslint-disable-next-line @typescript-eslint/no-require-imports
   // const path = require("path");
 
@@ -116,19 +140,9 @@ export async function readModelFolders(
         withFileTypes: true,
         recursive: true,
       })
-      .filter((f: any) => f.isFile());
+      .filter((f: any) => f.isFile() && f.name.endsWith("js"));
     for (const file of files) {
-      const exports = await normalizeImport(import(file));
-      const values = Object.values(exports).filter((e) => {
-        try {
-          const m = new (e as Constructor)();
-          return m instanceof Model;
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (e: unknown) {
-          return false;
-        }
-      }) as ModelConstructor<any>[];
-      result.push(...values);
+      result.push(...readModelFile(file));
     }
   }
   return result;
