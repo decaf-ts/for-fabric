@@ -10,7 +10,14 @@ import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
 import { type FabricClientAdapter } from "./FabricClientAdapter";
-import { PrimaryKeyType } from "@decaf-ts/db-decorators";
+import {
+  OperationKeys,
+  PrimaryKeyType,
+  ValidationError,
+  reduceErrorsToPrint,
+  enforceDBDecorators,
+} from "@decaf-ts/db-decorators";
+import { FabricFlags } from "../shared/types";
 
 /**
  * @description Repository implementation for Fabric client operations
@@ -209,6 +216,51 @@ export class FabricClientRepository<
       ...ctxArgs
     );
     return this.adapter.revert<M>(record, this.class, id, transient, ctx);
+  }
+
+  protected override async createAllPrefix(
+    models: M[],
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<[M[], ...any[], ContextOf<A>]> {
+    const contextArgs = await Context.args<M, Context<FabricFlags>>(
+      OperationKeys.CREATE,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const ignoreHandlers = contextArgs.context.get("ignoreHandlers");
+    const ignoreValidate = contextArgs.context.get("ignoreValidation");
+    if (!models.length) return [models, ...contextArgs.args] as any;
+
+    models = await Promise.all(
+      models.map(async (m) => {
+        m = new this.class(m);
+        if (!ignoreHandlers)
+          await enforceDBDecorators<M, Repository<M, A>, any>(
+            this,
+            contextArgs.context,
+            m,
+            OperationKeys.CREATE,
+            OperationKeys.ON
+          );
+        return m;
+      })
+    );
+
+    if (!ignoreValidate) {
+      const ignoredProps =
+        contextArgs.context.get("ignoredValidationProperties") || [];
+
+      const errors = await Promise.all(
+        models.map((m) => Promise.resolve(m.hasErrors(...ignoredProps)))
+      );
+
+      const errorMessages = reduceErrorsToPrint(errors);
+
+      if (errorMessages) throw new ValidationError(errorMessages);
+    }
+    return [models, ...contextArgs.args] as any;
   }
 
   override async createAll(

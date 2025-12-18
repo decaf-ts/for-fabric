@@ -1,6 +1,5 @@
 import { FabricCrudContract } from "./crud-contract";
 import { Model } from "@decaf-ts/decorator-validation";
-import { MangoQuery } from "@decaf-ts/for-couchdb";
 import { Context as Ctx, Transaction } from "fabric-contract-api";
 import { Constructor } from "@decaf-ts/decoration";
 import { Condition, OrderDirection } from "@decaf-ts/core";
@@ -114,7 +113,7 @@ export class SerializedCrudContract<
     });
     log.info(`calling prepared statement ${method}`);
     log.debug(`with args ${args}`);
-    return super.statement(ctx, method, ...args);
+    return JSON.stringify(await super.statement(ctx, method, ...args));
   }
 
   @Transaction(false)
@@ -125,7 +124,9 @@ export class SerializedCrudContract<
     ...args: string[]
   ) {
     const { ctx } = await this.logCtx([...args, context], this.listBy);
-    return super.listBy(ctx, key as keyof M, order as OrderDirection);
+    return JSON.stringify(
+      await super.listBy(ctx, key as keyof M, order as OrderDirection)
+    );
   }
 
   @Transaction(false)
@@ -137,7 +138,7 @@ export class SerializedCrudContract<
     ...args: string[]
   ) {
     const { ctx } = await this.logCtx([...args, context], this.paginateBy);
-    return super.paginateBy(ctx, key, order as any, size);
+    return JSON.stringify(await super.paginateBy(ctx, key, order as any, size));
   }
 
   @Transaction(false)
@@ -148,7 +149,7 @@ export class SerializedCrudContract<
     ...args: string[]
   ) {
     const { ctx } = await this.logCtx([...args, context], this.paginateBy);
-    return super.findOneBy(ctx, key, value, ...args);
+    return JSON.stringify(await super.findOneBy(ctx, key, value, ...args));
   }
 
   // @Transaction(false)
@@ -160,7 +161,7 @@ export class SerializedCrudContract<
     limit?: number,
     skip?: number,
     ...args: string[]
-  ): Promise<M[]> {
+  ): Promise<string> {
     const { ctx } = await this.logCtx([context], this.query);
     let cond: Condition<any>;
     try {
@@ -168,20 +169,22 @@ export class SerializedCrudContract<
     } catch (e: unknown) {
       throw new SerializationError(`Invalid condition: ${e}`);
     }
-    return super.query(ctx, cond, orderBy, order as any, limit, skip, ...args);
+    return JSON.stringify(
+      await super.query(ctx, cond, orderBy, order as any, limit, skip, ...args)
+    );
   }
-
-  // @Transaction(false)
-  override async raw(
-    context: Ctx,
-    rawInput: string,
-    docsOnly: boolean,
-    ...args: string[]
-  ): Promise<any> {
-    const { ctx } = await this.logCtx([context], this.raw);
-    const parsedInput: MangoQuery = JSON.parse(rawInput);
-    return super.raw(ctx, parsedInput, docsOnly, ...args);
-  }
+  //
+  // // @Transaction(false)
+  // override async raw(
+  //   context: Ctx,
+  //   rawInput: string,
+  //   docsOnly: boolean,
+  //   ...args: string[]
+  // ): Promise<any> {
+  //   const { ctx } = await this.logCtx([context], this.raw);
+  //   const parsedInput: MangoQuery = JSON.parse(rawInput);
+  //   return JSON.stringify(await super.raw(ctx, parsedInput, docsOnly, ...args));
+  // }
 
   @Transaction()
   override async init(ctx: Ctx): Promise<void> {

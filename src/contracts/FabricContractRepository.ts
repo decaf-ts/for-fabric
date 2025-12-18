@@ -79,6 +79,14 @@ export class FabricContractRepository<M extends Model> extends Repository<
   M,
   FabricContractAdapter
 > {
+  protected override _overrides = Object.assign({}, super["_overrides"], {
+    ignoreValidation: false,
+    ignoreHandlers: false,
+    allowRawStatements: true,
+    forcePrepareSimpleQueries: false,
+    forcePrepareComplexQueries: false,
+  });
+
   constructor(
     adapter?: FabricContractAdapter,
     clazz?: Constructor<M>,

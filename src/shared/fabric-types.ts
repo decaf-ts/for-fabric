@@ -1,5 +1,3 @@
-import "reflect-metadata";
-
 export type GetCertificatesRequest = {
   id?: string;
   aki?: string;

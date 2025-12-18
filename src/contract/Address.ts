@@ -20,7 +20,7 @@ import { FabricFlavour, ownedBy } from "../shared/index";
 @table()
 @model()
 export class Address extends Model {
-  @pk()
+  @pk({ type: Number, generated: true })
   id!: number;
 
   @column()

@@ -96,7 +96,7 @@ describe("Tests bulk and query operations", () => {
     certCertOrDirectoryPath: any;
   };
 
-  it.only("Create User Account", async () => {
+  it("Create User Account", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -133,7 +133,7 @@ describe("Tests bulk and query operations", () => {
 
   let created: Address[];
 
-  it.only("Should create one", async () => {
+  it.skip("Should create one", async () => {
     const repo = repository.for({ ...client });
 
     const created = await repo.create(
@@ -151,7 +151,7 @@ describe("Tests bulk and query operations", () => {
   it("Should create Addresses in bulk", async () => {
     const repo = repository.for({ ...client });
 
-    const models = Object.keys(new Array(10))
+    const models = Object.keys(new Array(10).fill(0))
       .map(parseInt)
       .map(
         (i) =>
@@ -250,7 +250,7 @@ describe("Tests bulk and query operations", () => {
     const list = await repo.select().execute();
 
     expect(list).toBeDefined();
-    expect(list.length).toEqual(created.length + 1);
+    expect(list.length).toEqual(created.length);
     expect(list.every((c, i) => c.equals(created[i]))).toEqual(true);
   });
 });

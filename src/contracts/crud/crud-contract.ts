@@ -7,6 +7,7 @@ import {
   ContextualizedArgs,
   LoggerOf,
   OrderDirection,
+  Paginator,
   Repository,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "../FabricContractRepository";
@@ -105,7 +106,7 @@ export abstract class FabricCrudContract<M extends Model>
     key: string | keyof M,
     order: string,
     ...args: any[]
-  ) {
+  ): Promise<M[] | string> {
     const { ctxArgs } = await this.logCtx([...args, ctx], this.listBy);
     return this.repo.listBy(
       key as keyof M,
@@ -120,7 +121,7 @@ export abstract class FabricCrudContract<M extends Model>
     order: string,
     size: number,
     ...args: any[]
-  ) {
+  ): Promise<Paginator<M, any> | string> {
     const { ctxArgs } = await this.logCtx([...args, ctx], this.paginateBy);
     return this.repo.paginateBy(key as keyof M, order as any, size, ...ctxArgs);
   }
@@ -130,7 +131,7 @@ export abstract class FabricCrudContract<M extends Model>
     key: string | keyof M,
     value: any,
     ...args: any[]
-  ) {
+  ): Promise<M | string> {
     const { ctxArgs } = await this.logCtx([...args, ctx], this.findOneBy);
     return this.repo.findOneBy(key as keyof M, value, ...ctxArgs);
   }
@@ -139,7 +140,7 @@ export abstract class FabricCrudContract<M extends Model>
     ctx: Ctx | FabricContractContext,
     method: string,
     ...args: any[]
-  ) {
+  ): Promise<any> {
     const { ctxArgs } = await this.logCtx([...args, ctx], this.statement);
     return this.repo.statement(method, ...ctxArgs);
   }
@@ -328,7 +329,7 @@ export abstract class FabricCrudContract<M extends Model>
     limit?: number,
     skip?: number,
     ...args: any[]
-  ): Promise<M[]> {
+  ): Promise<M[] | string> {
     const { ctxArgs } = await this.logCtx([...args, context], this.query);
     return this.repo.query(
       condition as Condition<M>,
@@ -351,13 +352,11 @@ export abstract class FabricCrudContract<M extends Model>
    */
   async raw(
     ctx: Ctx | FabricContractContext,
-    rawInput: MangoQuery | string,
+    rawInput: MangoQuery,
     docsOnly: boolean,
     ...args: any[]
-  ): Promise<any | string> {
+  ): Promise<any> {
     const { ctxArgs } = await this.logCtx([...args, ctx], this.raw);
-    if (typeof rawInput === "string")
-      rawInput = JSON.parse(rawInput) as MangoQuery;
     return FabricCrudContract.adapter.raw(rawInput, docsOnly, ...ctxArgs);
   }
 
@@ -399,7 +398,7 @@ export abstract class FabricCrudContract<M extends Model>
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    const { log } = await this.logCtx([...args, ctx], this.createAll);
+    const { log, ctxArgs } = await this.logCtx([...args, ctx], this.createAll);
 
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
@@ -407,7 +406,7 @@ export abstract class FabricCrudContract<M extends Model>
         .map((m) => new this.clazz(m)) as any;
 
     log.info(`adding ${models.length} entries to the table`);
-    return this.repo.createAll(models as unknown as M[], ctx, ...args);
+    return this.repo.createAll(models as unknown as M[], ...ctxArgs);
   }
 
   async logCtx<ARGS extends any[]>(

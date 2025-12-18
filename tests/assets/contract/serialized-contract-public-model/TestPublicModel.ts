@@ -12,7 +12,7 @@ import { ownedBy } from "../../../../src/shared/decorators";
 @table("tst_user")
 @model()
 export class TestPublicModel extends Model {
-  @pk({ type: "Number" })
+  @pk({ type: "Number", generated: true })
   id!: number;
 
   @column("tst_name")

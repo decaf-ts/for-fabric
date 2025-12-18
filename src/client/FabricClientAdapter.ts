@@ -290,10 +290,14 @@ export class FabricClientAdapter extends Adapter<
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.CREATE_ALL,
-      [ids, models.map((m) => this.serializer.serialize(m, clazz.name))],
+      [
+        JSON.stringify(
+          models.map((m) => this.serializer.serialize(m, clazz.name))
+        ),
+      ],
       transient,
       undefined,
-      tableName
+      clazz.name
     );
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
@@ -320,10 +324,10 @@ export class FabricClientAdapter extends Adapter<
     log.verbose(`pks: ${ids}`);
     const result = await this.evaluateTransaction(
       BulkCrudOperationKeys.READ_ALL,
-      [ids],
+      [JSON.stringify(ids)],
       undefined,
       undefined,
-      tableName
+      clazz.name
     );
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
@@ -361,7 +365,11 @@ export class FabricClientAdapter extends Adapter<
 
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.UPDATE_ALL,
-      [ids, models.map((m) => this.serializer.serialize(m, clazz.name))],
+      [
+        JSON.stringify(
+          models.map((m) => this.serializer.serialize(m, clazz.name))
+        ),
+      ],
       transient,
       undefined,
       clazz.name
@@ -392,7 +400,7 @@ export class FabricClientAdapter extends Adapter<
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
       BulkCrudOperationKeys.DELETE_ALL,
-      [ids],
+      [JSON.stringify(ids)],
       undefined,
       undefined,
       clazz.name
