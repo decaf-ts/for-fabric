@@ -172,11 +172,10 @@ export class FabricClientRepository<
     );
     const { log, ctx } = this.logCtx(contextArgs.args, this.statement);
     log.verbose(`Executing prepared statement ${name}`);
-    return this.adapter.evaluateTransaction(
-      ctx,
-      PersistenceKeys.STATEMENT,
-      contextArgs.args
-    );
+    return this.adapter.evaluateTransaction(ctx, PersistenceKeys.STATEMENT, [
+      name,
+      JSON.stringify(contextArgs.args),
+    ]);
   }
 
   override async create(

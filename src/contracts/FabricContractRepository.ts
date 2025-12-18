@@ -3,13 +3,26 @@ import {
   ObserverHandler,
   EventIds,
   ContextualArgs,
+  MaybeContextualArg,
+  QueryError,
+  Context,
+  PersistenceKeys,
+  ContextOf,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
 import { FabricContractRepositoryObservableHandler } from "./FabricContractRepositoryObservableHandler";
-import { BulkCrudOperationKeys, OperationKeys } from "@decaf-ts/db-decorators";
+import {
+  BaseError,
+  BulkCrudOperationKeys,
+  enforceDBDecorators,
+  InternalError,
+  OperationKeys,
+  reduceErrorsToPrint,
+  ValidationError,
+} from "@decaf-ts/db-decorators";
 import { Constructor } from "@decaf-ts/decoration";
-import type { FabricContractAdapter } from "./ContractAdapter";
+import { FabricContractAdapter } from "./ContractAdapter";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -93,6 +106,105 @@ export class FabricContractRepository<M extends Model> extends Repository<
     protected trackedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
   ) {
     super(adapter, clazz);
+  }
+
+  protected override async createAllPrefix(
+    models: M[],
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<[M[], ...any[], FabricContractContext]> {
+    const contextArgs = await Context.args(
+      OperationKeys.CREATE,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const ignoreHandlers = contextArgs.context.get("ignoreHandlers");
+    const ignoreValidate = contextArgs.context.get("ignoreValidation");
+    if (!models.length) return [models, ...contextArgs.args];
+    const opts = Model.sequenceFor(models[0]);
+    let ids: (string | number | bigint | undefined)[] = [];
+    if (opts.type) {
+      if (!opts.name) opts.name = Model.sequenceName(models[0], "pk");
+      ids = await (
+        await this.adapter.Sequence(opts)
+      ).range(models.length, ...contextArgs.args);
+    } else {
+      ids = models.map((m, i) => {
+        if (typeof m[this.pk] === "undefined")
+          throw new InternalError(
+            `Primary key is not defined for model in position ${i}`
+          );
+        return m[this.pk] as string;
+      });
+    }
+
+    models = await Promise.all(
+      models.map(async (m, i) => {
+        m = new this.class(m);
+        if (opts.type) {
+          m[this.pk] = (
+            opts.type !== "String"
+              ? ids[i]
+              : opts.generated
+                ? ids[i]
+                : `${m[this.pk]}`.toString()
+          ) as M[keyof M];
+        }
+
+        if (!ignoreHandlers)
+          await enforceDBDecorators<M, Repository<M, any>, any>(
+            this,
+            contextArgs.context,
+            m,
+            OperationKeys.CREATE,
+            OperationKeys.ON
+          );
+        return m;
+      })
+    );
+
+    if (!ignoreValidate) {
+      const ignoredProps =
+        contextArgs.context.get("ignoredValidationProperties") || [];
+
+      const errors = await Promise.all(
+        models.map((m) => Promise.resolve(m.hasErrors(...ignoredProps)))
+      );
+
+      const errorMessages = reduceErrorsToPrint(errors);
+
+      if (errorMessages) throw new ValidationError(errorMessages);
+    }
+    return [models, ...contextArgs.args];
+  }
+
+  override async statement(
+    name: string,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ) {
+    if (!Repository.statements(this, name as keyof typeof this))
+      throw new QueryError(`Invalid prepared statement requested ${name}`);
+    const contextArgs = await Context.args(
+      PersistenceKeys.STATEMENT,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    if (contextArgs.context.logger) {
+      contextArgs.context.logger.info(`Repo statement: ${name} + ${args}`);
+    }
+    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.statement);
+    log.verbose(`Executing prepared statement ${name} with args ${ctxArgs}`);
+    try {
+      return (this as any)[name](...ctxArgs);
+    } catch (e: unknown) {
+      if (e instanceof BaseError) throw e;
+      throw new InternalError(
+        `Failed to execute prepared statement ${name} with args ${ctxArgs}: ${e}`
+      );
+    }
   }
 
   /**

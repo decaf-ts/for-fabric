@@ -1,23 +1,17 @@
 import { CouchDBAdapter, CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
-import { list, Model, required, type } from "@decaf-ts/decorator-validation";
+import { Model } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
-  afterAny,
   BadRequestError,
   BaseError,
   ConflictError,
-  DBKeys,
-  GroupSort,
   InternalError,
   NotFoundError,
   onCreate,
   onCreateUpdate,
-  onDelete,
-  onUpdate,
   OperationKeys,
   PrimaryKeyType,
-  readonly,
   SerializationError,
 } from "@decaf-ts/db-decorators";
 import {
@@ -33,12 +27,6 @@ import {
   SequenceOptions,
   UnsupportedError,
   Adapter,
-  CascadeMetadata,
-  JoinColumnOptions,
-  oneToManyOnUpdate,
-  JoinTableOptions,
-  JoinTableMultipleColumnsOptions,
-  relation,
   PreparedModel,
   Repository,
   QueryError,
@@ -64,23 +52,9 @@ import {
 import { FabricStatement } from "./FabricContractStatement";
 import { FabricFlavour } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
-import {
-  oneToManyOnCreate,
-  oneToManyOnDelete,
-  oneToOneOnCreate,
-  oneToOneOnDelete,
-  oneToOneOnUpdate,
-  populate as pop,
-} from "./FabricConstruction";
-import {
-  apply,
-  Constructor,
-  Decoration,
-  prop,
-  propMetadata,
-  Metadata,
-} from "@decaf-ts/decoration";
+import { Constructor, Decoration, propMetadata } from "@decaf-ts/decoration";
 import { ContractLogger } from "./logging";
+import { FabricContractSequence } from "./FabricContractSequence";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -270,6 +244,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
     >,
   >(): Constructor<R> {
     return FabricContractRepository as unknown as Constructor<R>;
+  }
+
+  /**
+   * @description Creates a sequence generator
+   * @summary Factory method that creates a sequence generator for generating sequential values
+   * @param {SequenceOptions} options - Configuration options for the sequence
+   * @return {Promise<Sequence>} A promise that resolves to a new sequence instance
+   */
+  override async Sequence(options: SequenceOptions): Promise<Sequence> {
+    return new FabricContractSequence(options, this);
   }
 
   /**
@@ -570,7 +554,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
   protected async queryResult(
     stub: ChaincodeStub,
     rawInput: any,
-
     ...args: any[]
   ): Promise<Iterators.StateQueryIterator> {
     const { ctx } = this.logCtx(args, this.readState);
@@ -801,7 +784,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     docsOnly: D = true as D,
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<RawResult<R, D>> {
-    const { log, stub } = this.logCtx(args, this.raw);
+    const { log, stub, ctx } = this.logCtx(args, this.raw);
 
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
@@ -816,14 +799,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
           stub,
           rawInput,
           limit || 250,
-          (skip as any)?.toString()
+          (skip as any)?.toString(),
+          ctx
         )) as StateQueryResponse<Iterators.StateQueryIterator>;
       iterator = response.iterator;
     } else {
       log.debug("Retrieving iterator");
       iterator = (await this.queryResult(
         stub,
-        rawInput
+        rawInput,
+        ctx
       )) as Iterators.StateQueryIterator;
     }
     log.debug("Iterator acquired");

@@ -101,29 +101,26 @@ export class SerializedCrudContract<
   }
 
   @Transaction(false)
-  override async statement(context: Ctx, method: string, ...args: string[]) {
-    const { ctx, log } = await this.logCtx([...args, context], this.statement);
-    args = args.map((a) => {
-      try {
-        return JSON.parse(a);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (e: unknown) {
-        return a;
-      }
-    });
+  override async statement(context: Ctx, method: string, args: string) {
+    const { ctx, log } = await this.logCtx([context], this.statement);
+    try {
+      args = JSON.parse(args);
+    } catch (e: unknown) {
+      throw new SerializationError(`Invalid args: ${e}`);
+    }
+    if (!Array.isArray(args))
+      throw new SerializationError(
+        `Invalid args: ${JSON.stringify(args)}. must be an array`
+      );
     log.info(`calling prepared statement ${method}`);
-    log.debug(`with args ${args}`);
+    log.info(`with args ${args}`);
     return JSON.stringify(await super.statement(ctx, method, ...args));
   }
 
   @Transaction(false)
-  override async listBy(
-    context: Ctx,
-    key: string,
-    order: string,
-    ...args: string[]
-  ) {
-    const { ctx } = await this.logCtx([...args, context], this.listBy);
+  override async listBy(context: Ctx, key: string, order: string) {
+    const { ctx, log } = await this.logCtx([context], this.listBy);
+    log.info(`Executing listBy with key ${key} and order ${order}`);
     return JSON.stringify(
       await super.listBy(ctx, key as keyof M, order as OrderDirection)
     );
@@ -134,10 +131,10 @@ export class SerializedCrudContract<
     context: Ctx,
     key: string,
     order: string,
-    size: number,
-    ...args: string[]
+    size: number
   ) {
-    const { ctx } = await this.logCtx([...args, context], this.paginateBy);
+    const { ctx, log } = await this.logCtx([context], this.paginateBy);
+    log.info(`Executing paginateBy with key ${key} and order ${order}`);
     return JSON.stringify(await super.paginateBy(ctx, key, order as any, size));
   }
 
@@ -148,7 +145,8 @@ export class SerializedCrudContract<
     value: string,
     ...args: string[]
   ) {
-    const { ctx } = await this.logCtx([...args, context], this.paginateBy);
+    const { ctx, log } = await this.logCtx([...args, context], this.findOneBy);
+    log.info(`Executing findOneBy with key ${key} and value ${value}`);
     return JSON.stringify(await super.findOneBy(ctx, key, value, ...args));
   }
 
@@ -159,18 +157,23 @@ export class SerializedCrudContract<
     orderBy: string,
     order: string,
     limit?: number,
-    skip?: number,
-    ...args: string[]
+    skip?: number
   ): Promise<string> {
-    const { ctx } = await this.logCtx([context], this.query);
+    const { ctx, log } = await this.logCtx([context], this.query);
+
+    log.info(`Executing query orderedBy ${orderBy} and order ${order}`);
+
     let cond: Condition<any>;
     try {
       cond = Condition.from(JSON.parse(condition));
     } catch (e: unknown) {
       throw new SerializationError(`Invalid condition: ${e}`);
     }
+
+    log.info(`Condition: ${JSON.stringify(cond)}`);
+
     return JSON.stringify(
-      await super.query(ctx, cond, orderBy, order as any, limit, skip, ...args)
+      await super.query(ctx, cond, orderBy, order as any, limit, skip)
     );
   }
   //

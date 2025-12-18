@@ -3,6 +3,12 @@ import { TestPublicModel } from "../assets/contract/serialized-contract-public-m
 import { getMockCtx } from "./ContextMock";
 import { Model } from "@decaf-ts/decorator-validation";
 import { NotFoundError } from "@decaf-ts/db-decorators";
+import { OrderDirection } from "@decaf-ts/core";
+import {
+  FabricClientAdapter,
+  FabricClientRepository,
+} from "../../src/client/index";
+import { Product } from "../../src/contract/Product";
 
 describe("Tests Public contract", () => {
   const ctx = getMockCtx();
@@ -72,5 +78,27 @@ describe("Tests Public contract", () => {
     ).map((m) => Model.deserialize(m));
     expect(bulk).toBeDefined();
     expect(bulk.length).toEqual(models.length);
+  });
+
+  it("should perform simple queries", async () => {
+    // const clientRepo = new FabricClientRepository(
+    //   new FabricClientAdapter({} as any),
+    //   Product
+    // );
+    //
+    // const list = await repo
+    //   .select()
+    //   .orderBy(["productCode", OrderDirection.ASC])
+    //   .execute();
+
+    const bulk = JSON.parse(
+      await contract.statement(
+        ctx as any,
+        "listBy",
+        "productCode",
+        JSON.stringify({ direction: "asc" })
+      )
+    );
+    expect(bulk).toBeDefined();
   });
 });

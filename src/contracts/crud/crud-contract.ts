@@ -107,7 +107,10 @@ export abstract class FabricCrudContract<M extends Model>
     order: string,
     ...args: any[]
   ): Promise<M[] | string> {
-    const { ctxArgs } = await this.logCtx([...args, ctx], this.listBy);
+    const { ctxArgs, log } = await this.logCtx([...args, ctx], this.listBy);
+    log.info(
+      `Running listBy key ${key as string}, order ${order} and args ${ctxArgs}`
+    );
     return this.repo.listBy(
       key as keyof M,
       order as OrderDirection,
@@ -122,7 +125,10 @@ export abstract class FabricCrudContract<M extends Model>
     size: number,
     ...args: any[]
   ): Promise<Paginator<M, any> | string> {
-    const { ctxArgs } = await this.logCtx([...args, ctx], this.paginateBy);
+    const { ctxArgs, log } = await this.logCtx([...args, ctx], this.paginateBy);
+    log.info(
+      `Running paginateBy key ${key as string}, order ${order} with size ${size} and args ${ctxArgs}`
+    );
     return this.repo.paginateBy(key as keyof M, order as any, size, ...ctxArgs);
   }
 
@@ -132,7 +138,10 @@ export abstract class FabricCrudContract<M extends Model>
     value: any,
     ...args: any[]
   ): Promise<M | string> {
-    const { ctxArgs } = await this.logCtx([...args, ctx], this.findOneBy);
+    const { ctxArgs, log } = await this.logCtx([...args, ctx], this.findOneBy);
+    log.info(
+      `Running findOneBy key ${key as string}, value: ${value} with args ${ctxArgs}`
+    );
     return this.repo.findOneBy(key as keyof M, value, ...ctxArgs);
   }
 
@@ -141,7 +150,8 @@ export abstract class FabricCrudContract<M extends Model>
     method: string,
     ...args: any[]
   ): Promise<any> {
-    const { ctxArgs } = await this.logCtx([...args, ctx], this.statement);
+    const { ctxArgs, log } = await this.logCtx([...args, ctx], this.statement);
+    log.info(`Running statement ${method} with args ${ctxArgs}`);
     return this.repo.statement(method, ...ctxArgs);
   }
 

@@ -468,7 +468,7 @@ describe("Tests global contract implementation", () => {
       certCertOrDirectoryPath: Buffer.from(credentials.certificate!),
     };
 
-    const repo = productRepository.for({ ...client });
+    const repo = productRepository.for({ ...client } as any);
 
     const list = await repo
       .select()
