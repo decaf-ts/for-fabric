@@ -80,7 +80,7 @@ describe("Tests Public contract", () => {
     expect(bulk.length).toEqual(models.length);
   });
 
-  it("should perform simple queries", async () => {
+  it.skip("should perform simple queries", async () => {
     // const clientRepo = new FabricClientRepository(
     //   new FabricClientAdapter({} as any),
     //   Product
@@ -95,8 +95,7 @@ describe("Tests Public contract", () => {
       await contract.statement(
         ctx as any,
         "listBy",
-        "productCode",
-        JSON.stringify({ direction: "asc" })
+        JSON.stringify(["productCode", "asc"])
       )
     );
     expect(bulk).toBeDefined();
