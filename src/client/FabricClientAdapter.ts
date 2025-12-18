@@ -8,11 +8,7 @@ import {
   type Serializer,
 } from "@decaf-ts/decorator-validation";
 import { debug, final, Logging } from "@decaf-ts/logging";
-import {
-  type FabricFlags,
-  type PeerConfig,
-  type SegregatedModel,
-} from "../shared/types";
+import { type PeerConfig, type SegregatedModel } from "../shared/types";
 import {
   connect,
   type ConnectOptions,
@@ -69,6 +65,8 @@ import { FabricClientStatement } from "./FabricClientStatement";
 import { FabricClientPaginator } from "./FabricClientPaginator";
 import { FabricClientRepository } from "./FabricClientRepository";
 import { EndorsementError } from "../shared/errors";
+import { FabricClientFlags } from "./types";
+import { DefaultFabricClientFlags } from "./constants";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -125,7 +123,7 @@ export class FabricClientAdapter extends Adapter<
   PeerConfig,
   Client,
   MangoQuery,
-  Context<FabricFlags>
+  Context<FabricClientFlags>
 > {
   /**
    * @description Static text decoder for converting Uint8Array to string
@@ -170,15 +168,20 @@ export class FabricClientAdapter extends Adapter<
       | OperationKeys.UPDATE
       | OperationKeys.DELETE
       | string,
-    overrides: Partial<FabricFlags>,
+    overrides: Partial<FabricClientFlags>,
     model: Constructor<M> | Constructor<M>[],
     ...args: any[]
-  ): Promise<Context<FabricFlags>> {
+  ): Promise<Context<FabricClientFlags>> {
     const log = this.log.for(this.context);
     log.debug(
       `Creating new context for ${operation} operation on ${Array.isArray(model) ? model.map((m) => m.name) : model.name} model with flag overrides: ${JSON.stringify(overrides)}`
     );
-    const flags = await this.flags(operation, model, overrides, ...args);
+    const flags = await this.flags(
+      operation,
+      model,
+      Object.assign({}, DefaultFabricClientFlags, overrides),
+      ...args
+    );
     return new Context().accumulate(flags);
   }
 
@@ -195,7 +198,7 @@ export class FabricClientAdapter extends Adapter<
   override repository<
     R extends Repository<
       any,
-      Adapter<PeerConfig, Client, MangoQuery, Context<FabricFlags>>
+      Adapter<PeerConfig, Client, MangoQuery, Context<FabricClientFlags>>
     >,
   >(): Constructor<R> {
     return FabricClientRepository as unknown as Constructor<R>;
@@ -205,7 +208,7 @@ export class FabricClientAdapter extends Adapter<
     clazz: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
-    ...args: MaybeContextualArg<Context<FabricFlags>>
+    ...args: MaybeContextualArg<Context<FabricClientFlags>>
   ): [Constructor<M>, PrimaryKeyType, Record<string, any>, ...any[], Context] {
     const { ctxArgs } = this.logCtx(args, this.createPrefix);
     const tableName = Model.tableName(clazz);
@@ -228,7 +231,7 @@ export class FabricClientAdapter extends Adapter<
     clazz: Constructor<M>,
     ids: string[] | number[],
     models: Record<string, any>[],
-    ...args: MaybeContextualArg<Context<FabricFlags>>
+    ...args: MaybeContextualArg<Context<FabricClientFlags>>
   ) {
     const tableName = Model.tableName(clazz);
     if (ids.length !== models.length)
@@ -247,7 +250,7 @@ export class FabricClientAdapter extends Adapter<
     clazz: Constructor<M>,
     ids: PrimaryKeyType[],
     models: Record<string, any>[],
-    ...args: MaybeContextualArg<Context<FabricFlags>>
+    ...args: MaybeContextualArg<Context<FabricClientFlags>>
   ) {
     const tableName = Model.tableName(clazz);
     if (ids.length !== models.length)
@@ -274,14 +277,14 @@ export class FabricClientAdapter extends Adapter<
     clazz: Constructor<M>,
     ids: PrimaryKeyType[],
     models: Record<string, any>[],
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>[]> {
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
     const ctxArgs = [...(args as unknown as any[])];
     const transient = ctxArgs.shift() as Record<string, any>;
-    const { log } = this.logCtx(
-      ctxArgs as ContextualArgs<Context<FabricFlags>>,
+    const { log, ctx } = this.logCtx(
+      ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.createAll
     );
     const tableName = Model.tableName(clazz);
@@ -289,6 +292,7 @@ export class FabricClientAdapter extends Adapter<
     log.info(`adding ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
+      ctx,
       BulkCrudOperationKeys.CREATE_ALL,
       [
         JSON.stringify(
@@ -316,13 +320,14 @@ export class FabricClientAdapter extends Adapter<
   override async readAll<M extends Model>(
     clazz: Constructor<M>,
     ids: PrimaryKeyType[],
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>[]> {
-    const { log } = this.logCtx(args, this.readAll);
+    const { log, ctx } = this.logCtx(args, this.readAll);
     const tableName = Model.tableName(clazz);
     log.info(`reading ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const result = await this.evaluateTransaction(
+      ctx,
       BulkCrudOperationKeys.READ_ALL,
       [JSON.stringify(ids)],
       undefined,
@@ -349,14 +354,14 @@ export class FabricClientAdapter extends Adapter<
     clazz: Constructor<M>,
     ids: PrimaryKeyType[],
     models: Record<string, any>[],
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>[]> {
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
     const ctxArgs = [...(args as unknown as any[])];
     const transient = ctxArgs.shift() as Record<string, any>;
-    const { log } = this.logCtx(
-      ctxArgs as ContextualArgs<Context<FabricFlags>>,
+    const { log, ctx } = this.logCtx(
+      ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.updateAll
     );
     const tableName = Model.tableName(clazz);
@@ -364,6 +369,7 @@ export class FabricClientAdapter extends Adapter<
     log.verbose(`pks: ${ids}`);
 
     const result = await this.submitTransaction(
+      ctx,
       BulkCrudOperationKeys.UPDATE_ALL,
       [
         JSON.stringify(
@@ -392,13 +398,14 @@ export class FabricClientAdapter extends Adapter<
   override async deleteAll<M extends Model>(
     clazz: Constructor<M>,
     ids: PrimaryKeyType[],
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>[]> {
-    const { log } = Adapter.logCtx(args, this.deleteAll);
+    const { log, ctx } = Adapter.logCtx(args, this.deleteAll);
     const tableName = Model.tableName(clazz);
     log.info(`deleting ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const result = await this.submitTransaction(
+      ctx,
       BulkCrudOperationKeys.DELETE_ALL,
       [JSON.stringify(ids)],
       undefined,
@@ -423,7 +430,7 @@ export class FabricClientAdapter extends Adapter<
    */
   override prepare<M extends Model>(
     model: M,
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): SegregatedModel<M> & PreparedModel {
     const { log } = this.logCtx(args, this.prepare);
     const split = Model.segregate(model);
@@ -454,7 +461,7 @@ export class FabricClientAdapter extends Adapter<
     clazz: Constructor<M>,
     id: PrimaryKeyType,
     transient?: Record<string, any>,
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): M {
     const { log } = this.logCtx(args, this.revert);
     if (transient) {
@@ -483,7 +490,7 @@ export class FabricClientAdapter extends Adapter<
   @debug()
   protected async index<M extends Model>(
     ...args: MaybeContextualArg<
-      Context<FabricFlags>,
+      Context<FabricClientFlags>,
       [string, ...(Constructor<M> | string)[]]
     >
   ): Promise<void> {
@@ -527,17 +534,18 @@ export class FabricClientAdapter extends Adapter<
     id: PrimaryKeyType,
     model: Record<string, any>,
     transient: Record<string, any> = {},
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>> {
     const ctxArgs = [...(args as unknown as any[])];
-    const { log } = this.logCtx(
-      ctxArgs as ContextualArgs<Context<FabricFlags>>,
+    const { log, ctx } = this.logCtx(
+      ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.create
     );
     const tableName = Model.tableName(clazz);
     log.verbose(`adding entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
+      ctx,
       OperationKeys.CREATE,
       [this.serializer.serialize(model, clazz.name)],
       transient,
@@ -559,14 +567,15 @@ export class FabricClientAdapter extends Adapter<
   async read<M extends Model>(
     clazz: Constructor<M>,
     id: PrimaryKeyType,
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>> {
-    const { log } = this.logCtx(args, this.readAll);
+    const { log, ctx } = this.logCtx(args, this.readAll);
     const tableName = Model.tableName(clazz);
 
     log.verbose(`reading entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.evaluateTransaction(
+      ctx,
       OperationKeys.READ,
       [id.toString()],
       undefined,
@@ -580,7 +589,7 @@ export class FabricClientAdapter extends Adapter<
     clazz: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
-    ...args: MaybeContextualArg<Context<FabricFlags>>
+    ...args: MaybeContextualArg<Context<FabricClientFlags>>
   ) {
     const tableName = Model.tableName(clazz);
     const { ctxArgs } = this.logCtx(args, this.updatePrefix);
@@ -607,11 +616,11 @@ export class FabricClientAdapter extends Adapter<
     id: PrimaryKeyType,
     model: Record<string, any>,
     transient: Record<string, any> = {},
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>> {
     const ctxArgs = [...(args as unknown as any[])];
-    const { log } = this.logCtx(
-      ctxArgs as ContextualArgs<Context<FabricFlags>>,
+    const { log, ctx } = this.logCtx(
+      ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.updateAll
     );
     log.info(`CLIENT UPDATE class : ${typeof clazz}`);
@@ -619,6 +628,7 @@ export class FabricClientAdapter extends Adapter<
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
+      ctx,
       OperationKeys.UPDATE,
       [this.serializer.serialize(model, clazz.name || clazz)], // TODO should be receving class but is receiving string
       transient,
@@ -640,13 +650,14 @@ export class FabricClientAdapter extends Adapter<
   override async delete<M extends Model>(
     clazz: Constructor<M>,
     id: PrimaryKeyType,
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>> {
-    const { log } = this.logCtx(args, this.delete);
+    const { log, ctx } = this.logCtx(args, this.delete);
     const tableName = Model.tableName(clazz);
     log.verbose(`deleting entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
     const result = await this.submitTransaction(
+      ctx,
       OperationKeys.DELETE,
       [id.toString()],
       undefined,
@@ -686,14 +697,15 @@ export class FabricClientAdapter extends Adapter<
     rawInput: MangoQuery,
     docsOnly: D = true as D,
     clazz: ModelConstructor<any>,
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<V> {
-    const { log } = this.logCtx(args, this.raw);
+    const { log, ctx } = this.logCtx(args, this.raw);
     const tableName = clazz.name;
     log.info(`Performing raw statement on table ${Model.tableName(clazz)}`);
     let transactionResult: any;
     try {
       transactionResult = await this.evaluateTransaction(
+        ctx,
         "raw",
         [JSON.stringify(rawInput), docsOnly],
         undefined,
@@ -743,8 +755,8 @@ export class FabricClientAdapter extends Adapter<
    * @summary Creates a new Gateway instance using the current client
    * @return {Promise<Gateway>} Promise resolving to the Gateway instance
    */
-  protected async Gateway(): Promise<Gateway> {
-    return FabricClientAdapter.getGateway(this.config, this.client);
+  protected async Gateway(ctx: Context<FabricClientFlags>): Promise<Gateway> {
+    return FabricClientAdapter.getGateway(ctx, this.config, this.client);
   }
 
   private getContractName(className?: string) {
@@ -757,9 +769,12 @@ export class FabricClientAdapter extends Adapter<
    * @summary Creates a new Contract instance using the current Gateway
    * @return {Promise<Contrakt>} Promise resolving to the Contract instance
    */
-  protected async Contract(contractName?: string): Promise<Contrakt> {
+  protected async Contract(
+    ctx: Context<FabricClientFlags>,
+    contractName?: string
+  ): Promise<Contrakt> {
     return FabricClientAdapter.getContract(
-      await this.Gateway(),
+      await this.Gateway(ctx),
       this.config,
       contractName
     );
@@ -794,6 +809,7 @@ export class FabricClientAdapter extends Adapter<
    *   FabricAdapter->>Gateway: close()
    */
   protected async transaction(
+    ctx: Context<FabricClientFlags>,
     api: string,
     submit = true,
     args?: any[],
@@ -802,9 +818,12 @@ export class FabricClientAdapter extends Adapter<
     className?: string
   ): Promise<Uint8Array> {
     const log = this.log.for(this.transaction);
-    const gateway = await this.Gateway();
+    const gateway = await this.Gateway(ctx);
     try {
-      const contract = await this.Contract(this.getContractName(className));
+      const contract = await this.Contract(
+        ctx,
+        this.getContractName(className)
+      );
       log.verbose(
         `${submit ? "Submit" : "Evaluate"}ting transaction ${this.getContractName(className) || this.config.contractName}.${api}`
       );
@@ -853,6 +872,7 @@ export class FabricClientAdapter extends Adapter<
    * @return {Promise<Uint8Array>} Promise resolving to the transaction result
    */
   async submitTransaction(
+    ctx: Context<FabricClientFlags>,
     api: string,
     args?: any[],
     transientData?: Record<string, string>,
@@ -860,6 +880,7 @@ export class FabricClientAdapter extends Adapter<
     className?: string
   ): Promise<Uint8Array> {
     return this.transaction(
+      ctx,
       api,
       true,
       args,
@@ -879,6 +900,7 @@ export class FabricClientAdapter extends Adapter<
    * @return {Promise<Uint8Array>} Promise resolving to the transaction result
    */
   async evaluateTransaction(
+    ctx: Context<FabricClientFlags>,
     api: string,
     args?: any[],
     transientData?: Record<string, string>,
@@ -886,6 +908,7 @@ export class FabricClientAdapter extends Adapter<
     className?: string
   ): Promise<Uint8Array> {
     return this.transaction(
+      ctx,
       api,
       false,
       args,
@@ -961,10 +984,15 @@ export class FabricClientAdapter extends Adapter<
    * @param {Client} [client] - Optional gRPC client, will be created if not provided
    * @return {Promise<Gateway>} Promise resolving to the Gateway instance
    */
-  static async getGateway(config: PeerConfig, client?: Client) {
+  static async getGateway(
+    ctx: Context<FabricClientFlags>,
+    config: PeerConfig,
+    client?: Client
+  ) {
     return (await this.getConnection(
       client || (await this.getClient(config)),
-      config
+      config,
+      ctx
     )) as Gateway;
   }
 
@@ -1010,7 +1038,11 @@ export class FabricClientAdapter extends Adapter<
    *   Gateway-->>FabricAdapter: gateway
    *   FabricAdapter-->>Caller: gateway
    */
-  static async getConnection(client: Client, config: PeerConfig) {
+  static async getConnection(
+    client: Client,
+    config: PeerConfig,
+    ctx: Context<FabricClientFlags>
+  ) {
     const log = Logging.for(this.getConnection);
     log.debug(
       `Retrieving Peer Identity for ${config.mspId} under ${config.certCertOrDirectoryPath}`
@@ -1047,16 +1079,16 @@ export class FabricClientAdapter extends Adapter<
       signer: signer,
       // Default timeouts for different gRPC calls
       evaluateOptions: () => {
-        return { deadline: Date.now() + 5000 }; // 5 seconds
+        return { deadline: Date.now() + 1000 * ctx.get("evaluateTimeout") }; // defaults to 5 seconds
       },
       endorseOptions: () => {
-        return { deadline: Date.now() + 15000 }; // 15 seconds
+        return { deadline: Date.now() + 1000 * ctx.get("endorseTimeout") }; // defaults to 15 seconds
       },
       submitOptions: () => {
-        return { deadline: Date.now() + 5000 }; // 5 seconds
+        return { deadline: Date.now() + 1000 * ctx.get("submitTimeout") }; // defaults to 5 seconds
       },
       commitStatusOptions: () => {
-        return { deadline: Date.now() + 60000 }; // 1 minute
+        return { deadline: Date.now() + 1000 * ctx.get("commitTimeout") }; // defaults to 1 minute
       },
     } as ConnectOptions;
 

@@ -6,7 +6,7 @@ import {
   UnsupportedError,
   Context,
 } from "@decaf-ts/core";
-import { FabricFlags, PeerConfig } from "../shared/types";
+import { PeerConfig } from "../shared/types";
 import { Client } from "@grpc/grpc-js";
 import { FabricClientAdapter } from "./FabricClientAdapter";
 import {
@@ -21,6 +21,7 @@ import {
 import { parseEventName } from "../shared/events";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
+import { FabricClientFlags } from "./types";
 
 /**
  * @description Event dispatcher for Hyperledger Fabric chaincode events
@@ -116,7 +117,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    * @param {Adapter<any, any, any, any>} observer - The adapter to observe
    * @return {void}
    */
-  override observe(observer: Adapter<any, any, any>): void {
+  override observe(observer: Adapter<any, any, any, any>): void {
     if (!(observer instanceof FabricClientAdapter))
       throw new UnsupportedError(
         "Only FabricClientAdapter can be observed by dispatch"
@@ -136,7 +137,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
     model: Constructor<any> | string,
     event: OperationKeys | BulkCrudOperationKeys | string,
     id: EventIds,
-    ...args: ContextualArgs<Context<FabricFlags>>
+    ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<void> {
     const { log, ctxArgs } = this.logCtx(args, this.updateObservers);
     if (!this.adapter) {
@@ -173,7 +174,9 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    *   FabricDispatch->>Observers: updateObservers(table, event, payload.id)
    *   Observers-->>FabricDispatch: Callbacks executed
    */
-  protected async handleEvents(ctxArg?: Context<FabricFlags>): Promise<void> {
+  protected async handleEvents(
+    ctxArg?: Context<FabricClientFlags>
+  ): Promise<void> {
     if (!this.listeningStack)
       throw new InternalError(
         `Event stack not initialized. Ensure that "startListening" is called before attempting this operation.`
@@ -235,7 +238,16 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
   protected override async initialize(): Promise<void> {
     if (!this.adapter)
       throw new InternalError(`No adapter or config observed for dispatch`);
+    const context = this.adapter.context(
+      "dispatch",
+      {
+        correlationId: this.adapter.config.chaincodeName,
+      },
+      Model as any
+    );
+    const { ctx } = this.logCtx([context], this.initialize);
     const gateway = await FabricClientAdapter.getGateway(
+      ctx,
       this.adapter.config as PeerConfig,
       this.client
     );
@@ -245,7 +257,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
     this.listeningStack = await network.getChaincodeEvents(
       this.adapter.config.chaincodeName
     );
-    this.handleEvents();
+    this.handleEvents(ctx);
   }
 }
 

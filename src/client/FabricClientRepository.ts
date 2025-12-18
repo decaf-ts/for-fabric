@@ -10,6 +10,7 @@ import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
 import { type FabricClientAdapter } from "./FabricClientAdapter";
+import { FabricClientFlags } from "./types";
 import {
   OperationKeys,
   PrimaryKeyType,
@@ -17,7 +18,6 @@ import {
   reduceErrorsToPrint,
   enforceDBDecorators,
 } from "@decaf-ts/db-decorators";
-import { FabricFlags } from "../shared/types";
 
 /**
  * @description Repository implementation for Fabric client operations
@@ -49,7 +49,7 @@ import { FabricFlags } from "../shared/types";
  */
 export class FabricClientRepository<
   M extends Model,
-  A extends FabricClientAdapter,
+  A extends FabricClientAdapter = FabricClientAdapter,
 > extends Repository<M, A> {
   protected override _overrides = Object.assign({}, super["_overrides"], {
     ignoreValidation: true,
@@ -170,9 +170,10 @@ export class FabricClientRepository<
       this.adapter,
       this._overrides || {}
     );
-    const { log } = this.logCtx(contextArgs.args, this.statement);
+    const { log, ctx } = this.logCtx(contextArgs.args, this.statement);
     log.verbose(`Executing prepared statement ${name}`);
     return this.adapter.evaluateTransaction(
+      ctx,
       PersistenceKeys.STATEMENT,
       contextArgs.args
     );
@@ -222,7 +223,7 @@ export class FabricClientRepository<
     models: M[],
     ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<[M[], ...any[], ContextOf<A>]> {
-    const contextArgs = await Context.args<M, Context<FabricFlags>>(
+    const contextArgs = await Context.args<M, Context<FabricClientFlags>>(
       OperationKeys.CREATE,
       this.class,
       args,

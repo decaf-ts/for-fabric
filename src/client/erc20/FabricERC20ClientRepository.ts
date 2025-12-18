@@ -3,7 +3,13 @@ import { ERC20Token, ERC20Wallet } from "../../contracts/erc20/models";
 import { Model, Serializer } from "@decaf-ts/decorator-validation";
 import { FabricClientAdapter } from "../FabricClientAdapter";
 import { ClientSerializer } from "../../shared/ClientSerializer";
-import { ContextOf, ContextualArgs, EventIds, Sequence } from "@decaf-ts/core";
+import {
+  Context,
+  ContextOf,
+  ContextualArgs,
+  EventIds,
+  Sequence,
+} from "@decaf-ts/core";
 import {
   BulkCrudOperationKeys,
   InternalError,
@@ -100,7 +106,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async tokenName(): Promise<string> {
-    const name = await this.adapter.evaluateTransaction("TokenName");
+    const contextArgs = await Context.args(
+      "tokenName",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.clientAccountID);
+    const name = await this.adapter.evaluateTransaction(ctx, "TokenName");
     return this.decode(name);
   }
 
@@ -115,7 +129,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async symbol(): Promise<string> {
-    const symbol = await this.adapter.evaluateTransaction("Symbol");
+    const contextArgs = await Context.args(
+      "symbol",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.symbol);
+    const symbol = await this.adapter.evaluateTransaction(ctx, "Symbol");
     return this.decode(symbol);
   }
 
@@ -130,7 +152,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async decimals(): Promise<number> {
-    const decimals = await this.adapter.evaluateTransaction("Decimals");
+    const contextArgs = await Context.args(
+      "decimals",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.decimals);
+    const decimals = await this.adapter.evaluateTransaction(ctx, "Decimals");
     return Number(this.decode(decimals));
   }
 
@@ -145,7 +175,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async totalSupply(): Promise<number> {
-    const total = await this.adapter.evaluateTransaction("TotalSupply");
+    const contextArgs = await Context.args(
+      "totalSupply",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.totalSupply);
+    const total = await this.adapter.evaluateTransaction(ctx, "TotalSupply");
     return Number(this.decode(total));
   }
 
@@ -164,7 +202,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async balanceOf(owner: string): Promise<number> {
-    const balance = await this.adapter.evaluateTransaction("BalanceOf", [
+    const contextArgs = await Context.args(
+      "balance",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.balanceOf);
+    const balance = await this.adapter.evaluateTransaction(ctx, "BalanceOf", [
       owner,
     ]);
     return Number(this.decode(balance));
@@ -186,7 +232,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async transfer(to: string, value: number): Promise<boolean> {
-    const transferred = await this.adapter.submitTransaction("Transfer", [
+    const contextArgs = await Context.args(
+      "transfer",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.transfer);
+    const transferred = await this.adapter.submitTransaction(ctx, "Transfer", [
       to,
       value.toString(),
     ]);
@@ -215,11 +269,19 @@ export class FabricERC20ClientRepository<
     to: string,
     value: number
   ): Promise<boolean> {
-    const transferred = await this.adapter.submitTransaction("TransferFrom", [
-      from,
-      to,
-      value.toString(),
-    ]);
+    const contextArgs = await Context.args(
+      "transferFrom",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.transferFrom);
+    const transferred = await this.adapter.submitTransaction(
+      ctx,
+      "TransferFrom",
+      [from, to, value.toString()]
+    );
 
     return this.decode(transferred) === "true" ? true : false;
   }
@@ -239,7 +301,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async approve(spender: string, value: number): Promise<boolean> {
-    const approved = await this.adapter.submitTransaction("Approve", [
+    const contextArgs = await Context.args(
+      "approve",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.approve);
+    const approved = await this.adapter.submitTransaction(ctx, "Approve", [
       spender,
       value.toString(),
     ]);
@@ -262,7 +332,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async allowance(owner: string, spender: string): Promise<number> {
-    const allowance = await this.adapter.submitTransaction("Allowance", [
+    const contextArgs = await Context.args(
+      "allowance",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.allowance);
+    const allowance = await this.adapter.submitTransaction(ctx, "Allowance", [
       owner,
       spender,
     ]);
@@ -284,9 +362,19 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async initialize(token: ERC20Token): Promise<boolean> {
-    const initiliazed = await this.adapter.submitTransaction("Initialize", [
-      FabricERC20ClientRepository.serializer.serialize(token),
-    ]);
+    const contextArgs = await Context.args(
+      "initialize",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.initialize);
+    const initiliazed = await this.adapter.submitTransaction(
+      ctx,
+      "Initialize",
+      [FabricERC20ClientRepository.serializer.serialize(token)]
+    );
 
     return this.decode(initiliazed) === "true" ? true : false;
   }
@@ -302,7 +390,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails.
    */
   async checkInitialized(): Promise<void> {
-    await this.adapter.evaluateTransaction("CheckInitialized");
+    const contextArgs = await Context.args(
+      "checkInitialized",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.checkInitialized);
+    await this.adapter.evaluateTransaction(ctx, "CheckInitialized");
   }
 
   /**
@@ -320,7 +416,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails.
    */
   async mint(amount: number): Promise<void> {
-    await this.adapter.submitTransaction("Mint", [amount.toString()]);
+    const contextArgs = await Context.args(
+      "mint",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.mint);
+    await this.adapter.submitTransaction(ctx, "Mint", [amount.toString()]);
   }
 
   /**
@@ -337,7 +441,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails.
    */
   async burn(amount: number): Promise<void> {
-    await this.adapter.submitTransaction("Burn", [amount.toString()]);
+    const contextArgs = await Context.args(
+      "burn",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.burn);
+    await this.adapter.submitTransaction(ctx, "Burn", [amount.toString()]);
   }
 
   /**
@@ -355,7 +467,15 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails.
    */
   async burnFrom(account: string, amount: number): Promise<void> {
-    await this.adapter.submitTransaction("BurnFrom", [
+    const contextArgs = await Context.args(
+      "burnFrom",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.burnFrom);
+    await this.adapter.submitTransaction(ctx, "BurnFrom", [
       account,
       amount.toString(),
     ]);
@@ -373,7 +493,16 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async clientAccountBalance(): Promise<number> {
+    const contextArgs = await Context.args(
+      "accountBalance",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.clientAccountBalance);
     const serializedAccountBalance = await this.adapter.evaluateTransaction(
+      ctx,
       "ClientAccountBalance"
     );
 
@@ -392,8 +521,18 @@ export class FabricERC20ClientRepository<
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
   async clientAccountID(): Promise<string> {
-    const clientAccountID =
-      await this.adapter.evaluateTransaction("ClientAccountID");
+    const contextArgs = await Context.args(
+      "accountId",
+      this.class,
+      [],
+      this.adapter,
+      this._overrides || {}
+    );
+    const { ctx } = this.logCtx(contextArgs.args, this.clientAccountID);
+    const clientAccountID = await this.adapter.evaluateTransaction(
+      ctx,
+      "ClientAccountID"
+    );
 
     return this.decode(clientAccountID);
   }

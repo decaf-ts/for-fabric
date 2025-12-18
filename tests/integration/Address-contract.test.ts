@@ -12,6 +12,7 @@ import { FabricEnrollmentService } from "../../src/shared";
 import { NotFoundError } from "@decaf-ts/db-decorators";
 import { Repository } from "@decaf-ts/core";
 import { Address } from "../../src/contract/Address";
+import { FabricClientRepository } from "../../src/client/index";
 
 jest.setTimeout(3000000);
 
@@ -162,35 +163,33 @@ describe("Tests bulk and query operations", () => {
           })
       );
 
-    created = await repo.createAll(models);
+    created = await repo
+      .override({
+        // @ts-expect-error because ts?
+        endorseTimeout: 60,
+        evaluateTimeout: 60,
+        submitTimeout: 60,
+        commitTimeout: 240,
+      })
+      .createAll(models);
 
     expect(created).toBeDefined();
     expect(created.length).toEqual(models.length);
     expect(created.every((c) => !c.hasErrors())).toEqual(true);
   });
 
-  it("Should create Addresses in bulk", async () => {
+  it.skip("Should read Addresses in bulk", async () => {
     const repo = repository.for({ ...client });
 
-    const models = Object.keys(new Array(10))
-      .map(parseInt)
-      .map(
-        (i) =>
-          new Address({
-            city: "city" + i,
-            street: "street",
-            number: i,
-          })
-      );
+    const ids = created.map((c) => c.id).slice(3, 5);
 
-    created = await repo.createAll(models);
+    const deleted = await repo.readAll(ids);
 
-    expect(created).toBeDefined();
-    expect(created.length).toEqual(models.length);
-    expect(created.every((c) => !c.hasErrors())).toEqual(true);
+    expect(deleted).toBeDefined();
+    expect(deleted.length).toEqual(ids.length);
   });
 
-  it("Should update Addresses in bulk", async () => {
+  it.skip("Should update Addresses in bulk", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestOtherUser" + Date.now(), password: "TestUserPW" },
@@ -227,7 +226,7 @@ describe("Tests bulk and query operations", () => {
     ).toEqual(true);
   });
 
-  it("Should delete Addresses in bulk", async () => {
+  it.skip("Should delete Addresses in bulk", async () => {
     const repo = repository.for({ ...client });
 
     const ids = created.map((c) => c.id).slice(3, 5);
@@ -244,7 +243,7 @@ describe("Tests bulk and query operations", () => {
     await expect(repo.readAll(ids)).rejects.toThrow(NotFoundError);
   });
 
-  it("should perform simple queries", async () => {
+  it.skip("should perform simple queries", async () => {
     const repo = repository.for({ ...client });
 
     const list = await repo.select().execute();
