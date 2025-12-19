@@ -3,9 +3,9 @@ import { Info, Object as FabricObject } from "fabric-contract-api";
 import { BaseModel } from "@decaf-ts/core";
 import { SerializedCrudContract } from "../contracts/crud/serialized-crud-contract";
 import { User } from "./User";
-
-FabricObject()(Model);
-FabricObject()(BaseModel);
+//
+// FabricObject()(Model);
+// FabricObject()(BaseModel);
 
 @Info({
   title: "UserContract",

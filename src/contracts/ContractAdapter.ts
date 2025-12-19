@@ -52,7 +52,12 @@ import {
 import { FabricStatement } from "./FabricContractStatement";
 import { FabricFlavour } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
-import { Constructor, Decoration, propMetadata } from "@decaf-ts/decoration";
+import {
+  Constructor,
+  Decoration,
+  Metadata,
+  propMetadata,
+} from "@decaf-ts/decoration";
 import { ContractLogger } from "./logging";
 import { FabricContractSequence } from "./FabricContractSequence";
 
@@ -1153,21 +1158,25 @@ export class FabricContractAdapter extends CouchDBAdapter<
     Decoration.flavouredAs(FabricFlavour)
       .for(PersistenceKeys.TABLE)
       .extend(function table(obj: any) {
-        // const chain: any[] = [];
+        const chain: any[] = [];
+        let current =
+          typeof obj === "function"
+            ? Metadata.constr(obj)
+            : Metadata.constr(obj.constructor);
 
-        // let current = obj;
+        while (current && current !== Object && current.prototype) {
+          chain.push(current);
+          current = Object.getPrototypeOf(current);
+        }
 
-        // do {
-        //   chain.push(current);
-        //   console.log(`Found class: ${current}`);
-        // } while (current && current !== Object.prototype);
+        console.log(chain.map((c) => c.name || c));
 
-        // do {
-        //   current = chain.pop();
-        //   console.log(`Applying @Object() to class: ${current}`);
-        //   //TODO: THIS IS NOT WORKING AND THROWS ERROR
-        //   // FabricObject()(current);
-        // } while (chain.length > 1);
+        // Apply from the base class down to the decorated class
+        while (chain.length > 0) {
+          const constructor = chain.pop();
+          console.log(`Calling on ${constructor.name}`);
+          FabricObject()(constructor);
+        }
 
         return FabricObject()(obj);
       })
