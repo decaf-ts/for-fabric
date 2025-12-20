@@ -972,7 +972,13 @@ export class FabricClientAdapter extends Adapter<
       ) {
         pathOrCert = Buffer.from(pathOrCert, "utf8");
       } else {
-        pathOrCert = Buffer.from(fs.readFileSync(pathOrCert, "utf8"));
+        try {
+          pathOrCert = Buffer.from(fs.readFileSync(pathOrCert, "utf8"));
+        } catch (e: unknown) {
+          throw new InternalError(
+            `Failed to read the tls certificate from ${pathOrCert}`
+          );
+        }
       }
     }
 
