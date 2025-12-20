@@ -1,5 +1,6 @@
-import { BaseModel, pk } from "@decaf-ts/core";
+import { BaseModel, column, pk } from "@decaf-ts/core";
 import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
+import { description } from "@decaf-ts/decoration";
 
 /**
  * @description Identity credential model storing cryptographic materials
@@ -23,29 +24,37 @@ export class IdentityCredentials extends BaseModel {
    * @description Unique identifier of the credentials record
    * @summary Primary key for referencing this credentials entry
    */
+  @description("Unique identifier of the credentials record")
+  @column()
   @pk()
-  id?: string = undefined;
+  id!: string;
 
   /**
    * @description PEM-encoded X.509 certificate for the identity
    * @summary Leaf certificate associated with the identity
    */
+  @description("PEM-encoded X.509 certificate for the identity")
+  @column()
   @required()
-  certificate?: string = undefined;
+  certificate!: string;
 
   /**
    * @description PEM-encoded root or intermediate certificate
    * @summary Root of trust used to validate the leaf certificate
    */
+  @description("PEM-encoded root or intermediate certificate")
+  @column()
   @required()
-  rootCertificate?: string = undefined;
+  rootCertificate!: string;
 
   /**
    * @description PEM-encoded private key material
    * @summary Private key corresponding to the identity certificate
    */
+  @description("PEM-encoded private key")
+  @column()
   @required()
-  privateKey?: string = undefined;
+  privateKey!: string;
 
   constructor(arg?: ModelArg<IdentityCredentials>) {
     super(arg);

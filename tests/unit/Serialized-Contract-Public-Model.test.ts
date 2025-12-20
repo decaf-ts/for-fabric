@@ -3,12 +3,6 @@ import { TestPublicModel } from "../assets/contract/serialized-contract-public-m
 import { getMockCtx } from "./ContextMock";
 import { Model } from "@decaf-ts/decorator-validation";
 import { NotFoundError } from "@decaf-ts/db-decorators";
-import { OrderDirection } from "@decaf-ts/core";
-import {
-  FabricClientAdapter,
-  FabricClientRepository,
-} from "../../src/client/index";
-import { Product } from "../../src/contract/Product";
 
 describe("Tests Public contract", () => {
   const ctx = getMockCtx();
@@ -61,6 +55,8 @@ describe("Tests Public contract", () => {
     ).rejects.toThrow(NotFoundError);
   });
 
+  let bulk: TestPublicModel[];
+
   it("should create in bulk", async () => {
     const models = Object.keys(new Array(10).fill(0)).map(
       (i) =>
@@ -70,7 +66,7 @@ describe("Tests Public contract", () => {
         })
     );
 
-    const bulk = JSON.parse(
+    bulk = JSON.parse(
       await contract.createAll(
         ctx as any,
         JSON.stringify(models.map((m) => m.serialize()))
@@ -78,6 +74,46 @@ describe("Tests Public contract", () => {
     ).map((m) => Model.deserialize(m));
     expect(bulk).toBeDefined();
     expect(bulk.length).toEqual(models.length);
+  });
+
+  it("should read in bulk", async () => {
+    const keys = bulk.map((b) => b.id);
+
+    const read = JSON.parse(
+      await contract.readAll(ctx as any, JSON.stringify(keys))
+    ).map((m) => Model.deserialize(m));
+    expect(read).toBeDefined();
+    expect(read.length).toEqual(bulk.length);
+  });
+
+  it("should update in bulk", async () => {
+    const models = bulk.map(
+      (b) =>
+        new TestPublicModel(
+          Object.assign({}, b, {
+            name: "updated" + b.id,
+          })
+        )
+    );
+
+    bulk = JSON.parse(
+      await contract.updateAll(
+        ctx as any,
+        JSON.stringify(models.map((m) => m.serialize()))
+      )
+    ).map((m) => Model.deserialize(m));
+    expect(bulk).toBeDefined();
+    expect(bulk.length).toEqual(models.length);
+  });
+
+  it("should delete in bulk", async () => {
+    const keys = bulk.map((b) => b.id);
+
+    const read = JSON.parse(
+      await contract.deleteAll(ctx as any, JSON.stringify(keys))
+    ).map((m) => Model.deserialize(m));
+    expect(read).toBeDefined();
+    expect(read.length).toEqual(bulk.length);
   });
 
   it.skip("should perform simple queries", async () => {

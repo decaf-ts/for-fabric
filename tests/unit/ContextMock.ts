@@ -96,7 +96,7 @@ export function getMockCtx() {
   const ctr = new Contract();
   return Object.assign(ctr.createContext(), {
     stub: getStubMock(),
-    identity: getIdentityMock(),
+    clientIdentity: getIdentityMock(),
     logging: {
       setLevel: (level: string) =>
         Logging.setConfig({ level: level as LogLevel }),

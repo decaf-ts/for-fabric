@@ -1,7 +1,15 @@
-import { BaseModel, Cascade, index, oneToOne, pk } from "@decaf-ts/core";
+import {
+  BaseModel,
+  Cascade,
+  column,
+  index,
+  oneToOne,
+  pk,
+} from "@decaf-ts/core";
 import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
 import { IdentityCredentials } from "./IdentityCredentials";
 import { IdentityType } from "../constants";
+import { description } from "@decaf-ts/decoration";
 
 /**
  * @description Identity model representing a Fabric wallet entry
@@ -24,8 +32,9 @@ export class Identity extends BaseModel {
    * @description Unique identifier of the identity in the wallet
    * @summary Primary key used to reference this identity record
    */
+  @description("Unique identifier of the identity")
   @pk()
-  id?: string = undefined;
+  id!: string;
 
   /**
    * @description Link to the identity credentials stored separately
@@ -35,22 +44,24 @@ export class Identity extends BaseModel {
     update: Cascade.CASCADE,
     delete: Cascade.CASCADE,
   })
-  credentials?: IdentityCredentials = undefined;
+  credentials!: IdentityCredentials;
 
   /**
    * @description Membership Service Provider identifier
    * @summary The MSP ID corresponding to the organization that issued this identity
    */
+  @column()
   @required()
   @index()
-  mspId?: string = undefined;
+  mspId!: string;
 
   /**
    * @description Type of identity
    * @summary Indicates the identity encoding/format; defaults to X.509
    */
+  @column()
   @required()
-  type?: IdentityType = IdentityType.X509;
+  type: IdentityType = IdentityType.X509;
 
   constructor(arg: ModelArg<Identity>) {
     super(arg);
