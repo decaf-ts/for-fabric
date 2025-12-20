@@ -62,7 +62,7 @@ import { FabricClientRepository } from "./FabricClientRepository";
 import { EndorsementError } from "../shared/errors";
 import { FabricClientFlags } from "./types";
 import { DefaultFabricClientFlags } from "./constants";
-
+import fs from "fs";
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
  * @summary The FabricAdapter extends CouchDBAdapter to provide a seamless interface for interacting with Hyperledger Fabric networks.
@@ -962,11 +962,21 @@ export class FabricClientAdapter extends Adapter<
   static getClient(config: PeerConfig): Client {
     const log = this.log.for(this.getClient);
     log.debug(`generating TLS credentials for msp ${config.mspId}`);
-    const tlsCredentials = grpc.credentials.createSsl(
-      typeof config.tlsCert === "string"
-        ? Buffer.from(config.tlsCert)
-        : config.tlsCert
-    );
+    let pathOrCert: string | Buffer = config.tlsCert as string | Buffer;
+
+    if (typeof pathOrCert === "string") {
+      if (
+        pathOrCert.match(
+          /-----BEGIN (CERTIFICATE|KEY|PRIVATE KEY)-----.+?-----END \1-----$/gms
+        )
+      ) {
+        pathOrCert = Buffer.from(pathOrCert, "utf8");
+      } else {
+        pathOrCert = Buffer.from(fs.readFileSync(pathOrCert, "utf8"));
+      }
+    }
+
+    const tlsCredentials = grpc.credentials.createSsl(pathOrCert);
     log.debug(`generating Gateway Client for url ${config.peerEndpoint}`);
     return new Client(config.peerEndpoint, tlsCredentials);
   }
