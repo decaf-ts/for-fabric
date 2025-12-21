@@ -1,11 +1,12 @@
 import { Model } from "@decaf-ts/decorator-validation";
 import { Info, Object as FabricObject } from "fabric-contract-api";
-import { BaseModel } from "@decaf-ts/core";
 import { SerializedCrudContract } from "../contracts/crud/serialized-crud-contract";
 import { Address } from "./Address";
+import { FabricBaseModel, FabricIdentifiedBaseModel } from "../shared/index";
 //
 // FabricObject()(Model);
-// FabricObject()(BaseModel);
+// FabricObject()(FabricBaseModel);
+// FabricObject()(FabricIdentifiedBaseModel);
 
 @Info({
   title: "AddressContract",

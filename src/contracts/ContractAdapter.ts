@@ -1,5 +1,9 @@
 import { CouchDBAdapter, CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
-import { Model } from "@decaf-ts/decorator-validation";
+import {
+  Model,
+  Validation,
+  ValidationKeys,
+} from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
@@ -17,6 +21,7 @@ import {
 import {
   Context as Ctx,
   Object as FabricObject,
+  Property,
   Property as FabricProperty,
 } from "fabric-contract-api";
 import { Logger } from "@decaf-ts/logging";
@@ -1130,30 +1135,19 @@ export class FabricContractAdapter extends CouchDBAdapter<
         propMetadata(PersistenceKeys.UPDATED_BY, {})
       )
       .apply();
-    //
-    // Decoration.flavouredAs(FabricFlavour)
-    //   .for(DBKeys.ID)
-    //   .define({
-    //     decorator: function pkDec(
-    //       options: SequenceOptions,
-    //       groupsort?: GroupSort
-    //     ) {
-    //       return function pkDec(obj: any, attr: any) {
-    //         return apply(
-    //           required(),
-    //           readonly(),
-    //           propMetadata(Metadata.key(DBKeys.ID, attr), options),
-    //           onCreate(pkFabricOnCreate as any, options, groupsort)
-    //         )(obj, attr);
-    //       };
-    //     },
-    //   } as any)
-    //   .apply();
 
     Decoration.flavouredAs(FabricFlavour)
       .for(PersistenceKeys.COLUMN)
       .extend(FabricProperty())
       .apply();
+
+    Decoration.flavouredAs(FabricFlavour)
+      .for(ValidationKeys.DATE)
+      .extend(function fabricProperty() {
+        return (target: any, prop?: any) => {
+          Property(prop, "string:date")(target, prop);
+        };
+      });
 
     Decoration.flavouredAs(FabricFlavour)
       .for(PersistenceKeys.TABLE)
@@ -1181,71 +1175,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
         return FabricObject()(obj);
       })
       .apply();
-
-    // function oneToOneDec<M extends Model>(
-    //   clazz: Constructor<M> | (() => Constructor<M>),
-    //   cascade: CascadeMetadata,
-    //   populate: boolean,
-    //   joinColumnOpts?: JoinColumnOptions,
-    //   fk?: string
-    // ) {
-    //   const meta: RelationsMetadata = {
-    //     class: clazz,
-    //     cascade: cascade,
-    //     populate: populate,
-    //   };
-    //   if (joinColumnOpts) meta.joinTable = joinColumnOpts;
-    //   if (fk) meta.name = fk;
-    //   return apply(
-    //     prop(),
-    //     relation(PersistenceKeys.ONE_TO_ONE, meta),
-    //     type([clazz, String, Number, BigInt]),
-    //     onCreate(oneToOneOnCreate as any, meta),
-    //     onUpdate(oneToOneOnUpdate as any, meta),
-    //     onDelete(oneToOneOnDelete as any, meta),
-    //     afterAny(pop, meta),
-    //     propMetadata(PersistenceKeys.ONE_TO_ONE, meta)
-    //   );
-    // }
-    //
-    // Decoration.flavouredAs(FabricFlavour)
-    //   .for(PersistenceKeys.ONE_TO_ONE)
-    //   .define({
-    //     decorator: oneToOneDec,
-    //   } as any)
-    //   .apply();
-    //
-    // function oneToManyDec<M extends Model>(
-    //   clazz: Constructor<M> | (() => Constructor<M>),
-    //   cascade: CascadeMetadata,
-    //   populate: boolean,
-    //   joinTableOpts?: JoinTableOptions | JoinTableMultipleColumnsOptions,
-    //   fk?: string
-    // ) {
-    //   const metadata: RelationsMetadata = {
-    //     class: clazz,
-    //     cascade: cascade,
-    //     populate: populate,
-    //   };
-    //   if (joinTableOpts) metadata.joinTable = joinTableOpts;
-    //   if (fk) metadata.name = fk;
-    //   return apply(
-    //     prop(),
-    //     relation(PersistenceKeys.ONE_TO_MANY, metadata),
-    //     list([clazz as Constructor<M>, String, Number]),
-    //     onCreate(oneToManyOnCreate as any, metadata),
-    //     onUpdate(oneToManyOnUpdate, metadata),
-    //     onDelete(oneToManyOnDelete as any, metadata),
-    //     afterAny(pop, metadata),
-    //     propMetadata(PersistenceKeys.ONE_TO_MANY, metadata)
-    //   );
-    // }
-    //
-    // Decoration.for(PersistenceKeys.ONE_TO_MANY)
-    //   .define({
-    //     decorator: oneToManyDec,
-    //   } as any)
-    //   .apply();
   }
 }
 

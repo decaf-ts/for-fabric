@@ -39,7 +39,7 @@ describe("Tests Public contract", () => {
       )
     );
     expect(res.equals(created)).toEqual(false);
-    expect(res.equals(created, "name")).toEqual(true);
+    expect(res.equals(created, "name", "updatedAt", "version")).toEqual(true);
     created = res;
     console.log("Result: ", res);
   });

@@ -2,16 +2,16 @@ import { column, pk, table } from "@decaf-ts/core";
 import {
   maxlength,
   minlength,
-  Model,
   model,
   ModelArg,
   required,
 } from "@decaf-ts/decorator-validation";
 import { ownedBy } from "../../../../src/shared/decorators";
+import { FabricIdentifiedBaseModel } from "../../../../src/shared/index";
 
 @table("tst_user")
 @model()
-export class TestPublicModel extends Model {
+export class TestPublicModel extends FabricIdentifiedBaseModel {
   @pk({ type: "Number", generated: true })
   id!: number;
 

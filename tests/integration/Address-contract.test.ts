@@ -1,9 +1,5 @@
 import { execSync } from "child_process";
-import {
-  commitChaincode,
-  deployContract,
-  ensureInfrastructureBooted,
-} from "../utils";
+import { ensureInfrastructureBooted } from "../utils";
 import * as fs from "fs";
 import * as path from "path";
 import { CAConfig, PeerConfig } from "../../src/shared/types";
@@ -17,43 +13,16 @@ import { FabricClientRepository } from "../../src/client/index";
 jest.setTimeout(3000000);
 
 describe("Tests bulk and query operations", () => {
-  const contractFolderName = "global";
-  const contractName = "global";
+  const contractFolderName = "GlobalContract";
+  const contractName = "GlobalContract";
   let caConfig: CAConfig;
   let peerConfig: PeerConfig;
   let repository: Repository<Address, any>;
 
-  const useHsm = false;
-
   beforeAll(async () => {
-    const dest = path.join(
-      __dirname,
-      "../../docker/infrastructure/storage/softhsm/orghsm"
-    );
-    //Creates hsm folder
-    if (!fs.existsSync(dest)) fs.mkdirSync(dest);
-
-    // Boot infrastructure for testing
-    execSync(`npm run infrastructure${useHsm ? "-hsm" : ""}:up`, {
-      stdio: "inherit",
-    });
     // Ensure Infrastructure is ready
     await ensureInfrastructureBooted();
-    const location = path.join(
-      __dirname,
-      "../../docker/infrastructure/chaincode",
-      contractFolderName
-    );
-    if (!fs.existsSync(location)) {
-      execSync("npm run build:contract", { stdio: "inherit" });
-      execSync("npm run extract:indexes", { stdio: "inherit" });
-      execSync(
-        `cp -r  ${path.join(__dirname, "../..", contractFolderName)} ${path.join(__dirname, "../../docker/infrastructure/chaincode")}/`,
-        { stdio: "inherit" }
-      );
-      deployContract(contractFolderName, contractName);
-      commitChaincode(contractName);
-    }
+
     // Copy client config to local directory for testing purposes
     execSync(`docker cp org-a:/weaver/client/. docker/docker-data`, {
       stdio: "inherit",
@@ -135,7 +104,7 @@ describe("Tests bulk and query operations", () => {
 
   let created: Address[];
 
-  it.skip("Should create one", async () => {
+  it("Should create one", async () => {
     const repo = repository.for({ ...client });
 
     const created = await repo.create(

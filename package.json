@@ -25,6 +25,9 @@
       "types": "./lib/shared/index.d.ts"
     }
   },
+  "bin": {
+    "for-fabric": "./lib/bin/cli.cjs"
+  },
   "types": "lib/index.d.ts",
   "typesVersions": {
     "*": {
@@ -51,7 +54,6 @@
     "flash-forward": "npx npm-check-updates -u && npm run do-install",
     "reset": "rm -rf * && git checkout . && git pull && npm run do-install",
     "build": "npx build-scripts --dev && sed -i -e '1i#!/usr/bin/env node\\' lib/bin/*.cjs",
-    "build:contracts": "node ./lib/bin/build-contracts.cjs compile-contract --dev",
     "build:prod": "npx build-scripts --prod",
     "test": "jest --runInBand --coverage --detectOpenHandles",
     "test:unit": "jest --testPathPattern=\"/tests/unit\" --passWithNoTests --detectOpenHandles",
@@ -60,7 +62,6 @@
     "test:circular": "dpdm -T --no-warning --no-tree ./src/index.ts",
     "coverage": "rimraf ./workdocs/reports/data/*.json && npm run test:unit -- --coverage --config=./workdocs/reports/jest.coverage.config.ts",
     "lint": "eslint .",
-    "build:contract": "node ./lib/bin/build-contract.cjs compile-global-contract --dev --debug",
     "lint-fix": "eslint --fix .",
     "prepare-pr": "npm run lint-fix && npm run build:prod && npm run coverage && npm run docs",
     "prepare-release": "npm run build:prod && npm run coverage && npm run docs",
@@ -69,11 +70,15 @@
     "drawings": "for FILE in workdocs/drawings/*.drawio; do echo \"converting $FILE to image...\" && docker run --rm -v $(pwd):/data rlespinasse/drawio-export --format png $FILE; done && cp -rf workdocs/drawings/export/* workdocs/resources/",
     "uml": "cd workdocs/uml && for FILE in ./*.puml; do docker run --rm -v $(pwd):/work -w /work miy4/plantuml -DPLANTUML_LIMIT_SIZE=8192 -tpng $FILE; done && cd ../.. && cp -fr workdocs/uml/*.png workdocs/resources/",
     "docs": "npx rimraf ./docs && mkdir docs && npx build-scripts --docs",
-    "extract:indexes": "node ./lib/bin/compile-indexes.cjs compile-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/global",
+    "extract:indexes": "LEVEL=verbose node ./lib/bin/cli.cjs extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/GlobalContract",
     "infrastructure:up": "docker compose -f ./docker/infrastructure/docker-compose.yaml up -d",
     "infrastructure:down": "docker compose -f ./docker/infrastructure/docker-compose.yaml down --rmi local -v && rm -rf ./docker/docker-data && rm -f ./tests/integration/chaincodeTrackers/*.count",
     "infrastructure-hsm:up": "docker compose -f ./docker/infrastructure/docker-compose-hsm.yaml up -d",
     "infrastructure-hsm:down": "docker compose -f ./docker/infrastructure/docker-compose-hsm.yaml down --rmi local -v",
+    "build:contract2": "npx decaf fabric compile-contract --debug --name ${CONTRACT_NAME:-GlobalContract} --input ./src/contract --output ./docker/infrastructure/chaincode && LEVEL=verbose node ./lib/bin/cli.cjs extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract}",
+    "update:contract": "npm run build:contract && npm run deploy:contract",
+    "build:contract": "node ./lib/bin/cli.cjs compile-contract --debug --name ${CONTRACT_NAME:-GlobalContract} --input ./src/contract --output ./docker/infrastructure/chaincode && LEVEL=verbose node ./lib/bin/cli.cjs extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract}",
+    "deploy:contract": "node ./lib/bin/cli.cjs deploy-contract --name ${CONTRACT_NAME:-GlobalContract} --input ${CONTRACT_NAME:-GlobalContract}",
     "publish-docs": "docker run -it --rm --user $(id -u):$(id -g) -v \"$(pwd)/workdocs/confluence:/content\" -e ATLASSIAN_API_TOKEN=$(cat .confluence-token) ghcr.io/markdown-confluence/publish:latest",
     "copy-storage": "sudo cp -R docker/infrastructure/storage docker/docker-data/ && sudo chmod -R 755 docker/docker-data",
     "repo:init": "codex exec \"$(cat ./.codex/prompts/repo-setup.md)\nbase_path is `./`, initialize the repository\" -s workspace-write",
@@ -115,6 +120,7 @@
   },
   "homepage": "https://github.com/decaf-ts/for-fabric#readme",
   "devDependencies": {
+    "@decaf-ts/cli": "latest",
     "@decaf-ts/fabric-weaver": "latest",
     "@decaf-ts/utils": "latest"
   },

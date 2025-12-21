@@ -23,7 +23,9 @@ import {
   PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
 import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
+import { Object as FabricObject } from "fabric-contract-api";
 
+FabricObject()(Date);
 /**
  * @description Base contract class for CRUD operations in Fabric chaincode
  * @summary Provides standard create, read, update, and delete operations for models in Fabric chaincode
