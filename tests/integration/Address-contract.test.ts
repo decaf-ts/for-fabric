@@ -67,7 +67,7 @@ describe("Tests bulk and query operations", () => {
     certCertOrDirectoryPath: any;
   };
 
-  it.skip("Create User Account", async () => {
+  it("Create User Account", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -222,7 +222,7 @@ describe("Tests bulk and query operations", () => {
     expect(list.every((el) => el instanceof Address)).toEqual(true);
   });
 
-  it.only("should perform paged queries", async () => {
+  it("should perform paged queries", async () => {
     const repo = repository.for({ ...client });
 
     const page = await repo.select().paginate(10);

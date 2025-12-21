@@ -8,6 +8,8 @@ import {
   Context,
   PersistenceKeys,
   ContextOf,
+  PreparedStatementKeys,
+  OrderDirection,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -181,6 +183,32 @@ export class FabricContractRepository<M extends Model> extends Repository<
       if (errorMessages) throw new ValidationError(errorMessages);
     }
     return [models, ...contextArgs.args];
+  }
+
+  override async paginateBy(
+    key: keyof M,
+    order: OrderDirection,
+    size: number,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ) {
+    const contextArgs = await Context.args(
+      PreparedStatementKeys.PAGE_BY,
+      this.class,
+      args,
+      this.adapter,
+      this._overrides || {}
+    );
+    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.paginateBy);
+    log.verbose(
+      `paginating ${Model.tableName(this.class)} with page size ${size}`
+    );
+    return this.override({
+      forcePrepareComplexQueries: false,
+      forcePrepareSimpleQueries: false,
+    } as any)
+      .select()
+      .orderBy([key, order])
+      .paginate(size, ...ctxArgs);
   }
 
   override async statement(

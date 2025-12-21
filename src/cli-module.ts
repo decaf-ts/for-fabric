@@ -21,6 +21,7 @@ import {
   packageContract,
   commitChaincode,
 } from "./cli-utils";
+import "./shared/overrides";
 
 const logger = Logging.for("fabric");
 
@@ -176,6 +177,56 @@ const extractIndexes = new Command()
 
     for (const m of models) {
       log.verbose(`Extracting indexes for table ${Model.tableName(m)}`);
+      generateModelIndexes(m, result);
+    }
+    log.verbose(`Found ${Object.keys(result).length} indexes to create`);
+    log.debug(`Indexes: ${JSON.stringify(result)}`);
+    writeIndexes(Object.values(result), outDir);
+  });
+
+const extractCollections = new Command()
+  .command("extract-collections")
+  .option("--file [String]", "the model file")
+  .option("--folder [String]", "the model folder")
+  .option("--outDir <String>", "the outdir. should match your contract folder")
+  .description(
+    "Creates a the JSON index files to be submitted to along with the contract"
+  )
+  .action(async (options: any) => {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
+    );
+
+    const version = pkg.version;
+
+    const log = logger.for("extract-indexes");
+    log.debug(
+      `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
+    );
+
+    // eslint-disable-next-line prefer-const
+    let { file, folder, outDir } = options;
+
+    const models: any[] = [];
+    if (file) {
+      models.push(...readModelFile(file));
+    }
+
+    if (folder) {
+      log.info(`Loading models from ${folder}...`);
+      models.push(...(await readModelFolders(folder)));
+    }
+    const result: Record<string, any> = {};
+
+    if (!file && !folder)
+      throw new InternalError(`Must pass a file or a folder`);
+
+    const privateOrShared = models.filter(
+      (m) => Model.isPrivate(m) || Model.isShared(m)
+    );
+
+    for (const m of privateOrShared) {
+      log.verbose(`Extracting collections for table ${Model.tableName(m)}`);
       generateModelIndexes(m, result);
     }
     log.verbose(`Found ${Object.keys(result).length} indexes to create`);

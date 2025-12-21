@@ -14,6 +14,8 @@ export class FabricClientPaginator<M extends Model> extends Paginator<
   M,
   MangoQuery
 > {
+  bookmark?: string;
+
   constructor(
     adapter: FabricClientAdapter,
     query: MangoQuery | PreparedStatement<any>,

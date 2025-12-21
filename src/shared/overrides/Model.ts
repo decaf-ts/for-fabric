@@ -1,5 +1,6 @@
 import { SegregatedModel } from "../types";
 import { Constructor } from "@decaf-ts/decoration";
+import "@decaf-ts/decorator-validation";
 
 declare module "@decaf-ts/decorator-validation" {
   export interface Model {
