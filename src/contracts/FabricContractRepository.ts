@@ -119,16 +119,19 @@ export class FabricContractRepository<M extends Model> extends Repository<
       this.adapter,
       this._overrides || {}
     );
+    const log = contextArgs.context.logger.for(this.createAllPrefix);
     const ignoreHandlers = contextArgs.context.get("ignoreHandlers");
     const ignoreValidate = contextArgs.context.get("ignoreValidation");
     if (!models.length) return [models, ...contextArgs.args];
     const opts = Model.sequenceFor(models[0]);
+    log.info(`Sequence options: ${JSON.stringify(opts)}`);
     let ids: (string | number | bigint | undefined)[] = [];
     if (opts.type) {
       if (!opts.name) opts.name = Model.sequenceName(models[0], "pk");
       ids = await (
         await this.adapter.Sequence(opts)
       ).range(models.length, ...contextArgs.args);
+      log.info(`Sequence ids: ${ids}`);
     } else {
       ids = models.map((m, i) => {
         if (typeof m[this.pk] === "undefined")
@@ -152,6 +155,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
           ) as M[keyof M];
         }
 
+        log.info(`Creating model ${JSON.stringify(m)}`);
         if (!ignoreHandlers)
           await enforceDBDecorators<M, Repository<M, any>, any>(
             this,

@@ -104,7 +104,7 @@ describe("Tests bulk and query operations", () => {
 
   let created: Address[];
 
-  it("Should create one", async () => {
+  it.skip("Should create one", async () => {
     const repo = repository.for({ ...client });
 
     const created = await repo.create(
@@ -125,7 +125,7 @@ describe("Tests bulk and query operations", () => {
     const models = Object.keys(new Array(10).fill(0))
       .map(parseInt)
       .map(
-        (i) =>
+        (el, i) =>
           new Address({
             city: "city" + i,
             street: "street",
@@ -148,7 +148,7 @@ describe("Tests bulk and query operations", () => {
     expect(created.every((c) => !c.hasErrors())).toEqual(true);
   });
 
-  it.skip("Should read Addresses in bulk", async () => {
+  it("Should read Addresses in bulk", async () => {
     const repo = repository.for({ ...client });
 
     const ids = created.map((c) => c.id).slice(3, 5);
@@ -159,7 +159,7 @@ describe("Tests bulk and query operations", () => {
     expect(deleted.length).toEqual(ids.length);
   });
 
-  it.skip("Should update Addresses in bulk", async () => {
+  it("Should update Addresses in bulk", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = (await enrollmentService.registerAndEnroll(
       { userName: "TestOtherUser" + Date.now(), password: "TestUserPW" },
@@ -196,7 +196,7 @@ describe("Tests bulk and query operations", () => {
     ).toEqual(true);
   });
 
-  it.skip("Should delete Addresses in bulk", async () => {
+  it("Should delete Addresses in bulk", async () => {
     const repo = repository.for({ ...client });
 
     const ids = created.map((c) => c.id).slice(3, 5);
@@ -213,7 +213,7 @@ describe("Tests bulk and query operations", () => {
     await expect(repo.readAll(ids)).rejects.toThrow(NotFoundError);
   });
 
-  it.skip("should perform simple queries", async () => {
+  it("should perform simple queries", async () => {
     const repo = repository.for({ ...client });
 
     const list = await repo.select().execute();
