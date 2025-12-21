@@ -13,6 +13,8 @@
 .npmignore
 .prettierrc
 .snyk
+/lib/contract
+/lib/esm/contract
 Dockerfile
 eslint.config.js
 gulpfile.js
