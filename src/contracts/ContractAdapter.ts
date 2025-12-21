@@ -994,7 +994,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const records = ids.map((id, count) => {
       const record: Record<string, any> = {};
-      record[CouchDBKeys.TABLE] = tableName;
+      record[CouchDBKeys.TABLE] = Model.tableName(tableName);
       Object.assign(record, models[count]);
       return record;
     });
@@ -1014,7 +1014,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const records = ids.map((id, count) => {
       const record: Record<string, any> = {};
-      record[CouchDBKeys.TABLE] = tableName;
+      record[CouchDBKeys.TABLE] = Model.tableName(tableName);
       Object.assign(record, models[count]);
       return record;
     });

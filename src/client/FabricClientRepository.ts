@@ -173,10 +173,14 @@ export class FabricClientRepository<
     log.verbose(`Executing prepared statement ${name}`);
     const result = JSON.parse(
       this.adapter.decode(
-        await this.adapter.evaluateTransaction(ctx, PersistenceKeys.STATEMENT, [
-          name,
-          JSON.stringify(contextArgs.args),
-        ])
+        await this.adapter.evaluateTransaction(
+          ctx,
+          PersistenceKeys.STATEMENT,
+          [name, JSON.stringify(contextArgs.args)],
+          undefined,
+          undefined,
+          this.class.name
+        )
       )
     );
     if (Array.isArray(result)) {

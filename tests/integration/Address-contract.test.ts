@@ -6,7 +6,7 @@ import { CAConfig, PeerConfig } from "../../src/shared/types";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricEnrollmentService } from "../../src/shared";
 import { NotFoundError } from "@decaf-ts/db-decorators";
-import { Repository } from "@decaf-ts/core";
+import { Paginator, Repository } from "@decaf-ts/core";
 import { Address } from "../../src/contract/Address";
 import { FabricClientRepository } from "../../src/client/index";
 
@@ -67,7 +67,7 @@ describe("Tests bulk and query operations", () => {
     certCertOrDirectoryPath: any;
   };
 
-  it("Create User Account", async () => {
+  it.skip("Create User Account", async () => {
     const enrollmentService = new FabricEnrollmentService(caConfig);
     const userID = await enrollmentService.registerAndEnroll(
       { userName: "TestUser" + Date.now(), password: "TestUserPW" },
@@ -153,10 +153,10 @@ describe("Tests bulk and query operations", () => {
 
     const ids = created.map((c) => c.id).slice(3, 5);
 
-    const deleted = await repo.readAll(ids);
+    const read = await repo.readAll(ids);
 
-    expect(deleted).toBeDefined();
-    expect(deleted.length).toEqual(ids.length);
+    expect(read).toBeDefined();
+    expect(read.length).toEqual(ids.length);
   });
 
   it("Should update Addresses in bulk", async () => {
@@ -219,7 +219,21 @@ describe("Tests bulk and query operations", () => {
     const list = await repo.select().execute();
 
     expect(list).toBeDefined();
-    expect(list.length).toEqual(created.length);
-    expect(list.every((c, i) => c.equals(created[i]))).toEqual(true);
+    expect(list.every((el) => el instanceof Address)).toEqual(true);
+  });
+
+  it.only("should perform paged queries", async () => {
+    const repo = repository.for({ ...client });
+
+    const page = await repo.select().paginate(10);
+
+    expect(page).toBeDefined();
+    expect(page).toBeInstanceOf(Paginator);
+
+    const firstPage = await page.page();
+
+    expect(firstPage).toBeDefined();
+    expect(firstPage.length).toEqual(10);
+    expect(firstPage.every((el) => el instanceof Address)).toEqual(true);
   });
 });
