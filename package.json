@@ -26,7 +26,7 @@
     }
   },
   "bin": {
-    "for-fabric": "./lib/bin/cli.cjs"
+    "for-fabric": "lib/bin/cli.cjs"
   },
   "types": "lib/index.d.ts",
   "typesVersions": {
