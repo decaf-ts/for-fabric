@@ -7,7 +7,6 @@ import {
   QueryError,
   Context,
   PersistenceKeys,
-  ContextOf,
   PreparedStatementKeys,
   OrderDirection,
 } from "@decaf-ts/core";

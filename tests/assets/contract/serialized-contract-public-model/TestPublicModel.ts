@@ -1,4 +1,4 @@
-import { column, pk, table } from "@decaf-ts/core";
+import { Cascade, column, oneToOne, pk, table } from "@decaf-ts/core";
 import {
   maxlength,
   minlength,
@@ -8,6 +8,7 @@ import {
 } from "@decaf-ts/decorator-validation";
 import { ownedBy } from "../../../../src/shared/decorators";
 import { FabricIdentifiedBaseModel } from "../../../../src/shared/index";
+import { TestPublicModelChild } from "./TestPublicModelChild";
 
 @table("tst_user")
 @model()
@@ -28,6 +29,13 @@ export class TestPublicModel extends FabricIdentifiedBaseModel {
 
   @ownedBy()
   owner!: string;
+
+  @oneToOne(() => TestPublicModelChild, {
+    update: Cascade.CASCADE,
+    delete: Cascade.CASCADE,
+  })
+  @required()
+  child!: TestPublicModelChild;
 
   constructor(arg?: ModelArg<TestPublicModel>) {
     super(arg);
