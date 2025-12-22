@@ -4,7 +4,7 @@ import { Info } from "fabric-contract-api";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
 FabricContractAdapter.decoration();
 Adapter.setCurrent(FabricFlavour);
-import { Context, NotFoundError, OperationKeys } from "@decaf-ts/db-decorators";
+import { NotFoundError, OperationKeys } from "@decaf-ts/db-decorators";
 import { Product } from "./models/Product";
 import { SerializedCrudContract } from "../../src/contracts/crud/serialized-crud-contract";
 import { getMockCtx } from "./ContextMock";
@@ -34,8 +34,8 @@ describe("Inheritance and attribute generation", () => {
       acfProductCheckURL: "https://example.com/check",
     });
 
-    created = Model.deserialize(
-      await contract.create(ctx as any, model.serialize())
+    created = new Product(
+      JSON.parse(await contract.create(ctx as any, model.serialize()))
     );
 
     expect(created).toBeDefined();
@@ -43,7 +43,7 @@ describe("Inheritance and attribute generation", () => {
   });
 
   it("reads", async () => {
-    const read = Model.deserialize(
+    const read = new Product(
       await contract.read(ctx as any, created.productCode)
     );
 
@@ -77,9 +77,7 @@ describe("Inheritance and attribute generation", () => {
   });
 
   it("deletes", async () => {
-    const deleted = Model.deserialize(
-      await contract.read(ctx, created.productCode)
-    );
+    const deleted = new Product(await contract.read(ctx, created.productCode));
 
     expect(deleted).toBeDefined();
     expect(deleted.productCode).toEqual(created.productCode); // same model

@@ -32,7 +32,8 @@ export class SerializedCrudContract<
     const m = this.deserialize<M>(model);
 
     log.info(`Model deserialized: ${JSON.stringify(m)}`);
-    return this.serialize((await super.create(ctx as any, m)) as M);
+    const result = await super.create(ctx as any, m);
+    return this.serialize(result as M);
   }
 
   @Transaction(false)
@@ -211,10 +212,8 @@ export class SerializedCrudContract<
       .map((m) => new this.clazz(m));
 
     log.info(`Adding ${modelList.length} entries to the table`);
-    return JSON.stringify(
-      ((await super.createAll(context, modelList)) as M[]).map(
-        (m) => this.serialize(m) as string
-      )
-    );
+
+    const result = (await super.createAll(context, modelList)) as M[];
+    return JSON.stringify(result.map((m) => this.serialize(m) as string));
   }
 }

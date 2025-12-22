@@ -47,13 +47,19 @@ export class DeterministicSerializer<
     }
     toSerialize[ModelKeys.ANCHOR] = metadata || model.constructor.name;
 
-    function preSerialize(this: DeterministicSerializer<any>, obj: any): any {
+    const preSerialize = function preSerialize(
+      this: DeterministicSerializer<any>,
+      obj: any
+    ): any {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
+      const self = this;
       if (typeof obj !== "object") return obj;
-      if (Array.isArray(obj)) return obj.map(preSerialize);
-      return this.preSerialize(obj);
-    }
+      if (Array.isArray(obj)) return obj.map((o) => preSerialize.call(self, o));
+      return this.preSerialize.call(this, obj);
+    }.bind(this);
+
     Model.relations(model).forEach((r) => {
-      toSerialize[r] = preSerialize.call(this, toSerialize[r]);
+      toSerialize[r] = preSerialize(toSerialize[r]);
     });
     return toSerialize;
   }

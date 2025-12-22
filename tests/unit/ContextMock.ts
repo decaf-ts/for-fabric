@@ -1,5 +1,7 @@
 import { Logging, LogLevel } from "@decaf-ts/logging";
 import { Contract } from "fabric-contract-api";
+import { ModelKeys } from "@decaf-ts/decorator-validation";
+import { InternalError } from "@decaf-ts/db-decorators";
 
 export function getStubMock() {
   const state: Record<any, any> = {};
@@ -39,6 +41,9 @@ export function getStubMock() {
       return "";
     },
     putState: async (key: string, value: any) => {
+      const testStr = typeof value === "string" ? value : value.toString();
+      if (testStr.includes(ModelKeys.ANCHOR))
+        throw new InternalError("Anchor keys are not allowed");
       state[key] = value;
     },
     deleteState: async (key: string) => {

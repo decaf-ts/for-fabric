@@ -30,10 +30,14 @@ export class TestPublicModel extends FabricIdentifiedBaseModel {
   @ownedBy()
   owner!: string;
 
-  @oneToOne(() => TestPublicModelChild, {
-    update: Cascade.CASCADE,
-    delete: Cascade.CASCADE,
-  })
+  @oneToOne(
+    () => TestPublicModelChild,
+    {
+      update: Cascade.CASCADE,
+      delete: Cascade.CASCADE,
+    },
+    true
+  )
   @required()
   child!: TestPublicModelChild;
 

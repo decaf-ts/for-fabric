@@ -517,7 +517,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const { stub, log } = this.logCtx([ctx], this.putState);
     try {
       data = Buffer.from(
-        FabricContractAdapter.serializer.serialize(model as Model)
+        FabricContractAdapter.serializer.serialize(model as Model, false)
       );
     } catch (e: unknown) {
       throw new SerializationError(

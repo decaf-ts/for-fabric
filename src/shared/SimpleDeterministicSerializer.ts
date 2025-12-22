@@ -41,16 +41,16 @@ export class SimpleDeterministicSerializer<
     return deserialization;
   }
 
-  override serialize(model: M): string {
+  override serialize(model: M, putAnchor = true): string {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const stringify = require("json-stringify-deterministic");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const sortKeysRecursive = require("sort-keys-recursive");
-    const preSerialization = this.preSerialize(model);
+    const preSerialization = this.preSerialize(model, putAnchor);
     return stringify(sortKeysRecursive(preSerialization));
   }
 
-  protected override preSerialize(model: M) {
+  protected override preSerialize(model: M, putAnchor: boolean = true) {
     // TODO: nested preserialization (so increase performance when deserializing)
     // TODO: Verify why there is no metadata
     const toSerialize: Record<string, any> = Object.assign({}, model);
@@ -61,7 +61,8 @@ export class SimpleDeterministicSerializer<
     } catch (error: unknown) {
       metadata = undefined;
     }
-    toSerialize[ModelKeys.ANCHOR] = metadata || model.constructor.name;
+    if (putAnchor)
+      toSerialize[ModelKeys.ANCHOR] = metadata || model.constructor.name;
 
     function preSerialize(
       this: SimpleDeterministicSerializer<any>,
