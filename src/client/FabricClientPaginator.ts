@@ -11,7 +11,7 @@ import { MangoQuery } from "@decaf-ts/for-couchdb";
 
 export class FabricClientPaginator<M extends Model> extends Paginator<
   M,
-  M,
+  M[],
   MangoQuery
 > {
   bookmark?: string;

@@ -9,6 +9,7 @@ import {
   OrderDirection,
   Paginator,
   Repository,
+  SerializedPage,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "../FabricContractRepository";
 import { DeterministicSerializer } from "../../shared/DeterministicSerializer";
@@ -126,7 +127,7 @@ export abstract class FabricCrudContract<M extends Model>
     order: string,
     size: number,
     ...args: any[]
-  ): Promise<Paginator<M, any> | string> {
+  ): Promise<SerializedPage<M> | string> {
     const { ctxArgs, log } = await this.logCtx([...args, ctx], this.paginateBy);
     log.info(
       `Running paginateBy key ${key as string}, order ${order} with size ${size} and args ${ctxArgs}`

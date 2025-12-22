@@ -5,6 +5,8 @@ import {
   Context,
   ContextOf,
   PreparedStatementKeys,
+  SerializedPage,
+  DirectionLimitOffset,
 } from "@decaf-ts/core";
 import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -68,8 +70,9 @@ export class FabricClientRepository<
     key: keyof M,
     order: OrderDirection,
     size: number,
+    ref: { page?: number; bookmark?: string } | number = { page: 1 },
     ...args: MaybeContextualArg<ContextOf<A>>
-  ) {
+  ): Promise<SerializedPage<M>> {
     const contextArgs = await Context.args(
       PreparedStatementKeys.PAGE_BY,
       this.class,
@@ -81,9 +84,22 @@ export class FabricClientRepository<
     log.verbose(
       `paginating ${Model.tableName(this.class)} with page size ${size}`
     );
-    return this.select()
-      .orderBy([key, order])
-      .paginate(size, ...ctxArgs);
+    if (typeof ref === "number") ref = { page: ref };
+
+    const params: DirectionLimitOffset = {
+      direction: order,
+      limit: size,
+    };
+    if (ref.bookmark) {
+      params.offset = ref.bookmark as any;
+    }
+    return this.statement(
+      this.paginateBy.name,
+      key,
+      ref.page,
+      params,
+      ...ctxArgs
+    );
   }
 
   override async listBy(

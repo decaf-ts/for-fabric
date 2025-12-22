@@ -9,6 +9,8 @@ import {
   PersistenceKeys,
   PreparedStatementKeys,
   OrderDirection,
+  SerializedPage,
+  Paginator,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -188,8 +190,14 @@ export class FabricContractRepository<M extends Model> extends Repository<
     key: keyof M,
     order: OrderDirection,
     size: number,
+    ref: { page?: number; bookmark?: string } | number = { page: 1 },
     ...args: MaybeContextualArg<FabricContractContext>
-  ) {
+  ): Promise<SerializedPage<M>> {
+    if (typeof ref === "number") ref = { page: ref };
+    // eslint-disable-next-line prefer-const
+    let { page, bookmark } = ref;
+    if (!page && !bookmark)
+      throw new QueryError(`PaginateBy needs a page or a bookmark`);
     const contextArgs = await Context.args(
       PreparedStatementKeys.PAGE_BY,
       this.class,
@@ -201,13 +209,31 @@ export class FabricContractRepository<M extends Model> extends Repository<
     log.verbose(
       `paginating ${Model.tableName(this.class)} with page size ${size}`
     );
-    return this.override({
-      forcePrepareComplexQueries: false,
-      forcePrepareSimpleQueries: false,
-    } as any)
-      .select()
-      .orderBy([key, order])
-      .paginate(size, ...ctxArgs);
+
+    let paginator: Paginator<M>;
+    if (bookmark) {
+      paginator = await this.override({
+        forcePrepareComplexQueries: false,
+        forcePrepareSimpleQueries: false,
+      } as any)
+        .select()
+        .where(this.attr(Model.pk(this.class)).gt(bookmark))
+        .orderBy([key, order])
+        .paginate(size, ...ctxArgs);
+      page = 1;
+    } else if (page) {
+      paginator = await this.override({
+        forcePrepareComplexQueries: false,
+        forcePrepareSimpleQueries: false,
+      } as any)
+        .select()
+        .orderBy([key, order])
+        .paginate(size, ...ctxArgs);
+    } else {
+      throw new QueryError(`PaginateBy needs a page or a bookmark`);
+    }
+    const paged = await paginator.page(page);
+    return paginator.serialize(paged) as SerializedPage<M>;
   }
 
   override async statement(
@@ -228,14 +254,18 @@ export class FabricContractRepository<M extends Model> extends Repository<
     }
     const { log, ctxArgs } = this.logCtx(contextArgs.args, this.statement);
     log.verbose(`Executing prepared statement ${name} with args ${ctxArgs}`);
+
+    let result: any;
     try {
-      return (this as any)[name](...ctxArgs);
+      result = await (this as any)[name](...ctxArgs);
     } catch (e: unknown) {
       if (e instanceof BaseError) throw e;
       throw new InternalError(
         `Failed to execute prepared statement ${name} with args ${ctxArgs}: ${e}`
       );
     }
+
+    return result;
   }
 
   /**

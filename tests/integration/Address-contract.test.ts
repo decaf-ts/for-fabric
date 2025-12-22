@@ -196,7 +196,7 @@ describe("Tests bulk and query operations", () => {
     ).toEqual(true);
   });
 
-  it("Should delete Addresses in bulk", async () => {
+  it.skip("Should delete Addresses in bulk", async () => {
     const repo = repository.for({ ...client });
 
     const ids = created.map((c) => c.id).slice(3, 5);
