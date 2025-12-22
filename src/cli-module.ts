@@ -330,6 +330,27 @@ const deployContract = new Command()
     commitChaincode(name, sequence, version);
   });
 
+const getCryptoMaterial = new Command()
+  .name("get-crypto-material")
+  .description("copies the crypto material to the selected folder")
+  .option("--folder <String>", "output folder", "docker/docker-data")
+  .action(async (options: any) => {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
+    );
+
+    const version = pkg.version;
+
+    const log = logger.for("get-crypto-material");
+    log.debug(
+      `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
+    );
+    const { folder } = options;
+    execSync(`docker cp org-a:/weaver/client/. ${folder}`, {
+      cwd: process.cwd(),
+    });
+  });
+
 const fabricCmd = new Command()
   .name("fabric")
   .description(
@@ -340,6 +361,7 @@ fabricCmd.addCommand(compileCommand);
 fabricCmd.addCommand(extractIndexes);
 fabricCmd.addCommand(ensureInfra);
 fabricCmd.addCommand(deployContract);
+fabricCmd.addCommand(getCryptoMaterial);
 
 export default function fabric() {
   return fabricCmd;
