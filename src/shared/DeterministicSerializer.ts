@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-import { JSONSerializer, Model } from "@decaf-ts/decorator-validation";
+import { Constructor, Metadata } from "@decaf-ts/decoration";
+import {
+  JSONSerializer,
+  Model,
+  ModelKeys,
+} from "@decaf-ts/decorator-validation";
 
 /**
  * @description Deterministic JSON serializer for Fabric models
@@ -29,15 +34,43 @@ export class DeterministicSerializer<
   constructor() {
     super();
   }
+  protected override preSerialize(model: M) {
+    // TODO: nested preserialization (so increase performance when deserializing)
+    // TODO: Verify why there is no metadata
+    const toSerialize: Record<string, any> = Object.assign({}, model);
+    let metadata;
+    try {
+      metadata = Metadata.modelName(model.constructor as Constructor);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error: unknown) {
+      metadata = undefined;
+    }
+    toSerialize[ModelKeys.ANCHOR] = metadata || model.constructor.name;
+
+    function preSerialize(this: DeterministicSerializer<any>, obj: any): any {
+      if (typeof obj !== "object") return obj;
+      if (Array.isArray(obj)) return obj.map(preSerialize);
+      return this.preSerialize(obj);
+    }
+    Model.relations(model).forEach((r) => {
+      toSerialize[r] = preSerialize.call(this, toSerialize[r]);
+    });
+    return toSerialize;
+  }
 
   /**
-   * @description Deserialize a JSON string into a model instance
-   * @summary Delegates to the base JSONSerializer implementation to rebuild the model
-   * @param {string} str - The JSON string to deserialize
-   * @return {M} The reconstructed model instance
+   * @summary Rebuilds a model from a serialization
+   * @param {string} str
+   *
+   * @throws {Error} If it fails to parse the string, or to build the model
    */
   override deserialize(str: string): M {
-    return super.deserialize(str);
+    const deserialization = JSON.parse(str);
+    const className = deserialization[ModelKeys.ANCHOR];
+    if (!className)
+      throw new Error("Could not find class reference in serialized model");
+    const model: M = Model.build(deserialization, className) as unknown as M;
+    return model;
   }
 
   /**

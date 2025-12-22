@@ -1,4 +1,9 @@
-import { JSONSerializer, Model } from "@decaf-ts/decorator-validation";
+import {
+  JSONSerializer,
+  Model,
+  ModelKeys,
+} from "@decaf-ts/decorator-validation";
+import { Constructor, Metadata } from "@decaf-ts/decoration";
 
 export class SimpleDeterministicSerializer<
   M extends Model,
@@ -41,11 +46,34 @@ export class SimpleDeterministicSerializer<
     const stringify = require("json-stringify-deterministic");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const sortKeysRecursive = require("sort-keys-recursive");
-    return stringify(sortKeysRecursive(this.preSerialize(model)));
+    const preSerialization = this.preSerialize(model);
+    return stringify(sortKeysRecursive(preSerialization));
   }
 
-  override preSerialize(model: M): Record<string, any> {
+  protected override preSerialize(model: M) {
+    // TODO: nested preserialization (so increase performance when deserializing)
+    // TODO: Verify why there is no metadata
     const toSerialize: Record<string, any> = Object.assign({}, model);
+    let metadata;
+    try {
+      metadata = Metadata.modelName(model.constructor as Constructor);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error: unknown) {
+      metadata = undefined;
+    }
+    toSerialize[ModelKeys.ANCHOR] = metadata || model.constructor.name;
+
+    function preSerialize(
+      this: SimpleDeterministicSerializer<any>,
+      obj: any
+    ): any {
+      if (typeof obj !== "object") return obj;
+      if (Array.isArray(obj)) return obj.map(preSerialize);
+      return this.preSerialize(obj);
+    }
+    Model.relations(model).forEach((r) => {
+      toSerialize[r] = preSerialize.call(this, toSerialize[r]);
+    });
     return toSerialize;
   }
 }

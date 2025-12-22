@@ -14,9 +14,9 @@ describe("Tests Public contract", () => {
     const model = new TestPublicModel({
       name: "John Doe",
       nif: "123456789",
-      // child: {
-      //   name: "Child",
-      // },
+      child: {
+        name: "Child",
+      },
     });
 
     created = Model.deserialize(

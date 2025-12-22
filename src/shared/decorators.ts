@@ -141,6 +141,49 @@ export function ownedBy() {
     .apply();
 }
 
+export async function transactionIdOnCreate<
+  M extends Model<boolean>,
+  R extends Repo<M>,
+  V,
+>(
+  this: R,
+  context: Context<any>,
+  data: V,
+  key: keyof M,
+  model: M
+): Promise<void> {
+  const { stub } = context as any;
+  model[key] = stub.getTxID();
+}
+
+export function transactionId() {
+  function transactionId() {
+    return function (obj: any, attribute?: any) {
+      return apply(
+        required(),
+        readonly(),
+        onCreate(transactionIdOnCreate),
+        onUpdate(transactionIdOnCreate),
+        propMetadata(
+          Metadata.key(
+            FabricModelKeys.FABRIC,
+            attribute,
+            FabricModelKeys.TRANSACTION_ID
+          ),
+          attribute
+        )
+      )(obj, attribute);
+    };
+  }
+
+  return Decoration.for(FabricModelKeys.TRANSACTION_ID)
+    .define({
+      decorator: transactionId,
+      args: [],
+    })
+    .apply();
+}
+
 export function getFabricModelKey(key: string) {
   return Metadata.key(FabricModelKeys.FABRIC + key);
 }
