@@ -22,3 +22,5 @@ jest.config.ts
 tsconfig.json
 .codex
 !/workdocs/assets/slogans.json
+/lib/contract
+/lib/esm/contract

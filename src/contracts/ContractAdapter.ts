@@ -64,6 +64,7 @@ import {
 import { ContractLogger } from "./logging";
 import { FabricContractSequence } from "./FabricContractSequence";
 import { FabricContractPaginator } from "./FabricContractPaginator";
+import { MissingContextError } from "../shared/errors";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -303,12 +304,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     model: Record<string, any>,
     ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
-    const { ctx, log, stub } = this.logCtx(args, this.create);
+    const { ctx, log } = this.logCtx(args, this.create);
     log.info(`in ADAPTER create with args ${args}`);
     const tableName = Model.tableName(clazz);
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
-      const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+      const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
       model = await this.putState(composedKey, model, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
@@ -330,13 +331,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
     id: PrimaryKeyType,
     ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
-    const { ctx, log, stub } = this.logCtx(args, this.read);
+    const { ctx, log } = this.logCtx(args, this.read);
     log.info(`in ADAPTER read with args ${args}`);
     const tableName = Model.tableName(clazz);
 
     let model: Record<string, any>;
     try {
-      const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+      const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
       model = await this.readState(composedKey, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
@@ -361,12 +362,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     model: Record<string, any>,
     ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
-    const { ctx, log, stub } = this.logCtx(args, this.update);
+    const { ctx, log } = this.logCtx(args, this.update);
     const tableName = Model.tableName(clazz);
 
     try {
       log.verbose(`updating entry to ${tableName} table with pk ${id}`);
-      const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+      const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
       model = await this.putState(composedKey, model, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
@@ -388,11 +389,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
     id: PrimaryKeyType,
     ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
-    const { ctx, log, ctxArgs, stub } = this.logCtx(args, this.delete);
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.delete);
     const tableName = Model.tableName(clazz);
     let model: Record<string, any>;
     try {
-      const composedKey = stub.createCompositeKey(tableName, [String(id)]);
+      const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
       model = await this.read(clazz, id, ...ctxArgs);
       log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
       await this.deleteState(composedKey, ctx);
@@ -403,9 +404,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
-  protected async deleteState(id: string, ctx: FabricContractContext) {
-    const { stub } = this.logCtx([ctx], this.deleteState);
-    await stub.deleteState(id);
+  protected async deleteState(id: string, context: FabricContractContext) {
+    const { ctx } = this.logCtx([context], this.deleteState);
+    await ctx.stub.deleteState(id);
   }
 
   forPrivate(collection: string): FabricContractAdapter {
@@ -521,7 +522,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ) {
     let data: Buffer;
 
-    const { stub, log } = this.logCtx([ctx], this.putState);
+    const { log } = this.logCtx([ctx], this.putState);
     try {
       data = Buffer.from(
         FabricContractAdapter.serializer.serialize(model as Model, false)
@@ -533,8 +534,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
 
     const collection = ctx.get("segregated");
-    if (collection) await stub.putPrivateData(collection, id.toString(), data);
-    else await stub.putState(id.toString(), data);
+    if (collection)
+      await ctx.stub.putPrivateData(collection, id.toString(), data);
+    else await ctx.stub.putState(id.toString(), data);
 
     log.silly(
       `state stored${collection ? ` in ${collection} collection` : ""} under id ${id}`
@@ -545,12 +547,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
   protected async readState(id: string, ctx: FabricContractContext) {
     let result: any;
 
-    const { stub, log } = this.logCtx([ctx], this.readState);
+    const { log } = this.logCtx([ctx], this.readState);
     let res: string;
     const collection = ctx.get("segregated");
     if (collection)
-      res = (await stub.getPrivateData(collection, id.toString())).toString();
-    else res = (await stub.getState(id.toString())).toString();
+      res = (
+        await ctx.stub.getPrivateData(collection, id.toString())
+      ).toString();
+    else res = (await ctx.stub.getState(id.toString())).toString();
 
     if (!res)
       throw new NotFoundError(
@@ -577,7 +581,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     let res: Iterators.StateQueryIterator;
     const collection = ctx.get("segregated");
     if (collection)
-      res = await stub.getPrivateDataQueryResult(
+      res = await ctx.stub.getPrivateDataQueryResult(
         collection,
         JSON.stringify(rawInput)
       );
@@ -1115,6 +1119,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
       return new ConnectionError(err) as E;
     if (msg.includes(SerializationError.name))
       return new SerializationError(err) as E;
+    if (msg.includes("no ledger context"))
+      return new MissingContextError(
+        `No context found. this can be caused by debugging: ${msg}`
+      ) as E;
+
     return new InternalError(err) as E;
   }
 
