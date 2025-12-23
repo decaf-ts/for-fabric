@@ -352,7 +352,8 @@ const getCryptoMaterial = new Command()
   });
 
 const fabricCmd = new Command()
-  .name("fabric")
+  .name("for-fabric")
+  .command("fabric")
   .description(
     "exposes several commands to help manage the fabric infrastructure"
   );
