@@ -53,6 +53,26 @@ export function getStubMock() {
       }
       throw new Error("Missing");
     },
+    getQueryResult: async (query: string) => {
+      let currentIndex = 0;
+      const keys = Object.keys(state);
+      return {
+        async next() {
+          if (currentIndex < keys.length) {
+            const key = keys[currentIndex++];
+            return {
+              value: { key, value: state[key] },
+              done: false,
+            };
+          }
+          return { done: true };
+        },
+        async close() {
+          // No-op for mock
+        },
+      };
+    },
+
     getQueryResultWithPagination: async (
       query: string,
       pageSize: number,

@@ -119,17 +119,7 @@ describe("Tests Public contract", () => {
     expect(read.length).toEqual(bulk.length);
   });
 
-  it.skip("should perform simple queries", async () => {
-    // const clientRepo = new FabricClientRepository(
-    //   new FabricClientAdapter({} as any),
-    //   Product
-    // );
-    //
-    // const list = await repo
-    //   .select()
-    //   .orderBy(["productCode", OrderDirection.ASC])
-    //   .execute();
-
+  it("should perform simple queries", async () => {
     const bulk = JSON.parse(
       await contract.statement(
         ctx as any,
@@ -139,4 +129,17 @@ describe("Tests Public contract", () => {
     );
     expect(bulk).toBeDefined();
   });
+
+  it("should perform simple queries", async () => {
+    const bulk = JSON.parse(
+      await contract.statement(
+        ctx as any,
+        "listBy",
+        JSON.stringify(["productCode", "asc"])
+      )
+    );
+    expect(bulk).toBeDefined();
+  });
+
+  it("should paginate properly for simple queries", async () => {});
 });

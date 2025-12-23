@@ -1,9 +1,5 @@
 import { CouchDBAdapter, CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
-import {
-  Model,
-  Validation,
-  ValidationKeys,
-} from "@decaf-ts/decorator-validation";
+import { Model, ValidationKeys } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
 import {
@@ -45,8 +41,10 @@ import {
   LoggerOf,
   Context,
   RawResult,
+  Paginator,
+  ContextualArgs,
+  MaybeContextualArg,
 } from "@decaf-ts/core";
-import type { ContextualArgs, MaybeContextualArg } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
   ChaincodeStub,
@@ -65,6 +63,7 @@ import {
 } from "@decaf-ts/decoration";
 import { ContractLogger } from "./logging";
 import { FabricContractSequence } from "./FabricContractSequence";
+import { FabricContractPaginator } from "./FabricContractPaginator";
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -254,6 +253,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
     >,
   >(): Constructor<R> {
     return FabricContractRepository as unknown as Constructor<R>;
+  }
+
+  override Paginator<M extends Model>(
+    query: MangoQuery,
+    size: number,
+    clazz: Constructor<M>
+  ): Paginator<M, any, MangoQuery> {
+    return new FabricContractPaginator(this, query, size, clazz);
   }
 
   /**

@@ -7,6 +7,7 @@ import {
   PreparedStatementKeys,
   SerializedPage,
   DirectionLimitOffset,
+  Paginator,
 } from "@decaf-ts/core";
 import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -69,8 +70,10 @@ export class FabricClientRepository<
   override async paginateBy(
     key: keyof M,
     order: OrderDirection,
-    size: number,
-    ref: { page?: number; bookmark?: string } | number = { page: 1 },
+    ref: Omit<DirectionLimitOffset, "direction"> = {
+      offset: 1,
+      limit: 10,
+    },
     ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<SerializedPage<M>> {
     const contextArgs = await Context.args(
@@ -82,22 +85,13 @@ export class FabricClientRepository<
     );
     const { log, ctxArgs } = this.logCtx(contextArgs.args, this.paginateBy);
     log.verbose(
-      `paginating ${Model.tableName(this.class)} with page size ${size}`
+      `paginating ${Model.tableName(this.class)} with page size ${ref.limit}`
     );
-    if (typeof ref === "number") ref = { page: ref };
-
-    const params: DirectionLimitOffset = {
-      direction: order,
-      limit: size,
-    };
-    if (ref.bookmark) {
-      params.offset = ref.bookmark as any;
-    }
     return this.statement(
       this.paginateBy.name,
       key,
-      ref.page,
-      params,
+      order,
+      { limit: ref.limit, offset: ref.offset, bookmark: ref.bookmark },
       ...ctxArgs
     );
   }
@@ -199,6 +193,7 @@ export class FabricClientRepository<
         )
       )
     );
+
     if (Array.isArray(result)) {
       return result.map((r: any) =>
         (r as any)[CouchDBKeys.TABLE] &&
@@ -210,7 +205,11 @@ export class FabricClientRepository<
     return (result as any)[CouchDBKeys.TABLE] &&
       (result as any)[CouchDBKeys.TABLE] === Model.tableName(this.class)
       ? new this.class(result)
-      : result;
+      : Paginator.isSerializedPage(result)
+        ? Object.assign(result, {
+            data: result.data.map((d: any) => new this.class(d)),
+          })
+        : result;
   }
 
   override async create(

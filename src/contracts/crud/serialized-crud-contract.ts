@@ -2,8 +2,9 @@ import { FabricCrudContract } from "./crud-contract";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Context as Ctx, Transaction } from "fabric-contract-api";
 import { Constructor } from "@decaf-ts/decoration";
-import { Condition, OrderDirection } from "@decaf-ts/core";
+import { Condition, MaybeContextualArg, OrderDirection } from "@decaf-ts/core";
 import { SerializationError } from "@decaf-ts/db-decorators";
+import { FabricContractContext } from "../ContractContext";
 
 /**
  * @description CRUD contract variant that serializes/deserializes payloads
@@ -132,11 +133,21 @@ export class SerializedCrudContract<
     context: Ctx,
     key: string,
     order: string,
-    size: number
-  ) {
-    const { ctx, log } = await this.logCtx([context], this.paginateBy);
+    ref: string,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<string> {
+    const { ctx, log } = await this.logCtx([...args, context], this.paginateBy);
+    try {
+      ref = JSON.parse(ref);
+    } catch (e: unknown) {
+      throw new SerializationError(
+        `Failed to deserialize paginateBy reference: ${e}`
+      );
+    }
     log.info(`Executing paginateBy with key ${key} and order ${order}`);
-    return JSON.stringify(await super.paginateBy(ctx, key, order as any, size));
+    return JSON.stringify(
+      await super.paginateBy(ctx, key, order as any, ref as any, ...args)
+    );
   }
 
   @Transaction(false)

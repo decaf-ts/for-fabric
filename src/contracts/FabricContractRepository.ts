@@ -11,6 +11,7 @@ import {
   OrderDirection,
   SerializedPage,
   Paginator,
+  DirectionLimitOffset,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -189,14 +190,15 @@ export class FabricContractRepository<M extends Model> extends Repository<
   override async paginateBy(
     key: keyof M,
     order: OrderDirection,
-    size: number,
-    ref: { page?: number; bookmark?: string } | number = { page: 1 },
+    ref: Omit<DirectionLimitOffset, "direction"> = {
+      offset: 1,
+      limit: 10,
+    },
     ...args: MaybeContextualArg<FabricContractContext>
   ): Promise<SerializedPage<M>> {
-    if (typeof ref === "number") ref = { page: ref };
     // eslint-disable-next-line prefer-const
-    let { page, bookmark } = ref;
-    if (!page && !bookmark)
+    let { offset, bookmark, limit } = ref;
+    if (!offset && !bookmark)
       throw new QueryError(`PaginateBy needs a page or a bookmark`);
     const contextArgs = await Context.args(
       PreparedStatementKeys.PAGE_BY,
@@ -207,7 +209,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
     );
     const { log, ctxArgs } = this.logCtx(contextArgs.args, this.paginateBy);
     log.verbose(
-      `paginating ${Model.tableName(this.class)} with page size ${size}`
+      `paginating ${Model.tableName(this.class)} with page size ${limit}`
     );
 
     let paginator: Paginator<M>;
@@ -219,20 +221,20 @@ export class FabricContractRepository<M extends Model> extends Repository<
         .select()
         .where(this.attr(Model.pk(this.class)).gt(bookmark))
         .orderBy([key, order])
-        .paginate(size, ...ctxArgs);
-      page = 1;
-    } else if (page) {
+        .paginate(limit as number, ...ctxArgs);
+      offset = 1;
+    } else if (offset) {
       paginator = await this.override({
         forcePrepareComplexQueries: false,
         forcePrepareSimpleQueries: false,
       } as any)
         .select()
         .orderBy([key, order])
-        .paginate(size, ...ctxArgs);
+        .paginate(limit as number, ...ctxArgs);
     } else {
       throw new QueryError(`PaginateBy needs a page or a bookmark`);
     }
-    const paged = await paginator.page(page);
+    const paged = await paginator.page(offset, ...ctxArgs);
     return paginator.serialize(paged) as SerializedPage<M>;
   }
 

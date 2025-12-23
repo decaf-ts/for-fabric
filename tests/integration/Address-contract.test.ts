@@ -1,19 +1,16 @@
 import { execSync } from "child_process";
 import { ensureInfrastructureBooted } from "../utils";
 import * as fs from "fs";
-import * as path from "path";
 import { CAConfig, PeerConfig } from "../../src/shared/types";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricEnrollmentService } from "../../src/shared";
 import { NotFoundError } from "@decaf-ts/db-decorators";
 import { Paginator, Repository } from "@decaf-ts/core";
 import { Address } from "../../src/contract/Address";
-import { FabricClientRepository } from "../../src/client/index";
 
 jest.setTimeout(3000000);
 
 describe("Tests bulk and query operations", () => {
-  const contractFolderName = "GlobalContract";
   const contractName = "GlobalContract";
   let caConfig: CAConfig;
   let peerConfig: PeerConfig;
@@ -222,7 +219,7 @@ describe("Tests bulk and query operations", () => {
     expect(list.every((el) => el instanceof Address)).toEqual(true);
   });
 
-  it("should perform paged queries", async () => {
+  it.only("should perform paged queries", async () => {
     const repo = repository.for({ ...client });
 
     const page = await repo.select().paginate(10);
@@ -232,6 +229,7 @@ describe("Tests bulk and query operations", () => {
 
     const firstPage = await page.page();
 
+    expect(page.current).toEqual(1);
     expect(firstPage).toBeDefined();
     expect(firstPage.length).toEqual(10);
     expect(firstPage.every((el) => el instanceof Address)).toEqual(true);

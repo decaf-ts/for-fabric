@@ -5,9 +5,10 @@ import {
   Condition,
   Context,
   ContextualizedArgs,
+  DirectionLimitOffset,
   LoggerOf,
+  MaybeContextualArg,
   OrderDirection,
-  Paginator,
   Repository,
   SerializedPage,
 } from "@decaf-ts/core";
@@ -125,14 +126,22 @@ export abstract class FabricCrudContract<M extends Model>
     ctx: Ctx | FabricContractContext,
     key: string | keyof M,
     order: string,
-    size: number,
-    ...args: any[]
+    ref: Omit<DirectionLimitOffset, "direction"> | string = {
+      offset: 1,
+      limit: 10,
+    },
+    ...args: MaybeContextualArg<FabricContractContext>
   ): Promise<SerializedPage<M> | string> {
     const { ctxArgs, log } = await this.logCtx([...args, ctx], this.paginateBy);
     log.info(
-      `Running paginateBy key ${key as string}, order ${order} with size ${size} and args ${ctxArgs}`
+      `Running paginateBy key ${key as string}, order ${order} with size ${(ref as any).limit} and args ${ctxArgs}`
     );
-    return this.repo.paginateBy(key as keyof M, order as any, size, ...ctxArgs);
+    return this.repo.paginateBy(
+      key as keyof M,
+      order as any,
+      ref as any,
+      ...ctxArgs
+    );
   }
 
   async findOneBy(
