@@ -48,16 +48,16 @@ describe("Tests global contract implementation", () => {
       "../../docker/infrastructure/chaincode",
       contractFolderName
     );
-    if (!fs.existsSync(location)) {
-      execSync("npm run build:contract", { stdio: "inherit" });
-      execSync("npm run extract:indexes", { stdio: "inherit" });
-      execSync(
-        `cp -r  ${path.join(__dirname, "../..", contractFolderName)} ${path.join(__dirname, "../../docker/infrastructure/chaincode")}/`,
-        { stdio: "inherit" }
-      );
-      deployContract(contractFolderName, contractName);
-      commitChaincode(contractName);
-    }
+    // if (!fs.existsSync(location)) {
+    //   execSync("npm run build:contract", { stdio: "inherit" });
+    //   execSync("npm run extract:indexes", { stdio: "inherit" });
+    //   execSync(
+    //     `cp -r  ${path.join(__dirname, "../..", contractFolderName)} ${path.join(__dirname, "../../docker/infrastructure/chaincode")}/`,
+    //     { stdio: "inherit" }
+    //   );
+    //   deployContract(contractFolderName, contractName);
+    //   commitChaincode(contractName);
+    // }
     // Copy client config to local directory for testing purposes
     execSync(`docker cp org-a:/weaver/client/. docker/docker-data`, {
       stdio: "inherit",

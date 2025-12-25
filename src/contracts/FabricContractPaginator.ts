@@ -4,7 +4,7 @@ import {
   PagingError,
   Sequence,
 } from "@decaf-ts/core";
-import { DBKeys, InternalError } from "@decaf-ts/db-decorators";
+import { DBKeys } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "./ContractAdapter";
