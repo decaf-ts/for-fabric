@@ -62,7 +62,6 @@ import {
   propMetadata,
 } from "@decaf-ts/decoration";
 import { ContractLogger } from "./logging";
-import { FabricContractSequence } from "./FabricContractSequence";
 import { FabricContractPaginator } from "./FabricContractPaginator";
 import { MissingContextError } from "../shared/errors";
 
@@ -262,16 +261,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     clazz: Constructor<M>
   ): Paginator<M, any, MangoQuery> {
     return new FabricContractPaginator(this, query, size, clazz);
-  }
-
-  /**
-   * @description Creates a sequence generator
-   * @summary Factory method that creates a sequence generator for generating sequential values
-   * @param {SequenceOptions} options - Configuration options for the sequence
-   * @return {Promise<Sequence>} A promise that resolves to a new sequence instance
-   */
-  override async Sequence(options: SequenceOptions): Promise<Sequence> {
-    return new FabricContractSequence(options, this);
   }
 
   /**

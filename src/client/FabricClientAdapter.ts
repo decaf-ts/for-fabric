@@ -59,7 +59,12 @@ import { type Constructor } from "@decaf-ts/decoration";
 import { FabricClientStatement } from "./FabricClientStatement";
 import { FabricClientPaginator } from "./FabricClientPaginator";
 import { FabricClientRepository } from "./FabricClientRepository";
-import { EndorsementError } from "../shared/errors";
+import {
+  EndorsementError,
+  EndorsementPolicyError,
+  MvccReadConflictError,
+  PhantomReadConflictError,
+} from "../shared/errors";
 import { FabricClientFlags } from "./types";
 import { DefaultFabricClientFlags } from "./constants";
 import fs from "fs";
@@ -1108,6 +1113,16 @@ export class FabricClientAdapter extends Adapter<
     //   )
     // )
     //   return new UnauthorizedPrivateDataAccess(err) as E;
+    const msg = typeof err === "string" ? err : err.message;
+
+    if (msg.includes("MVCC_READ_CONFLICT"))
+      return new MvccReadConflictError(err) as E;
+
+    if (msg.includes("ENDORSEMENT_POLICY_FAILURE"))
+      return new EndorsementPolicyError(err) as E;
+
+    if (msg.includes("PHANTOM_READ_CONFLICT"))
+      return new PhantomReadConflictError(err) as E;
 
     if (err instanceof Error && (err as any).code) {
       switch ((err as any).code) {
@@ -1116,7 +1131,6 @@ export class FabricClientAdapter extends Adapter<
       }
     }
 
-    const msg = typeof err === "string" ? err : err.message;
     if (msg.includes(NotFoundError.name)) return new NotFoundError(err) as E;
     if (msg.includes(ConflictError.name)) return new ConflictError(err) as E;
     if (msg.includes(BadRequestError.name))

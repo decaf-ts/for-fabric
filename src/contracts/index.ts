@@ -12,6 +12,5 @@ export * from "./ContractContext";
 export * from "./FabricContractPaginator";
 export * from "./FabricContractRepository";
 export * from "./FabricContractRepositoryObservableHandler";
-export * from "./FabricContractSequence";
 export * from "./logging";
 export * from "./types";

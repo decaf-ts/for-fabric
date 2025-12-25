@@ -219,7 +219,7 @@ describe("Tests bulk and query operations", () => {
     expect(list.every((el) => el instanceof Address)).toEqual(true);
   });
 
-  it.only("should perform paged queries", async () => {
+  it("should perform paged queries", async () => {
     const repo = repository.for({ ...client });
 
     const page = await repo.select().paginate(10);

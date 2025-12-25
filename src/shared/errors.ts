@@ -147,3 +147,21 @@ export class EndorsementError extends InternalError {
     super(message, EndorsementError.name, 500);
   }
 }
+
+export class MvccReadConflictError extends InternalError {
+  constructor(message: string | Error) {
+    super(message, MvccReadConflictError.name, 500);
+  }
+}
+
+export class PhantomReadConflictError extends InternalError {
+  constructor(message: string | Error) {
+    super(message, PhantomReadConflictError.name, 500);
+  }
+}
+
+export class EndorsementPolicyError extends InternalError {
+  constructor(message: string | Error) {
+    super(message, EndorsementPolicyError.name, 500);
+  }
+}
