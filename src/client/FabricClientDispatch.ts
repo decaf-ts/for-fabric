@@ -96,7 +96,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    * @summary Stops listening for chaincode events and releases resources
    * @return {Promise<void>} Promise that resolves when the connection is closed
    */
-  override async close() {
+  override async close(): Promise<void> {
     if (this.listeningStack) this.listeningStack.close();
   }
 

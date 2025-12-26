@@ -53,6 +53,7 @@ import {
   StateQueryResponse,
 } from "fabric-shim-api";
 import { FabricStatement } from "./FabricContractStatement";
+import { FabricContractSequence } from "./FabricContractSequence";
 import { FabricFlavour } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
 import {
@@ -261,6 +262,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     clazz: Constructor<M>
   ): Paginator<M, any, MangoQuery> {
     return new FabricContractPaginator(this, query, size, clazz);
+  }
+
+  override async Sequence(options: SequenceOptions): Promise<Sequence> {
+    return new FabricContractSequence(options, this as any);
   }
 
   /**

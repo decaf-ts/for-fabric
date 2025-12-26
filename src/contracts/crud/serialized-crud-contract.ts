@@ -34,7 +34,11 @@ export class SerializedCrudContract<
 
     log.info(`Model deserialized: ${JSON.stringify(m)}`);
     const result = await super.create(ctx as any, m);
-    return this.serialize(result as M);
+
+    const serialized = this.serialize(result as M);
+    log.info(`RESULT: ${JSON.stringify(result)}`);
+    log.info(`Retuning: ${serialized}`);
+    return serialized;
   }
 
   @Transaction(false)
