@@ -144,18 +144,18 @@ describe("e2e Repository test", () => {
         productCode: id,
         inventedName: "test_name",
         nameMedicinalProduct: "123456789",
-        // strengths: [
-        //   {
-        //     productCode: id,
-        //     strength: "200mg",
-        //     substance: "Ibuprofen",
-        //   },
-        //   {
-        //     productCode: id,
-        //     strength: "400mg",
-        //     substance: "Ibuprofen",
-        //   },
-        // ],
+        strengths: [
+          {
+            productCode: id,
+            strength: "200mg",
+            substance: "Ibuprofen",
+          },
+          {
+            productCode: id,
+            strength: "400mg",
+            substance: "Ibuprofen",
+          },
+        ],
         markets: [
           {
             productCode: id,
@@ -245,14 +245,14 @@ describe("e2e Repository test", () => {
       await expect(
         repo.read(created.productCode as string)
       ).rejects.toThrowError(NotFoundError);
-      //
-      // const strengthRepo = Repository.forModel(ProductStrength);
-      // await expect(
-      //   strengthRepo.read(deleted.strengths[0].id)
-      // ).rejects.toThrowError(NotFoundError);
-      // await expect(
-      //   strengthRepo.read(deleted.strengths[1].id)
-      // ).rejects.toThrowError(NotFoundError);
+
+      const strengthRepo = Repository.forModel(ProductStrength);
+      await expect(
+        strengthRepo.read(deleted.strengths[0].id)
+      ).rejects.toThrowError(NotFoundError);
+      await expect(
+        strengthRepo.read(deleted.strengths[1].id)
+      ).rejects.toThrowError(NotFoundError);
 
       const marketRepo = Repository.forModel(Market);
       await expect(
@@ -272,18 +272,18 @@ describe("e2e Repository test", () => {
           productCode: id,
           inventedName: "test_name",
           nameMedicinalProduct: "123456789",
-          // strengths: [
-          //   {
-          //     productCode: id,
-          //     strength: "200mg",
-          //     substance: "Ibuprofen",
-          //   },
-          //   {
-          //     productCode: id,
-          //     strength: "400mg",
-          //     substance: "Ibuprofen",
-          //   },
-          // ],
+          strengths: [
+            {
+              productCode: id,
+              strength: "200mg",
+              substance: "Ibuprofen",
+            },
+            {
+              productCode: id,
+              strength: "400mg",
+              substance: "Ibuprofen",
+            },
+          ],
           markets: [
             {
               productCode: id,

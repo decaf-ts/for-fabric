@@ -15,6 +15,7 @@ import {
   UnsupportedError,
   UUID,
 } from "@decaf-ts/core";
+import { style } from "@decaf-ts/logging";
 
 /**
  * @description Abstract base class for sequence generation
@@ -96,22 +97,18 @@ export class FabricContractSequence extends Sequence {
       if (e instanceof NotFoundError) {
         let cachedCurrent: any;
         try {
+          log.debug(
+            `Trying to resolve current sequence ${name} value from context`
+          );
           cachedCurrent = ctx.get(name);
-          log.info(
+          log.debug(
             `Retrieved cached current value for sequence ${name}: ${cachedCurrent}`
           );
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e: unknown) {
+          log.info(`No cached value for sequence ${name} in context`);
           cachedCurrent = startWith;
         }
-
-        log.debug(
-          `Sequence.current missing ${name}, returning startWith=${cachedCurrent}`
-        );
-        if (typeof cachedCurrent === "undefined")
-          throw new InternalError(
-            "Starting value is not defined for a non existing sequence"
-          );
         try {
           return this.parse(cachedCurrent);
         } catch (e: any) {
@@ -231,82 +228,5 @@ export class FabricContractSequence extends Sequence {
       );
       return seq.current as string | number | bigint;
     }, name);
-  }
-
-  /**
-   * @description Gets the next value in the sequence
-   * @summary Retrieves the current value of the sequence and increments it by the
-   * configured increment amount. This is the main method used to get a new sequential value.
-   * @return A promise that resolves to the next value in the sequence
-   */
-  override async next(
-    ...argz: MaybeContextualArg<any>
-  ): Promise<number | string | bigint> {
-    const contextArgs = await Context.args(
-      OperationKeys.UPDATE,
-      SequenceModel,
-      argz,
-      this.adapter
-    );
-    const { context } = contextArgs;
-    return this.increment(undefined, context);
-  }
-
-  /**
-   * @description Generates a range of sequential values
-   * @summary Retrieves a specified number of sequential values from the sequence.
-   * This is useful when you need to allocate multiple IDs at once.
-   * The method increments the sequence by the total amount needed and returns all values in the range.
-   * @param {number} count - The number of sequential values to generate
-   * @return A promise that resolves to an array of sequential values
-   */
-  override async range(
-    count: number,
-    ...argz: MaybeContextualArg<any>
-  ): Promise<(number | string | bigint)[]> {
-    const contextArgs = await Context.args(
-      OperationKeys.UPDATE,
-      SequenceModel,
-      argz,
-      this.adapter
-    );
-    const { context, args } = contextArgs;
-
-    const log = context.logger.for(this.range);
-
-    if (this.options.type === "uuid" || this.options.type === "serial")
-      throw new UnsupportedError( // TODO just generate valid uuids/serials
-        `type ${this.options.type} is currently not suppported for this adapter`
-      );
-
-    const typeName =
-      typeof this.options.type === "function" &&
-      (this.options.type as any)?.name
-        ? (this.options.type as any).name
-        : this.options.type;
-
-    log.info(`Obtaining sequence range for ${typeName}`);
-
-    const current = (await this.current(...args)) as number;
-
-    log.info(`current value is ${current}`);
-    const incrementBy = this.parse(
-      this.options.incrementBy as number
-    ) as number;
-    const next: string | number | bigint = await this.increment(
-      (this.parse(count) as number) * incrementBy,
-      context
-    );
-    const range: (number | string | bigint)[] = [];
-    for (let i: number = 1; i <= count; i++) {
-      range.push(current + incrementBy * (this.parse(i) as number));
-    }
-
-    log.info(`Calculated range: ${range.join(", ")}`);
-
-    if (range[range.length - 1] !== next && typeName !== "String")
-      throw new InternalError("Miscalculation of range");
-
-    return range;
   }
 }

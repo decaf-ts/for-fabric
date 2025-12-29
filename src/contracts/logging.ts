@@ -94,6 +94,9 @@ export class ContractLogger extends MiniLogger {
       case LogLevel.error:
         method = this.logger.error;
         break;
+      case LogLevel.warn:
+        method = this.logger.warn;
+        break;
       case LogLevel.silly:
         method = this.logger.silly;
         break;
