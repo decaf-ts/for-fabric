@@ -4,11 +4,19 @@
  * @namespace shared
  * @memberOf module:for-fabric
  */
-export * from "./overrides";
-export * from "./events";
-export * from "./utils";
-export * from "./types";
-export * from "../client/services";
+export * from "./erc20";
+export * from "./interfaces";
 export * from "./model";
-export * from "./decorators";
+export * from "./overrides";
+export * from "./ClientSerializer";
 export * from "./constants";
+export * from "./crypto";
+export * from "./decorators";
+export * from "./DeterministicSerializer";
+export * from "./errors";
+export * from "./events";
+export * from "./fabric-types";
+export * from "./math";
+export * from "./SimpleDeterministicSerializer";
+export * from "./types";
+export * from "./utils";
