@@ -66,6 +66,7 @@ describe("Tests Public contract", () => {
         new TestPublicModel({
           name: "john" + i,
           nif: "123456789",
+          child: { name: "any" + i },
         })
     );
 
@@ -110,6 +111,21 @@ describe("Tests Public contract", () => {
   });
 
   it("should delete in bulk", async () => {
+    const models = Object.keys(new Array(10).fill(0)).map(
+      (i) =>
+        new TestPublicModel({
+          name: "john" + i,
+          nif: "123456789",
+          child: { name: "any" + i },
+        })
+    );
+
+    bulk = JSON.parse(
+      await contract.createAll(
+        ctx as any,
+        JSON.stringify(models.map((m) => m.serialize()))
+      )
+    ).map((m) => Model.deserialize(m));
     const keys = bulk.map((b) => b.id);
 
     const read = JSON.parse(

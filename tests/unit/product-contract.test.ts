@@ -66,6 +66,7 @@ describe("Product Contract test", () => {
         new TestPublicModel({
           name: "john" + i,
           nif: "123456789",
+          child: { name: "any" + i },
         })
     );
 
