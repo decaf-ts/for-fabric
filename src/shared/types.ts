@@ -46,6 +46,7 @@ export type PeerConfig = {
   caKey?: string;
   chaincodeName: string;
   contractName?: string;
+  sizeLimit?: number;
   ca?: string;
   mspId: string;
   channel: string;
