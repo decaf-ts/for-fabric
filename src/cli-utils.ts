@@ -279,3 +279,35 @@ export function invokePrivateChaincode(
   // --peerAddresses org-c-peer-0:7033 \
   // --tlsRootCertFiles /weaver/peer/org-c-tls-ca-cert.pem \
 }
+
+export enum ScriptCommands {
+  START = "fabric-chaincode-node start \
+          --grpc.max_receive_message_length ${CHAINCODE_MAXRECVMSGSIZE-15728640} \
+          --grpc.max_send_message_length ${CHAINCODE_MAXSENDMSGSIZE-15728640} ",
+  START_CCAAS = "fabric-chaincode-node server \
+          --chaincode-address=$CHAINCODE_SERVER_ADDRESS \
+          --chaincode-id=$CHAINCODE_ID \
+          --chaincode-tls-cert-file=${CHAINCODE_TLS_CERT} \
+          --chaincode-tls-key-file=${CHAINCODE_TLS_KEY} \
+          --grpc.max_receive_message_length ${CHAINCODE_MAXRECVMSGSIZE-15728640} \
+          --grpc.max_send_message_length ${CHAINCODE_MAXSENDMSGSIZE-15728640} \
+          --tls.enabled=true",
+  START_CCAAS_DEBUG = "node --inspect=0.0.0.0:9229 ./node_modules/.bin/fabric-chaincode-node server \
+          --chaincode-address=$CHAINCODE_SERVER_ADDRESS \
+          --chaincode-id=$CHAINCODE_ID \
+          --chaincode-tls-cert-file=${CHAINCODE_TLS_CERT} \
+          --chaincode-tls-key-file=${CHAINCODE_TLS_KEY} \
+          --grpc.max_receive_message_length ${CHAINCODE_MAXRECVMSGSIZE-15728640} \
+          --grpc.max_send_message_length ${CHAINCODE_MAXSENDMSGSIZE-15728640} \
+          --tls.enabled=true",
+  START_DEBUG = "node --inspect=0.0.0.0:9229 /usr/local/src/node_modules/.bin/fabric-chaincode-node start \
+          --grpc.max_receive_message_length ${CHAINCODE_MAXRECVMSGSIZE-15728640} \
+          --grpc.max_send_message_length ${CHAINCODE_MAXSENDMSGSIZE-15728640}"
+}
+
+export function getContractStartCommand(debug: boolean, ccaas: boolean): string {
+  if (ccaas) {
+    return debug ? ScriptCommands.START_CCAAS_DEBUG : ScriptCommands.START_CCAAS;
+  }
+  return debug ? ScriptCommands.START_DEBUG : ScriptCommands.START;
+}
