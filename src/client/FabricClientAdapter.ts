@@ -981,7 +981,7 @@ export class FabricClientAdapter extends Adapter<
           pathOrCert = Buffer.from(fs.readFileSync(pathOrCert, "utf8"));
         } catch (e: unknown) {
           throw new InternalError(
-            `Failed to read the tls certificate from ${pathOrCert}`
+            `Failed to read the tls certificate from ${pathOrCert}: ${e}`
           );
         }
       }
@@ -989,7 +989,10 @@ export class FabricClientAdapter extends Adapter<
 
     const tlsCredentials = grpc.credentials.createSsl(pathOrCert);
     log.debug(`generating Gateway Client for url ${config.peerEndpoint}`);
-    return new Client(config.peerEndpoint, tlsCredentials);
+    return new Client(config.peerEndpoint, tlsCredentials, {
+      "grpc.max_receive_message_length": (config.sizeLimit || 15) * 1024 * 1024,
+      "grpc.max_send_message_length": (config.sizeLimit || 15) * 1024 * 1024,
+    });
   }
 
   /**
