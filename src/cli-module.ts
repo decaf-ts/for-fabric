@@ -35,7 +35,7 @@ const compileCommand = new Command()
     "--description <String>",
     "contract description",
     "Global contract implementation"
-  )
+  ).option("--strip-contract-name", "strip contract name from output", false)
   .option("--input <String>", "input folder for contracts", "lib/contracts")
   .option("--output <String>", "output folder for contracts", "./contracts")
   .action(async (options: any) => {
@@ -46,13 +46,13 @@ const compileCommand = new Command()
     const version = pkg.version;
 
     // eslint-disable-next-line prefer-const
-    let { dev, debug, name, description, output, input } = options;
+    let { dev, debug, name, description, output, input, stripContractName } = options;
     const log = logger.for("compile-contract");
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );
 
-    output = path.join(output, name);
+    output = stripContractName ? output : path.join(output, name);
     log.info(`Deleting existing output folder (if exists) under ${output}`);
     execSync(`rm -rf ${output}`);
     log.info(`bundling contract from ${input}`);
