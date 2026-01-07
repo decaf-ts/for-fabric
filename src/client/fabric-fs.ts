@@ -1,8 +1,8 @@
-import { normalizeImport } from "@decaf-ts/utils";
 import { isBrowser, MiniLogger } from "@decaf-ts/logging";
 import { User } from "fabric-common";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
 import { InternalError } from "@decaf-ts/db-decorators";
+import { normalizeImport } from "@decaf-ts/core";
 
 const log = new MiniLogger("fabric-fs");
 
