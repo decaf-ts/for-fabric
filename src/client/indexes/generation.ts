@@ -2,8 +2,6 @@ import { IndexMetadata, OrderDirection } from "@decaf-ts/core";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
-import { normalizeImport } from "../../shared/index";
-import path from "path";
 
 export type Index = {
   index: {

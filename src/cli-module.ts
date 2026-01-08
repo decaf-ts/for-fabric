@@ -20,22 +20,26 @@ import {
   installContract,
   packageContract,
   commitChaincode,
+  getContractStartCommand,
 } from "./cli-utils";
 import "./shared/overrides";
 
 const logger = Logging.for("fabric");
 
+
+
 const compileCommand = new Command()
   .name("compile-contract")
   .description("Creates a global contract")
   .option("--dev", "compiles contracts without minification", false)
-  .option("--debug", "makes attaching debugger possible", true)
+  .option("--debug", "makes attaching debugger possible", false)
+  .option("--ccaas", "makes attaching debugger possible", false)
   .option("--name <String>", "contract name", "global-contract")
   .option(
     "--description <String>",
     "contract description",
     "Global contract implementation"
-  )
+  ).option("--strip-contract-name", "strip contract name from output", false)
   .option("--input <String>", "input folder for contracts", "lib/contracts")
   .option("--output <String>", "output folder for contracts", "./contracts")
   .action(async (options: any) => {
@@ -46,13 +50,13 @@ const compileCommand = new Command()
     const version = pkg.version;
 
     // eslint-disable-next-line prefer-const
-    let { dev, debug, name, description, output, input } = options;
+    let { dev, debug, name, description, output, input, stripContractName, ccaas } = options;
     const log = logger.for("compile-contract");
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );
 
-    output = path.join(output, name);
+    output = stripContractName ? output : path.join(output, name);
     log.info(`Deleting existing output folder (if exists) under ${output}`);
     execSync(`rm -rf ${output}`);
     log.info(`bundling contract from ${input}`);
@@ -84,25 +88,14 @@ const compileCommand = new Command()
     });
 
     const scripts = {
-      start: debug
-        ? "node --inspect=0.0.0.0:9229 /usr/local/src/node_modules/.bin/fabric-chaincode-node start"
-        : "fabric-chaincode-node start",
+      start: getContractStartCommand(debug, ccaas),
       "start:dev":
-        'fabric-chaincode-node start --peer.address "127.0.0.1:8541" --chaincode-id-name "chaincode1:0.0.1" --tls.enabled false',
+        'fabric-chaincode-node start --tls.enabled false',
       "start:watch": 'nodemon --exec "npm run start:dev"',
       build: 'echo "No need to build the chaincode"',
       lint: "eslint . --fix --ext .js",
     };
-    // const scripts = {
-    //   start: debug
-    //     ? "node --inspect=0.0.0.0:9229 /usr/local/src/node_modules/.bin/fabric-chaincode-node start --chaincode-address=$CHAINCODE_SERVER_ADDRESS --chaincode-id=$CHAINCODE_ID"
-    //     : "fabric-chaincode-node start --chaincode-address=$CHAINCODE_SERVER_ADDRESS --chaincode-id=$CHAINCODE_ID",
-    //   "start:dev":
-    //     "fabric-chaincode-node start --chaincode-address=$CHAINCODE_SERVER_ADDRESS --chaincode-id=$CHAINCODE_ID --tls.enabled false",
-    //   "start:watch": 'nodemon --exec "npm run start:dev"',
-    //   build: 'echo "No need to build the chaincode"',
-    //   lint: "eslint . --fix --ext .js",
-    // };
+
 
     const contractPackage = pkg;
 
