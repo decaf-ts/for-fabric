@@ -122,6 +122,7 @@ describe("Tests Public contract", () => {
           new TestPublicModel({
             name: "john" + i,
             nif: "123456789",
+            child: { name: "any" + i },
           })
       );
 
@@ -246,6 +247,7 @@ describe("Tests Public contract", () => {
           new TestNestedModel({
             name: "john" + i,
             nif: "123456789",
+            children: [{ name: "any" + i }],
           })
       );
 
