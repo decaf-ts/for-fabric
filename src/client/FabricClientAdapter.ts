@@ -3,13 +3,11 @@ import { CouchDBKeys, type MangoQuery } from "@decaf-ts/for-couchdb";
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
 import {
-  async,
-  model,
   Model,
   type ModelConstructor,
   type Serializer,
 } from "@decaf-ts/decorator-validation";
-import { debug, final, info, Logging, raw, verbose } from "@decaf-ts/logging";
+import { debug, final, Logging } from "@decaf-ts/logging";
 import { type PeerConfig, type SegregatedModel } from "../shared/types";
 import {
   connect,
@@ -31,9 +29,6 @@ import {
   ConflictError,
   BadRequestError,
   type PrimaryKeyType,
-  operation,
-  id,
-  transient,
 } from "@decaf-ts/db-decorators";
 import {
   Context,
@@ -55,18 +50,12 @@ import {
   MaybeContextualArg,
   ContextualArgs,
   type PreparedModel,
-  query,
-  repository,
-  create,
-  read,
-  update,
-  Dispatch,
 } from "@decaf-ts/core";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import { FabricClientDispatch } from "./FabricClientDispatch";
 import { HSMSignerFactoryCustom } from "./fabric-hsm";
-import { type Constructor, method } from "@decaf-ts/decoration";
+import { type Constructor } from "@decaf-ts/decoration";
 import { FabricClientStatement } from "./FabricClientStatement";
 import { FabricClientPaginator } from "./FabricClientPaginator";
 import { FabricClientRepository } from "./FabricClientRepository";
@@ -79,7 +68,6 @@ import {
 import { FabricClientFlags } from "./types";
 import { DefaultFabricClientFlags } from "./constants";
 import fs from "fs";
-import { Contract } from "fabric-contract-api";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks

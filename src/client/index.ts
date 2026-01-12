@@ -12,6 +12,7 @@ export * from "./erc20";
 export * from "./indexes";
 export * from "./services";
 export * from "./constants";
+export * from "./crypto";
 export * from "./services";
 export * from "./FabricClientDispatch";
 export * from "./fabric-fs";
