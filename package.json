@@ -29,22 +29,6 @@
     "for-fabric": "lib/bin/cli.cjs"
   },
   "types": "lib/index.d.ts",
-  "typesVersions": {
-    "*": {
-      "client": [
-        "./lib/esm/client/index.d.ts"
-      ],
-      "contracts": [
-        "./lib/esm/contracts/index.d.ts"
-      ],
-      "shared": [
-        "./lib/esm/shared/index.d.ts"
-      ],
-      "*": [
-        "./lib/index.d.ts"
-      ]
-    }
-  },
   "scripts": {
     "do-install": "NPM_TOKEN=$(cat .npmtoken) npm install",
     "update-dependencies": "PREFIX=\"decaf-ts\"; npm ls | grep \"$PREFIX\" | awk -F/ '{print $NF}' | sed 's/@.*//' | xargs -I package npm update @\"$PREFIX\"/package",
@@ -81,6 +65,7 @@
     "deploy:contract": "node ./lib/bin/cli.cjs deploy-contract --name ${CONTRACT_NAME:-GlobalContract} --input ${CONTRACT_NAME:-GlobalContract}",
     "publish-docs": "docker run -it --rm --user $(id -u):$(id -g) -v \"$(pwd)/workdocs/confluence:/content\" -e ATLASSIAN_API_TOKEN=$(cat .confluence-token) ghcr.io/markdown-confluence/publish:latest",
     "copy-storage": "sudo cp -R docker/infrastructure/storage docker/docker-data/ && sudo chmod -R 755 docker/docker-data",
+    "copy:crypto": "node ./lib/bin/cli.cjs get-crypto-material --folder ./docker/docker-data",
     "repo:init": "codex exec \"$(cat ./.codex/prompts/repo-setup.md)\nbase_path is `./`, initialize the repository\" -s workspace-write",
     "repo:setup": "codex exec \"$(cat ./.codex/prompts/repo-setup.md)\nbase_path is ./\" -s workspace-write",
     "repo:doc": "codex exec \"$(cat ./.codex/prompts/doc.md) $(cat ./.codex/prompts/bulk-docs.md)\nbase_path is ./\" -s workspace-write",

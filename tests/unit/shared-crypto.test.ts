@@ -1,4 +1,4 @@
-import { CryptoUtils } from "../../src/shared/crypto";
+import { CryptoUtils } from "../../src/client/crypto";
 
 const PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----
 MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg547BdDqx4+XgU/6c

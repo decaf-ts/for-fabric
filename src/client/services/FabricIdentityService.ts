@@ -30,7 +30,7 @@ import { RegistrationError } from "../../shared/errors";
 import { CA_ROLE } from "./constants";
 import { IKeyValueAttribute } from "./FabricEnrollmentService";
 import { Identity } from "../../shared/index";
-import { CryptoUtils } from "../../shared/crypto";
+import { CryptoUtils } from "../crypto";
 
 export class FabricIdentityService extends ClientBasedService<
   FabricCAServices,

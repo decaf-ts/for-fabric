@@ -48,15 +48,21 @@ const compileCommand = new Command()
 
     const version = pkg.version;
 
-    // eslint-disable-next-line prefer-const
     let {
+      // eslint-disable-next-line prefer-const
       dev,
+      // eslint-disable-next-line prefer-const
       debug,
+      // eslint-disable-next-line prefer-const
       name,
+      // eslint-disable-next-line prefer-const
       description,
       output,
+      // eslint-disable-next-line prefer-const
       input,
+      // eslint-disable-next-line prefer-const
       stripContractName,
+      // eslint-disable-next-line prefer-const
       ccaas,
     } = options;
     const log = logger.for("compile-contract");
@@ -272,7 +278,7 @@ const deployContract = new Command()
   .option("--name <String>", "Contract Name (and folder)")
   .option("--input <String>", "input folder")
   .option(
-    "--incrementVersion",
+    "--incrementVersion <Boolean>",
     "if should use version or sequence to update contracts",
     false
   )

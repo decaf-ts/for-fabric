@@ -18,7 +18,7 @@ import {
 } from "@decaf-ts/db-decorators";
 import { CoreUtils } from "../utils";
 import { CA_ROLE } from "./constants";
-import { CryptoUtils } from "../../shared/crypto";
+import { CryptoUtils } from "../crypto";
 import {
   CertificateResponse,
   FabricIdentity,

@@ -15,7 +15,7 @@ import {
 } from "../utils";
 import { TestERC20Contract } from "../assets/contract/erc-20-contract/TestERC20Contract";
 import { ERC20Token } from "../../src/contracts/erc20/models";
-import { CryptoUtils } from "../../src/shared/crypto";
+import { CryptoUtils } from "../../src/client/crypto";
 import { Observer } from "@decaf-ts/core";
 import { ERC20Events } from "../../src/shared/erc20/erc20-constants";
 

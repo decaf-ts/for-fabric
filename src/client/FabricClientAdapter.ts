@@ -3,11 +3,13 @@ import { CouchDBKeys, type MangoQuery } from "@decaf-ts/for-couchdb";
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
 import {
+  async,
+  model,
   Model,
   type ModelConstructor,
   type Serializer,
 } from "@decaf-ts/decorator-validation";
-import { debug, final, Logging } from "@decaf-ts/logging";
+import { debug, final, info, Logging, raw, verbose } from "@decaf-ts/logging";
 import { type PeerConfig, type SegregatedModel } from "../shared/types";
 import {
   connect,
@@ -29,6 +31,9 @@ import {
   ConflictError,
   BadRequestError,
   type PrimaryKeyType,
+  operation,
+  id,
+  transient,
 } from "@decaf-ts/db-decorators";
 import {
   Context,
@@ -50,12 +55,18 @@ import {
   MaybeContextualArg,
   ContextualArgs,
   type PreparedModel,
+  query,
+  repository,
+  create,
+  read,
+  update,
+  Dispatch,
 } from "@decaf-ts/core";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import { FabricClientDispatch } from "./FabricClientDispatch";
 import { HSMSignerFactoryCustom } from "./fabric-hsm";
-import { type Constructor } from "@decaf-ts/decoration";
+import { type Constructor, method } from "@decaf-ts/decoration";
 import { FabricClientStatement } from "./FabricClientStatement";
 import { FabricClientPaginator } from "./FabricClientPaginator";
 import { FabricClientRepository } from "./FabricClientRepository";
@@ -68,6 +79,8 @@ import {
 import { FabricClientFlags } from "./types";
 import { DefaultFabricClientFlags } from "./constants";
 import fs from "fs";
+import { Contract } from "fabric-contract-api";
+
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
  * @summary The FabricAdapter extends CouchDBAdapter to provide a seamless interface for interacting with Hyperledger Fabric networks.
@@ -161,28 +174,18 @@ export class FabricClientAdapter extends Adapter<
     return new FabricClientPaginator(this, query, size, clazz);
   }
 
-  override async context<M extends Model>(
-    operation:
-      | OperationKeys.CREATE
-      | OperationKeys.READ
-      | OperationKeys.UPDATE
-      | OperationKeys.DELETE
-      | string,
-    overrides: Partial<FabricClientFlags>,
-    model: Constructor<M> | Constructor<M>[],
+  protected override flags<M extends Model>(
+    operation: OperationKeys | string,
+    model: Constructor<M> | Constructor<M>[] | undefined,
+    flags: Partial<FabricClientFlags>,
     ...args: any[]
-  ): Promise<Context<FabricClientFlags>> {
-    const log = this.log.for(this.context);
-    log.debug(
-      `Creating new context for ${operation} operation on ${Array.isArray(model) ? model.map((m) => m.name) : model.name} model with flag overrides: ${JSON.stringify(overrides)}`
-    );
-    const flags = await this.flags(
+  ): Promise<FabricClientFlags> {
+    return super.flags(
       operation,
       model,
-      Object.assign({}, DefaultFabricClientFlags, overrides),
+      Object.assign({}, DefaultFabricClientFlags, flags || {}),
       ...args
     );
-    return new Context().accumulate(flags);
   }
 
   /**

@@ -10,7 +10,7 @@ export * from "./model";
 export * from "./overrides";
 export * from "./ClientSerializer";
 export * from "./constants";
-export * from "./crypto";
+export * from "../client/crypto";
 export * from "./decorators";
 export * from "./DeterministicSerializer";
 export * from "./errors";
