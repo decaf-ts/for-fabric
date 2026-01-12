@@ -19,4 +19,3 @@ export * from "./fabric-types";
 export * from "./math";
 export * from "./SimpleDeterministicSerializer";
 export * from "./types";
-export * from "./utils";

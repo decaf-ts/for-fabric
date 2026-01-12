@@ -5,7 +5,6 @@ import {
   ContextualArgs,
   MaybeContextualArg,
   QueryError,
-  Context,
   PersistenceKeys,
   PreparedStatementKeys,
   OrderDirection,
@@ -122,14 +121,9 @@ export class FabricContractRepository<M extends Model> extends Repository<
     let { offset, bookmark, limit } = ref;
     if (!offset && !bookmark)
       throw new QueryError(`PaginateBy needs a page or a bookmark`);
-    const contextArgs = await Context.args(
-      PreparedStatementKeys.PAGE_BY,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.paginateBy);
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.PAGE_BY, true)
+    ).for(this.paginateBy);
     log.verbose(
       `paginating ${Model.tableName(this.class)} with page size ${limit}`
     );
@@ -156,7 +150,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
     } else {
       throw new QueryError(`PaginateBy needs a page or a bookmark`);
     }
-    const paged = await paginator.page(offset, ...ctxArgs);
+    const paged = await paginator.page(offset, bookmark, ...ctxArgs);
     return paginator.serialize(paged) as SerializedPage<M>;
   }
 
@@ -164,19 +158,14 @@ export class FabricContractRepository<M extends Model> extends Repository<
     name: string,
     ...args: MaybeContextualArg<FabricContractContext>
   ) {
+    const { log, ctx, ctxArgs } = (
+      await this.logCtx(args, PersistenceKeys.STATEMENT, true)
+    ).for(this.statement);
     if (!Repository.statements(this, name as keyof typeof this))
       throw new QueryError(`Invalid prepared statement requested ${name}`);
-    const contextArgs = await Context.args(
-      PersistenceKeys.STATEMENT,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    if (contextArgs.context.logger) {
-      contextArgs.context.logger.info(`Repo statement: ${name} + ${args}`);
+    if (ctx.logger) {
+      ctx.logger.info(`Repo statement: ${name} + ${args}`);
     }
-    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.statement);
     log.verbose(`Executing prepared statement ${name} with args ${ctxArgs}`);
 
     let result: any;

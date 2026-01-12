@@ -3,7 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { generateKeyPairSync } from "crypto";
 
-import { CoreUtils } from "../../src/shared/utils";
+import { CoreUtils } from "../../src/client/utils";
 
 jest.mock("@hyperledger/fabric-gateway", () => {
   const signerMock = jest.fn();
@@ -49,9 +49,7 @@ jest.mock("fabric-common", () => {
   };
 });
 
-const {
-  __mocks: fabricCommonMocks,
-} = jest.requireMock("fabric-common") as {
+const { __mocks: fabricCommonMocks } = jest.requireMock("fabric-common") as {
   __mocks: {
     setCryptoSuiteMock: jest.Mock;
     setEnrollmentMock: jest.Mock;
@@ -70,7 +68,7 @@ const {
 } = fabricCommonMocks;
 
 describe("shared/utils CoreUtils", () => {
-const certificatePem = `-----BEGIN CERTIFICATE-----
+  const certificatePem = `-----BEGIN CERTIFICATE-----
 MIICFTCCAbugAwIBAgIUfJX7hC/K370mvzJeA5WunOxsQzswCgYIKoZIzj0EAwIw
 YDELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAk5ZMQwwCgYDVQQHDANOWUMxEjAQBgNV
 BAoMCUZvckZhYnJpYzEOMAwGA1UECwwFVGVzdHMxEjAQBgNVBAMMCXVuaXQudGVz
@@ -174,19 +172,13 @@ aNUApmLEXF+k
     const hsmKey = { isPrivate: () => true };
     (getKeyMock as jest.Mock).mockResolvedValueOnce(hsmKey);
 
-    await CoreUtils.getCAUser(
-      "hsmUser",
-      undefined,
-      certificatePem,
-      "Org1MSP",
-      {
-        hsm: {
-          library: "/usr/lib/softhsm/libsofthsm2.so",
-          tokenLabel: "TestToken",
-          pin: "123456",
-        },
-      }
-    );
+    await CoreUtils.getCAUser("hsmUser", undefined, certificatePem, "Org1MSP", {
+      hsm: {
+        library: "/usr/lib/softhsm/libsofthsm2.so",
+        tokenLabel: "TestToken",
+        pin: "123456",
+      },
+    });
 
     expect(newCryptoSuiteMock).toHaveBeenCalledWith({
       software: false,

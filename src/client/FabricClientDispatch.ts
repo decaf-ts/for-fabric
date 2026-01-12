@@ -139,7 +139,12 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
     id: EventIds,
     ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<void> {
-    const { log, ctxArgs } = this.logCtx(args, this.updateObservers);
+    const { log, ctxArgs } = Adapter.logCtx<Context<FabricClientFlags>>(
+      this.updateObservers,
+      event,
+      false,
+      ...args
+    );
     if (!this.adapter) {
       log.verbose(
         `No adapter observed for dispatch; skipping observer update for ${typeof model === "string" ? model : Model.tableName(model)}:${event}`
@@ -238,7 +243,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
   protected override async initialize(): Promise<void> {
     if (!this.adapter)
       throw new InternalError(`No adapter or config observed for dispatch`);
-    const context = this.adapter.context(
+    const context = await this.adapter.context(
       "dispatch",
       {
         correlationId: this.adapter.config.chaincodeName,

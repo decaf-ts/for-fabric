@@ -10,7 +10,7 @@ import { ProductMarketPattern, TableNames } from "./constants";
 import { column, index, OrderDirection, pk, table } from "@decaf-ts/core";
 import { composed } from "@decaf-ts/db-decorators";
 import { description, uses } from "@decaf-ts/decoration";
-import { FabricFlavour } from "../../../../src/shared/index";
+import { FabricFlavour } from "../../../../src/shared/constants";
 import { FabricIdentifiedModel } from "./FabricIdentifiedModel";
 
 @description("Links a product to a specific market.")

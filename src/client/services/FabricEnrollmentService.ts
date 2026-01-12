@@ -16,7 +16,7 @@ import {
   InternalError,
   NotFoundError,
 } from "@decaf-ts/db-decorators";
-import { CoreUtils } from "../../shared/utils";
+import { CoreUtils } from "../utils";
 import { CA_ROLE } from "./constants";
 import { CryptoUtils } from "../../shared/crypto";
 import {

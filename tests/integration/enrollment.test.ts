@@ -13,6 +13,7 @@ import {
   compileContract,
   deployContract,
   ensureInfrastructureBooted,
+  nextChaincodeSequence,
   randomName,
 } from "../utils";
 import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
@@ -22,6 +23,8 @@ jest.setTimeout(5000000);
 describe("Test enrollement", () => {
   const contractFolderName = "serialized-contract-public-model";
   const contractName = TestPublicModelContract.name;
+  const chaincodeName = `${contractName}-${Date.now()}`;
+  const adapterAlias = "hlf-fabric-test-enrollment";
 
   const user: Credentials = {
     userName: "TestUser" + Date.now(),
@@ -55,26 +58,17 @@ describe("Test enrollement", () => {
     await ensureInfrastructureBooted();
 
     // Check if contract folder exists and compile it if not
-    if (
-      fs.existsSync(
-        path.join(
-          __dirname,
-          "../../docker/infrastructure/chaincode",
-          contractFolderName
-        )
-      )
-    ) {
-      console.log("Contract folder already exists");
-    } else {
-      // Compile contract
-      compileContract(contractFolderName);
+    // Compile contract
+    compileContract(contractFolderName);
 
-      //Deploy contract
-      deployContract(contractFolderName, contractName);
+    const sequence = nextChaincodeSequence(chaincodeName);
+    const version = `${Date.now()}`;
 
-      // Commit Chaincode
-      commitChaincode(contractName);
-    }
+    //Deploy contract
+    deployContract(contractFolderName, chaincodeName, sequence, version);
+
+    // Commit Chaincode
+    commitChaincode(chaincodeName, sequence, version);
 
     // Copy client config to local directory for testing purposes
     execSync(`docker cp org-a:/weaver/client/. docker/docker-data`, {
@@ -88,14 +82,17 @@ describe("Test enrollement", () => {
       tlsCert: fs.readFileSync("./docker/docker-data/tls-ca-cert.pem"),
       peerEndpoint: "localhost:7031",
       peerHostAlias: "localhost",
-      chaincodeName: contractName,
+      chaincodeName: chaincodeName,
       ca: "org-a",
       mspId: "Peer0OrgaMSP",
       channel: "simple-channel",
     };
 
-    clientAdapter = new FabricClientAdapter(peerConfig);
-    TestModelRepository = FabricClientRepository.forModel(TestPublicModel);
+    clientAdapter = new FabricClientAdapter(peerConfig, adapterAlias);
+    TestModelRepository = FabricClientRepository.forModel(
+      TestPublicModel,
+      adapterAlias
+    );
   });
 
   it("register and enroll new user ", async () => {

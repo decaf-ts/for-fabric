@@ -2,7 +2,6 @@ import {
   OrderDirection,
   PersistenceKeys,
   Repository,
-  Context,
   ContextOf,
   PreparedStatementKeys,
   SerializedPage,
@@ -13,7 +12,6 @@ import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
 import { type FabricClientAdapter } from "./FabricClientAdapter";
-import { FabricClientFlags } from "./types";
 import {
   OperationKeys,
   PrimaryKeyType,
@@ -76,14 +74,9 @@ export class FabricClientRepository<
     },
     ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<SerializedPage<M>> {
-    const contextArgs = await Context.args(
-      PreparedStatementKeys.PAGE_BY,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.paginateBy);
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.PAGE_BY, true)
+    ).for(this.paginateBy);
     log.verbose(
       `paginating ${Model.tableName(this.class)} with page size ${ref.limit}`
     );
@@ -101,14 +94,9 @@ export class FabricClientRepository<
     order: OrderDirection,
     ...args: MaybeContextualArg<ContextOf<A>>
   ) {
-    const contextArgs = await Context.args(
-      "list",
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.listBy);
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.LIST_BY, true)
+    ).for(this.listBy);
     log.verbose(
       `listing ${Model.tableName(this.class)} by ${key as string} ${order}`
     );
@@ -125,14 +113,9 @@ export class FabricClientRepository<
     value: any,
     ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<M[]> {
-    const contextArgs = await Context.args(
-      PreparedStatementKeys.FIND_BY,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.findBy);
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.FIND_BY, true)
+    ).for(this.findBy);
     log.verbose(
       `finding all ${Model.tableName(this.class)} with ${key as string} ${value}`
     );
@@ -149,14 +132,9 @@ export class FabricClientRepository<
     value: any,
     ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<M> {
-    const contextArgs = await Context.args(
-      PreparedStatementKeys.FIND_ONE_BY,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    const { log, ctxArgs } = this.logCtx(contextArgs.args, this.findOneBy);
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.FIND_ONE_BY, true)
+    ).for(this.findOneBy);
     log.verbose(
       `finding One ${Model.tableName(this.class)} with ${key as string} ${value}`
     );
@@ -172,21 +150,17 @@ export class FabricClientRepository<
     name: string,
     ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<any> {
-    const contextArgs = await Context.args(
-      PersistenceKeys.STATEMENT,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    const { log, ctx } = this.logCtx(contextArgs.args, this.statement);
+    const { log, ctx, ctxArgs } = (
+      await this.logCtx(args, PersistenceKeys.STATEMENT, true)
+    ).for(this.statement);
     log.verbose(`Executing prepared statement ${name}`);
+    const callArgs = ctxArgs.slice(0, -1);
     const result = JSON.parse(
       this.adapter.decode(
         await this.adapter.evaluateTransaction(
           ctx,
           PersistenceKeys.STATEMENT,
-          [name, JSON.stringify(contextArgs.args)],
+          [name, JSON.stringify(callArgs)],
           undefined,
           undefined,
           this.class.name
@@ -256,16 +230,12 @@ export class FabricClientRepository<
     models: M[],
     ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<[M[], ...any[], ContextOf<A>]> {
-    const contextArgs = await Context.args<M, Context<FabricClientFlags>>(
-      OperationKeys.CREATE,
-      this.class,
-      args,
-      this.adapter,
-      this._overrides || {}
-    );
-    const ignoreHandlers = contextArgs.context.get("ignoreHandlers");
-    const ignoreValidate = contextArgs.context.get("ignoreValidation");
-    if (!models.length) return [models, ...contextArgs.args] as any;
+    const { ctx, ctxArgs } = (
+      await this.logCtx(args, OperationKeys.CREATE, true)
+    ).for(this.createAllPrefix);
+    const ignoreHandlers = ctx.get("ignoreHandlers");
+    const ignoreValidate = ctx.get("ignoreValidation");
+    if (!models.length) return [models, ...ctxArgs] as any;
 
     models = await Promise.all(
       models.map(async (m) => {
@@ -273,7 +243,7 @@ export class FabricClientRepository<
         if (!ignoreHandlers)
           await enforceDBDecorators<M, Repository<M, A>, any>(
             this,
-            contextArgs.context,
+            ctx,
             m,
             OperationKeys.CREATE,
             OperationKeys.ON
@@ -283,8 +253,7 @@ export class FabricClientRepository<
     );
 
     if (!ignoreValidate) {
-      const ignoredProps =
-        contextArgs.context.get("ignoredValidationProperties") || [];
+      const ignoredProps = ctx.get("ignoredValidationProperties") || [];
 
       const errors = await Promise.all(
         models.map((m) => Promise.resolve(m.hasErrors(...ignoredProps)))
@@ -294,7 +263,7 @@ export class FabricClientRepository<
 
       if (errorMessages) throw new ValidationError(errorMessages);
     }
-    return [models, ...contextArgs.args] as any;
+    return [models, ...ctxArgs] as any;
   }
 
   override async createAll(

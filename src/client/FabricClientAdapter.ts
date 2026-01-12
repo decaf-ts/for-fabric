@@ -281,6 +281,7 @@ export class FabricClientAdapter extends Adapter<
   ): Promise<Record<string, any>[]> {
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
+    //HERE!
     const ctxArgs = [...(args as unknown as any[])];
     const transient = ctxArgs.shift() as Record<string, any>;
     const { log, ctx } = this.logCtx(
@@ -400,7 +401,7 @@ export class FabricClientAdapter extends Adapter<
     ids: PrimaryKeyType[],
     ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>[]> {
-    const { log, ctx } = Adapter.logCtx(args, this.deleteAll);
+    const { log, ctx } = this.logCtx(args, this.deleteAll);
     const tableName = Model.tableName(clazz);
     log.info(`deleting ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);

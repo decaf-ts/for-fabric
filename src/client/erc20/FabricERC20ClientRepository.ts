@@ -8,6 +8,7 @@ import {
   ContextOf,
   ContextualArgs,
   EventIds,
+  MaybeContextualArg,
   Sequence,
 } from "@decaf-ts/core";
 import {
@@ -105,15 +106,10 @@ export class FabricERC20ClientRepository<
    *
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
-  async tokenName(): Promise<string> {
-    const contextArgs = await Context.args(
-      "tokenName",
-      this.class,
-      [],
-      this.adapter,
-      this._overrides || {}
+  async tokenName(...args: MaybeContextualArg<ContextOf<A>>): Promise<string> {
+    const { ctx } = (await this.logCtx(args, "tokenName", true)).for(
+      this.tokenName
     );
-    const { ctx } = this.logCtx(contextArgs.args, this.clientAccountID);
     const name = await this.adapter.evaluateTransaction(ctx, "TokenName");
     return this.decode(name);
   }
@@ -128,15 +124,8 @@ export class FabricERC20ClientRepository<
    *
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
-  async symbol(): Promise<string> {
-    const contextArgs = await Context.args(
-      "symbol",
-      this.class,
-      [],
-      this.adapter,
-      this._overrides || {}
-    );
-    const { ctx } = this.logCtx(contextArgs.args, this.symbol);
+  async symbol(...args: MaybeContextualArg<ContextOf<A>>): Promise<string> {
+    const { ctx } = (await this.logCtx(args, "symbol", true)).for(this.symbol);
     const symbol = await this.adapter.evaluateTransaction(ctx, "Symbol");
     return this.decode(symbol);
   }
@@ -151,15 +140,10 @@ export class FabricERC20ClientRepository<
    *
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
-  async decimals(): Promise<number> {
-    const contextArgs = await Context.args(
-      "decimals",
-      this.class,
-      [],
-      this.adapter,
-      this._overrides || {}
+  async decimals(...args: MaybeContextualArg<ContextOf<A>>): Promise<number> {
+    const { ctx } = (await this.logCtx(args, "decimals", true)).for(
+      this.decimals
     );
-    const { ctx } = this.logCtx(contextArgs.args, this.decimals);
     const decimals = await this.adapter.evaluateTransaction(ctx, "Decimals");
     return Number(this.decode(decimals));
   }
@@ -174,15 +158,12 @@ export class FabricERC20ClientRepository<
    *
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
-  async totalSupply(): Promise<number> {
-    const contextArgs = await Context.args(
-      "totalSupply",
-      this.class,
-      [],
-      this.adapter,
-      this._overrides || {}
+  async totalSupply(
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<number> {
+    const { ctx } = (await this.logCtx(args, "totalSupply", true)).for(
+      this.totalSupply
     );
-    const { ctx } = this.logCtx(contextArgs.args, this.totalSupply);
     const total = await this.adapter.evaluateTransaction(ctx, "TotalSupply");
     return Number(this.decode(total));
   }
@@ -201,15 +182,13 @@ export class FabricERC20ClientRepository<
    *
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
-  async balanceOf(owner: string): Promise<number> {
-    const contextArgs = await Context.args(
-      "balance",
-      this.class,
-      [],
-      this.adapter,
-      this._overrides || {}
+  async balanceOf(
+    owner: string,
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<number> {
+    const { ctx } = (await this.logCtx(args, "balance", true)).for(
+      this.balanceOf
     );
-    const { ctx } = this.logCtx(contextArgs.args, this.balanceOf);
     const balance = await this.adapter.evaluateTransaction(ctx, "BalanceOf", [
       owner,
     ]);
@@ -231,15 +210,14 @@ export class FabricERC20ClientRepository<
    *
    * @throws {Error} If the transaction fails or the decoding process fails.
    */
-  async transfer(to: string, value: number): Promise<boolean> {
-    const contextArgs = await Context.args(
-      "transfer",
-      this.class,
-      [],
-      this.adapter,
-      this._overrides || {}
+  async transfer(
+    to: string,
+    value: number,
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<boolean> {
+    const { ctx } = (await this.logCtx(args, "transfer", true)).for(
+      this.transfer
     );
-    const { ctx } = this.logCtx(contextArgs.args, this.transfer);
     const transferred = await this.adapter.submitTransaction(ctx, "Transfer", [
       to,
       value.toString(),

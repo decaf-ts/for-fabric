@@ -23,7 +23,7 @@ import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
 @table("erc20_tokens")
 @model()
 export class ERC20Token extends BaseModel {
-  @pk({ type: "String" })
+  @pk({ type: String })
   /**
    * @description Token unique name
    * @summary Serves as the primary key for the ERC20 token definition; typically a human-readable identifier
@@ -76,7 +76,7 @@ export class ERC20Token extends BaseModel {
 @table("erc20_wallets")
 @model()
 export class ERC20Wallet extends BaseModel {
-  @pk({ type: "String" })
+  @pk({ type: String })
   /**
    * @description Wallet unique identifier
    * @summary Primary key for the wallet; commonly references an account or identity
@@ -127,7 +127,7 @@ export class ERC20Wallet extends BaseModel {
 @table("erc20_allowances")
 @model()
 export class Allowance extends BaseModel {
-  @pk({ type: "String" })
+  @pk({ type: String })
   /**
    * @description Allowance unique identifier
    * @summary Primary key for the allowance; typically a unique identifier for the approval relationship

@@ -26,6 +26,7 @@ describe("FabricContractSequence", () => {
       update: jest.fn(),
       create: jest.fn(),
       pk: "id",
+      override: jest.fn().mockReturnThis(),
     };
     forModelSpy = jest
       .spyOn(Repository, "forModel")
@@ -48,6 +49,37 @@ describe("FabricContractSequence", () => {
         alias: "default",
         context: jest.fn().mockImplementation(() => {
           throw new InternalError("Context is required");
+        }),
+        logCtx: jest.fn(function logCtx(
+          this: any,
+          args: any[],
+          operation: any,
+          allowCreate = false
+        ) {
+          const providedCtx = args[args.length - 1];
+          const hasCtx = providedCtx instanceof FabricContractContext;
+          const build = (ctx: any) => {
+            const response: any = {
+              ctx,
+              log: (ctx && (ctx as any).logger) || logger,
+              ctxArgs: hasCtx ? args : [...args, ctx],
+            };
+            if (typeof operation === "string") {
+              response.for = () => response;
+            }
+            return response;
+          };
+
+          if (!allowCreate) {
+            if (!hasCtx) throw new InternalError("Context is required");
+            return build(providedCtx);
+          }
+
+          if (hasCtx) return Promise.resolve(build(providedCtx));
+          return Promise.resolve(
+            // context will throw in this test harness when missing
+            this.context(operation, {}, undefined, ...args)
+          ).then(build);
         }),
       } as any
     );

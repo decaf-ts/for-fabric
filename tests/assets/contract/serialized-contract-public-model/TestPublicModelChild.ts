@@ -1,7 +1,7 @@
 import { column, pk, table } from "@decaf-ts/core";
 import { model, ModelArg, required } from "@decaf-ts/decorator-validation";
 import { ownedBy } from "../../../../src/shared/decorators";
-import { FabricIdentifiedBaseModel } from "../../../../src/shared/index";
+import { FabricIdentifiedBaseModel } from "../../../../src/shared/model/FabricIdentifiedBaseModel";
 
 @table("tst_user_child")
 @model()

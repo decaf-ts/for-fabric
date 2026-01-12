@@ -11,6 +11,7 @@ import {
   compileContract,
   deployContract,
   ensureInfrastructureBooted,
+  nextChaincodeSequence,
 } from "../utils";
 import { TestERC20Contract } from "../assets/contract/erc-20-contract/TestERC20Contract";
 import { ERC20Token } from "../../src/contracts/erc20/models";
@@ -23,6 +24,8 @@ jest.setTimeout(5000000);
 describe("Test ERC20", () => {
   const contractFolderName = "erc-20-contract";
   const contractName = TestERC20Contract.name;
+  const chaincodeName = `${contractName}-${Date.now()}`;
+  const adapterAlias = "hlf-fabric-test-erc20";
 
   const caConfig: CAConfig = {
     url: "https://localhost:7011",
@@ -55,26 +58,17 @@ describe("Test ERC20", () => {
     await ensureInfrastructureBooted();
 
     // Check if contract folder exists and compile it if not
-    if (
-      fs.existsSync(
-        path.join(
-          __dirname,
-          "../../docker/infrastructure/chaincode",
-          contractFolderName
-        )
-      )
-    ) {
-      console.log("Contract folder already exists");
-    } else {
-      // Compile contract
-      compileContract(contractFolderName);
+    // Compile contract
+    compileContract(contractFolderName);
 
-      //Deploy contract
-      deployContract(contractFolderName, contractName);
+    const sequence = nextChaincodeSequence(chaincodeName);
+    const version = `${Date.now()}`;
 
-      // Commit Chaincode
-      commitChaincode(contractName);
-    }
+    //Deploy contract
+    deployContract(contractFolderName, chaincodeName, sequence, version);
+
+    // Commit Chaincode
+    commitChaincode(chaincodeName, sequence, version);
 
     // Copy client config to local directory for testing purposes
     execSync(`docker cp org-a:/weaver/client/. docker/docker-data`);
@@ -86,13 +80,13 @@ describe("Test ERC20", () => {
       tlsCert: fs.readFileSync("./docker/docker-data/tls-ca-cert.pem"),
       peerEndpoint: "localhost:7031",
       peerHostAlias: "localhost",
-      chaincodeName: contractName,
+      chaincodeName: chaincodeName,
       ca: "org-a",
       mspId: "Peer0OrgaMSP",
       channel: "simple-channel",
     };
 
-    clientAdapter = new FabricClientAdapter(peerConfig);
+    clientAdapter = new FabricClientAdapter(peerConfig, adapterAlias);
     testERC20ModelRepository = new FabricERC20ClientRepository(clientAdapter);
 
     testToken = new ERC20Token({
@@ -131,6 +125,7 @@ describe("Test ERC20", () => {
         return mock(event, payload);
       }
     })();
+    testERC20ModelRepository.observe(observer);
   });
 
   beforeEach(() => {
@@ -138,11 +133,9 @@ describe("Test ERC20", () => {
     jest.restoreAllMocks();
     jest.resetAllMocks();
     mock = jest.fn();
-
-    testERC20ModelRepository.observe(observer);
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     testERC20ModelRepository.unObserve(observer);
     await new Promise((resolve) => setTimeout(resolve, 1000));
   });

@@ -15,7 +15,7 @@ import {
   UnsupportedError,
   UUID,
 } from "@decaf-ts/core";
-import { style } from "@decaf-ts/logging";
+import { Logging, style } from "@decaf-ts/logging";
 
 /**
  * @description Abstract base class for sequence generation
@@ -81,19 +81,14 @@ export class FabricContractSequence extends Sequence {
   override async current(
     ...args: MaybeContextualArg<any>
   ): Promise<string | number | bigint> {
-    const contextArgs = await Context.args<any, any>(
-      OperationKeys.READ,
-      SequenceModel,
-      args,
-      this.adapter
-    );
-    const ctx = contextArgs.context;
+    const { ctx, log } = (
+      await this.logCtx(args, OperationKeys.READ, true)
+    ).for(this.current);
     const { name, startWith } = this.options;
     try {
       const sequence: SequenceModel = await this.repo.read(name as string, ctx);
       return this.parse(sequence.current as string | number);
     } catch (e: any) {
-      const log = ctx.logger.for(this.current);
       if (e instanceof NotFoundError) {
         let cachedCurrent: any;
         try {
@@ -155,7 +150,7 @@ export class FabricContractSequence extends Sequence {
         res: SequenceModel | Promise<SequenceModel>
       ) {
         if (res instanceof Promise) res = await res;
-        ctx.logger
+        log
           .for(returnAndCache)
           .info(`Storing new ${name} seq value in cache: ${res.current}`);
         ctx.cache.put(name as string, res.current);

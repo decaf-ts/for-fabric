@@ -7,7 +7,7 @@ import {
   required,
 } from "@decaf-ts/decorator-validation";
 import { ownedBy } from "../../../../src/shared/decorators";
-import { FabricIdentifiedBaseModel } from "../../../../src/shared/index";
+import { FabricIdentifiedBaseModel } from "../../../../src/shared/model/FabricIdentifiedBaseModel";
 import { TestPublicModelChild } from "./TestPublicModelChild";
 
 @table("tst_user")

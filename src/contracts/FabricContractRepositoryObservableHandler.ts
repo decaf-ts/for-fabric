@@ -87,8 +87,10 @@ export class FabricContractRepositoryObservableHandler extends ObserverHandler {
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<void> {
     const { log, ctx } = Adapter.logCtx<FabricContractContext>(
-      args,
-      this.updateObservers
+      this.updateObservers,
+      event,
+      false,
+      ...args
     );
     const { stub } = ctx;
     const [owner, payload] = args;

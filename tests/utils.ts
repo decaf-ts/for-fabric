@@ -182,6 +182,35 @@ export function commitChaincode(
     --peer-root-tls ./weaver/peer/tls-ca-cert.pem,./weaver/peer/org-b-tls-ca-cert.pem,./weaver/peer/org-c-tls-ca-cert.pem`);
 }
 
+export function nextChaincodeSequence(
+  contractName: string,
+  channelId: string = "simple-channel",
+  dockerName: string = "org-a-peer-0"
+): number {
+  try {
+    const output = execSync(
+      `docker exec ${dockerName} peer lifecycle chaincode querycommitted --channelID ${channelId} --name ${contractName} --output json`
+    )
+      .toString()
+      .trim();
+    try {
+      const parsed = JSON.parse(output);
+      if (typeof parsed.sequence === "number") {
+        return parsed.sequence + 1;
+      }
+    } catch {
+      // fall back to regex parsing below
+    }
+    const match = output.match(/\"sequence\"\s*:\s*\"?(\d+)\"?/);
+    if (match) {
+      return Number(match[1]) + 1;
+    }
+  } catch (err: any) {
+    if (err?.message?.includes("not found")) return 1;
+  }
+  return 1;
+}
+
 export async function ensureContractReadiness(
   contractName: string,
   dockerName: string = "org-a-peer-0",

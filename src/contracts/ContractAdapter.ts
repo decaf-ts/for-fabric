@@ -10,7 +10,6 @@ import {
   NotFoundError,
   onCreate,
   onCreateUpdate,
-  OperationKeys,
   PrimaryKeyType,
   SerializationError,
 } from "@decaf-ts/db-decorators";
@@ -20,7 +19,7 @@ import {
   Property,
   Property as FabricProperty,
 } from "fabric-contract-api";
-import { Logger } from "@decaf-ts/logging";
+import { Logger, Logging } from "@decaf-ts/logging";
 import {
   PersistenceKeys,
   RelationsMetadata,
@@ -38,12 +37,14 @@ import {
   ForbiddenError,
   ConnectionError,
   ContextualizedArgs,
-  LoggerOf,
   Context,
   RawResult,
   Paginator,
   ContextualArgs,
   MaybeContextualArg,
+  MethodOrOperation,
+  AllOperationKeys,
+  FlagsOf,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -65,6 +66,14 @@ import {
 import { ContractLogger } from "./logging";
 import { FabricContractPaginator } from "./FabricContractPaginator";
 import { MissingContextError } from "../shared/errors";
+
+export type FabricContextualizedArgs<
+  ARGS extends any[] = any[],
+  EXTEND extends boolean = false,
+> = ContextualizedArgs<FabricContractContext, ARGS, EXTEND> & {
+  stub: ChaincodeStub;
+  identity: ClientIdentity;
+};
 
 /**
  * @description Sets the creator or updater field in a model based on the user in the context
@@ -238,9 +247,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @description Context constructor for this adapter
    * @summary Overrides the base Context constructor with FabricContractContext
    */
-  protected override readonly Context: Constructor<FabricContractContext> =
-    FabricContractContext;
-
+  protected override get Context(): Constructor<FabricContractContext> {
+    return FabricContractContext;
+  }
   /**
    * @description Gets the repository constructor for this adapter
    * @summary Returns the FabricContractRepository constructor for creating repositories
@@ -569,9 +578,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
   protected async queryResult(
     stub: ChaincodeStub,
     rawInput: any,
-    ...args: any[]
+    ...args: ContextualArgs<FabricContractContext>
   ): Promise<Iterators.StateQueryIterator> {
-    const { ctx } = this.logCtx(args, this.readState);
+    const { ctx } = this.logCtx(args, this.queryResult);
     let res: Iterators.StateQueryIterator;
     const collection = ctx.get("segregated");
     if (collection)
@@ -657,38 +666,42 @@ export class FabricContractAdapter extends CouchDBAdapter<
    * @return {FabricContractFlags} The merged flags
    */
   protected override async flags<M extends Model>(
-    operation: OperationKeys,
-    model: Constructor<M>,
-    flags: Partial<FabricContractFlags>,
-    ctx: Ctx | FabricContractContext,
-    ...args: any[]
+    operation: AllOperationKeys,
+    model: Constructor<M> | undefined,
+    flags: Partial<FabricContractFlags> | FabricContractContext | Ctx
   ): Promise<FabricContractFlags> {
-    const baseFlags = {
-      stub: ctx.stub,
-      segregated: false,
-    };
-    if (ctx instanceof FabricContractContext) {
+    let baseFlags = Object.assign(
+      {
+        segregated: false,
+      },
+      flags
+    );
+    if (flags instanceof FabricContractContext) {
+      // do nothing
+    } else if ((flags as Ctx).stub) {
       Object.assign(baseFlags, {
-        logger: ctx.logger,
-        identity: ctx.identity,
-        correlationId: ctx.stub.getTxID(),
+        stub: flags.stub,
+        identity: (flags as Ctx).clientIdentity,
+        logger: Logging.for(
+          operation,
+          {
+            logLevel: false,
+            timestamp: false,
+            correlationId: (flags as Ctx).stub.getTxID(),
+          },
+          flags
+        ),
+        correlationId: (flags as Ctx).stub.getTxID(),
       });
     } else {
-      Object.assign(baseFlags, {
-        identity: ctx.clientIdentity,
-        logger: new ContractLogger(this as any, undefined, ctx),
-        correlationId: ctx.stub.getTxID(),
-      });
+      baseFlags = Object.assign(baseFlags, flags || {});
     }
 
-    flags = (await super.flags(
+    return (await super.flags(
       operation,
       model,
-      baseFlags as any,
-      ...args
+      baseFlags as any
     )) as FabricContractFlags;
-
-    return flags as FabricContractFlags;
   }
 
   /**
@@ -799,7 +812,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     docsOnly: D = true as D,
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<RawResult<R, D>> {
-    const { log, stub, ctx } = this.logCtx(args, this.raw);
+    const { log, ctx } = this.logCtx(args, this.raw);
 
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
@@ -811,9 +824,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
       const response: StateQueryResponse<Iterators.StateQueryIterator> =
         (await this.queryResultPaginated(
-          stub,
+          ctx.stub,
           rawInput,
-          limit || 250,
+          limit || Number.MAX_VALUE,
           (skip as any)?.toString(),
           ctx
         )) as StateQueryResponse<Iterators.StateQueryIterator>;
@@ -821,7 +834,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     } else {
       log.debug("Retrieving iterator");
       iterator = (await this.queryResult(
-        stub,
+        ctx.stub,
         rawInput,
         ctx
       )) as Iterators.StateQueryIterator;
@@ -1033,60 +1046,176 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return FabricContractAdapter.parseError(reason || err);
   }
 
-  override logCtx<ARGS extends any[]>(
-    args: ARGS,
-    method: ((...args: any[]) => any) | string
-  ): ContextualizedArgs<FabricContractContext, ARGS> & {
-    stub: ChaincodeStub;
-    identity: ClientIdentity;
-  } {
-    return FabricContractAdapter.logCtx.call(this, args, method as any) as any;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD
+  ): FabricContextualizedArgs<ARGS, METHOD extends string ? true : false>;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: false
+  ): FabricContextualizedArgs<ARGS, METHOD extends string ? true : false>;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: true,
+    overrides?: Partial<FlagsOf<FabricContractContext>>
+  ): Promise<
+    FabricContextualizedArgs<ARGS, METHOD extends string ? true : false>
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: boolean = false,
+    overrides?: Partial<FlagsOf<FabricContractContext>> | Ctx
+  ):
+    | Promise<
+        FabricContextualizedArgs<ARGS, METHOD extends string ? true : false>
+      >
+    | FabricContextualizedArgs<ARGS, METHOD extends string ? true : false> {
+    if (!allowCreate)
+      return super.logCtx<ARGS, METHOD>(
+        args,
+        operation as any,
+        allowCreate as any,
+        overrides as any
+      ) as any;
+
+    return super.logCtx
+      .call(this, args, operation as any, allowCreate, overrides as any)
+      .then((res) => {
+        if (!(res.ctx instanceof FabricContractContext))
+          throw new InternalError(`Invalid context binding`);
+        if (!res.ctx.stub) throw new InternalError(`Missing Stub`);
+        if (!res.ctx.identity) throw new InternalError(`Missing Identity`);
+        return Object.assign(res, {
+          stub: res.ctx.stub,
+          identity: res.ctx.identity,
+        });
+      }) as any;
   }
 
-  static override logCtx<ARGS extends any[]>(
-    this: any,
-    args: ARGS,
-    method: string
-  ): ContextualizedArgs<FabricContractContext, ARGS> & {
-    stub: ChaincodeStub;
-    identity: ClientIdentity;
-  };
-  static override logCtx<ARGS extends any[]>(
-    this: any,
-    args: ARGS,
-    method: (...args: any[]) => any
-  ): ContextualizedArgs<FabricContractContext, ARGS> & {
-    stub: ChaincodeStub;
-    identity: ClientIdentity;
-  };
-  static override logCtx<ARGS extends any[]>(
-    this: any,
-    args: ARGS,
-    method: ((...args: any[]) => any) | string
-  ): ContextualizedArgs<FabricContractContext, ARGS> & {
-    stub: ChaincodeStub;
-    identity: ClientIdentity;
-  } {
-    if (args.length < 1) throw new InternalError("No context provided");
-    const ctx = args.pop() as FabricContractContext;
-
-    if (!(ctx instanceof Context))
-      throw new InternalError("No context provided");
-    if (args.filter((a) => a instanceof Context).length > 1)
-      throw new Error("here");
-    const log = (
-      this
-        ? ctx.logger.for(this).for(method)
-        : ctx.logger.clear().for(this).for(method)
-    ) as LoggerOf<FabricContractContext>;
-    return {
-      ctx: ctx,
-      log: method ? (log.for(method) as LoggerOf<FabricContractContext>) : log,
-      stub: ctx.stub,
-      identity: ctx.identity,
-      ctxArgs: [...args, ctx],
-    };
-  }
+  // override logCtx<
+  //   ARGS extends any[] = any[],
+  //   METHOD extends MethodOrOperation = MethodOrOperation,
+  // >(
+  //   args: MaybeContextualArg<FabricContractContext, ARGS>,
+  //   method: METHOD
+  // ): ContextualizedArgs<
+  //   FabricContractContext,
+  //   ARGS,
+  //   METHOD extends string ? true : false
+  // > & {
+  //   stub: ChaincodeStub;
+  //   identity: ClientIdentity;
+  // };
+  // override logCtx<
+  //   ARGS extends any[] = any[],
+  //   METHOD extends MethodOrOperation = MethodOrOperation,
+  // >(
+  //   args: MaybeContextualArg<FabricContractContext, ARGS>,
+  //   method: METHOD,
+  //   allowCreate: false,
+  //   overrides?: Partial<FabricContractFlags>
+  // ): ContextualizedArgs<
+  //   FabricContractContext,
+  //   ARGS,
+  //   METHOD extends string ? true : false
+  // > & {
+  //   stub: ChaincodeStub;
+  //   identity: ClientIdentity;
+  // };
+  // override logCtx<
+  //   ARGS extends any[] = any[],
+  //   METHOD extends MethodOrOperation = MethodOrOperation,
+  // >(
+  //   args: MaybeContextualArg<FabricContractContext, ARGS>,
+  //   method: METHOD,
+  //   allowCreate: true,
+  //   overrides?: Partial<FabricContractFlags>
+  // ): Promise<
+  //   ContextualizedArgs<
+  //     FabricContractContext,
+  //     ARGS,
+  //     METHOD extends string ? true : false
+  //   > & {
+  //     stub: ChaincodeStub;
+  //     identity: ClientIdentity;
+  //   }
+  // >;
+  // override logCtx<
+  //   ARGS extends any[] = any[],
+  //   METHOD extends MethodOrOperation = MethodOrOperation,
+  // >(
+  //   args: MaybeContextualArg<FabricContractContext, ARGS>,
+  //   method: METHOD,
+  //   allowCreate: boolean = false,
+  //   overrides?: Partial<FabricContractFlags>
+  // ):
+  //   | (ContextualizedArgs<
+  //       FabricContractContext,
+  //       ARGS,
+  //       METHOD extends string ? true : false
+  //     > & {
+  //       stub: ChaincodeStub;
+  //       identity: ClientIdentity;
+  //     })
+  //   | Promise<
+  //       ContextualizedArgs<
+  //         FabricContractContext,
+  //         ARGS,
+  //         METHOD extends string ? true : false
+  //       > & {
+  //         stub: ChaincodeStub;
+  //         identity: ClientIdentity;
+  //       }
+  //     > {
+  //   const response = super.logCtx(
+  //     args,
+  //     method,
+  //     allowCreate as any,
+  //     overrides as any
+  //   ) as
+  //     | ContextualizedArgs<
+  //         FabricContractContext,
+  //         ARGS,
+  //         METHOD extends string ? true : false
+  //       >
+  //     | Promise<
+  //         ContextualizedArgs<
+  //           FabricContractContext,
+  //           ARGS,
+  //           METHOD extends string ? true : false
+  //         >
+  //       >;
+  //
+  //   const attach = <T extends ContextualizedArgs<FabricContractContext, ARGS>>(
+  //     resp: T
+  //   ) =>
+  //     Object.assign(resp, {
+  //       stub: resp.ctx.stub,
+  //       identity: resp.ctx.identity,
+  //     }) as T & {
+  //       stub: ChaincodeStub;
+  //       identity: ClientIdentity;
+  //     };
+  //
+  //   return response instanceof Promise
+  //     ? response.then(attach)
+  //     : attach(response);
+  // }
 
   static override parseError<E extends BaseError>(err: Error | string): E {
     // if (

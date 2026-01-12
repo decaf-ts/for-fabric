@@ -11,7 +11,7 @@ import {
   required,
   step,
 } from "@decaf-ts/decorator-validation";
-import { FabricFlavour } from "../../../../src/shared/index";
+import { FabricFlavour } from "../../../../src/shared/constants";
 
 @uses(FabricFlavour)
 @table("users")

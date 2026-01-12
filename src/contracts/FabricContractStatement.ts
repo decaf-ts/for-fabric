@@ -10,7 +10,7 @@ import {
 } from "@decaf-ts/for-couchdb";
 import { FabricContractContext } from "./ContractContext";
 import { CouchDBStatement } from "@decaf-ts/for-couchdb";
-import { Condition, OrderDirection } from "@decaf-ts/core";
+import { Condition, ContextualArgs, OrderDirection } from "@decaf-ts/core";
 import { Metadata } from "@decaf-ts/decoration";
 import { DBKeys } from "@decaf-ts/db-decorators";
 
@@ -47,7 +47,10 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
     super(adapter);
   }
 
-  override async raw<R>(rawInput: MangoQuery, ...args: any[]): Promise<R> {
+  override async raw<R>(
+    rawInput: MangoQuery,
+    ...args: ContextualArgs<FabricContractContext>
+  ): Promise<R> {
     const { ctx } = this.logCtx(args, this.raw);
 
     const results: any[] = await this.adapter.raw(rawInput, true, ctx);

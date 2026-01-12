@@ -21,7 +21,7 @@ import {
 import { description, uses } from "@decaf-ts/decoration";
 import { FabricBaseModel } from "./FabricBaseModel";
 import { AuditOperations, TableNames, UserGroup } from "./constants";
-import { FabricFlavour } from "../../../../src/shared/index";
+import { FabricFlavour } from "../../../../src/shared/constants";
 
 @description("Logs user activity for auditing purposes.")
 @uses(FabricFlavour)

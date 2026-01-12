@@ -2,8 +2,9 @@ import { stringFormat } from "@decaf-ts/decorator-validation";
 import { Logger, MiniLogger } from "@decaf-ts/logging";
 import { Identity, Signer, signers } from "@hyperledger/fabric-gateway";
 import { CryptoSetting, ICryptoSuite, User } from "fabric-common";
-import { HSMOptions } from "./types";
+import { HSMOptions } from "../shared/types";
 import { normalizeImport } from "@decaf-ts/core";
+import crypto, { X509Certificate } from "crypto";
 
 /**
  * @description Core utilities for interacting with files, crypto identities, and Fabric SDK helpers
@@ -142,8 +143,7 @@ export class CoreUtils {
   }
 
   static async getCertificateSKI(certificate: string): Promise<Buffer> {
-    const crypto = await normalizeImport(import("crypto"));
-    const x509 = new crypto.X509Certificate(certificate);
+    const x509 = new X509Certificate(certificate);
     const jwk = x509.publicKey.export({ format: "jwk" });
     const prefix = Buffer.from([0x04]);
     const x = Buffer.from(jwk.x || "", "base64url");

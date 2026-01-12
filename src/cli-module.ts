@@ -26,8 +26,6 @@ import "./shared/overrides";
 
 const logger = Logging.for("fabric");
 
-
-
 const compileCommand = new Command()
   .name("compile-contract")
   .description("Creates a global contract")
@@ -39,7 +37,8 @@ const compileCommand = new Command()
     "--description <String>",
     "contract description",
     "Global contract implementation"
-  ).option("--strip-contract-name", "strip contract name from output", false)
+  )
+  .option("--strip-contract-name", "strip contract name from output", false)
   .option("--input <String>", "input folder for contracts", "lib/contracts")
   .option("--output <String>", "output folder for contracts", "./contracts")
   .action(async (options: any) => {
@@ -50,7 +49,16 @@ const compileCommand = new Command()
     const version = pkg.version;
 
     // eslint-disable-next-line prefer-const
-    let { dev, debug, name, description, output, input, stripContractName, ccaas } = options;
+    let {
+      dev,
+      debug,
+      name,
+      description,
+      output,
+      input,
+      stripContractName,
+      ccaas,
+    } = options;
     const log = logger.for("compile-contract");
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
@@ -89,13 +97,11 @@ const compileCommand = new Command()
 
     const scripts = {
       start: getContractStartCommand(debug, ccaas),
-      "start:dev":
-        'fabric-chaincode-node start --tls.enabled false',
+      "start:dev": "fabric-chaincode-node start --tls.enabled false",
       "start:watch": 'nodemon --exec "npm run start:dev"',
       build: 'echo "No need to build the chaincode"',
       lint: "eslint . --fix --ext .js",
     };
-
 
     const contractPackage = pkg;
 
@@ -266,6 +272,11 @@ const deployContract = new Command()
   .option("--name <String>", "Contract Name (and folder)")
   .option("--input <String>", "input folder")
   .option(
+    "--incrementVersion",
+    "if should use version or sequence to update contracts",
+    false
+  )
+  .option(
     "--trackerFolder <String>",
     "contract version tracker folder (should be deleted on infrastructure:down)",
     path.join(process.cwd(), "tests", "integration", "chaincodeTrackers")
@@ -280,13 +291,13 @@ const deployContract = new Command()
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
     );
 
-    const version = pkg.version;
+    let version = pkg.version;
 
     const log = logger.for("deploy-contract");
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );
-    const { name, input, peers, trackerFolder } = options;
+    const { name, input, peers, trackerFolder, incrementVersion } = options;
     const peerIds = peers.split(",");
 
     const countPath = path.resolve(path.join(trackerFolder, `${name}.count`));
@@ -299,6 +310,11 @@ const deployContract = new Command()
       else sequence += 1;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e: unknown) {
+      sequence = 1;
+    }
+
+    if (incrementVersion) {
+      version = version + `-${sequence}`;
       sequence = 1;
     }
 

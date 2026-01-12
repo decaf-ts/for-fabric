@@ -1,14 +1,10 @@
-import {
-  MaybeContextualArg,
-  OrderDirection,
-  PagingError,
-  Sequence,
-} from "@decaf-ts/core";
+import { MaybeContextualArg, PagingError, Sequence } from "@decaf-ts/core";
 import { DBKeys } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "./ContractAdapter";
 import { CouchDBPaginator, MangoQuery } from "@decaf-ts/for-couchdb";
+import { ChaincodeStub } from "fabric-shim-api";
 
 /**
  * @description Paginator for CouchDB query results
@@ -34,8 +30,7 @@ import { CouchDBPaginator, MangoQuery } from "@decaf-ts/for-couchdb";
  */
 export class FabricContractPaginator<
   M extends Model,
-  R,
-> extends CouchDBPaginator<M, R> {
+> extends CouchDBPaginator<M> {
   /**
    * @description Creates a new CouchDBPaginator instance
    * @summary Initializes a paginator for CouchDB query results
@@ -129,36 +124,49 @@ export class FabricContractPaginator<
    */
   override async page(
     page: number = 1,
+    bookmark?: any,
     ...args: MaybeContextualArg<any>
   ): Promise<M[]> {
-    const { ctxArgs, ctx } = this.adapter["logCtx"](args, this.page);
-    if (this.isPreparedStatement()) return this.pagePrepared(page, ...ctxArgs);
+    const { ctxArgs, ctx, log } = this.adapter["logCtx"](
+      [bookmark, ...args],
+      this.page
+    );
+    if (this.isPreparedStatement())
+      return await this.pagePrepared(page, ...ctxArgs);
     const statement = Object.assign({}, this.statement);
 
     if (!this._recordCount || !this._totalPages) {
       this._totalPages = this._recordCount = 0;
-      const results: R[] =
-        (await this.adapter.raw(
-          { ...statement, limit: undefined },
+      const countResults =
+        (await this.adapter.raw<M[], true>(
+          { ...statement, limit: Number.MAX_VALUE },
           true,
-          ctx
+          ...ctxArgs
         )) || [];
-      this._recordCount = results.length;
+      this._recordCount = countResults.length;
       if (this._recordCount > 0) {
         const size = statement?.limit || this.size;
         this._totalPages = Math.ceil(this._recordCount / size);
+        return await this.page(page, ...ctxArgs);
       }
+    } else {
+      page = this.validatePage(page);
+      statement.skip = (page - 1) * this.size;
     }
-
-    this.validatePage(page);
 
     if (page !== 1) {
       if (!this._bookmark)
         throw new PagingError("No bookmark. Did you start in the first page?");
       statement["bookmark"] = this._bookmark as string;
     }
-    const docs: any[] = (await this.adapter.raw(statement, false, ctx)) as any;
+    const rawResult = (await this.adapter.raw(
+      statement,
+      true,
+      ...ctxArgs
+    )) as any;
 
+    const { docs, bookmark: nextBookmark, warning } = rawResult;
+    if (warning) log.warn(warning);
     if (!this.clazz) throw new PagingError("No statement target defined");
     const id = Model.pk(this.clazz);
     const type = Metadata.get(
@@ -167,8 +175,8 @@ export class FabricContractPaginator<
     )?.type;
     const results =
       statement.fields && statement.fields.length
-        ? docs // has fields means its not full model
-        : docs.map((d: any) => {
+        ? rawResult // has fields means its not full model
+        : rawResult.map((d: any) => {
             return this.adapter.revert(
               d,
               this.clazz,
@@ -177,9 +185,7 @@ export class FabricContractPaginator<
               ctx
             );
           });
-    const direction = statement.sort?.[0] || OrderDirection.DSC;
-    this._bookmark =
-      results[direction === OrderDirection.ASC ? results.length - 1 : 0][id];
+    this._bookmark = nextBookmark;
     this._currentPage = page;
     return results;
   }

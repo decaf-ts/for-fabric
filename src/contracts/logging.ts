@@ -58,6 +58,7 @@ export class ContractLogger extends MiniLogger {
       this.logger = new MiniLogger(context, conf);
     } else {
       this.logger = ctx.logging.getLogger(context) as unknown as Logger;
+      ctx.logging.setLevel(conf?.level || Logging.getConfig().level);
     }
   }
 
@@ -82,6 +83,9 @@ export class ContractLogger extends MiniLogger {
 
     let method;
     switch (level) {
+      case LogLevel.benchmark:
+        method = this.logger.verbose;
+        break;
       case LogLevel.info:
         method = this.logger.info;
         break;
@@ -93,6 +97,9 @@ export class ContractLogger extends MiniLogger {
         break;
       case LogLevel.error:
         method = this.logger.error;
+        break;
+      case LogLevel.trace:
+        method = this.logger.trace;
         break;
       case LogLevel.warn:
         method = this.logger.warn;

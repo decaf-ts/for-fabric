@@ -55,6 +55,7 @@ export const E2eConfig: DecafE2eConfig<FabricClientAdapter> = {
   adapterFactory: async (conf?: any, ...initArgs: any[]) => {
     const adapter = new E2eConfig.adapterClazz(conf || { user: "e2e-user" });
     await adapter.initialize(...initArgs);
+    Adapter.setCurrent(adapter.alias);
     return adapter;
   },
   ctxFactoryMock: ctxMock,

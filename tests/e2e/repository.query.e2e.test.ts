@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { E2eConfig } from "./e2e.config";
-import { Repo, Repository } from "../../src/repository/Repository";
+import { Repo, Repository } from "@decaf-ts/core";
 import { Context, OperationKeys } from "@decaf-ts/db-decorators";
-import { Product } from "./models/Product";
-import { generateGtin } from "./models/gtin";
+import { Product } from "../../src/contract/models/Product";
+import { generateGtin } from "../../src/contract/models/gtin";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Observer, OrderDirection } from "../../src/index";
 import { Logging, LogLevel, style } from "@decaf-ts/logging";

@@ -18,7 +18,7 @@ import {
   InternalError,
   NotFoundError,
 } from "@decaf-ts/db-decorators";
-import { CoreUtils } from "../../shared/utils";
+import { CoreUtils } from "../utils";
 import {
   CertificateResponse,
   FabricIdentity,

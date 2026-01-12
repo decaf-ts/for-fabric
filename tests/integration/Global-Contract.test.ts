@@ -20,6 +20,7 @@ jest.setTimeout(3000000);
 describe("Tests global contract implementation", () => {
   const contractFolderName = "global";
   const contractName = "global";
+  const adapterAlias = "hlf-fabric-test-global-contract";
   let caConfig: CAConfig;
   let peerConfig: PeerConfig;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -87,12 +88,15 @@ describe("Tests global contract implementation", () => {
       channel: "simple-channel",
     };
 
-    userAdapter = new FabricClientAdapter({
-      ...peerConfig,
-    });
+    userAdapter = new FabricClientAdapter(
+      {
+        ...peerConfig,
+      },
+      adapterAlias
+    );
 
-    userRepository = Repository.forModel(User);
-    productRepository = Repository.forModel(Product);
+    userRepository = Repository.forModel(User, adapterAlias);
+    productRepository = Repository.forModel(Product, adapterAlias);
     // userRepository = new FabricClientRepository(userAdapter, User);
     // productRepository = new FabricClientRepository(userAdapter, Product);
   });

@@ -6,6 +6,7 @@ import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { FabricModelKeys } from "../constants";
 import { SegregatedModel } from "../types";
 import { DBKeys, SerializationError } from "@decaf-ts/db-decorators";
+import { PersistenceKeys } from "@decaf-ts/core";
 
 Model.prototype.isShared = function isShared<M extends Model>(
   this: M
@@ -81,6 +82,16 @@ Model.prototype.segregate = function segregate<M extends Model>(
   result.model = Model.build(result.model, model.constructor.name);
   return result as SegregatedModel<M>;
 }.bind(Model);
+
+(Model as any).tableName = function <M extends Model>(
+  model: Constructor<M> | M
+): string {
+  const target = model instanceof Model ? model.constructor : model;
+  const meta = Metadata.get(target as any, PersistenceKeys.TABLE);
+  if (meta) return meta;
+  if (model instanceof Model) return model.constructor.name;
+  return model.name;
+};
 
 (Model as any).isPrivate = function isPrivate<M extends Model>(
   model: M | Constructor<M>

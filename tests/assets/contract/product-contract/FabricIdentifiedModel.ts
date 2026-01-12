@@ -1,6 +1,6 @@
 import { type ModelArg } from "@decaf-ts/decorator-validation";
 import { createdBy, index, OrderDirection, updatedBy } from "@decaf-ts/core";
-import { FabricFlavour } from "../../../../src/shared/index";
+import { FabricFlavour } from "../../../../src/shared/constants";
 import { uses } from "@decaf-ts/decoration";
 import { FabricBaseModel } from "./FabricBaseModel";
 

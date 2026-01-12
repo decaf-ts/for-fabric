@@ -2,7 +2,7 @@ import { Model, type ModelArg } from "@decaf-ts/decorator-validation";
 import { createdAt, index, OrderDirection, updatedAt } from "@decaf-ts/core";
 import { uses } from "@decaf-ts/decoration";
 import { version } from "@decaf-ts/db-decorators";
-import { FabricFlavour } from "../../../../src/shared/index";
+import { FabricFlavour } from "../../../../src/shared/constants";
 
 @uses(FabricFlavour)
 export class FabricBaseModel extends Model {

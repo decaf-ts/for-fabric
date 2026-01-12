@@ -11,7 +11,7 @@ import {
 } from "@decaf-ts/core";
 import { TableNames } from "./constants";
 import { description, uses } from "@decaf-ts/decoration";
-import { FabricFlavour } from "../../../../src/shared/index";
+import { FabricFlavour } from "../../../../src/shared/constants";
 import { FabricIdentifiedModel } from "./FabricIdentifiedModel";
 
 @uses(FabricFlavour)

@@ -146,16 +146,13 @@ describe("Tests Public contract", () => {
     expect(bulk).toBeDefined();
   });
 
-  it("should perform simple queries", async () => {
-    const bulk = JSON.parse(
-      await contract.statement(
-        ctx as any,
-        "listBy",
-        JSON.stringify(["productCode", "asc"])
-      )
+  it("should paginate properly for simple queries", async () => {
+    const page = await contract.paginateBy(
+      ctx,
+      "productCode",
+      "desc",
+      JSON.stringify({ offset: 1 })
     );
-    expect(bulk).toBeDefined();
+    expect(page).toBeDefined();
   });
-
-  it("should paginate properly for simple queries", async () => {});
 });

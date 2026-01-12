@@ -2,9 +2,8 @@ import { FabricCrudContract } from "./crud-contract";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Context as Ctx, Transaction } from "fabric-contract-api";
 import { Constructor } from "@decaf-ts/decoration";
-import { Condition, MaybeContextualArg, OrderDirection } from "@decaf-ts/core";
+import { Condition, OrderDirection } from "@decaf-ts/core";
 import { SerializationError } from "@decaf-ts/db-decorators";
-import { FabricContractContext } from "../ContractContext";
 
 /**
  * @description CRUD contract variant that serializes/deserializes payloads
@@ -26,49 +25,28 @@ export class SerializedCrudContract<
   }
 
   @Transaction()
-  override async create(context: Ctx, model: string): Promise<string> {
-    const { log, ctx } = await this.logCtx([context], this.create);
-    log.info(`Creating model: ${model}`);
-
-    const m = this.deserialize<M>(model);
-
-    log.info(`Model deserialized: ${JSON.stringify(m)}`);
-    const result = await super.create(ctx as any, m);
-
-    const serialized = this.serialize(result as M);
-    log.info(`RESULT: ${JSON.stringify(result)}`);
-    log.info(`Retuning: ${serialized}`);
-    return serialized;
+  override async create(ctx: Ctx, model: string): Promise<string> {
+    return this.serialize((await super.create(ctx as any, model)) as M);
   }
 
   @Transaction(false)
-  override async read(context: Ctx, key: string): Promise<string> {
-    const { log, ctx } = await this.logCtx([context], this.read);
-    log.info(`Reading id: ${key}`);
+  override async read(ctx: Ctx, key: string): Promise<string> {
     return this.serialize((await super.read(ctx as any, key)) as M);
   }
 
   @Transaction()
-  override async update(context: Ctx, model: string): Promise<string> {
-    const { log, ctx } = await this.logCtx([context], this.update);
-    log.info(`Updating model: ${model}`);
-    return this.serialize((await super.update(ctx as any, model)) as M);
+  override async update(ctx: Ctx, model: string): Promise<string> {
+    return this.serialize((await super.update(ctx, model)) as M);
   }
 
   @Transaction()
-  override async delete(context: Ctx, key: string): Promise<string> {
-    const { log, ctx } = await this.logCtx([context], this.delete);
-    log.info(`Deleting id: ${key}`);
+  override async delete(ctx: Ctx, key: string): Promise<string> {
     return this.serialize((await super.delete(ctx as any, key)) as M);
   }
 
   @Transaction()
-  override async deleteAll(context: Ctx, keys: string): Promise<string> {
+  override async deleteAll(ctx: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
-    const { log, ctx } = await this.logCtx([context], this.deleteAll);
-
-    log.info(`deleting ${parsedKeys.length} entries from the table`);
-
     return JSON.stringify(
       ((await super.deleteAll(ctx as any, parsedKeys)) as M[]).map(
         (m) => this.serialize(m) as string
@@ -77,12 +55,8 @@ export class SerializedCrudContract<
   }
 
   @Transaction(false)
-  override async readAll(context: Ctx, keys: string): Promise<string> {
+  override async readAll(ctx: Ctx, keys: string): Promise<string> {
     const parsedKeys: string[] = JSON.parse(keys);
-
-    const { log, ctx } = await this.logCtx([context], this.readAll);
-    log.info(`reading ${parsedKeys.length} entries from the table`);
-
     return JSON.stringify(
       ((await super.readAll(ctx as any, parsedKeys)) as M[]).map((m) =>
         this.serialize(m)
@@ -91,14 +65,12 @@ export class SerializedCrudContract<
   }
 
   @Transaction()
-  override async updateAll(context: Ctx, models: string): Promise<string> {
-    const { log, ctx } = await this.logCtx([context], this.updateAll);
+  override async updateAll(ctx: Ctx, models: string): Promise<string> {
     const list: string[] = JSON.parse(models);
     const modelList: M[] = list
       .map((m) => this.deserialize(m))
       .map((m) => new this.clazz(m));
 
-    log.info(`Updating ${modelList.length} entries to the table`);
     return JSON.stringify(
       ((await super.updateAll(ctx as any, modelList)) as M[]).map(
         (m) => this.serialize(m) as string
@@ -107,8 +79,7 @@ export class SerializedCrudContract<
   }
 
   @Transaction(false)
-  override async statement(context: Ctx, method: string, args: string) {
-    const { ctx, log } = await this.logCtx([context], this.statement);
+  override async statement(ctx: Ctx, method: string, args: string) {
     try {
       args = JSON.parse(args);
     } catch (e: unknown) {
@@ -118,15 +89,11 @@ export class SerializedCrudContract<
       throw new SerializationError(
         `Invalid args: ${JSON.stringify(args)}. must be an array`
       );
-    log.info(`calling prepared statement ${method}`);
-    log.info(`with args ${args}`);
     return JSON.stringify(await super.statement(ctx, method, ...args));
   }
 
   @Transaction(false)
-  override async listBy(context: Ctx, key: string, order: string) {
-    const { ctx, log } = await this.logCtx([context], this.listBy);
-    log.info(`Executing listBy with key ${key} and order ${order}`);
+  override async listBy(ctx: Ctx, key: string, order: string) {
     return JSON.stringify(
       await super.listBy(ctx, key as keyof M, order as OrderDirection)
     );
@@ -134,13 +101,11 @@ export class SerializedCrudContract<
 
   @Transaction(false)
   override async paginateBy(
-    context: Ctx,
+    ctx: Ctx,
     key: string,
     order: string,
-    ref: string,
-    ...args: MaybeContextualArg<FabricContractContext>
+    ref: string
   ): Promise<string> {
-    const { ctx, log } = await this.logCtx([...args, context], this.paginateBy);
     try {
       ref = JSON.parse(ref);
     } catch (e: unknown) {
@@ -148,45 +113,31 @@ export class SerializedCrudContract<
         `Failed to deserialize paginateBy reference: ${e}`
       );
     }
-    log.info(`Executing paginateBy with key ${key} and order ${order}`);
     return JSON.stringify(
-      await super.paginateBy(ctx, key, order as any, ref as any, ...args)
+      await super.paginateBy(ctx, key, order as any, ref as any)
     );
   }
 
   @Transaction(false)
-  override async findOneBy(
-    context: Ctx,
-    key: string,
-    value: string,
-    ...args: string[]
-  ) {
-    const { ctx, log } = await this.logCtx([...args, context], this.findOneBy);
-    log.info(`Executing findOneBy with key ${key} and value ${value}`);
-    return JSON.stringify(await super.findOneBy(ctx, key, value, ...args));
+  override async findOneBy(ctx: Ctx, key: string, value: string) {
+    return JSON.stringify(await super.findOneBy(ctx, key, value));
   }
 
   // @Transaction(false)
   override async query(
-    context: Ctx,
+    ctx: Ctx,
     condition: string,
     orderBy: string,
     order: string,
     limit?: number,
     skip?: number
   ): Promise<string> {
-    const { ctx, log } = await this.logCtx([context], this.query);
-
-    log.info(`Executing query orderedBy ${orderBy} and order ${order}`);
-
     let cond: Condition<any>;
     try {
       cond = Condition.from(JSON.parse(condition));
     } catch (e: unknown) {
       throw new SerializationError(`Invalid condition: ${e}`);
     }
-
-    log.info(`Condition: ${JSON.stringify(cond)}`);
 
     return JSON.stringify(
       await super.query(ctx, cond, orderBy, order as any, limit, skip)
@@ -211,22 +162,17 @@ export class SerializedCrudContract<
   }
 
   @Transaction(false)
-  override async healthcheck(context: Ctx): Promise<string> {
-    const { log, ctx } = await this.logCtx([context], this.updateAll);
-    log.debug(`Running Healthcheck: ${this.initialized}...`);
+  override async healthcheck(ctx: Ctx): Promise<string> {
     //TODO: TRIM NOT WORKING CHECK LATER
     return JSON.stringify(await super.healthcheck(ctx as any));
   }
 
   @Transaction()
   override async createAll(context: Ctx, models: string): Promise<string> {
-    const { log } = await this.logCtx([context], this.createAll);
     const list: string[] = JSON.parse(models);
     const modelList: M[] = list
       .map((m) => this.deserialize(m))
       .map((m) => new this.clazz(m));
-
-    log.info(`Adding ${modelList.length} entries to the table`);
 
     const result = (await super.createAll(context, modelList)) as M[];
     return JSON.stringify(result.map((m) => this.serialize(m) as string));
