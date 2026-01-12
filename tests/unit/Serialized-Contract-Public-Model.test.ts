@@ -151,7 +151,7 @@ describe("Tests Public contract", () => {
       ctx,
       "productCode",
       "desc",
-      JSON.stringify({ offset: 1 })
+      JSON.stringify({ offset: 1, limit: 3 })
     );
     expect(page).toBeDefined();
   });

@@ -63,7 +63,6 @@ import {
   Metadata,
   propMetadata,
 } from "@decaf-ts/decoration";
-import { ContractLogger } from "./logging";
 import { FabricContractPaginator } from "./FabricContractPaginator";
 import { MissingContextError } from "../shared/errors";
 
@@ -668,7 +667,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   protected override async flags<M extends Model>(
     operation: AllOperationKeys,
     model: Constructor<M> | undefined,
-    flags: Partial<FabricContractFlags> | FabricContractContext | Ctx
+    flags: Partial<FabricContractFlags> | FabricContractContext | Ctx | any
   ): Promise<FabricContractFlags> {
     let baseFlags = Object.assign(
       {

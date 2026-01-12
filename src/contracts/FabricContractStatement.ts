@@ -10,9 +10,16 @@ import {
 } from "@decaf-ts/for-couchdb";
 import { FabricContractContext } from "./ContractContext";
 import { CouchDBStatement } from "@decaf-ts/for-couchdb";
-import { Condition, ContextualArgs, OrderDirection } from "@decaf-ts/core";
+import {
+  Condition,
+  ContextualArgs,
+  MaybeContextualArg,
+  OrderDirection,
+  PersistenceKeys,
+  PreparedStatementKeys,
+} from "@decaf-ts/core";
 import { Metadata } from "@decaf-ts/decoration";
-import { DBKeys } from "@decaf-ts/db-decorators";
+import { DBKeys, InternalError } from "@decaf-ts/db-decorators";
 
 /**
  * @description Statement wrapper for executing Mango queries within Fabric contracts
@@ -45,6 +52,20 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
 > {
   constructor(adapter: CouchDBAdapter<any, void, FabricContractContext>) {
     super(adapter);
+  }
+
+  protected override async executionPrefix(
+    method: any,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ) {
+    const newArgs = args.filter(
+      Boolean
+    ) as MaybeContextualArg<FabricContractContext>;
+    if (args.length !== newArgs.length)
+      throw new InternalError(
+        `Received an undefined in the paginator for ${method}: ${args}`
+      );
+    return super.executionPrefix(method, ...args);
   }
 
   override async raw<R>(

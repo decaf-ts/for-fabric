@@ -4,7 +4,6 @@ import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "./ContractAdapter";
 import { CouchDBPaginator, MangoQuery } from "@decaf-ts/for-couchdb";
-import { ChaincodeStub } from "fabric-shim-api";
 
 /**
  * @description Paginator for CouchDB query results
