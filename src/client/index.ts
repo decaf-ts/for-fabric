@@ -19,3 +19,4 @@ export * from "./fabric-fs";
 export * from "./FabricClientAdapter";
 export * from "./FabricClientRepository";
 export * from "../shared/types";
+export * from "./utils";
