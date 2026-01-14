@@ -22,6 +22,10 @@ export interface FabricContractFlags extends FabricFlags {
    */
   identity: ClientIdentity;
 
+  roles?: string[];
+
+  cert: string;
+
   /**
    * @description Logger instance for the contract
    */

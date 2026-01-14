@@ -114,6 +114,10 @@ export function getIdentityMock() {
   return {
     getID: () => "id",
     getMSPID: () => "Aeon",
+    getIDBytes: () => Buffer.from("creatorID"),
+    getAttributeValue: (name: string) => {
+      return name === "roles" ? ["admin"] : undefined;
+    },
   };
 }
 

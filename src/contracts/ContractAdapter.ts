@@ -681,6 +681,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
       Object.assign(baseFlags, {
         stub: flags.stub,
         identity: (flags as Ctx).clientIdentity,
+        cert: (flags as Ctx).clientIdentity.getIDBytes().toString(),
+        roles: (flags as Ctx).clientIdentity.getAttributeValue("roles"),
         logger: Logging.for(
           operation,
           {
