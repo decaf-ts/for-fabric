@@ -17,6 +17,7 @@ describe("Tests Public contract", () => {
       child: {
         name: "Child",
       },
+      children: [{ name: "children" }],
     });
 
     created = Model.deserialize(
@@ -43,6 +44,50 @@ describe("Tests Public contract", () => {
     );
     expect(res.equals(created)).toEqual(false);
     expect(res.equals(created, "name", "updatedAt", "version")).toEqual(true);
+    created = res;
+    console.log("Result: ", res);
+  });
+
+  it("should update model's oneToOne relation", async () => {
+    const res = Model.deserialize(
+      await contract.update(
+        ctx as any,
+        new TestPublicModel({
+          ...created,
+          child: {
+            name: "Jane Doe",
+          },
+        }).serialize()
+      )
+    );
+    expect(res.equals(created)).toEqual(false);
+    expect(
+      res.equals(created, "name", "updatedAt", "version", "child")
+    ).toEqual(true);
+    expect(res.child.name).toEqual("Jane Doe");
+    created = res;
+    console.log("Result: ", res);
+  });
+
+  it("should update model's oneToMany relation", async () => {
+    const res = Model.deserialize(
+      await contract.update(
+        ctx as any,
+        new TestPublicModel({
+          ...created,
+          children: [
+            ...created.children,
+            {
+              name: "Other Jane Doe",
+            },
+          ],
+        }).serialize()
+      )
+    );
+    expect(res.equals(created)).toEqual(false);
+    expect(
+      res.equals(created, "name", "updatedAt", "version", "children")
+    ).toEqual(true);
     created = res;
     console.log("Result: ", res);
   });

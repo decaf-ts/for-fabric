@@ -4,6 +4,7 @@ import {
   Context,
   UnsupportedError,
   Repository,
+  ContextOf,
 } from "@decaf-ts/core";
 import {
   InternalError,
@@ -93,7 +94,7 @@ export async function ownedByOnCreate<
   V,
 >(
   this: R,
-  context: Context<any>,
+  context: ContextOf<R>,
   data: V,
   key: keyof M,
   model: M
@@ -147,7 +148,7 @@ export async function transactionIdOnCreate<
   V,
 >(
   this: R,
-  context: Context<any>,
+  context: ContextOf<R>,
   data: V,
   key: keyof M,
   model: M
@@ -202,7 +203,7 @@ export type SegregatedDataMetadata = {
 
 export async function segregatedDataOnCreate<M extends Model>(
   this: Repository<M, any>,
-  context: Context<FabricFlags>,
+  context: ContextOf<typeof this>,
   data: SegregatedDataMetadata[],
   keys: (keyof M)[],
   model: M
@@ -292,7 +293,7 @@ export async function segregatedDataOnRead<M extends Model>(
 
 export async function segregatedDataOnUpdate<M extends Model>(
   this: Repository<M, any>,
-  context: Context<FabricFlags>,
+  context: ContextOf<typeof this>,
   data: SegregatedDataMetadata[],
   key: keyof M[],
   model: M,
@@ -305,7 +306,7 @@ export async function segregatedDataOnDelete<
   V extends SegregatedDataMetadata,
 >(
   this: R,
-  context: Context<FabricFlags>,
+  context: ContextOf<R>,
   data: V[],
   key: keyof M[],
   model: M
