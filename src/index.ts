@@ -4,7 +4,7 @@
  * @module for-fabric
  */
 
-// export * from "./client";
-export * from "./contracts";
-// export * from "./shared";
+export * from "./client";
+// export * from "./contracts";
+export * from "./shared";
 export * from "./version";

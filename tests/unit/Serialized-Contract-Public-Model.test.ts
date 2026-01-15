@@ -155,4 +155,13 @@ describe("Tests Public contract", () => {
     );
     expect(page).toBeDefined();
   });
+
+  it("should executed prepared statements properly for simple queries", async () => {
+    const page = await contract.statement(
+      ctx,
+      "paginateBy",
+      JSON.stringify(["productCode", "desc", { offset: 1, limit: 3 }])
+    );
+    expect(page).toBeDefined();
+  });
 });

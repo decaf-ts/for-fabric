@@ -529,17 +529,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
     stub: ChaincodeStub,
     rawInput: any,
     limit: number = 250,
-    skip?: number,
+    page?: number,
+    bookmark?: string | number,
     ...args: any[]
   ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
     const { ctx } = this.logCtx(args, this.readState);
     let res: StateQueryResponse<Iterators.StateQueryIterator>;
     const collection = ctx.get("segregated");
     if (collection) {
-      rawInput.selector = {
-        ...rawInput.selector,
-        _id: skip ? { $gt: skip.toString() } : { $gte: "" },
-      };
+      if (bookmark) rawInput.selector._id = { $gt: bookmark.toString() };
       const it = await stub.getPrivateDataQueryResult(
         collection,
         JSON.stringify(rawInput)
@@ -555,7 +553,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       res = await stub.getQueryResultWithPagination(
         JSON.stringify(rawInput),
         limit,
-        skip?.toString()
+        bookmark?.toString()
       );
 
     return res;
@@ -742,7 +740,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
    */
   async raw<R, D extends boolean>(
     rawInput: MangoQuery,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     docsOnly: D = true as D,
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<RawResult<R, D>> {
@@ -750,6 +748,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
+    const resp = { docs: [], bookmark: undefined as string | undefined };
     if (limit || skip) {
       delete rawInput["limit"];
       delete rawInput["skip"];
@@ -762,8 +761,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
           rawInput,
           limit || Number.MAX_VALUE,
           (skip as any)?.toString(),
+          rawInput["bookmark"],
           ctx
         )) as StateQueryResponse<Iterators.StateQueryIterator>;
+      resp.bookmark = response.metadata.bookmark;
       iterator = response.iterator;
     } else {
       log.debug("Retrieving iterator");
@@ -775,11 +776,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
     log.debug("Iterator acquired");
 
-    const results = (await this.resultIterator(log, iterator)) as R;
+    resp.docs = (await this.resultIterator(log, iterator)) as any;
     log.debug(
-      `returning ${Array.isArray(results) ? results.length : 1} results`
+      `returning ${Array.isArray(resp.docs) ? resp.docs.length : 1} results`
     );
-    return results as any;
+    if (docsOnly) return resp.docs as any;
+    return resp as any;
   }
 
   override Statement<M extends Model>(): FabricStatement<M, any> {

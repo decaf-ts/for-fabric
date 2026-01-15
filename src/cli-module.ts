@@ -278,8 +278,8 @@ const deployContract = new Command()
   .option("--name <String>", "Contract Name (and folder)")
   .option("--input <String>", "input folder")
   .option(
-    "--incrementVersion <Boolean>",
-    "if should use version or sequence to update contracts",
+    "--incrementVersion <String>",
+    "(true | false) if should use version or sequence to update contracts",
     false
   )
   .option(
@@ -297,7 +297,7 @@ const deployContract = new Command()
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
     );
 
-    let version = pkg.version;
+    const version = pkg.version;
 
     const log = logger.for("deploy-contract");
     log.debug(
@@ -318,11 +318,11 @@ const deployContract = new Command()
     } catch (e: unknown) {
       sequence = 1;
     }
-
-    if (incrementVersion) {
-      version = version + `-${sequence}`;
-      sequence = 1;
-    }
+    //
+    // if (incrementVersion) {
+    //   version = version + `-${sequence}`;
+    //   // sequence = 1;
+    // }
 
     try {
       for (const peer of peerIds) {

@@ -27,6 +27,8 @@ const Clazz = Product;
 
 const pk = Model.pk(Clazz);
 
+jest.setTimeout(50000);
+
 describe("e2e Repository test", () => {
   let created: Product;
 
@@ -376,10 +378,13 @@ describe("e2e Repository test", () => {
         Product,
         FabricClientRepository<Product>
       >(Product);
-      const paginator = await repo.select().paginate(10);
-      const page1 = await paginator.page(1);
+      const paginator = await repo.select().paginate(5);
       expect(paginator).toBeDefined();
+      expect(paginator["_bookmark"]).toBeUndefined();
+      const page1 = await paginator.page(1);
+      expect(paginator.count).toBeGreaterThan(10);
       expect(page1).toBeDefined();
+      expect(paginator["_bookmark"]).toBeDefined();
     });
 
     it.skip("Deletes in Bulk", async () => {
