@@ -1,4 +1,9 @@
-import { MaybeContextualArg, PagingError, Sequence } from "@decaf-ts/core";
+import {
+  MaybeContextualArg,
+  PagingError,
+  Sequence,
+  Context,
+} from "@decaf-ts/core";
 import { DBKeys } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
@@ -126,15 +131,20 @@ export class FabricContractPaginator<
     bookmark?: any,
     ...args: MaybeContextualArg<any>
   ): Promise<M[]> {
-    const { ctxArgs, ctx, log } = this.adapter["logCtx"](
+    const { ctxArgs, ctx } = this.adapter["logCtx"](
       [bookmark, ...args].filter(Boolean),
       this.page
     );
+    if (bookmark && bookmark instanceof Context) {
+      bookmark = undefined;
+    }
+
+    this._bookmark = bookmark;
     if (this.isPreparedStatement())
       return await this.pagePrepared(page, ...ctxArgs);
     const statement = Object.assign({}, this.statement);
 
-    if (!this._recordCount || !this._totalPages) {
+    if (!bookmark && (!this._recordCount || !this._totalPages)) {
       this._totalPages = this._recordCount = 0;
       const countResults =
         (await this.adapter.raw<M[], true>(
@@ -148,7 +158,7 @@ export class FabricContractPaginator<
         this._totalPages = Math.ceil(this._recordCount / size);
         return await this.page(page, ...ctxArgs);
       }
-    } else {
+    } else if (page === 1) {
       page = this.validatePage(page);
       statement.skip = (page - 1) * this.size;
     }

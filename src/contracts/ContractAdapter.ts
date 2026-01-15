@@ -740,7 +740,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
    */
   async raw<R, D extends boolean>(
     rawInput: MangoQuery,
-
     docsOnly: D = true as D,
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<RawResult<R, D>> {
