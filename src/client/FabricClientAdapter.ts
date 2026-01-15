@@ -169,12 +169,7 @@ export class FabricClientAdapter extends Adapter<
     flags: Partial<FabricClientFlags>,
     ...args: any[]
   ): Promise<FabricClientFlags> {
-    return super.flags(
-      operation,
-      model,
-      Object.assign({}, DefaultFabricClientFlags, flags || {}),
-      ...args
-    );
+    return super.flags(operation, model, flags, ...args);
   }
 
   override async context<M extends Model>(
