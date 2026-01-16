@@ -8,13 +8,15 @@ import {
   ContextualArgs,
 } from "@decaf-ts/core";
 import {
+  afterCreate,
+  afterDelete,
+  afterUpdate,
   InternalError,
   NotFoundError,
   onCreate,
   onDelete,
   onRead,
   onUpdate,
-  OperationKeys,
   readonly,
   transient,
   ValidationError,
@@ -34,7 +36,6 @@ import {
 import { FabricFlags } from "./types";
 import { toPascalCase } from "@decaf-ts/logging";
 import { FabricContractContext } from "../contracts/index";
-import { Audit } from "../contract/models/Audit";
 
 /**
  * Decorator for marking methods that require ownership authorization.
@@ -200,8 +201,43 @@ export type MirrorCondition = <M extends Model>(
 
 export type MirrorMetadata = {
   condition: MirrorCondition;
-  resolver?: CollectionResolver;
+  resolver: CollectionResolver | string;
 };
+
+export async function evalMirrorMetadata<M extends Model>(
+  model: M,
+  condition: MirrorCondition,
+  resolver: undefined | string | CollectionResolver,
+  ctx: FabricContractContext
+) {
+  let shouldExecute: boolean;
+  try {
+    shouldExecute = await condition(model, ctx.stub, ctx);
+  } catch (e: unknown) {
+    throw new InternalError(
+      `Failed to validate Mirror condition execution: ${e}`
+    );
+  }
+
+  if (!shouldExecute) return;
+
+  let collection: CollectionResolver | string | undefined = resolver;
+  if (typeof collection !== "string") {
+    const owner = Model.ownerOf(model) || ctx.stub.getCreator().toString();
+    try {
+      if (resolver && typeof resolver === "function")
+        collection = await resolver(model, owner, ctx);
+    } catch (e: unknown) {
+      throw new InternalError(`Failed to resolve collection mirror name: ${e}`);
+    }
+  }
+
+  if (!collection || typeof collection !== "string")
+    throw new InternalError(
+      `No collection found model ${model.constructor.name}`
+    );
+  return collection;
+}
 
 export async function createMirrorHandler<
   M extends Model,
@@ -213,27 +249,12 @@ export async function createMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  let shouldExecute: boolean;
-  try {
-    shouldExecute = await data.condition(model, context.stub, context);
-  } catch (e: unknown) {
-    throw new InternalError(
-      `Failed to validate Mirror condition execution: ${e}`
-    );
-  }
-
-  if (!shouldExecute) return;
-
-  let collection: string | undefined = undefined;
-  try {
-    if (data.resolver) collection = await data.resolver(model, "", context);
-  } catch (e: unknown) {
-    throw new InternalError(`Failed to resolve collection mirror name: ${e}`);
-  }
-  if (!collection)
-    throw new InternalError(
-      `No collection found model ${model.constructor.name}`
-    );
+  const collection = await evalMirrorMetadata(
+    model,
+    data.condition,
+    data.resolver,
+    context
+  );
 
   const repo = this.override(
     Object.assign({}, this._overrides, {
@@ -244,26 +265,100 @@ export async function createMirrorHandler<
   );
 
   const mirror = await repo.create(model, context);
-  context.logger.info(`Mirror for ${Model.tableName(this.class)} created`);
+  context.logger.info(
+    `Mirror for ${Model.tableName(this.class)} created with ${Model.pk(model) as string}: ${mirror[Model.pk(model)]}`
+  );
+}
+
+export async function updateMirrorHandler<
+  M extends Model,
+  R extends Repository<M, any>,
+>(
+  this: R,
+  context: FabricContractContext,
+  data: MirrorMetadata,
+  key: keyof M,
+  model: M
+): Promise<void> {
+  const collection = await evalMirrorMetadata(
+    model,
+    data.condition,
+    data.resolver,
+    context
+  );
+
+  const repo = this.override(
+    Object.assign({}, this._overrides, {
+      segregate: collection,
+      ignoreValidation: true,
+      ignoreHandlers: true,
+    } as any)
+  );
+
+  const mirror = await repo.update(model, context);
+  context.logger.info(
+    `Mirror for ${Model.tableName(this.class)} updated with ${Model.pk(model) as string}: ${mirror[Model.pk(model)]}`
+  );
+}
+
+export async function deleteMirrorHandler<
+  M extends Model,
+  R extends Repository<M, any>,
+>(
+  this: R,
+  context: FabricContractContext,
+  data: MirrorMetadata,
+  key: keyof M,
+  model: M
+): Promise<void> {
+  const collection = await evalMirrorMetadata(
+    model,
+    data.condition,
+    data.resolver,
+    context
+  );
+
+  const repo = this.override(
+    Object.assign({}, this._overrides, {
+      segregate: collection,
+      ignoreValidation: true,
+      ignoreHandlers: true,
+    } as any)
+  );
+
+  const mirror = await repo.delete(Model.pk(model) as string, context);
+  context.logger.info(
+    `Mirror for ${Model.tableName(this.class)} deleted with ${Model.pk(model) as string}: ${mirror[Model.pk(model)]}`
+  );
 }
 
 export function mirror(
-  condition: MirrorCondition,
-  resolver?: CollectionResolver
+  collection: CollectionResolver | string,
+  condition?: MirrorCondition
 ) {
-  function mirror(condition: MirrorCondition, resolver?: CollectionResolver) {
+  function mirror(
+    resolver: CollectionResolver | string,
+    condition: MirrorCondition
+  ) {
+    const meta: MirrorMetadata = {
+      condition: condition,
+      resolver: resolver,
+    };
     return apply(
-      metadata(Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.MIRROR), {
-        condition: condition,
-        resolver: resolver,
-      })
+      metadata(
+        Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.MIRROR),
+        meta
+      ),
+      afterCreate(createMirrorHandler as any, meta, { priority: 95 }),
+      afterUpdate(updateMirrorHandler as any, meta, { priority: 95 }),
+      afterDelete(deleteMirrorHandler as any, meta, { priority: 95 })
     );
   }
 
   return Decoration.for(FabricModelKeys.MIRROR)
     .define({
       decorator: mirror,
-      args: [condition, resolver],
+      args: [collection, condition],
     })
     .apply();
 }

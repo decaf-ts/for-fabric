@@ -6,7 +6,7 @@ import path from "path";
 import { rollup } from "rollup";
 import replace from "@rollup/plugin-replace";
 import typescript from "@rollup/plugin-typescript";
-import { InternalError } from "@decaf-ts/db-decorators";
+import { InternalError, SerializationError } from "@decaf-ts/db-decorators";
 import {
   generateModelIndexes,
   readModelFile,
@@ -23,6 +23,10 @@ import {
   getContractStartCommand,
 } from "./cli-utils";
 import "./shared/overrides";
+import {
+  extractCollections as exCollections,
+  writeCollections,
+} from "./client/collections/index";
 
 const logger = Logging.for("fabric");
 
@@ -194,6 +198,12 @@ const extractCollections = new Command()
   .option("--file [String]", "the model file")
   .option("--folder [String]", "the model folder")
   .option("--outDir <String>", "the outdir. should match your contract folder")
+  .option("--mspIds <String>", "single mspId or stringified array")
+  .option(
+    "--overrides [String]",
+    "stringified override object {requiredPeerCount: number, maxPeerCount: number, blockToLive: number, memberOnlyRead: number, memberOnlyWrite: number, endorsementPolicy:  {}}"
+  )
+  .option("--outDir <String>", "the outdir. should match your contract folder")
   .description(
     "Creates a the JSON index files to be submitted to along with the contract"
   )
@@ -210,7 +220,21 @@ const extractCollections = new Command()
     );
 
     // eslint-disable-next-line prefer-const
-    let { file, folder, outDir } = options;
+    let { file, folder, outDir, mspIds, overrides } = options;
+
+    try {
+      try {
+        mspIds = mspIds ? JSON.parse(mspIds) : undefined;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (e: unknown) {
+        //  do nothing
+      }
+      overrides = overrides ? JSON.parse(overrides) : undefined;
+    } catch (e: unknown) {
+      throw new SerializationError(
+        `Unable to extract mspids or overrides:  ${e}`
+      );
+    }
 
     const models: any[] = [];
     if (file) {
@@ -226,16 +250,13 @@ const extractCollections = new Command()
     if (!file && !folder)
       throw new InternalError(`Must pass a file or a folder`);
 
-    const privateOrShared = models.filter(
-      (m) => Model.isPrivate(m) || Model.isShared(m)
-    );
+    const cols = models.map((m) => exCollections(m, mspIds, overrides)).flat();
+    log.verbose(`Found ${Object.keys(result).length} collections to create`);
+    log.debug(`Collections: ${JSON.stringify(result)}`);
 
-    for (const m of privateOrShared) {
-      log.verbose(`Extracting collections for table ${Model.tableName(m)}`);
-      generateModelIndexes(m, result);
-    }
-    log.verbose(`Found ${Object.keys(result).length} indexes to create`);
-    log.debug(`Indexes: ${JSON.stringify(result)}`);
+    log.verbose(`generating indexes for collections`);
+
+    // writeCollections(cols, outDir);
     writeIndexes(Object.values(result), outDir);
   });
 
@@ -303,6 +324,7 @@ const deployContract = new Command()
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { name, input, peers, trackerFolder, incrementVersion } = options;
     const peerIds = peers.split(",");
 
@@ -378,6 +400,7 @@ fabricCmd.addCommand(extractIndexes);
 fabricCmd.addCommand(ensureInfra);
 fabricCmd.addCommand(deployContract);
 fabricCmd.addCommand(getCryptoMaterial);
+fabricCmd.addCommand(extractCollections);
 
 export default function fabric() {
   return fabricCmd;

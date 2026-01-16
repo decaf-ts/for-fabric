@@ -99,6 +99,15 @@ Model.prototype.segregate = function segregate<M extends Model>(
   );
 }.bind(Model);
 
+(Model as any).mirrored = function mirrored<M extends Model>(
+  model: M | Constructor<M>
+): boolean {
+  return Metadata.get(
+    typeof model !== "function" ? (model.constructor as any) : model,
+    Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.MIRROR)
+  );
+}.bind(Model);
+
 (Model as any).ownedBy = function ownedBy<M extends Model>(
   model: M
 ): string | undefined {

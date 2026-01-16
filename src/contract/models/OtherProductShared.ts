@@ -10,6 +10,7 @@ import { gtin } from "./gtin";
 import { audit } from "./decorators";
 import {
   FabricFlavour,
+  mirror,
   ModelCollection,
   ownedBy,
   privateData,
@@ -25,6 +26,7 @@ import { version } from "@decaf-ts/db-decorators";
 export class OtherProductShared extends BaseIdentifiedModel {
   @pk()
   @gtin()
+  @mirror("ptp-product")
   @audit(OtherProductShared)
   productCode!: string;
 

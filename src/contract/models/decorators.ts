@@ -24,12 +24,13 @@ export async function createAuditHandler<
   const repo = Repository.forModel(Audit);
 
   if (!context.identity || !context.identity.getID)
-    throw new InternalError(`Lost context apprently. no getId in identity`);
+    throw new InternalError(`Lost context apparently. no getId in identity`);
 
   const toCreate = new Audit({
     userGroup: context.identity.getID(),
     userId: context.identity.getID(),
     model: Model.tableName(data.class),
+    transaction: context.stub.getTxID(),
     action: OperationKeys.CREATE,
     diffs: new this.class().compare(model),
   });
@@ -55,6 +56,7 @@ export async function updateAuditHandler<
     userGroup: context.identity.getID(),
     userId: context.identity.getID(),
     model: Model.tableName(data.class),
+    transaction: context.stub.getTxID(),
     action: OperationKeys.UPDATE,
     diffs: model.compare(oldModel),
   });
@@ -83,6 +85,7 @@ export async function deleteAuditHandler<
     userGroup: context.identity.getID(),
     userId: context.identity.getID(),
     model: Model.tableName(data.class),
+    transaction: context.stub.getTxID(),
     action: OperationKeys.DELETE,
     diffs: model.compare(new this.class()),
   });

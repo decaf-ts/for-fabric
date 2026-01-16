@@ -105,6 +105,7 @@ export function getStubMock() {
             // No-op for mock
           },
         },
+        metadata: { bookmark: Date.now().toString() },
       };
     },
   };

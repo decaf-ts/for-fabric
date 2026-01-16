@@ -4,7 +4,7 @@ import { Info } from "fabric-contract-api";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
 FabricContractAdapter.decoration();
 Adapter.setCurrent(FabricFlavour);
-import { NotFoundError, OperationKeys } from "@decaf-ts/db-decorators";
+import { NotFoundError } from "@decaf-ts/db-decorators";
 import { Product } from "./models/Product";
 import { SerializedCrudContract } from "../../src/contracts/crud/serialized-crud-contract";
 import { getMockCtx } from "./ContextMock";
