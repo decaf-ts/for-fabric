@@ -6,7 +6,7 @@ import {
 } from "@decaf-ts/decorator-validation";
 import {
   BlockOperations,
-  composed,
+  InternalError,
   OperationKeys,
   readonly,
   serialize,
@@ -16,15 +16,24 @@ import {
   table,
   pk,
   createdBy,
-  createdAt,
   column,
-  updatedAt,
   OrderDirection,
   index,
+  uuid,
+  ContextualArgs,
 } from "@decaf-ts/core";
 import { BaseModel } from "./BaseModel";
 import { AuditOperations } from "./constants";
 import { FabricFlavour, transactionId } from "../../shared/index";
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function uuidSeed(m: Audit, ...args: ContextualArgs<any>) {
+  try {
+    return `${m.model}${m.action}${m.userId}${m.transaction}${JSON.stringify(m.diffs)}`;
+  } catch (e: unknown) {
+    throw new InternalError(`Failed to generate deterministic uuid: ${e}`);
+  }
+}
 
 @description("Logs user activity for auditing purposes.")
 @BlockOperations([
@@ -36,8 +45,8 @@ import { FabricFlavour, transactionId } from "../../shared/index";
 @table("audit")
 @model()
 export class Audit extends BaseModel {
-  @pk({ type: String, generated: false })
-  @composed(["transaction", "action", "diffs"], ":", false, true)
+  @pk()
+  @uuid(uuidSeed)
   @description("Unique identifier of the audit record.")
   id!: string;
 
@@ -57,6 +66,13 @@ export class Audit extends BaseModel {
   @column()
   @required()
   @readonly()
+  @index([OrderDirection.ASC, OrderDirection.DSC])
+  @description("model/entity affected by the action")
+  model!: string;
+
+  @column()
+  @required()
+  @readonly()
   @transactionId()
   @description("the transaction the audit record was created in")
   transaction!: string;
@@ -71,9 +87,10 @@ export class Audit extends BaseModel {
 
   @column()
   @readonly()
+  @required()
   @serialize()
   @description("the diffs for the action.")
-  diffs?: Record<string, any>;
+  diffs!: Record<string, any>;
 
   constructor(model?: ModelArg<Audit>) {
     super(model);

@@ -204,7 +204,7 @@ const extractCollections = new Command()
 
     const version = pkg.version;
 
-    const log = logger.for("extract-indexes");
+    const log = logger.for("extract-collections");
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );

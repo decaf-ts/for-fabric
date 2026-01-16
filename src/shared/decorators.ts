@@ -5,6 +5,7 @@ import {
   UnsupportedError,
   Repository,
   ContextOf,
+  ContextualArgs,
 } from "@decaf-ts/core";
 import {
   InternalError,
@@ -13,8 +14,10 @@ import {
   onDelete,
   onRead,
   onUpdate,
+  OperationKeys,
   readonly,
   transient,
+  ValidationError,
 } from "@decaf-ts/db-decorators";
 import { Model, required } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
@@ -29,6 +32,9 @@ import {
   propMetadata,
 } from "@decaf-ts/decoration";
 import { FabricFlags } from "./types";
+import { toPascalCase } from "@decaf-ts/logging";
+import { FabricContractContext } from "../contracts/index";
+import { Audit } from "../contract/models/Audit";
 
 /**
  * Decorator for marking methods that require ownership authorization.
@@ -121,20 +127,21 @@ export async function ownedByOnCreate<
 }
 
 export function ownedBy() {
-  const key = getFabricModelKey(FabricModelKeys.OWNEDBY);
-
   function ownedBy() {
     return function (obj: any, attribute?: any) {
       return apply(
         required(),
         readonly(),
         onCreate(ownedByOnCreate),
-        propMetadata(getFabricModelKey(FabricModelKeys.OWNEDBY), attribute)
+        propMetadata(
+          Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.OWNED_BY),
+          attribute
+        )
       )(obj, attribute);
     };
   }
 
-  return Decoration.for(key)
+  return Decoration.for(FabricModelKeys.OWNED_BY)
     .define({
       decorator: ownedBy,
       args: [],
@@ -185,16 +192,111 @@ export function transactionId() {
     .apply();
 }
 
-export function getFabricModelKey(key: string) {
-  return Metadata.key(FabricModelKeys.FABRIC + key);
+export type MirrorCondition = <M extends Model>(
+  m: M,
+  stub: any,
+  ctx: Context
+) => Promise<boolean>;
+
+export type MirrorMetadata = {
+  condition: MirrorCondition;
+  resolver?: CollectionResolver;
+};
+
+export async function createMirrorHandler<
+  M extends Model,
+  R extends Repository<M, any>,
+>(
+  this: R,
+  context: FabricContractContext,
+  data: MirrorMetadata,
+  key: keyof M,
+  model: M
+): Promise<void> {
+  let shouldExecute: boolean;
+  try {
+    shouldExecute = await data.condition(model, context.stub, context);
+  } catch (e: unknown) {
+    throw new InternalError(
+      `Failed to validate Mirror condition execution: ${e}`
+    );
+  }
+
+  if (!shouldExecute) return;
+
+  let collection: string | undefined = undefined;
+  try {
+    if (data.resolver) collection = await data.resolver(model, "", context);
+  } catch (e: unknown) {
+    throw new InternalError(`Failed to resolve collection mirror name: ${e}`);
+  }
+  if (!collection)
+    throw new InternalError(
+      `No collection found model ${model.constructor.name}`
+    );
+
+  const repo = this.override(
+    Object.assign({}, this._overrides, {
+      segregate: collection,
+      ignoreValidation: true,
+      ignoreHandlers: true,
+    } as any)
+  );
+
+  const mirror = await repo.create(model, context);
+  context.logger.info(`Mirror for ${Model.tableName(this.class)} created`);
 }
 
-export type CollectionResolver = <M extends Model>(model: M) => string;
+export function mirror(
+  condition: MirrorCondition,
+  resolver?: CollectionResolver
+) {
+  function mirror(condition: MirrorCondition, resolver?: CollectionResolver) {
+    return apply(
+      metadata(Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.MIRROR), {
+        condition: condition,
+        resolver: resolver,
+      })
+    );
+  }
 
-export const ImplicitPrivateCollection: CollectionResolver = <M extends Model>(
-  model: M
+  return Decoration.for(FabricModelKeys.MIRROR)
+    .define({
+      decorator: mirror,
+      args: [condition, resolver],
+    })
+    .apply();
+}
+
+export type CollectionResolver = <M extends Model>(
+  model: M,
+  msp?: string,
+  ...args: ContextualArgs<any>
+) => Promise<string>;
+
+export const ModelCollection: CollectionResolver = async <M extends Model>(
+  model: M,
+  msp?: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  ...args: ContextualArgs<any>
 ) => {
-  return `__${model.constructor.name}PrivateCollection`;
+  return `${toPascalCase(Model.tableName(model.constructor as any))}${msp ? toPascalCase(msp) : ""}PrivateCollection`;
+};
+
+export const ImplicitPrivateCollection: CollectionResolver = async <
+  M extends Model,
+>(
+  model: M,
+  mspId?: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  ...args: ContextualArgs<any>
+) => {
+  const orgName = Model.ownerOf(model) || mspId;
+  if (!orgName)
+    throw new InternalError(
+      `Model ${model.constructor.name} is not owned by any organization. did you use @ownedBy() (or provide the name)?`
+    );
+  return `__${toPascalCase(orgName)}PrivateCollection`;
 };
 
 export type SegregatedDataMetadata = {
@@ -213,18 +315,24 @@ export async function segregatedDataOnCreate<M extends Model>(
       `Segregated data keys and metadata length mismatch`
     );
 
+  const msp = Model.ownerOf(model);
+  if (!msp)
+    throw new ValidationError(
+      `There's no assigned organization for model ${model.constructor.name}`
+    );
+
   const collectionResolver = data[0].collections;
   const collection =
     typeof collectionResolver === "string"
       ? collectionResolver
-      : collectionResolver(model);
+      : collectionResolver(model, msp, context);
 
   const rebuilt = keys.reduce(
     (acc: Record<keyof M, any>, k, i) => {
       const c =
         typeof data[i].collections === "string"
           ? data[i].collections
-          : data[i].collections(model);
+          : data[i].collections(model, msp, context);
       if (c !== collection)
         throw new UnsupportedError(
           `Segregated data collection mismatch: ${c} vs ${collection}`
@@ -258,37 +366,38 @@ export async function segregatedDataOnRead<M extends Model>(
       `Segregated data keys and metadata length mismatch`
     );
 
+  const msp = Model.ownerOf(model);
+  if (!msp)
+    throw new ValidationError(
+      `There's no assigned organization for model ${model.constructor.name}`
+    );
+
   const collectionResolver = data[0].collections;
   const collection =
     typeof collectionResolver === "string"
       ? collectionResolver
-      : collectionResolver(model);
+      : await collectionResolver(model, msp, context);
 
   const rebuilt = keys.reduce(
     (acc: Record<keyof M, any>, k, i) => {
       const c =
         typeof data[i].collections === "string"
           ? data[i].collections
-          : data[i].collections(model);
-      if (c !== collection)
-        throw new UnsupportedError(
-          `Segregated data collection mismatch: ${c} vs ${collection}`
-        );
+          : data[i].collections(model, msp, context);
+      if (c !== collection) return acc;
       acc[k] = model[k];
       return acc;
     },
     {} as Record<keyof M, any>
   );
 
-  const toCreate = new this.class(rebuilt);
-
   // const segregated = Model.segregate(model);
-
-  const created = await this.override({ segregated: collection } as any).create(
-    toCreate,
-    context
-  );
-  Object.assign(model, created);
+  //
+  // const created = await this.override({ segregated: collection } as any).readAll(
+  //   toCreate,
+  //   context
+  // );
+  // Object.assign(model, created);
 }
 
 export async function segregatedDataOnUpdate<M extends Model>(
@@ -318,12 +427,6 @@ function segregated(
 ) {
   return function innerSegregated(target: object, propertyKey?: any) {
     function segregatedDec(target: object, propertyKey?: any) {
-      if (!propertyKey) {
-        const props = Metadata.properties(target as Constructor) || [];
-        for (const prop of props) segregated(collection, type)(target, prop);
-        return target;
-      }
-
       const key = Metadata.key(type, propertyKey);
       const constr: Constructor = target.constructor as Constructor;
 
@@ -332,14 +435,20 @@ function segregated(
       collections.add(collection);
       meta.collections = [...collections];
       Metadata.set(constr as Constructor, key, meta);
+
+      const constrMeta = Metadata.get(constr as Constructor, type) || {};
+      const constrCollections = new Set(constrMeta.collections || []);
+      constrCollections.add(collection);
+      meta.collections = [...collections];
+      Metadata.set(constr as Constructor, type, meta);
     }
+
     const decs: any[] = [];
     if (!propertyKey) {
       // decorated at the class level
       Metadata.properties(target as Constructor)?.forEach((p) =>
         segregated(collection, type)(target, p)
       );
-      return metadata(type, true)(target);
     } else {
       decs.push(
         transient(),
@@ -422,42 +531,3 @@ export function sharedData(collection: string | CollectionResolver) {
     })
     .apply();
 }
-//
-// export function privateData(collection?: string) {
-//   if (!collection) {
-//     throw new Error("Collection name is required");
-//   }
-//
-//   const key: string = FabricModelKeys.PRIVATE;
-//
-//   return function privateData<M extends Model>(
-//     model: M | Constructor<M>,
-//     attribute?: any
-//   ) {
-//     const constr =
-//       model instanceof Model ? (model.constructor as Constructor) : model;
-//
-//     const metaData: any = Metadata.get(constr);
-//     const modeldata = metaData?.private?.collections || [];
-//
-//     propMetadata(key, {
-//       ...(!attribute && {
-//         collections: modeldata
-//           ? [...new Set([...modeldata, collection])]
-//           : [collection],
-//       }),
-//       isPrivate: !attribute,
-//     })(attribute ? constr : model);
-//
-//     if (attribute) {
-//       const attributeData =
-//         (metaData?.private?.[attribute] as any)?.collections || [];
-//       propMetadata(Metadata.key(key, attribute), {
-//         collections: attributeData
-//           ? [...new Set([...attributeData, collection])]
-//           : [collection],
-//       })(model, attribute);
-//       transient()(model, attribute);
-//     }
-//   };
-// }

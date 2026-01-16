@@ -4,7 +4,7 @@
  * @namespace contracts
  * @memberOf module:for-fabric
  */
-
+export * from "./overrides"; // first one on purpose
 export * from "./crud";
 export * from "./erc20";
 export * from "./ContractAdapter";

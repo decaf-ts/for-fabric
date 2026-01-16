@@ -12,10 +12,8 @@ import {
   SequenceModel,
   SequenceOptions,
   Serial,
-  UnsupportedError,
   UUID,
 } from "@decaf-ts/core";
-import { Logging, style } from "@decaf-ts/logging";
 
 /**
  * @description Abstract base class for sequence generation
@@ -183,9 +181,9 @@ export class FabricContractSequence extends Sequence {
         }
       };
 
-      const incrementSerial = (
+      const incrementSerial = async (
         base: string | number | bigint
-      ): string | number | bigint => {
+      ): Promise<string | number | bigint> => {
         switch (typeName) {
           case Number.name:
             return (this.parse(base) as number) + toIncrementBy;
@@ -194,7 +192,9 @@ export class FabricContractSequence extends Sequence {
           case String.name:
             return this.parse(base);
           case "serial":
-            return Serial.instance.generate(base as string);
+            return await Promise.resolve(
+              Serial.instance.generate(base as string)
+            );
           default:
             throw new InternalError("Should never happen");
         }
@@ -202,7 +202,7 @@ export class FabricContractSequence extends Sequence {
 
       if (typeName === "uuid") {
         while (true) {
-          const next = UUID.instance.generate(currentValue as string);
+          const next = await UUID.instance.generate(currentValue as string);
           try {
             const result = await performUpsert(next);
             log.debug(
@@ -216,7 +216,7 @@ export class FabricContractSequence extends Sequence {
         }
       }
 
-      const next = incrementSerial(currentValue);
+      const next = await incrementSerial(currentValue);
       const seq = await performUpsert(next);
       log.debug(
         `Sequence.increment ${name} current=${currentValue as any} next=${next as any}`

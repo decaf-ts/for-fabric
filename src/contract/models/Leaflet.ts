@@ -27,8 +27,8 @@ import { FabricFlavour } from "../../shared/index";
 @table(TableNames.Leaflet)
 @model()
 export class Leaflet extends BaseIdentifiedModel {
-  @audit()
-  @pk({ type: "String", generated: false })
+  @audit(Leaflet)
+  @pk()
   @composed(["productCode", "batchNumber", "lang", "countryMarket"], ":", [
     "batchNumber",
     "countryMarket",

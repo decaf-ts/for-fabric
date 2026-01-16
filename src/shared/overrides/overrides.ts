@@ -1,12 +1,10 @@
 import { Model } from "@decaf-ts/decorator-validation";
-// import { validateCompare } from "../model/validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
-// import { DBKeys } from "../model/constants";
-// import { SerializationError } from "../repository/errors";
 import { FabricModelKeys } from "../constants";
 import { SegregatedModel } from "../types";
-import { DBKeys, SerializationError } from "@decaf-ts/db-decorators";
-import { PersistenceKeys } from "@decaf-ts/core";
+import { DBKeys, InternalError } from "@decaf-ts/db-decorators";
+import { Context } from "@decaf-ts/core";
+import { CollectionResolver } from "../decorators";
 
 Model.prototype.isShared = function isShared<M extends Model>(
   this: M
@@ -83,16 +81,6 @@ Model.prototype.segregate = function segregate<M extends Model>(
   return result as SegregatedModel<M>;
 }.bind(Model);
 
-(Model as any).tableName = function <M extends Model>(
-  model: Constructor<M> | M
-): string {
-  const target = model instanceof Model ? model.constructor : model;
-  const meta = Metadata.get(target as any, PersistenceKeys.TABLE);
-  if (meta) return meta;
-  if (model instanceof Model) return model.constructor.name;
-  return model.name;
-};
-
 (Model as any).isPrivate = function isPrivate<M extends Model>(
   model: M | Constructor<M>
 ): boolean {
@@ -102,11 +90,71 @@ Model.prototype.segregate = function segregate<M extends Model>(
   );
 }.bind(Model);
 
-(Metadata as any).isShared = function isShared<M extends Model>(
+(Model as any).isShared = function isShared<M extends Model>(
   model: M | Constructor<M>
 ): boolean {
   return !!Metadata.get(
     typeof model !== "function" ? (model.constructor as any) : model,
     FabricModelKeys.SHARED
   );
-}.bind(Metadata);
+}.bind(Model);
+
+(Model as any).ownedBy = function ownedBy<M extends Model>(
+  model: M
+): string | undefined {
+  const meta = Metadata.get(
+    model.constructor as any,
+    Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.OWNED_BY)
+  );
+  if (!meta) return undefined;
+  return model[meta as keyof M] as string;
+}.bind(Model);
+
+(Model as any).collectionsFor = function collectionsFor<M extends Model>(
+  model: M | Constructor<M>,
+  prop?: keyof M | Context<any>,
+  ctx?: Context<any>
+): { privateCols: string[]; sharedCols: string[] } {
+  if (!ctx && typeof prop !== "string") {
+    ctx = prop as any;
+    prop = undefined;
+  }
+
+  const privateKeys: string[] = (
+    prop
+      ? [FabricModelKeys.FABRIC, FabricModelKeys.PRIVATE, prop]
+      : [FabricModelKeys.PRIVATE]
+  ) as string[];
+  const sharedKeys: string[] = (
+    prop
+      ? [FabricModelKeys.FABRIC, FabricModelKeys.SHARED, prop]
+      : [FabricModelKeys.SHARED]
+  ) as string[];
+
+  const privateKey = Metadata.key(...privateKeys);
+  const sharedKey = Metadata.key(...sharedKeys);
+
+  function resolveCollection(col: string | CollectionResolver) {
+    if (typeof model === "function") {
+      throw new InternalError(
+        `Collection resolvers need the actual instance to generate the collection`
+      );
+    }
+    return typeof col === "string"
+      ? col
+      : (col as CollectionResolver)(model, "", ctx);
+  }
+
+  const constr = typeof model === "function" ? model : model.constructor;
+  const privateMeta: string[] = (
+    Metadata.get(constr as any, privateKey) || []
+  ).map(resolveCollection);
+  const sharedMeta: string[] = (
+    Metadata.get(constr as any, sharedKey) || []
+  ).map(resolveCollection);
+
+  return {
+    privateCols: privateMeta,
+    sharedCols: sharedMeta,
+  };
+}.bind(Model);

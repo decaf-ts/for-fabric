@@ -26,6 +26,8 @@ export interface FabricContractFlags extends FabricFlags {
 
   cert: string;
 
+  segregate?: string;
+
   /**
    * @description Logger instance for the contract
    */
