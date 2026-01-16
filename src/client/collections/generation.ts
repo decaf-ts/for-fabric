@@ -3,6 +3,7 @@ import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
 import { InternalError } from "@decaf-ts/db-decorators";
+import { CollectionResolver, MirrorMetadata } from "../../shared/index";
 
 export type Index = {
   index: {
@@ -128,23 +129,28 @@ export function sharedCollectionFor(
   return c;
 }
 
-export function extractCollections<M extends Model>(
+export async function extractCollections<M extends Model>(
   m: Constructor<M>,
   mspIds: string[],
-  overrides?: {
-    privateCols: Partial<PrivateCollection>;
-    sharedCols: Partial<PrivateCollection>;
-  }
+  overrides: {
+    privateCols?: Partial<PrivateCollection>;
+    sharedCols?: Partial<PrivateCollection>;
+  } = {},
+  mirror: boolean = false
 ) {
-  const { privateCols, sharedCols } = Model.collectionsFor(m);
-  if (
-    (privateCols.length && privateCols.find((p) => sharedCols.includes(p))) ||
-    (sharedCols.length && sharedCols.find((s) => privateCols.includes(s)))
-  ) {
-    throw new InternalError(
-      `Private and shared collections cannot share the same name`
-    );
+  let { privateCols, sharedCols } = Model.collectionsFor(m);
+
+  function resolveCollection(arg: string | CollectionResolver): string {
+    try {
+      if (typeof arg === "string") return arg;
+      return arg(m, mspIds[0]) as string;
+    } catch (e: unknown) {
+      throw new InternalError(e as Error);
+    }
   }
+
+  privateCols = privateCols.map(resolveCollection);
+  sharedCols = sharedCols.map(resolveCollection);
 
   const privateDefaults = Object.assign(
     {},
@@ -166,33 +172,47 @@ export function extractCollections<M extends Model>(
       memberOnlyRead: true,
       memberOnlyWrite: true,
     },
-    overrides?.privateCols || {}
+    overrides?.sharedCols || {}
   );
+
+  const mirrorMeta = mirror ? Model.mirroredAt(m) : undefined;
 
   const privates = mspIds
     .map((mspId) =>
-      privateCols.map((p) => {
-        const {
-          requiredPeerCount,
-          maxPeerCount,
-          blockToLive,
-          memberOnlyRead,
-          memberOnlyWrite,
-        } = privateDefaults;
-        return privateCollectionFor(
-          mspId,
-          p,
-          requiredPeerCount,
-          maxPeerCount,
-          blockToLive,
-          memberOnlyRead,
-          memberOnlyWrite
-        );
-      })
+      (privateCols as string[])
+        .filter((p) => {
+          if (!mirrorMeta) return true;
+          const mirroCol =
+            typeof mirrorMeta.resolver === "string"
+              ? mirrorMeta.resolver
+              : mirrorMeta.resolver(m, mspId);
+          return (
+            mirroCol === p &&
+            (mirrorMeta.condition ? mirrorMeta.condition(mspId) : true)
+          );
+        })
+        .map((p) => {
+          const {
+            requiredPeerCount,
+            maxPeerCount,
+            blockToLive,
+            memberOnlyRead,
+            memberOnlyWrite,
+          } = privateDefaults;
+          return privateCollectionFor(
+            mspId,
+            p,
+            requiredPeerCount,
+            maxPeerCount,
+            blockToLive,
+            memberOnlyRead,
+            memberOnlyWrite
+          );
+        })
     )
     .flat();
 
-  const shared = sharedCols.map((p) => {
+  const shared = (sharedCols as string[]).map((p) => {
     const {
       requiredPeerCount,
       maxPeerCount,

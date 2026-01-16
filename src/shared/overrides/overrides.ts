@@ -4,7 +4,7 @@ import { FabricModelKeys } from "../constants";
 import { SegregatedModel } from "../types";
 import { DBKeys, InternalError } from "@decaf-ts/db-decorators";
 import { Context } from "@decaf-ts/core";
-import { CollectionResolver } from "../decorators";
+import { CollectionResolver, MirrorMetadata } from "../decorators";
 
 Model.prototype.isShared = function isShared<M extends Model>(
   this: M
@@ -119,51 +119,41 @@ Model.prototype.segregate = function segregate<M extends Model>(
   return model[meta as keyof M] as string;
 }.bind(Model);
 
-(Model as any).collectionsFor = function collectionsFor<M extends Model>(
-  model: M | Constructor<M>,
-  prop?: keyof M | Context<any>,
-  ctx?: Context<any>
-): { privateCols: string[]; sharedCols: string[] } {
-  if (!ctx && typeof prop !== "string") {
-    ctx = prop as any;
-    prop = undefined;
-  }
+(Model as any).mirroredAt = function mirroredAt<M extends Model>(
+  model: M | Constructor<M>
+): MirrorMetadata | undefined {
+  model = typeof model !== "function" ? (model.constructor as any) : model;
+  return Metadata.get(
+    model as any,
+    Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.MIRROR)
+  );
+}.bind(Model);
 
-  const privateKeys: string[] = (
-    prop
-      ? [FabricModelKeys.FABRIC, FabricModelKeys.PRIVATE, prop]
-      : [FabricModelKeys.PRIVATE]
-  ) as string[];
-  const sharedKeys: string[] = (
-    prop
-      ? [FabricModelKeys.FABRIC, FabricModelKeys.SHARED, prop]
-      : [FabricModelKeys.SHARED]
-  ) as string[];
+(Model as any).collectionsFor = function collectionsFor<M extends Model>(
+  model: M | Constructor<M>
+): {
+  privateCols: (string | CollectionResolver)[];
+  sharedCols: (string | CollectionResolver)[];
+} {
+  const privateKeys: string[] = [FabricModelKeys.PRIVATE] as string[];
+  const sharedKeys: string[] = [FabricModelKeys.SHARED] as string[];
 
   const privateKey = Metadata.key(...privateKeys);
   const sharedKey = Metadata.key(...sharedKeys);
 
-  function resolveCollection(col: string | CollectionResolver) {
-    if (typeof model === "function") {
-      throw new InternalError(
-        `Collection resolvers need the actual instance to generate the collection`
-      );
-    }
-    return typeof col === "string"
-      ? col
-      : (col as CollectionResolver)(model, "", ctx);
-  }
-
   const constr = typeof model === "function" ? model : model.constructor;
-  const privateMeta: string[] = (
-    Metadata.get(constr as any, privateKey) || []
-  ).map(resolveCollection);
-  const sharedMeta: string[] = (
-    Metadata.get(constr as any, sharedKey) || []
-  ).map(resolveCollection);
+
+  const privateMeta: { collections: string[] } = Metadata.get(
+    constr as any,
+    privateKey
+  );
+  const sharedMeta: { collections: string[] } = Metadata.get(
+    constr as any,
+    sharedKey
+  );
 
   return {
-    privateCols: privateMeta,
-    sharedCols: sharedMeta,
+    privateCols: privateMeta?.collections || [],
+    sharedCols: sharedMeta?.collections || [],
   };
 }.bind(Model);

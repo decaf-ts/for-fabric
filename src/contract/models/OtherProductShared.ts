@@ -1,6 +1,13 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
-import { column, index, OrderDirection, pk, table } from "@decaf-ts/core";
+import {
+  column,
+  Context,
+  index,
+  OrderDirection,
+  pk,
+  table,
+} from "@decaf-ts/core";
 // import {BlockOperations, OperationKeys, readonly} from "@decaf-ts/db-decorators";
 import { uses } from "@decaf-ts/decoration";
 
@@ -13,7 +20,6 @@ import {
   mirror,
   ModelCollection,
   ownedBy,
-  privateData,
   sharedData,
 } from "../../shared/index";
 import { version } from "@decaf-ts/db-decorators";
@@ -21,12 +27,12 @@ import { version } from "@decaf-ts/db-decorators";
 @sharedData(ModelCollection)
 @uses(FabricFlavour)
 // @BlockOperations([OperationKeys.DELETE])
-@table("other_product")
+@table("other_product_shared")
 @model()
 export class OtherProductShared extends BaseIdentifiedModel {
   @pk()
   @gtin()
-  @mirror("ptp-product")
+  @mirror("ptp-product", (mspId: string) => mspId === "pla")
   @audit(OtherProductShared)
   productCode!: string;
 

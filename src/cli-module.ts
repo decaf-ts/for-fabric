@@ -25,8 +25,11 @@ import {
 import "./shared/overrides";
 import {
   extractCollections as exCollections,
+  Index,
+  PrivateCollection,
   writeCollections,
 } from "./client/collections/index";
+import { Metadata } from "@decaf-ts/decoration";
 
 const logger = Logging.for("fabric");
 
@@ -199,11 +202,11 @@ const extractCollections = new Command()
   .option("--folder [String]", "the model folder")
   .option("--outDir <String>", "the outdir. should match your contract folder")
   .option("--mspIds <String>", "single mspId or stringified array")
+  .option("--mainMspId <String>", "single mspId")
   .option(
     "--overrides [String]",
     "stringified override object {requiredPeerCount: number, maxPeerCount: number, blockToLive: number, memberOnlyRead: number, memberOnlyWrite: number, endorsementPolicy:  {}}"
   )
-  .option("--outDir <String>", "the outdir. should match your contract folder")
   .description(
     "Creates a the JSON index files to be submitted to along with the contract"
   )
@@ -220,7 +223,7 @@ const extractCollections = new Command()
     );
 
     // eslint-disable-next-line prefer-const
-    let { file, folder, outDir, mspIds, overrides } = options;
+    let { file, folder, outDir, mspIds, overrides, mainMspId } = options;
 
     try {
       try {
@@ -229,7 +232,9 @@ const extractCollections = new Command()
       } catch (e: unknown) {
         //  do nothing
       }
-      overrides = overrides ? JSON.parse(overrides) : undefined;
+      overrides = overrides
+        ? JSON.parse(overrides)
+        : { privateCols: {}, sharedCols: {} };
     } catch (e: unknown) {
       throw new SerializationError(
         `Unable to extract mspids or overrides:  ${e}`
@@ -245,19 +250,108 @@ const extractCollections = new Command()
       log.info(`Loading models from ${folder}...`);
       models.push(...(await readModelFolders(folder)));
     }
-    const result: Record<string, any> = {};
 
     if (!file && !folder)
       throw new InternalError(`Must pass a file or a folder`);
 
-    const cols = models.map((m) => exCollections(m, mspIds, overrides)).flat();
-    log.verbose(`Found ${Object.keys(result).length} collections to create`);
-    log.debug(`Collections: ${JSON.stringify(result)}`);
+    const cols: {
+      indexes: Index[];
+      mirror?: PrivateCollection;
+      collections: PrivateCollection[];
+    }[] = await Promise.all(
+      models.map(async (clazz) => {
+        const tableName = Model.tableName(clazz);
+        const meta = Metadata.get(clazz);
+        const mirrorMeta = Model.mirroredAt(clazz);
 
-    log.verbose(`generating indexes for collections`);
+        console.log(tableName);
+        const collections: Record<string, any> = {};
+        for (const msp of mspIds) {
+          collections[msp] = await exCollections(
+            clazz,
+            [msp, mainMspId],
+            {},
+            // {
+            //   sharedCols: Object.assign({}, overrides.sharedCols),
+            //   privateCols: Object.assign({}, overrides.privateCols),
+            // },
+            !!mirrorMeta
+          );
+        }
 
-    // writeCollections(cols, outDir);
-    writeIndexes(Object.values(result), outDir);
+        let mirrorCollection: PrivateCollection | undefined = undefined;
+
+        if (mirrorMeta) {
+          Object.keys(collections).forEach((msp: string) => {
+            collections[msp].privates = collections[msp].privates?.filter(
+              (p: any) => {
+                if (p.name !== (mirrorMeta.resolver as string)) return true;
+                mirrorCollection = p;
+                return false;
+              }
+            );
+          });
+        }
+
+        const privatesCount = Object.values(collections)
+          .map((c) => c.privates)
+          .flat().length;
+        if (privatesCount)
+          log
+            .for(Model.tableName(clazz))
+            .info(`Found ${privatesCount} private collections to create`);
+        const sharedCount = Object.values(collections)
+          .map((c) => c.shared)
+          .flat().length;
+
+        log
+          .for(Model.tableName(clazz))
+          .info(`Found ${sharedCount} shared collections to create`);
+        if (mirrorCollection)
+          log
+            .for(Model.tableName(clazz))
+            .info(
+              `Found one mirror collection ${mirrorMeta?.resolver as string}`
+            );
+
+        const colList = Object.values(collections)
+          .map((c) => [...(c.privates || []), ...(c.shared || [])])
+          .flat();
+        let indexes: any;
+        if (colList.length) {
+          log
+            .for(Model.tableName(clazz))
+            .verbose(`generating indexes for collections`);
+          indexes = generateModelIndexes(clazz);
+          log
+            .for(Model.tableName(clazz))
+            .info(`found ${indexes.length} indexes`);
+        }
+        return {
+          indexes: indexes,
+          collections: colList,
+          mirror: mirrorCollection,
+        };
+      })
+    );
+
+    const collectionsTo = [
+      ...cols.map((c) => c.collections).flat(),
+      ...cols.filter((c) => c.mirror).map((c) => c.mirror),
+    ] as PrivateCollection[];
+
+    if (collectionsTo.length) {
+      writeCollections(collectionsTo, outDir);
+      log.info(
+        `Stored ${collectionsTo.length} collections to ${outDir}/collection_config.json`
+      );
+      collectionsTo.forEach((c) => {
+        writeIndexes((cols as any).indexes, outDir, c.name);
+        log.info(
+          `Stored ${(cols as any).indexes.length} indexes to collection ${c}`
+        );
+      });
+    }
   });
 
 const ensureInfra = new Command()

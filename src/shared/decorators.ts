@@ -5,7 +5,6 @@ import {
   UnsupportedError,
   Repository,
   ContextOf,
-  ContextualArgs,
 } from "@decaf-ts/core";
 import {
   afterCreate,
@@ -31,6 +30,7 @@ import {
   Decoration,
   metadata,
   Metadata,
+  prop,
   propMetadata,
 } from "@decaf-ts/decoration";
 import { FabricFlags } from "./types";
@@ -193,11 +193,7 @@ export function transactionId() {
     .apply();
 }
 
-export type MirrorCondition = <M extends Model>(
-  m: M,
-  stub: any,
-  ctx: Context
-) => Promise<boolean>;
+export type MirrorCondition = (msp: string) => boolean;
 
 export type MirrorMetadata = {
   condition: MirrorCondition;
@@ -206,21 +202,9 @@ export type MirrorMetadata = {
 
 export async function evalMirrorMetadata<M extends Model>(
   model: M,
-  condition: MirrorCondition,
   resolver: undefined | string | CollectionResolver,
   ctx: FabricContractContext
 ) {
-  let shouldExecute: boolean;
-  try {
-    shouldExecute = await condition(model, ctx.stub, ctx);
-  } catch (e: unknown) {
-    throw new InternalError(
-      `Failed to validate Mirror condition execution: ${e}`
-    );
-  }
-
-  if (!shouldExecute) return;
-
   let collection: CollectionResolver | string | undefined = resolver;
   if (typeof collection !== "string") {
     const owner = Model.ownerOf(model) || ctx.stub.getCreator().toString();
@@ -249,12 +233,7 @@ export async function createMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  const collection = await evalMirrorMetadata(
-    model,
-    data.condition,
-    data.resolver,
-    context
-  );
+  const collection = await evalMirrorMetadata(model, data.resolver, context);
 
   const repo = this.override(
     Object.assign({}, this._overrides, {
@@ -280,12 +259,7 @@ export async function updateMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  const collection = await evalMirrorMetadata(
-    model,
-    data.condition,
-    data.resolver,
-    context
-  );
+  const collection = await evalMirrorMetadata(model, data.resolver, context);
 
   const repo = this.override(
     Object.assign({}, this._overrides, {
@@ -311,12 +285,7 @@ export async function deleteMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  const collection = await evalMirrorMetadata(
-    model,
-    data.condition,
-    data.resolver,
-    context
-  );
+  const collection = await evalMirrorMetadata(model, data.resolver, context);
 
   const repo = this.override(
     Object.assign({}, this._overrides, {
@@ -349,6 +318,7 @@ export function mirror(
         Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.MIRROR),
         meta
       ),
+      privateData(collection),
       afterCreate(createMirrorHandler as any, meta, { priority: 95 }),
       afterUpdate(updateMirrorHandler as any, meta, { priority: 95 }),
       afterDelete(deleteMirrorHandler as any, meta, { priority: 95 })
@@ -364,29 +334,31 @@ export function mirror(
 }
 
 export type CollectionResolver = <M extends Model>(
-  model: M,
+  model: M | Constructor<M>,
   msp?: string,
-  ...args: ContextualArgs<any>
-) => Promise<string>;
+  ...args: any[]
+) => string;
 
-export const ModelCollection: CollectionResolver = async <M extends Model>(
-  model: M,
-  msp?: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  ...args: ContextualArgs<any>
+export const ModelCollection: CollectionResolver = <M extends Model>(
+  model: M | Constructor<M>,
+  mspId?: string
 ) => {
-  return `${toPascalCase(Model.tableName(model.constructor as any))}${msp ? toPascalCase(msp) : ""}PrivateCollection`;
+  const orgName =
+    mspId || (typeof model !== "function" ? Model.ownerOf(model) : undefined);
+  const constr = typeof model === "function" ? model : model.constructor;
+  if (!orgName)
+    throw new InternalError(
+      `Model ${constr.name} is not owned by any organization. did you use @ownedBy() (or provide the name)?`
+    );
+  return `${toPascalCase(constr.name)}${mspId ? toPascalCase(mspId) : ""}`;
 };
 
-export const ImplicitPrivateCollection: CollectionResolver = async <
-  M extends Model,
->(
-  model: M,
-  mspId?: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  ...args: ContextualArgs<any>
+export const ImplicitPrivateCollection: CollectionResolver = <M extends Model>(
+  model: M | Constructor<M>,
+  mspId?: string
 ) => {
-  const orgName = Model.ownerOf(model) || mspId;
+  const orgName =
+    mspId || (typeof model !== "function" ? Model.ownerOf(model) : undefined);
   if (!orgName)
     throw new InternalError(
       `Model ${model.constructor.name} is not owned by any organization. did you use @ownedBy() (or provide the name)?`
@@ -518,7 +490,8 @@ export async function segregatedDataOnDelete<
 
 function segregated(
   collection: string | CollectionResolver,
-  type: FabricModelKeys.PRIVATE | FabricModelKeys.SHARED
+  type: FabricModelKeys.PRIVATE | FabricModelKeys.SHARED,
+  filter?: (propName: string) => boolean
 ) {
   return function innerSegregated(target: object, propertyKey?: any) {
     function segregatedDec(target: object, propertyKey?: any) {
@@ -541,11 +514,14 @@ function segregated(
     const decs: any[] = [];
     if (!propertyKey) {
       // decorated at the class level
-      Metadata.properties(target as Constructor)?.forEach((p) =>
-        segregated(collection, type)(target, p)
-      );
+      Metadata.properties(target as Constructor)?.forEach((p) => {
+        if (!filter || filter(p)) {
+          segregated(collection, type)((target as any).prototype, p);
+        }
+      });
     } else {
       decs.push(
+        prop(),
         transient(),
         segregatedDec,
         onCreate(
@@ -595,7 +571,6 @@ function segregated(
       );
     }
     return apply(...decs)(target, propertyKey);
-    // return apply()(target, propertyKey);
   };
 }
 
