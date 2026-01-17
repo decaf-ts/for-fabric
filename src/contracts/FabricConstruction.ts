@@ -179,7 +179,8 @@ export async function oneToOneOnUpdate<
   const updated: any = await createOrUpdate(
     model[key] as M,
     context,
-    this.adapter.alias
+    this.adapter.alias,
+    this
   );
   const pk = Model.pk(updated);
   await cacheModelForPopulate(
