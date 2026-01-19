@@ -35,7 +35,8 @@ import {
 } from "@decaf-ts/decoration";
 import { FabricFlags } from "./types";
 import { toPascalCase } from "@decaf-ts/logging";
-import { FabricContractContext } from "../contracts/index";
+import { FabricContractFlags } from "../contracts/types";
+import "../shared/overrides";
 
 /**
  * Decorator for marking methods that require ownership authorization.
@@ -203,12 +204,13 @@ export type MirrorMetadata = {
 export async function evalMirrorMetadata<M extends Model>(
   model: M,
   resolver: undefined | string | CollectionResolver,
-  ctx: FabricContractContext
+  ctx: Context<FabricContractFlags>
 ) {
   let collection: CollectionResolver | string | undefined = resolver;
   if (typeof collection !== "string") {
-    const owner = Model.ownerOf(model) || ctx.stub.getCreator().toString();
     try {
+      const owner =
+        Model.ownerOf(model) || ctx.get("stub").getCreator().toString();
       if (resolver && typeof resolver === "function")
         collection = await resolver(model, owner, ctx);
     } catch (e: unknown) {
@@ -228,7 +230,7 @@ export async function createMirrorHandler<
   R extends Repository<M, any>,
 >(
   this: R,
-  context: FabricContractContext,
+  context: Context<FabricContractFlags>,
   data: MirrorMetadata,
   key: keyof M,
   model: M
@@ -254,7 +256,7 @@ export async function updateMirrorHandler<
   R extends Repository<M, any>,
 >(
   this: R,
-  context: FabricContractContext,
+  context: Context<FabricContractFlags>,
   data: MirrorMetadata,
   key: keyof M,
   model: M
@@ -280,7 +282,7 @@ export async function deleteMirrorHandler<
   R extends Repository<M, any>,
 >(
   this: R,
-  context: FabricContractContext,
+  context: Context<FabricContractFlags>,
   data: MirrorMetadata,
   key: keyof M,
   model: M
@@ -414,10 +416,12 @@ export async function segregatedDataOnCreate<M extends Model>(
 
   // const segregated = Model.segregate(model);
 
-  const created = await this.override({ segregated: collection } as any).create(
-    toCreate,
-    context
-  );
+  const created = await this.override({
+    segregated: collection,
+    mergeModel: false,
+    ignoreHandlers: true,
+    ignoreValidation: true,
+  } as any).create(toCreate, context);
   Object.assign(model, created);
 }
 

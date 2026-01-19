@@ -282,11 +282,12 @@ const extractCollections = new Command()
         let mirrorCollection: PrivateCollection | undefined = undefined;
 
         if (mirrorMeta) {
+          collections[mainMspId] = collections[mainMspId] || {};
           Object.keys(collections).forEach((msp: string) => {
-            collections[msp].privates = collections[msp].privates?.filter(
+            collections[mainMspId].privates = collections[msp].privates?.filter(
               (p: any) => {
                 if (p.name !== (mirrorMeta.resolver as string)) return true;
-                mirrorCollection = p;
+                mirrorCollection = p as any;
                 return false;
               }
             );
@@ -345,11 +346,16 @@ const extractCollections = new Command()
       log.info(
         `Stored ${collectionsTo.length} collections to ${outDir}/collection_config.json`
       );
-      collectionsTo.forEach((c) => {
-        writeIndexes((cols as any).indexes, outDir, c.name);
-        log.info(
-          `Stored ${(cols as any).indexes.length} indexes to collection ${c}`
-        );
+
+      cols.forEach((c, i) => {
+        const { indexes, collections, mirror } = c;
+        const toIndex: PrivateCollection[] = [...collections, mirror].filter(
+          Boolean
+        ) as PrivateCollection[];
+        toIndex.forEach((i) => {
+          writeIndexes(indexes, outDir, i.name);
+          log.info(`Stored ${toIndex.length} indexes to collection ${i.name}`);
+        });
       });
     }
   });

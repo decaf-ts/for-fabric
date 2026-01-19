@@ -32,6 +32,13 @@ function addIndex(
   direction?: OrderDirection,
   compositions?: string[]
 ) {
+  const tableField = fields.pop();
+  if (tableField && tableField !== CouchDBKeys.TABLE) {
+    fields.push(tableField);
+  } else if (tableField === CouchDBKeys.TABLE) {
+    fields.unshift(tableField);
+  }
+
   const name = getIndexReference(fields, direction, compositions);
 
   let f: string[] | { [k: string]: OrderDirection }[] = [

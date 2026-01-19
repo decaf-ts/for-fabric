@@ -96,7 +96,7 @@ export function privateCollectionFor(
 ): PrivateCollection {
   return collectionFor(
     collectionName,
-    `OR('${mspId}MSP.member')`,
+    `OR('${mspId}.member')`,
     requiredPeerCount,
     maxPeerCount,
     blockToLive,
@@ -116,7 +116,7 @@ export function sharedCollectionFor(
 ): PrivateCollection {
   const c = collectionFor(
     collectionName,
-    `OR(${mspIds.map((m) => `'${m}MSP.member'`).join(",")})`,
+    `OR(${mspIds.map((m) => `'${m}.member'`).join(",")})`,
     requiredPeerCount,
     maxPeerCount,
     blockToLive,
@@ -124,7 +124,7 @@ export function sharedCollectionFor(
     memberOnlyWrite
   );
   c.endorsementPolicy = {
-    signaturePolicy: `AND(${mspIds.map((m) => `'${m}MSP.peer'`).join(",")})`,
+    signaturePolicy: `AND(${mspIds.map((m) => `'${m}.peer'`).join(",")})`,
   };
   return c;
 }

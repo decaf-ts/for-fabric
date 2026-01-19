@@ -108,7 +108,7 @@ Model.prototype.segregate = function segregate<M extends Model>(
   );
 }.bind(Model);
 
-(Model as any).ownedBy = function ownedBy<M extends Model>(
+(Model as any).ownerOf = function ownerOf<M extends Model>(
   model: M
 ): string | undefined {
   const meta = Metadata.get(
