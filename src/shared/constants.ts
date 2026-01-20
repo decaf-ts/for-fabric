@@ -10,9 +10,10 @@ export enum FabricModelKeys {
   PRIVATE = "private",
   SHARED = "shared",
   /** Namespace prefix used for Fabric-specific metadata keys */
-  FABRIC = "fabric.",
-  OWNEDBY = "owned-by",
+  FABRIC = "fabric",
+  OWNED_BY = "owned-by",
   TRANSACTION_ID = "transaction-id",
+  MIRROR = "mirror",
 }
 /**
  * @description Supported identity types for Fabric credentials

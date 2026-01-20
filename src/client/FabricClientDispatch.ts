@@ -117,12 +117,13 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    * @param {Adapter<any, any, any, any>} observer - The adapter to observe
    * @return {void}
    */
-  override observe(observer: Adapter<any, any, any, any>): void {
+  override observe(observer: Adapter<any, any, any, any>): () => void {
     if (!(observer instanceof FabricClientAdapter))
       throw new UnsupportedError(
         "Only FabricClientAdapter can be observed by dispatch"
       );
     super.observe(observer as FabricClientAdapter);
+    return () => this.unObserve(observer);
   }
 
   /**

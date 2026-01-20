@@ -6,7 +6,7 @@ import path from "path";
 import { rollup } from "rollup";
 import replace from "@rollup/plugin-replace";
 import typescript from "@rollup/plugin-typescript";
-import { InternalError } from "@decaf-ts/db-decorators";
+import { InternalError, SerializationError } from "@decaf-ts/db-decorators";
 import {
   generateModelIndexes,
   readModelFile,
@@ -25,6 +25,13 @@ import {
 } from "./cli-utils";
 import "./shared/overrides";
 import ts from "typescript";
+import {
+  extractCollections as exCollections,
+  Index,
+  PrivateCollection,
+  writeCollections,
+} from "./client/collections/index";
+import { Metadata } from "@decaf-ts/decoration";
 
 const logger = Logging.for("fabric");
 
@@ -226,6 +233,12 @@ const extractCollections = new Command()
   .option("--file [String]", "the model file")
   .option("--folder [String]", "the model folder")
   .option("--outDir <String>", "the outdir. should match your contract folder")
+  .option("--mspIds <String>", "single mspId or stringified array")
+  .option("--mainMspId <String>", "single mspId")
+  .option(
+    "--overrides [String]",
+    "stringified override object {requiredPeerCount: number, maxPeerCount: number, blockToLive: number, memberOnlyRead: number, memberOnlyWrite: number, endorsementPolicy:  {}}"
+  )
   .description(
     "Creates a the JSON index files to be submitted to along with the contract"
   )
@@ -236,13 +249,29 @@ const extractCollections = new Command()
 
     const version = pkg.version;
 
-    const log = logger.for("extract-indexes");
+    const log = logger.for("extract-collections");
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );
 
     // eslint-disable-next-line prefer-const
-    let { file, folder, outDir } = options;
+    let { file, folder, outDir, mspIds, overrides, mainMspId } = options;
+
+    try {
+      try {
+        mspIds = mspIds ? JSON.parse(mspIds) : undefined;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (e: unknown) {
+        //  do nothing
+      }
+      overrides = overrides
+        ? JSON.parse(overrides)
+        : { privateCols: {}, sharedCols: {} };
+    } catch (e: unknown) {
+      throw new SerializationError(
+        `Unable to extract mspids or overrides:  ${e}`
+      );
+    }
 
     const models: any[] = [];
     if (file) {
@@ -253,22 +282,114 @@ const extractCollections = new Command()
       log.info(`Loading models from ${folder}...`);
       models.push(...(await readModelFolders(folder)));
     }
-    const result: Record<string, any> = {};
 
     if (!file && !folder)
       throw new InternalError(`Must pass a file or a folder`);
 
-    const privateOrShared = models.filter(
-      (m) => Model.isPrivate(m) || Model.isShared(m)
+    const cols: {
+      indexes: Index[];
+      mirror?: PrivateCollection;
+      collections: PrivateCollection[];
+    }[] = await Promise.all(
+      models.map(async (clazz) => {
+        const tableName = Model.tableName(clazz);
+        const meta = Metadata.get(clazz);
+        const mirrorMeta = Model.mirroredAt(clazz);
+
+        console.log(tableName);
+        const collections: Record<string, any> = {};
+        for (const msp of mspIds) {
+          collections[msp] = await exCollections(
+            clazz,
+            [msp, mainMspId],
+            {},
+            // {
+            //   sharedCols: Object.assign({}, overrides.sharedCols),
+            //   privateCols: Object.assign({}, overrides.privateCols),
+            // },
+            !!mirrorMeta
+          );
+        }
+
+        let mirrorCollection: PrivateCollection | undefined = undefined;
+
+        if (mirrorMeta) {
+          collections[mainMspId] = collections[mainMspId] || {};
+          Object.keys(collections).forEach((msp: string) => {
+            collections[mainMspId].privates = collections[msp].privates?.filter(
+              (p: any) => {
+                if (p.name !== (mirrorMeta.resolver as string)) return true;
+                mirrorCollection = p as any;
+                return false;
+              }
+            );
+          });
+        }
+
+        const privatesCount = Object.values(collections)
+          .map((c) => c.privates)
+          .flat().length;
+        if (privatesCount)
+          log
+            .for(Model.tableName(clazz))
+            .info(`Found ${privatesCount} private collections to create`);
+        const sharedCount = Object.values(collections)
+          .map((c) => c.shared)
+          .flat().length;
+
+        log
+          .for(Model.tableName(clazz))
+          .info(`Found ${sharedCount} shared collections to create`);
+        if (mirrorCollection)
+          log
+            .for(Model.tableName(clazz))
+            .info(
+              `Found one mirror collection ${mirrorMeta?.resolver as string}`
+            );
+
+        const colList = Object.values(collections)
+          .map((c) => [...(c.privates || []), ...(c.shared || [])])
+          .flat();
+        let indexes: any;
+        if (colList.length) {
+          log
+            .for(Model.tableName(clazz))
+            .verbose(`generating indexes for collections`);
+          indexes = generateModelIndexes(clazz);
+          log
+            .for(Model.tableName(clazz))
+            .info(`found ${indexes.length} indexes`);
+        }
+        return {
+          indexes: indexes,
+          collections: colList,
+          mirror: mirrorCollection,
+        };
+      })
     );
 
-    for (const m of privateOrShared) {
-      log.verbose(`Extracting collections for table ${Model.tableName(m)}`);
-      generateModelIndexes(m, result);
+    const collectionsTo = [
+      ...cols.map((c) => c.collections).flat(),
+      ...cols.filter((c) => c.mirror).map((c) => c.mirror),
+    ] as PrivateCollection[];
+
+    if (collectionsTo.length) {
+      writeCollections(collectionsTo, outDir);
+      log.info(
+        `Stored ${collectionsTo.length} collections to ${outDir}/collection_config.json`
+      );
+
+      cols.forEach((c, i) => {
+        const { indexes, collections, mirror } = c;
+        const toIndex: PrivateCollection[] = [...collections, mirror].filter(
+          Boolean
+        ) as PrivateCollection[];
+        toIndex.forEach((i) => {
+          writeIndexes(indexes, outDir, i.name);
+          log.info(`Stored ${toIndex.length} indexes to collection ${i.name}`);
+        });
+      });
     }
-    log.verbose(`Found ${Object.keys(result).length} indexes to create`);
-    log.debug(`Indexes: ${JSON.stringify(result)}`);
-    writeIndexes(Object.values(result), outDir);
   });
 
 const ensureInfra = new Command()
@@ -310,8 +431,8 @@ const deployContract = new Command()
   .option("--name <String>", "Contract Name (and folder)")
   .option("--input <String>", "input folder")
   .option(
-    "--incrementVersion <Boolean>",
-    "if should use version or sequence to update contracts",
+    "--incrementVersion <String>",
+    "(true | false) if should use version or sequence to update contracts",
     false
   )
   .option(
@@ -329,12 +450,13 @@ const deployContract = new Command()
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
     );
 
-    let version = pkg.version;
+    const version = pkg.version;
 
     const log = logger.for("deploy-contract");
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { name, input, peers, trackerFolder, incrementVersion } = options;
     const peerIds = peers.split(",");
 
@@ -350,11 +472,11 @@ const deployContract = new Command()
     } catch (e: unknown) {
       sequence = 1;
     }
-
-    if (incrementVersion) {
-      version = version + `-${sequence}`;
-      sequence = 1;
-    }
+    //
+    // if (incrementVersion) {
+    //   version = version + `-${sequence}`;
+    //   // sequence = 1;
+    // }
 
     try {
       for (const peer of peerIds) {
@@ -410,6 +532,7 @@ fabricCmd.addCommand(extractIndexes);
 fabricCmd.addCommand(ensureInfra);
 fabricCmd.addCommand(deployContract);
 fabricCmd.addCommand(getCryptoMaterial);
+fabricCmd.addCommand(extractCollections);
 
 export default function fabric() {
   return fabricCmd;

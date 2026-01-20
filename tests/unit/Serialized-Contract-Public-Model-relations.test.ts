@@ -20,7 +20,7 @@ import {
 } from "@decaf-ts/core";
 import { FabricIdentifiedBaseModel, ownedBy } from "../../src/shared/index";
 import { TestPublicModelChild } from "../assets/contract/serialized-contract-public-model/TestPublicModelChild";
-import { SerializedCrudContract } from "../../src/index";
+import { SerializedCrudContract } from "../../src/contracts";
 
 @table("tst_nested_model")
 @model()

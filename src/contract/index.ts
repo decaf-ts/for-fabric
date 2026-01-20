@@ -5,10 +5,12 @@ import { ProductContract } from "./ProductContract";
 import { BatchContract } from "./BatchContract";
 import { UserContract } from "./UserContract";
 import { AddressContract } from "./AddressContract";
+import { OtherProductSharedContract } from "./OtherProductSharedContract";
 
 export const contracts: (typeof Contract)[] = [
   ProductContract,
   BatchContract,
   UserContract,
   AddressContract,
+  OtherProductSharedContract,
 ];

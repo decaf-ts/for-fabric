@@ -2,6 +2,7 @@ import { IndexMetadata, OrderDirection } from "@decaf-ts/core";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
+import { InternalError } from "@decaf-ts/db-decorators";
 
 export type Index = {
   index: {
@@ -31,6 +32,13 @@ function addIndex(
   direction?: OrderDirection,
   compositions?: string[]
 ) {
+  const tableField = fields.pop();
+  if (tableField && tableField !== CouchDBKeys.TABLE) {
+    fields.push(tableField);
+  } else if (tableField === CouchDBKeys.TABLE) {
+    fields.unshift(tableField);
+  }
+
   const name = getIndexReference(fields, direction, compositions);
 
   let f: string[] | { [k: string]: OrderDirection }[] = [
@@ -125,10 +133,6 @@ export async function readModelFolders(
 ): Promise<ModelConstructor<any>[]> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const path = require("path");
-  // // eslint-disable-next-line @typescript-eslint/no-require-imports
-  // const path = require("path");
 
   const result: ModelConstructor<any>[] = [];
 
@@ -146,7 +150,11 @@ export async function readModelFolders(
   return result;
 }
 
-export function writeIndexes(indexes: Index[], p: string = process.cwd()) {
+export function writeIndexes(
+  indexes: Index[],
+  p: string = process.cwd(),
+  collection?: string
+) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -163,7 +171,10 @@ export function writeIndexes(indexes: Index[], p: string = process.cwd()) {
 
   indexes.forEach((index) => {
     const file = path.resolve(
-      path.join(p, `./META-INF/statedb/couchdb/indexes/${index.name}.json`)
+      path.join(
+        p,
+        `./META-INF/statedb/couchdb/${collection ? `collections/${collection}/` : ""}indexes/${index.name}.json`
+      )
     );
     ensureDirectoryExistence(file);
     fs.writeFileSync(file, JSON.stringify(index, undefined, 2));

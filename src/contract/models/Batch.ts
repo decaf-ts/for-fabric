@@ -20,8 +20,8 @@ import { FabricFlavour } from "../../shared/index";
 @table(TableNames.Batch)
 @model()
 export class Batch extends BaseIdentifiedModel {
-  @pk({ type: String, generated: false })
-  @audit()
+  @pk()
+  @audit(Batch)
   @composed(["productCode", "batchNumber"], ":")
   @description("Unique identifier composed of product code and batch number.")
   id!: string;

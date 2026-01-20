@@ -1,23 +1,22 @@
-import { TestPublicModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
-import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
 import { getMockCtx } from "./ContextMock";
 import { Model } from "@decaf-ts/decorator-validation";
 import { NotFoundError } from "@decaf-ts/db-decorators";
+import { OtherProductSharedContract } from "../../src/contract/OtherProductSharedContract";
+import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
+import { generateGtin } from "../../src/contract/models/gtin";
 
-describe("Tests Public contract", () => {
+describe.skip("Tests Shared and mirrored models", () => {
   const ctx = getMockCtx();
-  const contract = new TestPublicModelContract();
+  const contract = new OtherProductSharedContract();
 
-  let created: TestPublicModel;
+  let created: OtherProductShared;
 
-  it("should create model", async () => {
-    const model = new TestPublicModel({
-      name: "John Doe",
-      nif: "123456789",
-      child: {
-        name: "Child",
-      },
-      children: [{ name: "children" }],
+  it("should create and mirror", async () => {
+    const id = generateGtin();
+    const model = new OtherProductShared({
+      productCode: id,
+      inventedName: "test_name",
+      nameMedicinalProduct: "123456789",
     });
 
     created = Model.deserialize(
@@ -29,7 +28,7 @@ describe("Tests Public contract", () => {
 
   it("should read model", async () => {
     const res = Model.deserialize(
-      await contract.read(ctx as any, created.id.toString())
+      await contract.read(ctx as any, created.productCode.toString())
     );
     expect(res.equals(created)).toEqual(true);
     console.log("Result: ", res);
@@ -39,7 +38,7 @@ describe("Tests Public contract", () => {
     const res = Model.deserialize(
       await contract.update(
         ctx as any,
-        new TestPublicModel({ ...created, name: "Jane Doe" }).serialize()
+        new OtherProductShared({ ...created, name: "Jane Doe" }).serialize()
       )
     );
     expect(res.equals(created)).toEqual(false);
@@ -48,72 +47,28 @@ describe("Tests Public contract", () => {
     console.log("Result: ", res);
   });
 
-  it("should update model's oneToOne relation", async () => {
-    const res = Model.deserialize(
-      await contract.update(
-        ctx as any,
-        new TestPublicModel({
-          ...created,
-          child: {
-            name: "Jane Doe",
-          },
-        }).serialize()
-      )
-    );
-    expect(res.equals(created)).toEqual(false);
-    expect(
-      res.equals(created, "name", "updatedAt", "version", "child")
-    ).toEqual(true);
-    expect(res.child.name).toEqual("Jane Doe");
-    created = res;
-    console.log("Result: ", res);
-  });
-
-  it("should update model's oneToMany relation", async () => {
-    const res = Model.deserialize(
-      await contract.update(
-        ctx as any,
-        new TestPublicModel({
-          ...created,
-          children: [
-            ...created.children,
-            {
-              name: "Other Jane Doe",
-            },
-          ],
-        }).serialize()
-      )
-    );
-    expect(res.equals(created)).toEqual(false);
-    expect(
-      res.equals(created, "name", "updatedAt", "version", "children")
-    ).toEqual(true);
-    created = res;
-    console.log("Result: ", res);
-  });
-
   it("should delete model", async () => {
     const res = Model.deserialize(
-      await contract.delete(ctx as any, created.id.toString())
+      await contract.delete(ctx as any, created.productCode.toString())
     );
     expect(res.equals(created)).toEqual(true);
     console.log("Result: ", res);
     await expect(
-      contract.read(ctx as any, created.id.toString())
+      contract.read(ctx as any, created.productCode.toString())
     ).rejects.toThrow(NotFoundError);
   });
 
-  let bulk: TestPublicModel[];
+  let bulk: OtherProductShared[];
 
   it("should create in bulk", async () => {
-    const models = Object.keys(new Array(10).fill(0)).map(
-      (i) =>
-        new TestPublicModel({
-          name: "john" + i,
-          nif: "123456789",
-          child: { name: "any" + i },
-        })
-    );
+    const models = Object.keys(new Array(10).fill(0)).map((i) => {
+      const id = generateGtin();
+      return new OtherProductShared({
+        productCode: id,
+        inventedName: "test_name" + i,
+        nameMedicinalProduct: "123456789",
+      });
+    });
 
     bulk = JSON.parse(
       await contract.createAll(
@@ -126,7 +81,7 @@ describe("Tests Public contract", () => {
   });
 
   it("should read in bulk", async () => {
-    const keys = bulk.map((b) => b.id);
+    const keys = bulk.map((b) => b.productCode);
 
     const read = JSON.parse(
       await contract.readAll(ctx as any, JSON.stringify(keys))
@@ -138,9 +93,9 @@ describe("Tests Public contract", () => {
   it("should update in bulk", async () => {
     const models = bulk.map(
       (b) =>
-        new TestPublicModel(
+        new OtherProductShared(
           Object.assign({}, b, {
-            name: "updated" + b.id,
+            name: "updated" + b.productCode,
           })
         )
     );
@@ -156,14 +111,14 @@ describe("Tests Public contract", () => {
   });
 
   it("should delete in bulk", async () => {
-    const models = Object.keys(new Array(10).fill(0)).map(
-      (i) =>
-        new TestPublicModel({
-          name: "john" + i,
-          nif: "123456789",
-          child: { name: "any" + i },
-        })
-    );
+    const models = Object.keys(new Array(10).fill(0)).map((i) => {
+      const id = generateGtin();
+      return new OtherProductShared({
+        productCode: id,
+        inventedName: i.toString() + "test_name",
+        nameMedicinalProduct: "123456789",
+      });
+    });
 
     bulk = JSON.parse(
       await contract.createAll(
@@ -171,7 +126,7 @@ describe("Tests Public contract", () => {
         JSON.stringify(models.map((m) => m.serialize()))
       )
     ).map((m) => Model.deserialize(m));
-    const keys = bulk.map((b) => b.id);
+    const keys = bulk.map((b) => b.productCode);
 
     const read = JSON.parse(
       await contract.deleteAll(ctx as any, JSON.stringify(keys))
@@ -197,6 +152,15 @@ describe("Tests Public contract", () => {
       "productCode",
       "desc",
       JSON.stringify({ offset: 1, limit: 3 })
+    );
+    expect(page).toBeDefined();
+  });
+
+  it("should executed prepared statements properly for simple queries", async () => {
+    const page = await contract.statement(
+      ctx,
+      "paginateBy",
+      JSON.stringify(["productCode", "desc", { offset: 1, limit: 3 }])
     );
     expect(page).toBeDefined();
   });

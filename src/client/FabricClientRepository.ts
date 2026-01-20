@@ -59,6 +59,7 @@ export class FabricClientRepository<
     allowRawStatements: false,
     forcePrepareSimpleQueries: true,
     forcePrepareComplexQueries: true,
+    allowGenerationOverride: false,
   });
 
   constructor(adapter?: A, clazz?: Constructor<M>) {

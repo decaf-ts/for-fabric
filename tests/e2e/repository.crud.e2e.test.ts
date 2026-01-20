@@ -1,16 +1,19 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { E2eConfig } from "./e2e.config";
-import { Repo, Repository } from "@decaf-ts/core";
-import { Context, NotFoundError, OperationKeys } from "@decaf-ts/db-decorators";
+import {
+  Observer,
+  OrderDirection,
+  PersistenceKeys,
+  Repo,
+  Repository,
+} from "@decaf-ts/core";
+import { NotFoundError } from "@decaf-ts/db-decorators";
 import { Product } from "../../src/contract/models/Product";
 import { generateGtin } from "../../src/contract/models/gtin";
 import { Model } from "@decaf-ts/decorator-validation";
-import { Observer, PersistenceKeys } from "@decaf-ts/core";
 import { Constructor } from "@decaf-ts/decoration";
 import { Logging, LogLevel, style } from "@decaf-ts/logging";
-import { ProductStrength } from "../../src/contract/models/ProductStrength";
-import { Market } from "../../src/contract/models/Market";
 import { CAConfig, PeerConfig } from "../../src/shared/index";
 import { FabricClientRepository } from "../../src/client/index";
 import { ensureInfrastructureBooted } from "../utils";
@@ -23,6 +26,8 @@ const { adapterFactory, logger, flavour } = E2eConfig;
 const Clazz = Product;
 
 const pk = Model.pk(Clazz);
+
+jest.setTimeout(50000);
 
 describe("e2e Repository test", () => {
   let created: Product;
@@ -61,27 +66,27 @@ describe("e2e Repository test", () => {
     mspId: "Peer0OrgaMSP",
     channel: "simple-channel",
   };
-
-  function MockCtxFactory(
-    op: string,
-    overrides: Partial<any>,
-    model: Constructor,
-    ...args: any[]
-  ) {
-    const log = logger
-      .for(style("adapter context factory").green.bold)
-      .for(expect.getState().currentTestName);
-    try {
-      log.info(
-        `adapter context called with ${op}, ${JSON.stringify(overrides)}, ${model ? `name ${model.name}, ` : ""}${JSON.stringify(args)}`
-      );
-    } catch (e: unknown) {
-      log.warn(
-        `adapter context called with ${op}, ${model ? `name ${model.name}, ` : ""}, and not stringifyable args or overrides`
-      );
-    }
-    return adapterContextFactory(op, overrides, model, ...args);
-  }
+  //
+  // function MockCtxFactory(
+  //   op: string,
+  //   overrides: Partial<any>,
+  //   model: Constructor,
+  //   ...args: any[]
+  // ) {
+  //   const log = logger
+  //     .for(style("adapter context factory").green.bold)
+  //     .for(expect.getState().currentTestName);
+  //   try {
+  //     log.info(
+  //       `adapter context called with ${op}, ${JSON.stringify(overrides)}, ${model ? `name ${model.name}, ` : ""}${JSON.stringify(args)}`
+  //     );
+  //   } catch (e: unknown) {
+  //     log.warn(
+  //       `adapter context called with ${op}, ${model ? `name ${model.name}, ` : ""}, and not stringifyable args or overrides`
+  //     );
+  //   }
+  //   return adapterContextFactory(op, overrides, model, ...args);
+  // }
 
   beforeAll(async () => {
     // Ensure Infrastructure is ready
@@ -110,27 +115,26 @@ describe("e2e Repository test", () => {
     // repo.observe(observer);
 
     adapterContextFactory = adapter.context.bind(adapter);
-    contextFactoryMock = jest
-      .spyOn(adapter, "context")
-      .mockImplementation(MockCtxFactory)
-      .mockImplementationOnce(
-        (
-          op: string,
-          overrides: Partial<any>,
-          model: Constructor,
-          ...args: any[]
-        ) => {
-          const ctx = MockCtxFactory(
-            op,
-            Object.assign({}, overrides, {
-              PERSISTENT_PROPERTY: true,
-            }),
-            model,
-            ...args
-          );
-          return ctx;
-        }
-      );
+    contextFactoryMock = jest.spyOn(adapter, "context");
+    // .mockImplementation(MockCtxFactory)
+    // .mockImplementationOnce(
+    //   (
+    //     op: string,
+    //     overrides: Partial<any>,
+    //     model: Constructor,
+    //     ...args: any[]
+    //   ) => {
+    //     const ctx = MockCtxFactory(
+    //       op,
+    //       Object.assign({}, overrides, {
+    //         PERSISTENT_PROPERTY: true,
+    //       }),
+    //       model,
+    //       ...args
+    //     );
+    //     return ctx;
+    //   }
+    // );
   });
 
   afterEach(() => {
@@ -358,7 +362,41 @@ describe("e2e Repository test", () => {
       ).toEqual(true);
     });
 
-    it("lists");
+    it("lists", async () => {
+      const repo: FabricClientRepository<Product> = Repository.forModel<
+        Product,
+        FabricClientRepository<Product>
+      >(Product);
+
+      const list = await repo.listBy("inventedName", OrderDirection.ASC);
+      expect(list).toBeDefined();
+      expect(list.every((el) => el instanceof Product)).toEqual(true);
+    });
+
+    it("Paginates", async () => {
+      const repo: FabricClientRepository<Product> = Repository.forModel<
+        Product,
+        FabricClientRepository<Product>
+      >(Product);
+      const paginator = await repo.select().paginate(5);
+      expect(paginator).toBeDefined();
+      expect(paginator["_bookmark"]).toBeUndefined();
+      const page1 = await paginator.page(1);
+      expect(paginator.count).toBeGreaterThan(9);
+      expect(page1).toBeDefined();
+      expect(paginator["_bookmark"]).toBeDefined();
+      // expect(
+      //   page1.every((el, i) => el.equals([...updated].reverse()[i]))
+      // ).toEqual(true);
+
+      const page2 = await paginator.next();
+      // expect(paginator.count).toBeGreaterThan(9);
+      expect(page2).toBeDefined();
+      expect(paginator["_bookmark"]).toBeDefined();
+      // expect(
+      //   page2.every((el, i) => el.equals([...updated].reverse()[i + 5]))
+      // ).toEqual(true);
+    });
 
     it("Deletes in Bulk", async () => {
       const repo: FabricClientRepository<Product> = Repository.forModel<

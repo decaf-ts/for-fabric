@@ -121,15 +121,17 @@ export class FabricContractRepository<M extends Model> extends Repository<
     let { offset, bookmark, limit } = ref;
     if (!offset && !bookmark)
       throw new QueryError(`PaginateBy needs a page or a bookmark`);
-    const { log, ctxArgs } = (
+    const { log, ctxArgs, ctx } = (
       await this.logCtx(args, PreparedStatementKeys.PAGE_BY, true)
     ).for(this.paginateBy);
     log.verbose(
       `paginating ${Model.tableName(this.class)} with page size ${limit}`
     );
 
+    const segregated = !!ctx.get("segregated");
+
     let paginator: Paginator<M>;
-    if (bookmark) {
+    if (segregated && bookmark) {
       paginator = await this.override({
         forcePrepareComplexQueries: false,
         forcePrepareSimpleQueries: false,
@@ -138,7 +140,14 @@ export class FabricContractRepository<M extends Model> extends Repository<
         .where(this.attr(Model.pk(this.class)).gt(bookmark))
         .orderBy([key, order])
         .paginate(limit as number, ...ctxArgs);
-      offset = 1;
+    } else if (offset && bookmark) {
+      paginator = await this.override({
+        forcePrepareComplexQueries: false,
+        forcePrepareSimpleQueries: false,
+      } as any)
+        .select()
+        .orderBy([key, order])
+        .paginate(limit as number, bookmark, ...ctxArgs);
     } else if (offset) {
       paginator = await this.override({
         forcePrepareComplexQueries: false,

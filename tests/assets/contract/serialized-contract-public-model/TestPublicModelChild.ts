@@ -6,7 +6,25 @@ import { FabricIdentifiedBaseModel } from "../../../../src/shared/model/FabricId
 @table("tst_user_child")
 @model()
 export class TestPublicModelChild extends FabricIdentifiedBaseModel {
-  @pk({ type: "Number", generated: true })
+  @pk({ type: Number, generated: true })
+  id!: number;
+
+  @column("tst_name")
+  @required()
+  name!: string;
+
+  @ownedBy()
+  owner!: string;
+
+  constructor(arg?: ModelArg<TestPublicModelChild>) {
+    super(arg);
+  }
+}
+
+@table("tst_user_other_child")
+@model()
+export class TestPublicModelOtherChild extends FabricIdentifiedBaseModel {
+  @pk({ type: Number, generated: true })
   id!: number;
 
   @column("tst_name")

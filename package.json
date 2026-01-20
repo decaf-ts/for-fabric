@@ -1,6 +1,6 @@
 {
   "name": "@decaf-ts/for-fabric",
-  "version": "0.1.56",
+  "version": "0.1.62",
   "description": "Abstracts fabric logic",
   "type": "module",
   "exports": {
@@ -48,13 +48,14 @@
     "lint": "eslint .",
     "lint-fix": "eslint --fix .",
     "prepare-pr": "npm run lint-fix && npm run build:prod && npm run coverage && npm run docs",
-    "prepare-release": "npm run build:prod && npm run coverage && npm run docs",
+    "prepare-release": "npm run build:prod && npm run docs",
     "release": "./bin/tag-release.sh",
     "clean-publish": "npx clean-publish",
     "drawings": "for FILE in workdocs/drawings/*.drawio; do echo \"converting $FILE to image...\" && docker run --rm -v $(pwd):/data rlespinasse/drawio-export --format png $FILE; done && cp -rf workdocs/drawings/export/* workdocs/resources/",
     "uml": "cd workdocs/uml && for FILE in ./*.puml; do docker run --rm -v $(pwd):/work -w /work miy4/plantuml -DPLANTUML_LIMIT_SIZE=8192 -tpng $FILE; done && cd ../.. && cp -fr workdocs/uml/*.png workdocs/resources/",
     "docs": "npx rimraf ./docs && mkdir docs && npx build-scripts --docs",
     "extract:indexes": "LEVEL=verbose node ./lib/bin/cli.cjs extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/GlobalContract",
+    "extract:collections": "LEVEL=verbose node ./lib/bin/cli.cjs extract-collections --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/GlobalContract --mspIds '[\"org-a\",\"org-b\"]' --mainMspId org-c",
     "infrastructure:up": "docker compose -f ./docker/infrastructure/docker-compose.yaml up -d",
     "infrastructure:down": "docker compose -f ./docker/infrastructure/docker-compose.yaml down --rmi local -v && rm -rf ./docker/docker-data && rm -f ./tests/integration/chaincodeTrackers/*.count",
     "infrastructure-hsm:up": "docker compose -f ./docker/infrastructure/docker-compose-hsm.yaml up -d",

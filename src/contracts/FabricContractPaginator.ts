@@ -1,4 +1,9 @@
-import { MaybeContextualArg, PagingError, Sequence } from "@decaf-ts/core";
+import {
+  MaybeContextualArg,
+  PagingError,
+  Sequence,
+  Context,
+} from "@decaf-ts/core";
 import { DBKeys } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
@@ -126,21 +131,26 @@ export class FabricContractPaginator<
     bookmark?: any,
     ...args: MaybeContextualArg<any>
   ): Promise<M[]> {
-    const { ctxArgs, ctx, log } = this.adapter["logCtx"](
-      [bookmark, ...args],
+    const { ctxArgs, ctx } = this.adapter["logCtx"](
+      [bookmark, ...args].filter(Boolean),
       this.page
     );
+    if (bookmark && bookmark instanceof Context) {
+      bookmark = undefined;
+    }
+
+    this._bookmark = bookmark;
     if (this.isPreparedStatement())
       return await this.pagePrepared(page, ...ctxArgs);
     const statement = Object.assign({}, this.statement);
 
-    if (!this._recordCount || !this._totalPages) {
+    if (!bookmark && (!this._recordCount || !this._totalPages)) {
       this._totalPages = this._recordCount = 0;
       const countResults =
         (await this.adapter.raw<M[], true>(
-          { ...statement, limit: Number.MAX_VALUE },
+          { ...statement, limit: undefined, skip: undefined },
           true,
-          ...ctxArgs
+          ctx
         )) || [];
       this._recordCount = countResults.length;
       if (this._recordCount > 0) {
@@ -148,7 +158,7 @@ export class FabricContractPaginator<
         this._totalPages = Math.ceil(this._recordCount / size);
         return await this.page(page, ...ctxArgs);
       }
-    } else {
+    } else if (page === 1) {
       page = this.validatePage(page);
       statement.skip = (page - 1) * this.size;
     }
@@ -158,14 +168,9 @@ export class FabricContractPaginator<
         throw new PagingError("No bookmark. Did you start in the first page?");
       statement["bookmark"] = this._bookmark as string;
     }
-    const rawResult = (await this.adapter.raw(
-      statement,
-      true,
-      ...ctxArgs
-    )) as any;
+    const rawResult = (await this.adapter.raw(statement, false, ctx)) as any;
 
-    const { docs, bookmark: nextBookmark, warning } = rawResult;
-    if (warning) log.warn(warning);
+    const { docs, bookmark: nextBookmark } = rawResult;
     if (!this.clazz) throw new PagingError("No statement target defined");
     const id = Model.pk(this.clazz);
     const type = Metadata.get(
@@ -174,8 +179,8 @@ export class FabricContractPaginator<
     )?.type;
     const results =
       statement.fields && statement.fields.length
-        ? rawResult // has fields means its not full model
-        : rawResult.map((d: any) => {
+        ? docs // has fields means its not full model
+        : docs.map((d: any) => {
             return this.adapter.revert(
               d,
               this.clazz,

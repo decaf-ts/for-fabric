@@ -1,6 +1,7 @@
 import { SegregatedModel } from "../types";
 import { Constructor } from "@decaf-ts/decoration";
 import "@decaf-ts/decorator-validation";
+import { CollectionResolver, MirrorMetadata } from "../decorators";
 
 declare module "@decaf-ts/decorator-validation" {
   export interface Model {
@@ -14,5 +15,15 @@ declare module "@decaf-ts/decorator-validation" {
     function isPrivate<M extends Model>(model: Constructor<M>): boolean;
     function isShared<M extends Model>(model: Constructor<M>): boolean;
     function segregate<M extends Model>(model: M): SegregatedModel<M>;
+    function ownerOf<M extends Model>(model: M): string;
+    function mirroredAt<M extends Model>(
+      model: M | Constructor<M>
+    ): MirrorMetadata | undefined;
+    function collectionsFor<M extends Model>(
+      model: M | Constructor<M>
+    ): {
+      privateCols: (string | CollectionResolver)[];
+      sharedCols: (string | CollectionResolver)[];
+    };
   }
 }

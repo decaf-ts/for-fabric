@@ -1,4 +1,4 @@
-import { FabricContractAdapter, FabricCrudContract } from "../../src/index";
+import { FabricContractAdapter, FabricCrudContract } from "../../src/contracts";
 console.log("Using adapter:", FabricContractAdapter.name);
 import { getMockCtx } from "./ContextMock";
 import { ProductContract } from "../../src/contract/ProductContract";

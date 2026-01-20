@@ -45,6 +45,7 @@ import {
   MethodOrOperation,
   AllOperationKeys,
   FlagsOf,
+  ContextOf,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -106,7 +107,7 @@ export async function createdByOnFabricCreateUpdate<
   V extends RelationsMetadata,
 >(
   this: R,
-  context: Context<FabricContractFlags>,
+  context: ContextOf<R>,
   data: V,
   key: keyof M,
   model: M
@@ -120,74 +121,6 @@ export async function createdByOnFabricCreateUpdate<
       "No User found in context. Please provide a user in the context"
     );
   }
-}
-
-/**
- * @description Primary key auto-assignment callback for Fabric models
- * @summary Generates and assigns a primary key value to the specified model property using a Fabric-backed sequence when the model is created. If the sequence name is not provided in options, it is derived from the model via sequenceNameForModel. The assigned key is defined as non-writable and enumerable.
- * @template M - Type extending Model for the target instance
- * @template R - Type extending FabricContractRepository for repository context
- * @template V - Type extending SequenceOptions to configure sequence behavior
- * @template F - Type extending FabricContractFlags for contextual flags
- * @param {R} this - The repository instance invoking the callback
- * @param {FabricContractContext} context - Fabric contract context containing invocation metadata
- * @param {V} data - Sequence options used to configure or locate the sequence
- * @param {string} key - The primary key property name to assign on the model
- * @param {M} model - The model instance to receive the generated primary key
- * @return {Promise<void>} Resolves when the key is assigned or when no action is required
- * @function pkFabricOnCreate
- * @memberOf module:for-fabric.contracts
- * @mermaid
- * sequenceDiagram
- *   participant R as Repository
- *   participant C as Context<F>
- *   participant S as FabricContractDBSequence
- *   participant M as Model
- *   R->>R: derive sequence name if missing
- *   R->>S: adapter.Sequence(options)
- *   S-->>R: sequence instance
- *   R->>S: next(context)
- *   S-->>R: next value
- *   R->>M: define non-writable primary key
- */
-export async function pkFabricOnCreate<
-  M extends Model,
-  R extends FabricContractRepository<M>,
->(
-  this: R,
-  context: FabricContractContext,
-  data: SequenceOptions,
-  key: keyof M,
-  model: M
-): Promise<void> {
-  if (!data.type || model[key]) {
-    return;
-  }
-
-  const setPrimaryKeyValue = function <M extends Model>(
-    target: M,
-    propertyKey: string,
-    value: string | number | bigint
-  ) {
-    Object.defineProperty(target, propertyKey, {
-      enumerable: true,
-      writable: false,
-      configurable: true,
-      value: value,
-    });
-  };
-  if (!data.name) data.name = Model.sequenceName(model, "pk");
-  let sequence: Sequence;
-  try {
-    sequence = (await this.adapter.Sequence(data)) as Sequence;
-  } catch (e: any) {
-    throw new InternalError(
-      `Failed to instantiate Sequence ${data.name}: ${e}`
-    );
-  }
-
-  const next = await sequence.next(context as FabricContractContext);
-  setPrimaryKeyValue(model, key as string, next);
 }
 
 /**
@@ -596,17 +529,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
     stub: ChaincodeStub,
     rawInput: any,
     limit: number = 250,
-    skip?: number,
+    page?: number,
+    bookmark?: string | number,
     ...args: any[]
   ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
     const { ctx } = this.logCtx(args, this.readState);
     let res: StateQueryResponse<Iterators.StateQueryIterator>;
     const collection = ctx.get("segregated");
     if (collection) {
-      rawInput.selector = {
-        ...rawInput.selector,
-        _id: skip ? { $gt: skip.toString() } : { $gte: "" },
-      };
+      if (bookmark) rawInput.selector._id = { $gt: bookmark.toString() };
       const it = await stub.getPrivateDataQueryResult(
         collection,
         JSON.stringify(rawInput)
@@ -622,7 +553,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       res = await stub.getQueryResultWithPagination(
         JSON.stringify(rawInput),
         limit,
-        skip?.toString()
+        bookmark?.toString()
       );
 
     return res;
@@ -681,6 +612,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
       Object.assign(baseFlags, {
         stub: flags.stub,
         identity: (flags as Ctx).clientIdentity,
+        cert: (flags as Ctx).clientIdentity.getIDBytes().toString(),
+        roles: (flags as Ctx).clientIdentity.getAttributeValue("roles"),
         logger: Logging.for(
           operation,
           {
@@ -807,7 +740,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
    */
   async raw<R, D extends boolean>(
     rawInput: MangoQuery,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     docsOnly: D = true as D,
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<RawResult<R, D>> {
@@ -815,6 +747,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
+    const resp = { docs: [], bookmark: undefined as string | undefined };
     if (limit || skip) {
       delete rawInput["limit"];
       delete rawInput["skip"];
@@ -827,8 +760,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
           rawInput,
           limit || Number.MAX_VALUE,
           (skip as any)?.toString(),
+          rawInput["bookmark"],
           ctx
         )) as StateQueryResponse<Iterators.StateQueryIterator>;
+      resp.bookmark = response.metadata.bookmark;
       iterator = response.iterator;
     } else {
       log.debug("Retrieving iterator");
@@ -840,11 +775,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
     log.debug("Iterator acquired");
 
-    const results = (await this.resultIterator(log, iterator)) as R;
+    resp.docs = (await this.resultIterator(log, iterator)) as any;
     log.debug(
-      `returning ${Array.isArray(results) ? results.length : 1} results`
+      `returning ${Array.isArray(resp.docs) ? resp.docs.length : 1} results`
     );
-    return results as any;
+    if (docsOnly) return resp.docs as any;
+    return resp as any;
   }
 
   override Statement<M extends Model>(): FabricStatement<M, any> {
@@ -1105,116 +1041,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
         });
       }) as any;
   }
-
-  // override logCtx<
-  //   ARGS extends any[] = any[],
-  //   METHOD extends MethodOrOperation = MethodOrOperation,
-  // >(
-  //   args: MaybeContextualArg<FabricContractContext, ARGS>,
-  //   method: METHOD
-  // ): ContextualizedArgs<
-  //   FabricContractContext,
-  //   ARGS,
-  //   METHOD extends string ? true : false
-  // > & {
-  //   stub: ChaincodeStub;
-  //   identity: ClientIdentity;
-  // };
-  // override logCtx<
-  //   ARGS extends any[] = any[],
-  //   METHOD extends MethodOrOperation = MethodOrOperation,
-  // >(
-  //   args: MaybeContextualArg<FabricContractContext, ARGS>,
-  //   method: METHOD,
-  //   allowCreate: false,
-  //   overrides?: Partial<FabricContractFlags>
-  // ): ContextualizedArgs<
-  //   FabricContractContext,
-  //   ARGS,
-  //   METHOD extends string ? true : false
-  // > & {
-  //   stub: ChaincodeStub;
-  //   identity: ClientIdentity;
-  // };
-  // override logCtx<
-  //   ARGS extends any[] = any[],
-  //   METHOD extends MethodOrOperation = MethodOrOperation,
-  // >(
-  //   args: MaybeContextualArg<FabricContractContext, ARGS>,
-  //   method: METHOD,
-  //   allowCreate: true,
-  //   overrides?: Partial<FabricContractFlags>
-  // ): Promise<
-  //   ContextualizedArgs<
-  //     FabricContractContext,
-  //     ARGS,
-  //     METHOD extends string ? true : false
-  //   > & {
-  //     stub: ChaincodeStub;
-  //     identity: ClientIdentity;
-  //   }
-  // >;
-  // override logCtx<
-  //   ARGS extends any[] = any[],
-  //   METHOD extends MethodOrOperation = MethodOrOperation,
-  // >(
-  //   args: MaybeContextualArg<FabricContractContext, ARGS>,
-  //   method: METHOD,
-  //   allowCreate: boolean = false,
-  //   overrides?: Partial<FabricContractFlags>
-  // ):
-  //   | (ContextualizedArgs<
-  //       FabricContractContext,
-  //       ARGS,
-  //       METHOD extends string ? true : false
-  //     > & {
-  //       stub: ChaincodeStub;
-  //       identity: ClientIdentity;
-  //     })
-  //   | Promise<
-  //       ContextualizedArgs<
-  //         FabricContractContext,
-  //         ARGS,
-  //         METHOD extends string ? true : false
-  //       > & {
-  //         stub: ChaincodeStub;
-  //         identity: ClientIdentity;
-  //       }
-  //     > {
-  //   const response = super.logCtx(
-  //     args,
-  //     method,
-  //     allowCreate as any,
-  //     overrides as any
-  //   ) as
-  //     | ContextualizedArgs<
-  //         FabricContractContext,
-  //         ARGS,
-  //         METHOD extends string ? true : false
-  //       >
-  //     | Promise<
-  //         ContextualizedArgs<
-  //           FabricContractContext,
-  //           ARGS,
-  //           METHOD extends string ? true : false
-  //         >
-  //       >;
-  //
-  //   const attach = <T extends ContextualizedArgs<FabricContractContext, ARGS>>(
-  //     resp: T
-  //   ) =>
-  //     Object.assign(resp, {
-  //       stub: resp.ctx.stub,
-  //       identity: resp.ctx.identity,
-  //     }) as T & {
-  //       stub: ChaincodeStub;
-  //       identity: ClientIdentity;
-  //     };
-  //
-  //   return response instanceof Promise
-  //     ? response.then(attach)
-  //     : attach(response);
-  // }
 
   static override parseError<E extends BaseError>(err: Error | string): E {
     // if (

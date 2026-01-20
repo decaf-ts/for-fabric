@@ -105,6 +105,7 @@ export function getStubMock() {
             // No-op for mock
           },
         },
+        metadata: { bookmark: Date.now().toString() },
       };
     },
   };
@@ -114,6 +115,10 @@ export function getIdentityMock() {
   return {
     getID: () => "id",
     getMSPID: () => "Aeon",
+    getIDBytes: () => Buffer.from("creatorID"),
+    getAttributeValue: (name: string) => {
+      return name === "roles" ? ["admin"] : undefined;
+    },
   };
 }
 

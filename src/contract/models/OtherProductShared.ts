@@ -2,31 +2,38 @@ import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
 import {
   column,
+  Context,
   index,
-  oneToMany,
-  table,
   OrderDirection,
   pk,
-  Cascade,
+  table,
 } from "@decaf-ts/core";
 // import {BlockOperations, OperationKeys, readonly} from "@decaf-ts/db-decorators";
 import { uses } from "@decaf-ts/decoration";
-import { ProductStrength } from "./ProductStrength";
-import { Market } from "./Market";
+
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { gtin } from "./gtin";
 
 import { audit } from "./decorators";
-import { FabricFlavour } from "../../shared/constants";
+import {
+  FabricFlavour,
+  mirror,
+  ModelCollection,
+  ownedBy,
+  sharedData,
+} from "../../shared/index";
+import { version } from "@decaf-ts/db-decorators";
 
+@sharedData(ModelCollection)
 @uses(FabricFlavour)
 // @BlockOperations([OperationKeys.DELETE])
-@table()
+@table("other_product_shared")
 @model()
-export class Product extends BaseIdentifiedModel {
-  @gtin()
-  @audit(Product)
+export class OtherProductShared extends BaseIdentifiedModel {
   @pk()
+  @gtin()
+  @mirror("ptp-product", (mspId: string) => mspId === "org-c")
+  @audit(OtherProductShared)
   productCode!: string;
 
   @column()
@@ -65,24 +72,28 @@ export class Product extends BaseIdentifiedModel {
   // @column()
   // healthcarePractitionerInfo?: string;
 
-  @column()
+  @version()
   counter?: number;
+  //
+  // @oneToMany(
+  //   () => ProductStrength,
+  //   { update: Cascade.CASCADE, delete: Cascade.CASCADE },
+  //   false
+  // )
+  // strengths!: ProductStrength[];
+  //
+  // @oneToMany(
+  //   () => Market,
+  //   { update: Cascade.NONE, delete: Cascade.NONE },
+  //   false
+  // )
+  // markets!: Market[];
 
-  @oneToMany(
-    () => ProductStrength,
-    { update: Cascade.CASCADE, delete: Cascade.CASCADE },
-    false
-  )
-  strengths!: ProductStrength[];
+  @column()
+  @ownedBy()
+  ownedBy?: string;
 
-  @oneToMany(
-    () => Market,
-    { update: Cascade.NONE, delete: Cascade.NONE },
-    false
-  )
-  markets!: Market[];
-
-  constructor(args?: ModelArg<Product>) {
+  constructor(args?: ModelArg<OtherProductShared>) {
     super(args);
   }
 }

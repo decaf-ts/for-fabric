@@ -1,13 +1,13 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
 import {
+  Cascade,
   column,
   index,
   oneToMany,
-  table,
   OrderDirection,
   pk,
-  Cascade,
+  table,
 } from "@decaf-ts/core";
 // import {BlockOperations, OperationKeys, readonly} from "@decaf-ts/db-decorators";
 import { uses } from "@decaf-ts/decoration";
@@ -17,16 +17,18 @@ import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { gtin } from "./gtin";
 
 import { audit } from "./decorators";
-import { FabricFlavour } from "../../shared/constants";
+import { FabricFlavour, ownedBy, privateData } from "../../shared/index";
+import { version } from "@decaf-ts/db-decorators";
 
+@privateData()
 @uses(FabricFlavour)
 // @BlockOperations([OperationKeys.DELETE])
-@table()
+@table("other_product")
 @model()
-export class Product extends BaseIdentifiedModel {
-  @gtin()
-  @audit(Product)
+export class OtherProduct extends BaseIdentifiedModel {
   @pk()
+  @gtin()
+  @audit(OtherProduct)
   productCode!: string;
 
   @column()
@@ -65,24 +67,28 @@ export class Product extends BaseIdentifiedModel {
   // @column()
   // healthcarePractitionerInfo?: string;
 
-  @column()
+  @version()
   counter?: number;
+  //
+  // @oneToMany(
+  //   () => ProductStrength,
+  //   { update: Cascade.CASCADE, delete: Cascade.CASCADE },
+  //   false
+  // )
+  // strengths!: ProductStrength[];
+  //
+  // @oneToMany(
+  //   () => Market,
+  //   { update: Cascade.NONE, delete: Cascade.NONE },
+  //   false
+  // )
+  // markets!: Market[];
 
-  @oneToMany(
-    () => ProductStrength,
-    { update: Cascade.CASCADE, delete: Cascade.CASCADE },
-    false
-  )
-  strengths!: ProductStrength[];
+  @column()
+  @ownedBy()
+  ownedBy?: string;
 
-  @oneToMany(
-    () => Market,
-    { update: Cascade.NONE, delete: Cascade.NONE },
-    false
-  )
-  markets!: Market[];
-
-  constructor(args?: ModelArg<Product>) {
+  constructor(args?: ModelArg<OtherProduct>) {
     super(args);
   }
 }

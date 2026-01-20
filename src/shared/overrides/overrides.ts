@@ -1,12 +1,10 @@
 import { Model } from "@decaf-ts/decorator-validation";
-// import { validateCompare } from "../model/validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
-// import { DBKeys } from "../model/constants";
-// import { SerializationError } from "../repository/errors";
 import { FabricModelKeys } from "../constants";
 import { SegregatedModel } from "../types";
-import { DBKeys, SerializationError } from "@decaf-ts/db-decorators";
-import { PersistenceKeys } from "@decaf-ts/core";
+import { DBKeys, InternalError } from "@decaf-ts/db-decorators";
+import { Context } from "@decaf-ts/core";
+import { CollectionResolver, MirrorMetadata } from "../decorators";
 
 Model.prototype.isShared = function isShared<M extends Model>(
   this: M
@@ -83,16 +81,6 @@ Model.prototype.segregate = function segregate<M extends Model>(
   return result as SegregatedModel<M>;
 }.bind(Model);
 
-(Model as any).tableName = function <M extends Model>(
-  model: Constructor<M> | M
-): string {
-  const target = model instanceof Model ? model.constructor : model;
-  const meta = Metadata.get(target as any, PersistenceKeys.TABLE);
-  if (meta) return meta;
-  if (model instanceof Model) return model.constructor.name;
-  return model.name;
-};
-
 (Model as any).isPrivate = function isPrivate<M extends Model>(
   model: M | Constructor<M>
 ): boolean {
@@ -102,11 +90,70 @@ Model.prototype.segregate = function segregate<M extends Model>(
   );
 }.bind(Model);
 
-(Metadata as any).isShared = function isShared<M extends Model>(
+(Model as any).isShared = function isShared<M extends Model>(
   model: M | Constructor<M>
 ): boolean {
   return !!Metadata.get(
     typeof model !== "function" ? (model.constructor as any) : model,
     FabricModelKeys.SHARED
   );
-}.bind(Metadata);
+}.bind(Model);
+
+(Model as any).mirrored = function mirrored<M extends Model>(
+  model: M | Constructor<M>
+): boolean {
+  return Metadata.get(
+    typeof model !== "function" ? (model.constructor as any) : model,
+    Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.MIRROR)
+  );
+}.bind(Model);
+
+(Model as any).ownerOf = function ownerOf<M extends Model>(
+  model: M
+): string | undefined {
+  const meta = Metadata.get(
+    model.constructor as any,
+    Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.OWNED_BY)
+  );
+  if (!meta) return undefined;
+  return model[meta as keyof M] as string;
+}.bind(Model);
+
+(Model as any).mirroredAt = function mirroredAt<M extends Model>(
+  model: M | Constructor<M>
+): MirrorMetadata | undefined {
+  model = typeof model !== "function" ? (model.constructor as any) : model;
+  return Metadata.get(
+    model as any,
+    Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.MIRROR)
+  );
+}.bind(Model);
+
+(Model as any).collectionsFor = function collectionsFor<M extends Model>(
+  model: M | Constructor<M>
+): {
+  privateCols: (string | CollectionResolver)[];
+  sharedCols: (string | CollectionResolver)[];
+} {
+  const privateKeys: string[] = [FabricModelKeys.PRIVATE] as string[];
+  const sharedKeys: string[] = [FabricModelKeys.SHARED] as string[];
+
+  const privateKey = Metadata.key(...privateKeys);
+  const sharedKey = Metadata.key(...sharedKeys);
+
+  const constr = typeof model === "function" ? model : model.constructor;
+
+  const privateMeta: { collections: string[] } = Metadata.get(
+    constr as any,
+    privateKey
+  );
+  const sharedMeta: { collections: string[] } = Metadata.get(
+    constr as any,
+    sharedKey
+  );
+
+  return {
+    privateCols: privateMeta?.collections || [],
+    sharedCols: sharedMeta?.collections || [],
+  };
+}.bind(Model);

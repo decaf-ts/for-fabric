@@ -50,6 +50,7 @@ import {
   MaybeContextualArg,
   ContextualArgs,
   type PreparedModel,
+  AllOperationKeys,
 } from "@decaf-ts/core";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
@@ -168,12 +169,59 @@ export class FabricClientAdapter extends Adapter<
     flags: Partial<FabricClientFlags>,
     ...args: any[]
   ): Promise<FabricClientFlags> {
-    return super.flags(
-      operation,
-      model,
-      Object.assign({}, DefaultFabricClientFlags, flags || {}),
-      ...args
+    return super.flags(operation, model, flags, ...args);
+  }
+
+  override async context<M extends Model>(
+    operation: ((...args: any[]) => any) | AllOperationKeys,
+    overrides: Partial<FabricClientFlags>,
+    model: Constructor<M> | Constructor<M>[],
+    ...args: MaybeContextualArg<Context<any>>
+  ): Promise<Context<FabricClientFlags>> {
+    const log = this.log.for(this.context);
+    log.silly(
+      `creating new context for ${operation} operation on ${model ? (Array.isArray(model) ? model.map((m) => Model.tableName(m)) : Model.tableName(model)) : "no"} table ${overrides && Object.keys(overrides) ? Object.keys(overrides).length : "no"} with flag overrides`
     );
+    let ctx = args.pop();
+    if (typeof ctx !== "undefined" && !(ctx instanceof Context)) {
+      args.push(ctx);
+      ctx = undefined;
+    }
+
+    overrides = ctx
+      ? Object.assign({}, overrides, ctx.toOverrides())
+      : overrides;
+    const flags = await this.flags(
+      typeof operation === "string" ? operation : operation.name,
+      model,
+      overrides as Partial<FabricClientFlags>,
+      ...args,
+      ctx
+    );
+
+    if (ctx) {
+      if (!(ctx instanceof this.Context)) {
+        return new this.Context().accumulate({
+          ...ctx["cache"],
+          ...flags,
+          parentContext: ctx,
+        }) as any;
+      }
+      const currentOp = ctx.get("operation");
+      const currentModel = ctx.get("affectedTables");
+      if (currentOp !== operation || model !== currentModel)
+        return new this.Context().accumulate({
+          ...ctx["cache"],
+          ...flags,
+          parentContext: ctx,
+        }) as any;
+      return ctx.accumulate(flags) as any;
+    }
+
+    return new this.Context().accumulate({
+      ...DefaultFabricClientFlags,
+      ...flags,
+    }) as any;
   }
 
   /**

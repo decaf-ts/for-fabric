@@ -7,8 +7,8 @@ import {
 describe("shared/constants", () => {
   it("exposes fabric model keys", () => {
     expect(FabricModelKeys.PRIVATE).toBe("private");
-    expect(FabricModelKeys.FABRIC).toBe("fabric.");
-    expect(FabricModelKeys.OWNEDBY).toBe("owned-by");
+    expect(FabricModelKeys.FABRIC).toBe("fabric");
+    expect(FabricModelKeys.OWNED_BY).toBe("owned-by");
   });
 
   it("lists supported identity types", () => {
