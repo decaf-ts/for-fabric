@@ -59,7 +59,7 @@
     "infrastructure:down": "docker compose -f ./docker/infrastructure/docker-compose.yaml down --rmi local -v && rm -rf ./docker/docker-data && rm -f ./tests/integration/chaincodeTrackers/*.count",
     "infrastructure-hsm:up": "docker compose -f ./docker/infrastructure/docker-compose-hsm.yaml up -d",
     "infrastructure-hsm:down": "docker compose -f ./docker/infrastructure/docker-compose-hsm.yaml down --rmi local -v",
-    "build:contract2": "npx decaf fabric compile-contract --debug --name ${CONTRACT_NAME:-GlobalContract} --input ./src/contract --output ./docker/infrastructure/chaincode && LEVEL=verbose node ./lib/bin/cli.cjs extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract}",
+    "build:contract2": "npx decaf fabric compile-contract --debug --bundle --name ${CONTRACT_NAME:-GlobalContract} --input ./src/contract --output ./docker/infrastructure/chaincode && LEVEL=verbose node ./lib/bin/cli.cjs extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract}",
     "update:contract": "npm run build:contract && npm run deploy:contract",
     "build:contract": "node ./lib/bin/cli.cjs compile-contract --dev --debug --bundle --name ${CONTRACT_NAME:-GlobalContract} --input ./src/contract --output ./docker/infrastructure/chaincode && LEVEL=verbose node ./lib/bin/cli.cjs extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract}",
     "deploy:contract": "node ./lib/bin/cli.cjs deploy-contract --name ${CONTRACT_NAME:-GlobalContract} --input ${CONTRACT_NAME:-GlobalContract}",
