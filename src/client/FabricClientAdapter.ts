@@ -173,7 +173,7 @@ export class FabricClientAdapter extends Adapter<
       await super.flags(
         operation,
         model,
-        Object.assign({}, DefaultFabricClientFlags, flags),
+        Object.assign({}, this.config, flags),
         ...args
       )
     );
