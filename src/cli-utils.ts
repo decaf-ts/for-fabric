@@ -2,6 +2,7 @@ import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { InternalError } from "@decaf-ts/db-decorators";
+import ts from "typescript";
 
 export function didInfrastructureBoot(
   containerName: string = "boot-org-c-peer-0"
@@ -302,12 +303,90 @@ export enum ScriptCommands {
           --tls.enabled=true",
   START_DEBUG = "node --inspect=0.0.0.0:9229 /usr/local/src/node_modules/.bin/fabric-chaincode-node start \
           --grpc.max_receive_message_length ${CHAINCODE_MAXRECVMSGSIZE-15728640} \
-          --grpc.max_send_message_length ${CHAINCODE_MAXSENDMSGSIZE-15728640}"
+          --grpc.max_send_message_length ${CHAINCODE_MAXSENDMSGSIZE-15728640}",
 }
 
-export function getContractStartCommand(debug: boolean, ccaas: boolean): string {
+export function getContractStartCommand(
+  debug: boolean,
+  ccaas: boolean
+): string {
   if (ccaas) {
-    return debug ? ScriptCommands.START_CCAAS_DEBUG : ScriptCommands.START_CCAAS;
+    return debug
+      ? ScriptCommands.START_CCAAS_DEBUG
+      : ScriptCommands.START_CCAAS;
   }
   return debug ? ScriptCommands.START_DEBUG : ScriptCommands.START;
+}
+
+function formatDiagnostics(diags: readonly ts.Diagnostic[]): string {
+  const host: ts.FormatDiagnosticsHost = {
+    getCanonicalFileName: (f) => f,
+    getCurrentDirectory: ts.sys.getCurrentDirectory,
+    getNewLine: () => ts.sys.newLine,
+  };
+  return ts.formatDiagnosticsWithColorAndContext(diags, host);
+}
+
+export function compileWithTsconfigOverrides(
+  tsconfigPath: string,
+  overrides: Partial<ts.CompilerOptions>
+): void {
+  const absConfigPath = path.isAbsolute(tsconfigPath)
+    ? tsconfigPath
+    : path.resolve(process.cwd(), tsconfigPath);
+
+  // 1) Read the tsconfig.json
+  const configFile = ts.readConfigFile(absConfigPath, ts.sys.readFile);
+  if (configFile.error) {
+    throw new Error(formatDiagnostics([configFile.error]));
+  }
+
+  // 2) Parse it (resolves "extends", include/exclude/files, etc.)
+  const configDir = path.dirname(absConfigPath);
+  const parsed = ts.parseJsonConfigFileContent(
+    configFile.config,
+    ts.sys,
+    configDir,
+    /*existingOptions*/ undefined,
+    absConfigPath
+  );
+
+  if (parsed.errors.length) {
+    throw new Error(formatDiagnostics(parsed.errors));
+  }
+
+  // 3) Override compiler options in-memory
+  const options: ts.CompilerOptions = {
+    ...parsed.options,
+    ...overrides,
+  };
+
+  // Optional: If you override outDir/rootDir, ensure they’re absolute
+  // to avoid surprises depending on CWD.
+  if (options.outDir) options.outDir = path.resolve(configDir, options.outDir);
+  if (options.rootDir)
+    options.rootDir = path.resolve(configDir, options.rootDir);
+
+  // 4) Create program + emit
+  const program = ts.createProgram({
+    rootNames: parsed.fileNames,
+    options,
+    projectReferences: parsed.projectReferences,
+  });
+
+  const preEmit = ts.getPreEmitDiagnostics(program);
+  if (preEmit.length) {
+    // If you want "transpile anyway", you can choose to not throw here.
+    throw new Error(formatDiagnostics(preEmit));
+  }
+
+  const emitResult = program.emit();
+  const emitDiagnostics = emitResult.diagnostics ?? [];
+  if (emitDiagnostics.length) {
+    throw new Error(formatDiagnostics(emitDiagnostics));
+  }
+
+  if (emitResult.emitSkipped) {
+    throw new Error("Emit was skipped (check diagnostics above).");
+  }
 }

@@ -21,8 +21,10 @@ import {
   packageContract,
   commitChaincode,
   getContractStartCommand,
+  compileWithTsconfigOverrides,
 } from "./cli-utils";
 import "./shared/overrides";
+import ts from "typescript";
 
 const logger = Logging.for("fabric");
 
@@ -31,8 +33,18 @@ const compileCommand = new Command()
   .description("Creates a global contract")
   .option("--dev", "compiles contracts without minification", false)
   .option("--debug", "makes attaching debugger possible", false)
-  .option("--ccaas", "makes attaching debugger possible", false)
+  .option(
+    "--ccaas",
+    "Ajusts the package commands to be deployed as ccaas",
+    false
+  )
   .option("--name <String>", "contract name", "global-contract")
+  .option("--bundle", "Bundles with rollup instead of using tsc", false)
+  .option(
+    "--ts-config-file <string>",
+    "relative path to the ts config file based on cwd or absolute path",
+    "./tsconfig.json"
+  )
   .option(
     "--description <String>",
     "contract description",
@@ -64,42 +76,60 @@ const compileCommand = new Command()
       stripContractName,
       // eslint-disable-next-line prefer-const
       ccaas,
+      // eslint-disable-next-line prefer-const
+      bundle,
+
+      tsConfigFile,
     } = options;
     const log = logger.for("compile-contract");
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );
 
+    tsConfigFile = path.isAbsolute(tsConfigFile)
+      ? tsConfigFile
+      : path.join(process.cwd(), tsConfigFile);
+
     output = stripContractName ? output : path.join(output, name);
     log.info(`Deleting existing output folder (if exists) under ${output}`);
     execSync(`rm -rf ${output}`);
-    log.info(`bundling contract from ${input}`);
-    const bundle = await rollup({
-      input: `${input}/index.ts`,
-      plugins: [
-        replace({
-          preventAssignment: true,
-          delimiters: ["", ""],
-          values: { "##VERSION##": version, "##PACKAGE##": pkg.name },
-        }),
-        typescript({
-          tsconfig: "./tsconfig.json",
-          compilerOptions: {
-            outDir: output,
-          },
-          module: "esnext",
-          declaration: false,
-        }),
-      ],
-    });
-    log.info(
-      `withing contract to ${output} with name ${toPascalCase(name)}.js`
-    );
-    await bundle.write({
-      file: `${output}/${toPascalCase(name)}.js`,
-      format: "umd",
-      name: `${toPascalCase(name)}.js`,
-    });
+    if (bundle) {
+      log.info(`bundling contract from ${input}`);
+      const bundle = await rollup({
+        input: `${input}/index.ts`,
+        plugins: [
+          replace({
+            preventAssignment: true,
+            delimiters: ["", ""],
+            values: { "##VERSION##": version, "##PACKAGE##": pkg.name },
+          }),
+          typescript({
+            tsconfig: tsConfigFile,
+            compilerOptions: {
+              outDir: output,
+            },
+            module: "esnext",
+            declaration: false,
+          }),
+        ],
+      });
+      log.info(
+        `withing contract to ${output} with name ${toPascalCase(name)}.js`
+      );
+      await bundle.write({
+        file: `${output}/${toPascalCase(name)}.js`,
+        format: "umd",
+        name: `${toPascalCase(name)}.js`,
+      });
+    } else {
+      compileWithTsconfigOverrides(tsConfigFile, {
+        outDir: output,
+        module: ts.ModuleKind.ESNext,
+        declaration: false,
+        sourceMap: false,
+        // rootDir: input,
+      });
+    }
 
     const scripts = {
       start: getContractStartCommand(debug, ccaas),
@@ -118,7 +148,9 @@ const compileCommand = new Command()
     delete contractPackage.type;
     delete contractPackage.types;
     delete contractPackage.exports;
-    contractPackage.main = `${toPascalCase(name)}.js`;
+    contractPackage.main = bundle
+      ? `${toPascalCase(name)}.js`
+      : `${input}/index.js`;
 
     fs.writeFileSync(
       path.join(output, "package.json"),
