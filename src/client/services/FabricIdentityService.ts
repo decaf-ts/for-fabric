@@ -3,6 +3,7 @@ import {
   ClientBasedService,
   Context,
   MaybeContextualArg,
+  PersistenceKeys,
 } from "@decaf-ts/core";
 import FabricCAServices, {
   AffiliationService,
@@ -17,6 +18,7 @@ import {
   ConflictError,
   InternalError,
   NotFoundError,
+  OperationKeys,
 } from "@decaf-ts/db-decorators";
 import { CoreUtils } from "../utils";
 import {
@@ -97,7 +99,9 @@ export class FabricIdentityService extends ClientBasedService<
   override async initialize(
     ...args: MaybeContextualArg<any>
   ): Promise<{ config: CAConfig; client: FabricCAServices }> {
-    const { log, ctx } = await this.logCtx(args, this.initialize, true);
+    const { log, ctx } = (
+      await this.logCtx(args, PersistenceKeys.INITIALIZATION, true)
+    ).for(this.initialize);
     const [config] = args;
     if (!config) throw new InternalError("Missing Fabric CA configuration");
 
@@ -160,7 +164,9 @@ export class FabricIdentityService extends ClientBasedService<
       doMap = true as MAP;
     }
 
-    const { log } = await this.logCtx(args, this.getCertificates, true);
+    const { log } = (await this.logCtx(args, OperationKeys.READ, true)).for(
+      this.getCertificates
+    );
     log.debug(
       `Retrieving certificates${request ? ` for ${request.id}` : ""} for CA ${this.config.caName}`
     );
@@ -224,7 +230,9 @@ export class FabricIdentityService extends ClientBasedService<
     enrollmentId: string,
     ...args: MaybeContextualArg<any>
   ): Promise<FabricIdentity> {
-    const { log } = await this.logCtx(args, this.read, true);
+    const { log } = (await this.logCtx(args, OperationKeys.READ, true)).for(
+      this.read
+    );
     log.verbose(`Retrieving identity with enrollment ID ${enrollmentId}`);
     let result: IServiceResponse;
     try {
@@ -263,7 +271,9 @@ export class FabricIdentityService extends ClientBasedService<
     maxEnrollments?: number,
     ...args: MaybeContextualArg<any>
   ): Promise<string> {
-    const { log } = await this.logCtx(args, this.register, true);
+    const { log } = (await this.logCtx(args, "register", true)).for(
+      this.register
+    );
 
     let registration: string;
     try {
@@ -323,7 +333,9 @@ export class FabricIdentityService extends ClientBasedService<
     registration: string,
     ...args: MaybeContextualArg<any>
   ): Promise<Identity> {
-    const { log, ctx } = await this.logCtx(args, this.enroll, true);
+    const { log, ctx } = (await this.logCtx(args, "enroll", true)).for(
+      this.enroll
+    );
     let identity: Identity;
     try {
       log.debug(`Enrolling ${enrollmentId}`);
@@ -365,7 +377,9 @@ export class FabricIdentityService extends ClientBasedService<
     maxEnrollments?: number,
     ...args: MaybeContextualArg<any>
   ): Promise<Identity> {
-    const { ctx } = await this.logCtx(args, this.registerAndEnroll, true);
+    const { ctx } = (await this.logCtx(args, "register-enroll", true)).for(
+      this.registerAndEnroll
+    );
     const registration = await this.register(
       model,
       isSuperUser,
@@ -393,7 +407,7 @@ export class FabricIdentityService extends ClientBasedService<
     enrollmentId: string,
     ...args: MaybeContextualArg<any>
   ): Promise<IServiceResponse> {
-    const { log } = await this.logCtx(args, this.revoke, true);
+    const { log } = (await this.logCtx(args, "revoke", true)).for(this.revoke);
     log.verbose(`Revoking identity with enrollment ID ${enrollmentId}`);
     const identity = await this.read(enrollmentId);
     if (!identity)
