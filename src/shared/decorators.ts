@@ -10,6 +10,7 @@ import {
   afterCreate,
   afterDelete,
   afterUpdate,
+  generated,
   InternalError,
   NotFoundError,
   onCreate,
@@ -133,6 +134,7 @@ export function ownedBy() {
     return function (obj: any, attribute?: any) {
       return apply(
         required(),
+        generated(),
         readonly(),
         onCreate(ownedByOnCreate),
         propMetadata(
