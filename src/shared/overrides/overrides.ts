@@ -52,9 +52,9 @@ Model.prototype.segregate = function segregate<M extends Model>(
     shared: {} as Record<keyof M, any>,
   };
 
-  const transientKeys = Object.keys(transientProps);
-  const privateKeys = Object.keys(privateProperties);
-  const sharedKeys = Object.keys(sharedProperties);
+  const transientKeys = Object.keys(transientProps || {});
+  const privateKeys = Object.keys(privateProperties || {});
+  const sharedKeys = Object.keys(sharedProperties || {});
 
   for (const key of decoratedProperties) {
     const isTransient = transientKeys.includes(key);
