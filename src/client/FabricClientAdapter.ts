@@ -445,7 +445,7 @@ export class FabricClientAdapter extends Adapter<
       model: split.model,
       id: model[Model.pk(model.constructor as Constructor<M>)] as string,
       transient: split.transient,
-      private: split.private,
+      privates: split.privates,
       shared: split.shared,
     };
   }

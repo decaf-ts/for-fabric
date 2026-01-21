@@ -2,8 +2,7 @@ import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { FabricModelKeys } from "../constants";
 import { SegregatedModel } from "../types";
-import { DBKeys, InternalError } from "@decaf-ts/db-decorators";
-import { Context } from "@decaf-ts/core";
+import { DBKeys } from "@decaf-ts/db-decorators";
 import { CollectionResolver, MirrorMetadata } from "../decorators";
 
 Model.prototype.isShared = function isShared<M extends Model>(
@@ -48,7 +47,7 @@ Model.prototype.segregate = function segregate<M extends Model>(
   const result: SegregatedModel<M> = {
     model: {} as Record<keyof M, any>,
     transient: {} as Record<keyof M, any>,
-    private: {} as Record<keyof M, any>,
+    privates: {} as Record<keyof M, any>,
     shared: {} as Record<keyof M, any>,
   };
 
@@ -64,8 +63,8 @@ Model.prototype.segregate = function segregate<M extends Model>(
       result.transient = result.transient || ({} as any);
       (result.transient as any)[key] = model[key as keyof M];
       if (isPrivate) {
-        result.private = result.private || ({} as any);
-        (result.private as any)[key] = model[key as keyof M];
+        result.privates = result.privates || ({} as any);
+        (result.privates as any)[key] = model[key as keyof M];
       }
       if (isShared) {
         result.shared = result.shared || ({} as any);

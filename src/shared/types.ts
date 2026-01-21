@@ -90,7 +90,7 @@ export interface Credentials {
 export type SegregatedModel<M extends Model> = {
   model: M;
   transient?: Record<keyof M, any>;
-  private?: Record<keyof M, any>;
+  privates?: Record<keyof M, any>;
   shared?: Record<keyof M, any>;
 };
 
