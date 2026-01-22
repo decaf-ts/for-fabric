@@ -840,6 +840,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
         const mappedProp = Model.columnName(model, key as any);
         if (this.isReserved(mappedProp))
           throw new InternalError(`Property name ${mappedProp} is reserved`);
+        val = val instanceof Date ? new Date(val) : val;
         accum[mappedProp] = val;
         return accum;
       },
