@@ -55,7 +55,7 @@
     "uml": "cd workdocs/uml && for FILE in ./*.puml; do docker run --rm -v $(pwd):/work -w /work miy4/plantuml -DPLANTUML_LIMIT_SIZE=8192 -tpng $FILE; done && cd ../.. && cp -fr workdocs/uml/*.png workdocs/resources/",
     "docs": "npx rimraf ./docs && mkdir docs && npx build-scripts --docs",
     "extract:indexes": "LEVEL=verbose node ./lib/bin/cli.cjs extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/GlobalContract",
-    "extract:collections": "LEVEL=verbose node ./lib/bin/cli.cjs extract-collections --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/GlobalContract --mspIds '[\"org-a\",\"org-b\"]' --mainMspId org-c",
+    "extract:collections": "LEVEL=verbose node ./lib/bin/cli.cjs extract-collections --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/GlobalContract --mspIds '[\"org-a\",\"org-b\"]' --mainMspId main-org",
     "infrastructure:up": "docker compose -f ./docker/infrastructure/docker-compose.yaml up -d",
     "infrastructure:down": "docker compose -f ./docker/infrastructure/docker-compose.yaml down --rmi local -v && rm -rf ./docker/docker-data && rm -f ./tests/integration/chaincodeTrackers/*.count",
     "infrastructure-hsm:up": "docker compose -f ./docker/infrastructure/docker-compose-hsm.yaml up -d",
@@ -133,8 +133,6 @@
     "fabric-contract-api": "^2.5.8",
     "fabric-network": "^2.2.20",
     "fabric-shim": "^2.5.8",
-    "jsrsasign": "^11.1.0",
-    "jsrsasign-util": "^1.0.5",
     "rollup-plugin-ts": "^3.4.5"
   },
   "overrides": {

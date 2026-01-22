@@ -1,30 +1,21 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
-import {
-  column,
-  Context,
-  index,
-  OrderDirection,
-  pk,
-  table,
-} from "@decaf-ts/core";
+import { column, index, OrderDirection, pk, table } from "@decaf-ts/core";
 // import {BlockOperations, OperationKeys, readonly} from "@decaf-ts/db-decorators";
 import { uses } from "@decaf-ts/decoration";
-
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { gtin } from "./gtin";
-
 import { audit } from "./decorators";
 import {
   FabricFlavour,
   mirror,
-  ModelCollection,
+  NamespaceCollection,
   ownedBy,
   sharedData,
 } from "../../shared/index";
 import { version } from "@decaf-ts/db-decorators";
 
-@sharedData(ModelCollection)
+@sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
 // @BlockOperations([OperationKeys.DELETE])
 @table("other_product_shared")
@@ -32,7 +23,7 @@ import { version } from "@decaf-ts/db-decorators";
 export class OtherProductShared extends BaseIdentifiedModel {
   @pk()
   @gtin()
-  @mirror("ptp-product", (mspId: string) => mspId === "org-c")
+  @mirror("mirror-collection", (mspId: string) => mspId === "main-org")
   @audit(OtherProductShared)
   productCode!: string;
 

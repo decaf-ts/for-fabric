@@ -6,13 +6,13 @@ import {
 } from "../../src/client/collections/index";
 import { Model } from "@decaf-ts/decorator-validation";
 
-describe.skip("collection extraction", () => {
+describe("collection extraction", () => {
   it("extracts collections", async () => {
     const clazz = OtherProductShared;
 
-    const mainMsp = "pla";
+    const mainMsp = "main-org";
 
-    const otherMsps = ["msp1", "msp2", "msp3"];
+    const otherMsps = ["msp1", "msp2"];
 
     const mirrorMeta = Model.mirroredAt(clazz);
 
@@ -44,6 +44,17 @@ describe.skip("collection extraction", () => {
     }
 
     expect(collections).toBeDefined();
+
+    const keys = Object.keys(collections);
+    expect(keys).toHaveLength(2);
+    expect(keys).toEqual(otherMsps);
+
+    const col0 = collections[keys[0]];
+    expect(col0.privates).toHaveLength(0);
+    expect(col0.shared).toHaveLength(1);
+
+    // expect(shared.)
+
     expect(mirrorCollection).toBeDefined();
   });
 });

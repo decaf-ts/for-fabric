@@ -2,7 +2,6 @@ import { Context, Repo, Repository } from "@decaf-ts/core";
 import { InternalError } from "@decaf-ts/db-decorators";
 import { Product } from "../../src/contract/models/Product";
 import { generateGtin } from "../../src/contract/models/gtin";
-import { Model } from "@decaf-ts/decorator-validation";
 import { Logging, LogLevel } from "@decaf-ts/logging";
 import { CAConfig, PeerConfig } from "../../src/shared/index";
 import { FabricClientAdapter } from "../../src/client/index";
@@ -14,16 +13,16 @@ const { adapterFactory } = E2eConfig;
 
 const Clazz = Product;
 
-const pk = Model.pk(Clazz);
-
 jest.setTimeout(50000);
 
 describe("impersonation test", () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let adapter: Awaited<ReturnType<typeof adapterFactory>>;
   let repo: Repo<Product>;
 
   const contractName = "GlobalContract";
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const caConfig: CAConfig = {
     url: "https://localhost:7011",
     tls: {
@@ -102,7 +101,8 @@ describe("impersonation test", () => {
 
       jest
         .spyOn(FabricClientAdapter, "getClient")
-        .mockImplementation((...args: any[]) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        .mockImplementation((cfg: PeerConfig): any => {
           return {};
         });
 

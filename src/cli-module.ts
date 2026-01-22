@@ -286,12 +286,20 @@ const extractCollections = new Command()
     if (!file && !folder)
       throw new InternalError(`Must pass a file or a folder`);
 
+    const injectableModels = models.filter(
+      (model) => Model.isShared(model) || Model.isPrivate(model) || !!Model.mirroredAt(model)
+    );
+    if (!injectableModels.length) {
+      log.info(`No shared, private, or mirrored models found to extract collections`);
+      return;
+    }
+
     const cols: {
       indexes: Index[];
       mirror?: PrivateCollection;
       collections: PrivateCollection[];
     }[] = await Promise.all(
-      models.map(async (clazz) => {
+      injectableModels.map(async (clazz) => {
         const tableName = Model.tableName(clazz);
         const meta = Metadata.get(clazz);
         const mirrorMeta = Model.mirroredAt(clazz);

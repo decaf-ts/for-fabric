@@ -354,8 +354,21 @@ export const ModelCollection: CollectionResolver = <M extends Model>(
     throw new InternalError(
       `Model ${constr.name} is not owned by any organization. did you use @ownedBy() (or provide the name)?`
     );
-  return `${toPascalCase(constr.name)}${mspId ? toPascalCase(mspId) : ""}`;
+  return `${toPascalCase(constr.name)}${orgName ? toPascalCase(orgName) : ""}`;
 };
+
+export function NamespaceCollection(namespace: string): CollectionResolver {
+  return <M extends Model>(model: M | Constructor<M>, mspId?: string) => {
+    const orgName =
+      mspId || (typeof model !== "function" ? Model.ownerOf(model) : undefined);
+    const constr = typeof model === "function" ? model : model.constructor;
+    if (!orgName)
+      throw new InternalError(
+        `Model ${constr.name} is not owned by any organization. did you use @ownedBy() (or provide the name)?`
+      );
+    return `${namespace}${orgName ? toPascalCase(orgName) : ""}`;
+  };
+}
 
 export const ImplicitPrivateCollection: CollectionResolver = <M extends Model>(
   model: M | Constructor<M>,
