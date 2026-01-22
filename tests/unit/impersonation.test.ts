@@ -100,7 +100,7 @@ describe("e2e Repository test", () => {
           throw new InternalError("for test");
         });
 
-      const getClientMock = jest
+      jest
         .spyOn(FabricClientAdapter, "getClient")
         .mockImplementation((...args: any[]) => {
           return {};
