@@ -7,6 +7,8 @@ import {
   SerializedPage,
   DirectionLimitOffset,
   Paginator,
+  FlagsOf,
+  ObserverHandler,
 } from "@decaf-ts/core";
 import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -64,6 +66,14 @@ export class FabricClientRepository<
 
   constructor(adapter?: A, clazz?: Constructor<M>) {
     super(adapter, clazz);
+  }
+
+  override override(flags: Partial<FlagsOf<ContextOf<A>>>): this {
+    return super.override(flags).for(flags as any);
+  }
+
+  protected override ObserverHandler(): ObserverHandler {
+    return super.ObserverHandler();
   }
 
   override async paginateBy(
