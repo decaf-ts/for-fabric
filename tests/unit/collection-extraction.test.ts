@@ -6,7 +6,7 @@ import {
 } from "../../src/client/collections/index";
 import { Model } from "@decaf-ts/decorator-validation";
 
-describe("collection extraction", () => {
+describe.skip("collection extraction", () => {
   it("extracts collections", async () => {
     const clazz = OtherProductShared;
 

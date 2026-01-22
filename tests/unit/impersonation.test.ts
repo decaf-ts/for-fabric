@@ -1,4 +1,4 @@
-import { Repo, Repository } from "@decaf-ts/core";
+import { Context, Repo, Repository } from "@decaf-ts/core";
 import { InternalError } from "@decaf-ts/db-decorators";
 import { Product } from "../../src/contract/models/Product";
 import { generateGtin } from "../../src/contract/models/gtin";
@@ -18,7 +18,7 @@ const pk = Model.pk(Clazz);
 
 jest.setTimeout(50000);
 
-describe("e2e Repository test", () => {
+describe("impersonation test", () => {
   let adapter: Awaited<ReturnType<typeof adapterFactory>>;
   let repo: Repo<Product>;
 
@@ -120,7 +120,8 @@ describe("e2e Repository test", () => {
         expect.anything(),
         expect.objectContaining({
           ...override,
-        })
+        }),
+        expect.any(Context)
       );
     });
   });
