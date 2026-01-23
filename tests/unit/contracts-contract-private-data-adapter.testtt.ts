@@ -29,7 +29,7 @@
 //     );
 //     const seq = await adapter.Sequence({
 //       name: "pd-seq",
-//       type: "Number",
+//       type: Number,
 //       incrementBy: 1,
 //       startWith: 1,
 //       cycle: false,

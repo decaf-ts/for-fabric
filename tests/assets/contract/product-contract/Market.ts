@@ -18,7 +18,7 @@ import { FabricIdentifiedModel } from "./FabricIdentifiedModel";
 @table(TableNames.Market)
 @model()
 export class Market extends FabricIdentifiedModel {
-  @pk({ type: "String", generated: false })
+  @pk({ type: String, generated: false })
   @composed(["productCode", "marketId"], ":", true)
   @description("Unique identifier composed of product code and market ID.")
   id!: string;

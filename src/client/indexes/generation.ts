@@ -1,6 +1,10 @@
 import { IndexMetadata, OrderDirection } from "@decaf-ts/core";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
-import { CouchDBKeys } from "@decaf-ts/for-couchdb";
+import {
+  CouchDBDesignDoc,
+  CouchDBKeys,
+  generateViews,
+} from "@decaf-ts/for-couchdb";
 import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
 import { InternalError } from "@decaf-ts/db-decorators";
 
@@ -66,6 +70,19 @@ function addIndex(
   accum[name] = index;
 }
 
+function ensureDirectoryExistence(filePath: string) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("fs");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require("path");
+  const dirname: string = path.dirname(filePath);
+  if (fs.existsSync(dirname)) {
+    return true;
+  }
+  ensureDirectoryExistence(dirname);
+  fs.mkdirSync(dirname);
+}
+
 export function generateModelIndexes<M extends Model>(
   m: Constructor<M>,
   accum?: Record<string, any>
@@ -108,6 +125,18 @@ export function generateModelIndexes<M extends Model>(
     indexes[key] = value;
   });
   return Object.values(result);
+}
+
+export function generateModelDesignDocs<M extends Model>(
+  m: Constructor<M>,
+  accum?: Record<string, CouchDBDesignDoc>
+): CouchDBDesignDoc[] {
+  const views = generateViews([m]);
+  const storage: Record<string, CouchDBDesignDoc> = accum || {};
+  views.forEach((doc) => {
+    storage[doc._id] = doc;
+  });
+  return views;
 }
 
 export function readModelFile(file: any) {
@@ -160,15 +189,6 @@ export function writeIndexes(
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path");
 
-  function ensureDirectoryExistence(filePath: string) {
-    const dirname: string = path.dirname(filePath) as string;
-    if (fs.existsSync(dirname)) {
-      return true;
-    }
-    ensureDirectoryExistence(dirname);
-    fs.mkdirSync(dirname);
-  }
-
   indexes.forEach((index) => {
     const file = path.resolve(
       path.join(
@@ -178,5 +198,31 @@ export function writeIndexes(
     );
     ensureDirectoryExistence(file);
     fs.writeFileSync(file, JSON.stringify(index, undefined, 2));
+  });
+}
+
+export function writeDesignDocs(
+  designDocs: CouchDBDesignDoc[],
+  p: string = process.cwd(),
+  collection?: string
+) {
+  if (!designDocs.length) return;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("fs");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require("path");
+
+  designDocs.forEach((doc) => {
+    const docId = doc._id.replace(/^_design\//, "");
+    const file = path.resolve(
+      path.join(
+        p,
+        `./META-INF/statedb/couchdb/${collection ? `collections/${collection}/` : ""}design_docs/${docId}.json`
+      )
+    );
+    ensureDirectoryExistence(file);
+    const payload = { ...doc };
+    delete payload._rev;
+    fs.writeFileSync(file, JSON.stringify(payload, undefined, 2));
   });
 }

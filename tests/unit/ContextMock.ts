@@ -2,9 +2,11 @@ import { Logging, LogLevel } from "@decaf-ts/logging";
 import { Contract } from "fabric-contract-api";
 import { ModelKeys } from "@decaf-ts/decorator-validation";
 import { InternalError } from "@decaf-ts/db-decorators";
+import { Iterators } from "fabric-shim-api";
 
 export function getStubMock() {
   const state: Record<any, any> = {};
+  const privateState: Record<string, Record<string, any>> = {};
 
   return {
     getCreator: async () => {
@@ -106,6 +108,65 @@ export function getStubMock() {
           },
         },
         metadata: { bookmark: Date.now().toString() },
+      };
+    },
+
+    getPrivateData(collection: string, key: string): Promise<any> {
+      if (collection in privateState && key in privateState[collection])
+        return privateState[collection][key];
+      return "";
+    },
+    // getPrivateDataHash(collection: string, key: string): Promise<Uint8Array>;
+    putPrivateData(
+      collection: string,
+      key: string,
+      value: Uint8Array
+    ): Promise<void> {
+      const testStr = typeof value === "string" ? value : value.toString();
+      if (testStr.includes(ModelKeys.ANCHOR))
+        throw new InternalError("Anchor keys are not allowed");
+      state[key] = value;
+    },
+    deletePrivateData(collection: string, key: string): Promise<void> {
+      if (key in state) {
+        delete state[key];
+        return;
+      }
+      throw new Error("Missing");
+    },
+    // purgePrivateData(collection: string, key: string): Promise<void>;
+    // setPrivateDataValidationParameter(collection: string, key: string, ep: Uint8Array): Promise<void>;
+    // getPrivateDataValidationParameter(collection: string, key: string): Promise<Uint8Array>;
+    // getPrivateDataByRange(collection: string, startKey: string, endKey: string): Promise<Iterators.StateQueryIterator> & AsyncIterable<Iterators.KV>;
+    // getPrivateDataByPartialCompositeKey(collection: string, objectType: string, attributes: string[]): Promise<Iterators.StateQueryIterator> & AsyncIterable<Iterators.KV>;
+
+    async getPrivateDataQueryResult(collection: string, query: string) {
+      if (!(collection in this.privateState)) {
+        return {
+          async next() {
+            return { done: true };
+          },
+          async close() {
+            return;
+          },
+        };
+      }
+      let currentIndex = 0;
+      const keys = Object.keys(state);
+      return {
+        async next() {
+          if (currentIndex < keys.length) {
+            const key = keys[currentIndex++];
+            return {
+              value: { key, value: state[key] },
+              done: false,
+            };
+          }
+          return { done: true };
+        },
+        async close() {
+          // No-op for mock
+        },
       };
     },
   };

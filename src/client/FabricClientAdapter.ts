@@ -463,7 +463,7 @@ export class FabricClientAdapter extends Adapter<
         `re-adding transient properties: ${Object.keys(transient).join(", ")}`
       );
       Object.entries(transient as Record<string, any>).forEach(([key, val]) => {
-        if (key in obj)
+        if (key in obj && typeof obj[key] !== "undefined")
           throw new InternalError(
             `Transient property ${key} already exists on model ${typeof clazz === "string" ? clazz : clazz.name}. should be impossible`
           );

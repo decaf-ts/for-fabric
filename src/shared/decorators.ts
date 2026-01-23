@@ -400,7 +400,7 @@ export async function segregatedDataOnCreate<M extends Model>(
       `Segregated data keys and metadata length mismatch`
     );
 
-  const msp = Model.ownerOf(model);
+  const msp = Model.ownerOf(model) || context.identity;
   if (!msp)
     throw new ValidationError(
       `There's no assigned organization for model ${model.constructor.name}`

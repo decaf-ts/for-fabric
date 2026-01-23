@@ -23,7 +23,7 @@ import {
 @table("tst_user")
 @model()
 export class TestPublicModel extends FabricIdentifiedBaseModel {
-  @pk({ type: "Number", generated: true })
+  @pk({ type: Number, generated: true })
   id!: number;
 
   @column("tst_name")

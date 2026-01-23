@@ -1,9 +1,10 @@
 import { OrderDirection } from "@decaf-ts/core";
-import { Constructor, Metadata } from "@decaf-ts/decoration";
-import { CouchDBKeys } from "@decaf-ts/for-couchdb";
-import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
+import { Constructor } from "@decaf-ts/decoration";
+import { CouchDBDesignDoc } from "@decaf-ts/for-couchdb";
+import { Model } from "@decaf-ts/decorator-validation";
 import { InternalError } from "@decaf-ts/db-decorators";
-import { CollectionResolver, MirrorMetadata } from "../../shared/index";
+import { CollectionResolver } from "../../shared/index";
+import { writeDesignDocs } from "../indexes/generation";
 
 export type Index = {
   index: {
@@ -259,4 +260,13 @@ export function writeCollections(
   const file = path.resolve(path.join(p, `./META-INF/${fileName}.json`));
   ensureDirectoryExistence(file);
   fs.writeFileSync(file, JSON.stringify(cols, undefined, 2));
+}
+
+export function writeCollectionDesignDocs(
+  docs: CouchDBDesignDoc[],
+  p: string = process.cwd(),
+  collection?: string
+) {
+  if (!docs?.length) return;
+  writeDesignDocs(docs, p, collection);
 }

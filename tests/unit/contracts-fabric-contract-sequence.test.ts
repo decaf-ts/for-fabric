@@ -41,7 +41,7 @@ describe("FabricContractSequence", () => {
     new Sequence(
       {
         name: "test-seq",
-        type: "Number",
+        type: Number,
         incrementBy: 1,
         startWith: 1,
       } as SequenceOptions,

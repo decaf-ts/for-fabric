@@ -125,7 +125,7 @@ describe("contracts/ContractAdapter helpers", () => {
     } as unknown as FabricContractRepository<TestModel>;
 
     const model = new TestModel();
-    const sequenceOptions = { type: "Number" } as SequenceOptions;
+    const sequenceOptions = { type: Number } as SequenceOptions;
 
     await pkFabricOnCreate.call(
       repositoryMock,
@@ -137,7 +137,7 @@ describe("contracts/ContractAdapter helpers", () => {
 
     expect(adapterMock.Sequence).toHaveBeenCalledTimes(1);
     expect(adapterMock.Sequence).toHaveBeenCalledWith(
-      expect.objectContaining({ name: expect.any(String), type: "Number" })
+      expect.objectContaining({ name: expect.any(String), type: Number })
     );
     expect(model.id).toBe(nextValue);
     const descriptor = Object.getOwnPropertyDescriptor(model, "id");

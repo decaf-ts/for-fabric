@@ -25,7 +25,7 @@ import { SerializedCrudContract } from "../../src/contracts";
 @table("tst_nested_model")
 @model()
 export class TestNestedModel extends FabricIdentifiedBaseModel {
-  @pk({ type: "Number", generated: true })
+  @pk({ type: Number, generated: true })
   id!: number;
 
   @column("tst_name")

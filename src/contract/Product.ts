@@ -9,7 +9,7 @@ import { uses } from "@decaf-ts/decoration";
 @table()
 @model()
 export class Product extends FabricIdentifiedBaseModel {
-  @pk({ type: "Number", generated: true })
+  @pk({ type: Number, generated: true })
   productCode!: number;
 
   @column()

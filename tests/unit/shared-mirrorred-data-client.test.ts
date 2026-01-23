@@ -22,7 +22,7 @@ const { adapterFactory } = E2eConfig;
 
 jest.setTimeout(50000);
 
-describe("shared and mirrored data", () => {
+describe("shared and mirrored data - client", () => {
   let adapter: Awaited<ReturnType<typeof adapterFactory>>;
 
   const contractName = "GlobalContract";
@@ -120,9 +120,10 @@ describe("shared and mirrored data", () => {
           createdAt: undefined,
         })
       );
+      expect(shared).toEqual({});
     });
 
-    it.skip("creates", async () => {
+    it("creates from client side", async () => {
       const model = new PrivateClass({
         name: "name",
       });
@@ -158,28 +159,21 @@ describe("shared and mirrored data", () => {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             className?: string
           ): any => {
-            return Buffer.from("{}");
+            return Buffer.from(new PrivateClass().serialize());
           }
         );
 
-      const override: any = {
-        keyCertOrDirectoryPath: "dummy",
-        certCertOrDirectoryPath: "dummy",
-      };
-
-      await expect(
-        repo.override(override as any).create(model)
-      ).rejects.toThrow(InternalError);
-
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const created = await repo.create(model);
       expect(transactionMock).toHaveBeenCalled();
       expect(transactionMock).toHaveBeenCalledWith(
         expect.any(Context),
-        expect.any(String),
+        "create",
         true,
-        [],
-        {},
-        [],
-        ""
+        [new PrivateClass().serialize()],
+        { name: "name", id: undefined, createdAt: undefined },
+        undefined,
+        PrivateClass.name
       );
     });
   });

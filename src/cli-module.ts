@@ -8,9 +8,11 @@ import replace from "@rollup/plugin-replace";
 import typescript from "@rollup/plugin-typescript";
 import { InternalError, SerializationError } from "@decaf-ts/db-decorators";
 import {
+  generateModelDesignDocs,
   generateModelIndexes,
   readModelFile,
   readModelFolders,
+  writeDesignDocs,
   writeIndexes,
 } from "./client/indexes";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -30,6 +32,7 @@ import {
   Index,
   PrivateCollection,
   writeCollections,
+  writeCollectionDesignDocs,
 } from "./client/collections/index";
 import { Metadata } from "@decaf-ts/decoration";
 
@@ -215,6 +218,7 @@ const extractIndexes = new Command()
       models.push(...(await readModelFolders(folder)));
     }
     const result: Record<string, any> = {};
+    const designDocs: Record<string, any> = {};
 
     if (!file && !folder)
       throw new InternalError(`Must pass a file or a folder`);
@@ -222,10 +226,16 @@ const extractIndexes = new Command()
     for (const m of models) {
       log.verbose(`Extracting indexes for table ${Model.tableName(m)}`);
       generateModelIndexes(m, result);
+      generateModelDesignDocs(m, designDocs);
     }
-    log.verbose(`Found ${Object.keys(result).length} indexes to create`);
+    const indexesToWrite = Object.values(result);
+    const docsToWrite = Object.values(designDocs);
+    log.verbose(`Found ${indexesToWrite.length} indexes to create`);
+    log.verbose(`Found ${docsToWrite.length} design docs to create`);
     log.debug(`Indexes: ${JSON.stringify(result)}`);
-    writeIndexes(Object.values(result), outDir);
+    log.debug(`DesignDocs: ${JSON.stringify(designDocs)}`);
+    writeIndexes(indexesToWrite, outDir);
+    writeDesignDocs(docsToWrite, outDir);
   });
 
 const extractCollections = new Command()
@@ -359,6 +369,7 @@ const extractCollections = new Command()
           .map((c) => [...(c.privates || []), ...(c.shared || [])])
           .flat();
         let indexes: any;
+        let designDocs: any;
         if (colList.length) {
           log
             .for(Model.tableName(clazz))
@@ -367,9 +378,14 @@ const extractCollections = new Command()
           log
             .for(Model.tableName(clazz))
             .info(`found ${indexes.length} indexes`);
+          designDocs = generateModelDesignDocs(clazz);
+          log
+            .for(Model.tableName(clazz))
+            .info(`found ${designDocs.length} design docs`);
         }
         return {
           indexes: indexes,
+          designDocs,
           collections: colList,
           mirror: mirrorCollection,
         };
@@ -388,13 +404,16 @@ const extractCollections = new Command()
       );
 
       cols.forEach((c, i) => {
-        const { indexes, collections, mirror } = c;
+        const { indexes, designDocs, collections, mirror } = c;
         const toIndex: PrivateCollection[] = [...collections, mirror].filter(
           Boolean
         ) as PrivateCollection[];
         toIndex.forEach((i) => {
           writeIndexes(indexes, outDir, i.name);
-          log.info(`Stored ${toIndex.length} indexes to collection ${i.name}`);
+          writeCollectionDesignDocs(designDocs || [], outDir, i.name);
+          log.info(
+            `Stored ${indexes?.length || 0} indexes and ${designDocs?.length || 0} design docs to collection ${i.name}`
+          );
         });
       });
     }

@@ -19,7 +19,7 @@ import { column, pk } from "@decaf-ts/core";
 jest.setTimeout(5000000);
 
 class TestPublicModel extends Model {
-  @pk({ type: "Number" })
+  @pk({ type: Number })
   id!: number;
 
   @column()

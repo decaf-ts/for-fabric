@@ -1,10 +1,18 @@
-import "../../src/shared/overrides";
 import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
 import {
   extractCollections,
   PrivateCollection,
+  writeCollectionDesignDocs,
 } from "../../src/client/collections/index";
-import { Model } from "@decaf-ts/decorator-validation";
+import { model, Model, ModelArg } from "@decaf-ts/decorator-validation";
+import { BaseModel, pk, table } from "@decaf-ts/core";
+import { uses } from "@decaf-ts/decoration";
+import { FabricFlavour } from "../../src/shared/constants";
+import { generateModelDesignDocs } from "../../src/client/indexes";
+import { view } from "@decaf-ts/for-couchdb";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
 describe("collection extraction", () => {
   it("extracts collections", async () => {
@@ -56,5 +64,46 @@ describe("collection extraction", () => {
     // expect(shared.)
 
     expect(mirrorCollection).toBeDefined();
+  });
+
+  it("writes collection design docs for decorated models", () => {
+    @uses(FabricFlavour)
+    @table("collection_view_model")
+    @model()
+    class CollectionViewModel extends BaseModel {
+      @pk({ type: String })
+      id!: string;
+
+      @view({ name: "by_status", ddoc: "collection_view_ddoc" })
+      status!: string;
+
+      constructor(arg?: ModelArg<CollectionViewModel>) {
+        super(arg);
+      }
+    }
+
+    const docs = generateModelDesignDocs(CollectionViewModel);
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fabric-collections-"));
+    const collectionName = "MyCollection";
+    writeCollectionDesignDocs(docs, tmpDir, collectionName);
+
+    const designDir = path.join(
+      tmpDir,
+      "META-INF",
+      "statedb",
+      "couchdb",
+      "collections",
+      collectionName,
+      "design_docs"
+    );
+
+    expect(fs.existsSync(designDir)).toBe(true);
+    const files = fs.readdirSync(designDir);
+    expect(files.length).toBeGreaterThan(0);
+
+    const storedDoc = JSON.parse(
+      fs.readFileSync(path.join(designDir, files[0]), "utf-8")
+    );
+    expect(storedDoc._id).toBe("_design/collection_view_ddoc");
   });
 });
