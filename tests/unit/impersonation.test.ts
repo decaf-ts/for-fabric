@@ -3,8 +3,8 @@ import { InternalError } from "@decaf-ts/db-decorators";
 import { Product } from "../../src/contract/models/Product";
 import { generateGtin } from "../../src/contract/models/gtin";
 import { Logging, LogLevel } from "@decaf-ts/logging";
-import { CAConfig, PeerConfig } from "../../src/shared/index";
-import { FabricClientAdapter } from "../../src/client/index";
+import { CAConfig, PeerConfig } from "../../src/shared";
+import { FabricClientAdapter } from "../../src/client";
 import { E2eConfig } from "../e2e/e2e.config";
 
 Logging.setConfig({ level: LogLevel.debug });

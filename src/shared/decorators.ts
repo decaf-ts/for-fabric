@@ -20,6 +20,7 @@ import {
   readonly,
   transient,
   ValidationError,
+  DBKeys,
 } from "@decaf-ts/db-decorators";
 import { Model, required } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
@@ -526,14 +527,27 @@ function segregated(
       const constrMeta = Metadata.get(constr as Constructor, type) || {};
       const constrCollections = new Set(constrMeta.collections || []);
       constrCollections.add(collection);
-      meta.collections = [...collections];
-      Metadata.set(constr as Constructor, type, meta);
+      constrMeta.collections = [...constrCollections];
+      Metadata.set(constr as Constructor, type, constrMeta);
+
+      const transientMeta =
+        Metadata.get(constr as Constructor, DBKeys.TRANSIENT) || {};
+      const updatedTransientMeta = {
+        ...transientMeta,
+        [propertyKey as any]: {},
+      };
+      Metadata.set(
+        constr as Constructor,
+        DBKeys.TRANSIENT,
+        updatedTransientMeta
+      );
     }
 
     const decs: any[] = [];
     if (!propertyKey) {
       // decorated at the class level
-      Metadata.properties(target as Constructor)?.forEach((p) => {
+      const properties = Metadata.validatableProperties(target as Constructor);
+      properties?.forEach((p) => {
         if (!filter || filter(p)) {
           segregated(collection, type)((target as any).prototype, p);
         }

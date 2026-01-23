@@ -41,7 +41,7 @@ Model.prototype.segregate = function segregate<M extends Model>(
   );
   const sharedProperties = Metadata.get(
     model.constructor as any,
-    FabricModelKeys.PRIVATE
+    FabricModelKeys.SHARED
   );
 
   const result: SegregatedModel<M> = {
@@ -55,24 +55,33 @@ Model.prototype.segregate = function segregate<M extends Model>(
   const privateKeys = Object.keys(privateProperties || {});
   const sharedKeys = Object.keys(sharedProperties || {});
 
+  const pkKey = Model.pk(model.constructor as any);
   for (const key of decoratedProperties) {
+    const value = model[key as keyof M];
     const isTransient = transientKeys.includes(key);
     const isPrivate = privateKeys.includes(key);
     const isShared = sharedKeys.includes(key);
-    if (isTransient) {
+    const isPrimaryKey = key === pkKey;
+    const decoratedValue =
+      isPrimaryKey && typeof value === "string" && !value.endsWith(",")
+        ? `${value},`
+        : value;
+    if (isTransient || isPrivate || isShared) {
       result.transient = result.transient || ({} as any);
-      (result.transient as any)[key] = model[key as keyof M];
-      if (isPrivate) {
-        result.privates = result.privates || ({} as any);
-        (result.privates as any)[key] = model[key as keyof M];
-      }
-      if (isShared) {
-        result.shared = result.shared || ({} as any);
-        (result.shared as any)[key] = model[key as keyof M];
-      }
-    } else {
+      (result.transient as any)[key] = decoratedValue;
+    }
+    if (isPrivate) {
+      result.privates = result.privates || ({} as any);
+      (result.privates as any)[key] = decoratedValue;
+    }
+    if (isShared) {
+      result.shared = result.shared || ({} as any);
+      (result.shared as any)[key] = decoratedValue;
+    }
+    const shouldIncludeInModel = !isTransient && !isPrivate && !isShared;
+    if (shouldIncludeInModel) {
       result.model = result.model || {};
-      (result.model as any)[key] = (model as Record<string, any>)[key];
+      (result.model as any)[key] = value;
     }
   }
 
