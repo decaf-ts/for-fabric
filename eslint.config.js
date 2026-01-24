@@ -11,6 +11,7 @@ export default [
       "bin",
       "dist",
       "docs",
+      "docker/**/*",
       "gulpfile.js",
       "workdocs",
       "!src/**/*",

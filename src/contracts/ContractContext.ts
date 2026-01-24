@@ -68,6 +68,23 @@ export class FabricContractContext extends Context<FabricContractFlags> {
     return this.get("identity");
   }
 
+  writeTo(col: string, record: any) {
+    const cols: Record<string, any> = (this.getOrUndefined("segregateWrite") ||
+      {}) as Record<string, any>;
+    if (!(col in cols)) cols[col] = [];
+
+    cols[col].push(record);
+    this.cache.put("segregateWrite", cols);
+  }
+
+  readFrom(cols: string | string[]) {
+    cols = Array.isArray(cols) ? cols : [cols];
+    let current: string[] = (this.getOrUndefined("segregateRead") ||
+      []) as string[];
+    current = [...new Set([...current, ...cols])];
+    this.cache.put("segregateRead", current);
+  }
+
   override toString() {
     return `fabric ctx${this.stub ? " with stub" : "without stub"}`;
   }

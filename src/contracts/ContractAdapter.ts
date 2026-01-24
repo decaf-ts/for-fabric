@@ -365,20 +365,31 @@ export class FabricContractAdapter extends CouchDBAdapter<
           async apply(fn, thisArg, argsList) {
             switch (prop) {
               case "putState": {
-                const [stub, id, model] = argsList;
-                await stub.putPrivateData(collection, id.toString(), model);
+                // putState signature: (id: string, model: Record<string, any>, ctx: FabricContractContext)
+                const [id, model, ctx] = argsList;
+                const data = Buffer.from(
+                  FabricContractAdapter.serializer.serialize(
+                    model as Model,
+                    false
+                  )
+                );
+                await ctx.stub.putPrivateData(
+                  collection,
+                  id.toString(),
+                  data
+                );
                 return model;
               }
               case "deleteState": {
-                const [stub, id] = argsList;
-                return (stub as ChaincodeStub).deletePrivateData(
-                  collection,
-                  id
-                );
+                // deleteState signature: (id: string, context: FabricContractContext)
+                const [id, ctx] = argsList;
+                await ctx.stub.deletePrivateData(collection, id.toString());
+                return;
               }
               case "readState": {
-                const [stub, id] = argsList;
-                return stub.getPrivateData(collection, id);
+                // readState signature: (id: string, ctx: FabricContractContext)
+                const [id, ctx] = argsList;
+                return ctx.stub.getPrivateData(collection, id);
               }
               case "queryResult": {
                 const [stub, rawInput] = argsList;
