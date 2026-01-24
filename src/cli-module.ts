@@ -29,11 +29,11 @@ import "./shared/overrides";
 import ts from "typescript";
 import {
   extractCollections as exCollections,
-  Index,
   PrivateCollection,
   writeCollections,
   writeCollectionDesignDocs,
 } from "./client/collections/index";
+import { CouchDBDesignDoc, CreateIndexRequest } from "@decaf-ts/for-couchdb";
 import { Metadata } from "@decaf-ts/decoration";
 
 const logger = Logging.for("fabric");
@@ -225,7 +225,12 @@ const extractIndexes = new Command()
 
     for (const m of models) {
       log.verbose(`Extracting indexes for table ${Model.tableName(m)}`);
-      generateModelIndexes(m, result);
+      const indexes = generateModelIndexes(m);
+      indexes.forEach((index) => {
+        if (index.name) {
+          result[index.name] = index;
+        }
+      });
       generateModelDesignDocs(m, designDocs);
     }
     const indexesToWrite = Object.values(result);
@@ -305,7 +310,8 @@ const extractCollections = new Command()
     }
 
     const cols: {
-      indexes: Index[];
+      indexes: CreateIndexRequest[];
+      designDocs: CouchDBDesignDoc[];
       mirror?: PrivateCollection;
       collections: PrivateCollection[];
     }[] = await Promise.all(
@@ -368,8 +374,8 @@ const extractCollections = new Command()
         const colList = Object.values(collections)
           .map((c) => [...(c.privates || []), ...(c.shared || [])])
           .flat();
-        let indexes: any;
-        let designDocs: any;
+        let indexes: CreateIndexRequest[] = [];
+        let designDocs: CouchDBDesignDoc[] = [];
         if (colList.length) {
           log
             .for(Model.tableName(clazz))
@@ -384,7 +390,7 @@ const extractCollections = new Command()
             .info(`found ${designDocs.length} design docs`);
         }
         return {
-          indexes: indexes,
+          indexes,
           designDocs,
           collections: colList,
           mirror: mirrorCollection,

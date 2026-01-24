@@ -8,6 +8,7 @@ import {
   OrderDirection,
   pk,
   table,
+  view,
 } from "@decaf-ts/core";
 import {
   model,
@@ -16,11 +17,7 @@ import {
   required,
 } from "@decaf-ts/decorator-validation";
 import { uses } from "@decaf-ts/decoration";
-import {
-  count,
-  CouchDBDesignDoc,
-  view,
-} from "@decaf-ts/for-couchdb";
+import { count, CouchDBDesignDoc } from "@decaf-ts/for-couchdb";
 import { FabricFlavour } from "../../src/shared/constants";
 import {
   generateModelDesignDocs,

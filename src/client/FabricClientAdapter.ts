@@ -1,5 +1,5 @@
 import "../shared/overrides";
-import { CouchDBKeys, type MangoQuery } from "@decaf-ts/for-couchdb";
+import { CouchDBKeys, type MangoQuery, type ViewResponse } from "@decaf-ts/for-couchdb";
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
 import {
@@ -693,6 +693,47 @@ export class FabricClientAdapter extends Adapter<
     }
 
     return parseRecord(result as any) as V;
+  }
+
+  /**
+   * @description Executes a CouchDB view query against the Fabric chaincode
+   * @summary Evaluates a transaction to query a design document view
+   * @template R - The view response type
+   * @param {string} ddoc - Design document name
+   * @param {string} viewName - View name
+   * @param {Record<string, any>} options - View query options
+   * @param {...ContextualArgs<Context<FabricClientFlags>>} args - Optional contextual arguments
+   * @return {Promise<ViewResponse<R>>} The view response
+   */
+  @debug()
+  async view<R>(
+    ddoc: string,
+    viewName: string,
+    options: Record<string, any>,
+    ...args: ContextualArgs<Context<FabricClientFlags>>
+  ): Promise<ViewResponse<R>> {
+    const { log, ctx } = this.logCtx(args, this.view);
+    log.info(`Querying view ${ddoc}/${viewName}`);
+    let transactionResult: any;
+    try {
+      transactionResult = await this.evaluateTransaction(
+        ctx,
+        "view",
+        [ddoc, viewName, JSON.stringify(options)],
+        undefined,
+        undefined,
+        undefined
+      );
+    } catch (e: unknown) {
+      throw this.parseError(e as Error);
+    }
+    let result: ViewResponse<R>;
+    try {
+      result = JSON.parse(this.decode(transactionResult));
+    } catch (e: any) {
+      throw new SerializationError(`Failed to process view result: ${e}`);
+    }
+    return result;
   }
 
   /**

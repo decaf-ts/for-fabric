@@ -1,4 +1,5 @@
 import { TLSOptions } from "fabric-ca-client";
+import { ClientIdentity } from "fabric-shim-api";
 import { Model } from "@decaf-ts/decorator-validation";
 import { AdapterFlags } from "@decaf-ts/core";
 import { Logger } from "@decaf-ts/logging";
@@ -96,4 +97,5 @@ export type SegregatedModel<M extends Model> = {
 
 export type FabricFlags<LOG extends Logger = Logger> = AdapterFlags<LOG> & {
   segregated?: string;
+  identity?: string | ClientIdentity;
 };

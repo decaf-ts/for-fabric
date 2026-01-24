@@ -1,4 +1,9 @@
-import { CouchDBAdapter, CouchDBKeys, MangoQuery } from "@decaf-ts/for-couchdb";
+import {
+  CouchDBAdapter,
+  CouchDBKeys,
+  MangoQuery,
+  ViewResponse,
+} from "@decaf-ts/for-couchdb";
 import { Model, ValidationKeys } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
@@ -781,6 +786,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
     );
     if (docsOnly) return resp.docs as any;
     return resp as any;
+  }
+
+  async view<R>(
+    ddoc: string,
+    viewName: string,
+    options: Record<string, any>,
+    ..._args: ContextualArgs<FabricContractContext>
+  ): Promise<ViewResponse<R>> {
+    throw new UnsupportedError("Fabric contracts do not support CouchDB views.");
   }
 
   override Statement<M extends Model>(): FabricStatement<M, any> {

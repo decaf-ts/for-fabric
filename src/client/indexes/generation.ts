@@ -1,74 +1,13 @@
-import { IndexMetadata, OrderDirection } from "@decaf-ts/core";
-import { Constructor, Metadata } from "@decaf-ts/decoration";
+import { Constructor } from "@decaf-ts/decoration";
 import {
+  CreateIndexRequest,
   CouchDBDesignDoc,
-  CouchDBKeys,
+  generateIndexes,
   generateViews,
 } from "@decaf-ts/for-couchdb";
 import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
-import { InternalError } from "@decaf-ts/db-decorators";
 
-export type Index = {
-  index: {
-    fields: string[] | { [k: string]: OrderDirection };
-  };
-  ddoc?: string;
-  name: string;
-  type: "json";
-};
-
-function getIndexReference(
-  name: string[],
-  direction?: OrderDirection,
-  compositions?: string[]
-) {
-  return [
-    ...name.map((n) => (n === CouchDBKeys.TABLE ? "table" : n)),
-    ...(compositions || []),
-    ...(direction ? [direction] : []),
-    "index",
-  ].join(Metadata.splitter);
-}
-
-function addIndex(
-  accum: Record<string, any>,
-  fields: string[],
-  direction?: OrderDirection,
-  compositions?: string[]
-) {
-  const tableField = fields.pop();
-  if (tableField && tableField !== CouchDBKeys.TABLE) {
-    fields.push(tableField);
-  } else if (tableField === CouchDBKeys.TABLE) {
-    fields.unshift(tableField);
-  }
-
-  const name = getIndexReference(fields, direction, compositions);
-
-  let f: string[] | { [k: string]: OrderDirection }[] = [
-    ...fields,
-    ...(compositions || []),
-  ];
-
-  if (direction)
-    f = f.reduce((accum: { [k: string]: OrderDirection }[], el: string) => {
-      const entry: Record<string, any> = {};
-      entry[el] = direction;
-      accum.push(entry);
-      return accum;
-    }, []);
-
-  const index: Index = {
-    index: {
-      fields: f,
-    },
-    name: name,
-    ddoc: name,
-    type: "json",
-  } as Index;
-
-  accum[name] = index;
-}
+export type Index = CreateIndexRequest;
 
 function ensureDirectoryExistence(filePath: string) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -84,47 +23,9 @@ function ensureDirectoryExistence(filePath: string) {
 }
 
 export function generateModelIndexes<M extends Model>(
-  m: Constructor<M>,
-  accum?: Record<string, any>
+  m: Constructor<M>
 ): Index[] {
-  const tableName = getIndexReference([CouchDBKeys.TABLE]);
-  const indexes: Record<string, Index> = accum || {};
-  indexes[tableName] = {
-    index: {
-      fields: [CouchDBKeys.TABLE],
-    },
-    name: tableName,
-    ddoc: tableName,
-    type: "json",
-  };
-
-  const result: Record<string, any> = {};
-
-  const modelIndexes = Model.indexes(m);
-  for (const prop of Object.keys(modelIndexes)) {
-    for (const [, dec] of Object.entries(modelIndexes[prop])) {
-      const directions = (dec as IndexMetadata)
-        .directions as unknown as OrderDirection[];
-      const compositions = (dec as IndexMetadata).compositions;
-      const fields = [prop, CouchDBKeys.TABLE];
-
-      addIndex(result, fields);
-      if (compositions && compositions.length)
-        addIndex(result, fields, undefined, compositions);
-      if (directions && directions.length) {
-        directions.forEach((d) => {
-          addIndex(result, fields, d);
-          if (compositions && compositions.length)
-            addIndex(result, fields, d, compositions);
-        });
-      }
-    }
-  }
-
-  Object.entries(result).forEach(([key, value]) => {
-    indexes[key] = value;
-  });
-  return Object.values(result);
+  return generateIndexes([m]);
 }
 
 export function generateModelDesignDocs<M extends Model>(

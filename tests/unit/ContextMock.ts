@@ -3,10 +3,163 @@ import { Contract } from "fabric-contract-api";
 import { ModelKeys } from "@decaf-ts/decorator-validation";
 import { InternalError } from "@decaf-ts/db-decorators";
 import { Iterators } from "fabric-shim-api";
+import { CouchDBKeys } from "@decaf-ts/for-couchdb";
+
+function parseQuery(query: string) {
+  try {
+    return JSON.parse(query);
+  } catch {
+    return {};
+  }
+}
+
+function normalizeDocument(value: any, key: string) {
+  let doc: any = value;
+  if (value instanceof Uint8Array || Buffer.isBuffer(value)) {
+    const text = Buffer.from(value).toString("utf8");
+    try {
+      doc = JSON.parse(text);
+    } catch {
+      doc = text;
+    }
+  } else if (typeof value === "string") {
+    try {
+      doc = JSON.parse(value);
+    } catch {
+      doc = value;
+    }
+  }
+  if (doc && typeof doc === "object") {
+    doc[CouchDBKeys.ID] = key;
+    doc["_id"] = key;
+  }
+  return doc;
+}
+
+function toBuffer(value: any) {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof Uint8Array) return Buffer.from(value);
+  if (typeof value === "string") return Buffer.from(value, "utf8");
+  try {
+    return Buffer.from(JSON.stringify(value), "utf8");
+  } catch {
+    return Buffer.from(String(value), "utf8");
+  }
+}
+
+function getFieldValue(doc: any, field: string) {
+  if (!doc || typeof doc !== "object") return undefined;
+  return doc[field];
+}
+
+function applyOperator(operator: string, value: any, comparison: any) {
+  if (value === undefined) return false;
+  switch (operator) {
+    case "$gt":
+      return value > comparison;
+    case "$gte":
+      return value >= comparison;
+    case "$lt":
+      return value < comparison;
+    case "$lte":
+      return value <= comparison;
+    case "$eq":
+      return value === comparison;
+    case "$ne":
+      return value !== comparison;
+    case "$in":
+      return Array.isArray(comparison) && comparison.includes(value);
+    case "$nin":
+      return Array.isArray(comparison) && !comparison.includes(value);
+    case "$exists":
+      return (value !== undefined) === Boolean(comparison);
+    case "$regex":
+      try {
+        const regex = new RegExp(comparison);
+        return regex.test(String(value));
+      } catch {
+        return false;
+      }
+    default:
+      return false;
+  }
+}
+
+function matchesSelector(doc: any, selector?: any): boolean {
+  if (!selector) return true;
+  if (Array.isArray(selector)) {
+    return selector.every((sub) => matchesSelector(doc, sub));
+  }
+  for (const [key, condition] of Object.entries(selector)) {
+    if (key === "$and" && Array.isArray(condition))
+      return condition.every((sub) => matchesSelector(doc, sub));
+    if (key === "$or" && Array.isArray(condition))
+      return condition.some((sub) => matchesSelector(doc, sub));
+    if (key === "$nor" && Array.isArray(condition))
+      return !condition.some((sub) => matchesSelector(doc, sub));
+    const value = getFieldValue(doc, key);
+    if (condition && typeof condition === "object" && !Array.isArray(condition)) {
+      for (const [op, comp] of Object.entries(condition)) {
+        if (!applyOperator(op, value, comp)) return false;
+      }
+      continue;
+    }
+    if (value !== condition) return false;
+  }
+  return true;
+}
+
+function filterRows(
+  store: Record<string, any>,
+  selector?: any,
+  sort?: any[]
+) {
+  const entries = Object.entries(store).map(([key, value]) => ({
+    key,
+    value,
+    doc: normalizeDocument(value, key),
+  }));
+  let rows = entries.filter((row) => matchesSelector(row.doc, selector));
+  if (sort && sort.length) {
+    const [spec] = sort;
+    const [field, direction] = Object.entries(spec)[0];
+    const dir = String(direction).toLowerCase() === "desc" ? -1 : 1;
+    rows = rows.sort((a, b) => {
+      const aVal = getFieldValue(a.doc, field);
+      const bVal = getFieldValue(b.doc, field);
+      if (aVal === bVal) return 0;
+      if (aVal === undefined) return -dir;
+      if (bVal === undefined) return dir;
+      return aVal > bVal ? dir : -dir;
+    });
+  } else {
+    rows = rows.sort((a, b) => a.key.localeCompare(b.key));
+  }
+  return rows;
+}
+
+function createIterator(rows: Array<{ key: string; value: any }>) {
+  let idx = 0;
+  return {
+    async next() {
+      if (idx < rows.length) {
+        const row = rows[idx++];
+        return {
+          value: { key: row.key, value: toBuffer(row.value) },
+          done: false,
+        };
+      }
+      return { done: true };
+    },
+    async close() {
+      // noop
+    },
+  };
+}
 
 export function getStubMock() {
-  const state: Record<any, any> = {};
-  const privateState: Record<string, Record<string, any>> = {};
+  const state: Record<string, Buffer> = {};
+  const privateState: Record<string, Record<string, Buffer>> = {};
 
   return {
     getCreator: async () => {
@@ -46,7 +199,7 @@ export function getStubMock() {
       const testStr = typeof value === "string" ? value : value.toString();
       if (testStr.includes(ModelKeys.ANCHOR))
         throw new InternalError("Anchor keys are not allowed");
-      state[key] = value;
+      state[key] = toBuffer(value);
     },
     deleteState: async (key: string) => {
       if (key in state) {
@@ -56,23 +209,9 @@ export function getStubMock() {
       throw new Error("Missing");
     },
     getQueryResult: async (query: string) => {
-      let currentIndex = 0;
-      const keys = Object.keys(state);
-      return {
-        async next() {
-          if (currentIndex < keys.length) {
-            const key = keys[currentIndex++];
-            return {
-              value: { key, value: state[key] },
-              done: false,
-            };
-          }
-          return { done: true };
-        },
-        async close() {
-          // No-op for mock
-        },
-      };
+      const { selector, sort } = parseQuery(query);
+      const rows = filterRows(state, selector, sort);
+      return createIterator(rows);
     },
 
     getQueryResultWithPagination: async (
@@ -80,34 +219,23 @@ export function getStubMock() {
       pageSize: number,
       bookmark: string
     ) => {
-      const keys = Object.keys(state);
-
+      const { selector, sort } = parseQuery(query);
+      const rows = filterRows(state, selector, sort);
       let startIndex = 0;
       if (bookmark) {
-        const index = keys.indexOf(bookmark);
-        startIndex = index >= 0 ? index + 1 : 0;
+        const found = rows.findIndex((row) => row.key === bookmark);
+        startIndex = found >= 0 ? found + 1 : 0;
       }
-
-      const paginatedKeys = keys.slice(startIndex, startIndex + pageSize);
-      let currentIndex = 0;
-
+      const paginated = rows.slice(startIndex, startIndex + pageSize);
+      const iterator = createIterator(paginated);
+      const lastKey =
+        paginated.length > 0 ? paginated[paginated.length - 1].key : bookmark || "";
       return {
-        iterator: {
-          async next() {
-            if (currentIndex < paginatedKeys.length) {
-              const key = paginatedKeys[currentIndex++];
-              return {
-                value: { key, value: state[key] },
-                done: false,
-              };
-            }
-            return { done: true };
-          },
-          async close() {
-            // No-op for mock
-          },
+        iterator,
+        metadata: {
+          bookmark: lastKey,
+          fetchedRecordsCount: paginated.length,
         },
-        metadata: { bookmark: Date.now().toString() },
       };
     },
 
@@ -125,11 +253,12 @@ export function getStubMock() {
       const testStr = typeof value === "string" ? value : value.toString();
       if (testStr.includes(ModelKeys.ANCHOR))
         throw new InternalError("Anchor keys are not allowed");
-      state[key] = value;
+      if (!privateState[collection]) privateState[collection] = {};
+      privateState[collection][key] = toBuffer(value);
     },
     deletePrivateData(collection: string, key: string): Promise<void> {
-      if (key in state) {
-        delete state[key];
+      if (privateState[collection] && key in privateState[collection]) {
+        delete privateState[collection][key];
         return;
       }
       throw new Error("Missing");
@@ -141,33 +270,9 @@ export function getStubMock() {
     // getPrivateDataByPartialCompositeKey(collection: string, objectType: string, attributes: string[]): Promise<Iterators.StateQueryIterator> & AsyncIterable<Iterators.KV>;
 
     async getPrivateDataQueryResult(collection: string, query: string) {
-      if (!(collection in this.privateState)) {
-        return {
-          async next() {
-            return { done: true };
-          },
-          async close() {
-            return;
-          },
-        };
-      }
-      let currentIndex = 0;
-      const keys = Object.keys(state);
-      return {
-        async next() {
-          if (currentIndex < keys.length) {
-            const key = keys[currentIndex++];
-            return {
-              value: { key, value: state[key] },
-              done: false,
-            };
-          }
-          return { done: true };
-        },
-        async close() {
-          // No-op for mock
-        },
-      };
+      const { selector, sort } = parseQuery(query);
+      const rows = filterRows(privateState[collection] || {}, selector, sort);
+      return createIterator(rows);
     },
   };
 }

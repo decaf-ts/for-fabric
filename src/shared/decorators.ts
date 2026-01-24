@@ -25,6 +25,7 @@ import {
 import { Model, required } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
 import type { Context as HLContext } from "fabric-contract-api";
+import { ClientIdentity } from "fabric-shim-api";
 import { FabricERC20Contract } from "../contracts/erc20/erc20contract";
 import {
   apply,
@@ -39,6 +40,17 @@ import { FabricFlags } from "./types";
 import { toPascalCase } from "@decaf-ts/logging";
 import { FabricContractFlags } from "../contracts/types";
 import "../shared/overrides";
+
+/**
+ * @description Extracts the MSP ID from either a string or ClientIdentity object
+ * @param identity - The identity value which can be a string MSP ID or ClientIdentity object
+ * @returns The MSP ID as a string, or undefined if not available
+ */
+function extractMspId(identity: string | ClientIdentity | undefined): string | undefined {
+  if (!identity) return undefined;
+  if (typeof identity === "string") return identity;
+  return identity.getMSPID();
+}
 
 /**
  * Decorator for marking methods that require ownership authorization.
@@ -400,7 +412,7 @@ export async function segregatedDataOnCreate<M extends Model>(
       `Segregated data keys and metadata length mismatch`
     );
 
-  const msp = Model.ownerOf(model) || context.identity;
+  const msp = Model.ownerOf(model) || extractMspId(context.get("identity") as string | ClientIdentity | undefined);
   if (!msp)
     throw new ValidationError(
       `There's no assigned organization for model ${model.constructor.name}`
@@ -453,7 +465,7 @@ export async function segregatedDataOnRead<M extends Model>(
       `Segregated data keys and metadata length mismatch`
     );
 
-  const msp = Model.ownerOf(model);
+  const msp = Model.ownerOf(model) || extractMspId(context.get("identity"));
   if (!msp)
     throw new ValidationError(
       `There's no assigned organization for model ${model.constructor.name}`

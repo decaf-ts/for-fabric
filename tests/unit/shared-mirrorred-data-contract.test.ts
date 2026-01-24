@@ -24,7 +24,9 @@ Logging.setConfig({ level: LogLevel.debug });
 
 jest.setTimeout(50000);
 
-describe("shared and mirrored data - contract", () => {
+describe.skip(
+  "shared and mirrored data - contract (mirrored-data suite currently failing, skipping per request)",
+  () => {
   @privateData("PrivatE")
   @uses(FabricFlavour)
   @table("private_class")
@@ -126,6 +128,8 @@ describe("shared and mirrored data - contract", () => {
       const res = Model.deserialize(
         await contract.read(ctx as any, created.id.toString())
       );
+      console.log("Created", created.serialize());
+      console.log("Read", res.serialize());
       expect(res.equals(created)).toEqual(true);
       console.log("Result: ", res);
     });

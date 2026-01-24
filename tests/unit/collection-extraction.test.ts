@@ -9,7 +9,7 @@ import { BaseModel, pk, table } from "@decaf-ts/core";
 import { uses } from "@decaf-ts/decoration";
 import { FabricFlavour } from "../../src/shared/constants";
 import { generateModelDesignDocs } from "../../src/client/indexes";
-import { view } from "@decaf-ts/for-couchdb";
+import { view } from "@decaf-ts/core";
 import fs from "fs";
 import os from "os";
 import path from "path";
