@@ -104,7 +104,7 @@ export class FabricClientRepository<
     key: keyof M,
     order: OrderDirection,
     ...args: MaybeContextualArg<ContextOf<A>>
-  ) {
+  ): Promise<M[]> {
     const { log, ctxArgs } = (
       await this.logCtx(args, PreparedStatementKeys.LIST_BY, true)
     ).for(this.listBy);
@@ -208,7 +208,7 @@ export class FabricClientRepository<
       `counting ${Model.tableName(this.class)}${key ? ` by ${key as string}` : ""}`
     );
     const stmtArgs = key ? [key, ...ctxArgs] : ctxArgs;
-    return this.statement(this.countOf.name, ...stmtArgs);
+    return this.statement(PreparedStatementKeys.COUNT_OF, ...stmtArgs);
   }
 
   override async maxOf<K extends keyof M>(
@@ -218,8 +218,10 @@ export class FabricClientRepository<
     const { log, ctxArgs } = (
       await this.logCtx(args, PreparedStatementKeys.MAX_OF, true)
     ).for(this.maxOf);
-    log.verbose(`finding max of ${key as string} in ${Model.tableName(this.class)}`);
-    return this.statement(this.maxOf.name, key, ...ctxArgs);
+    log.verbose(
+      `finding max of ${key as string} in ${Model.tableName(this.class)}`
+    );
+    return this.statement(PreparedStatementKeys.MAX_OF, key, ...ctxArgs);
   }
 
   override async minOf<K extends keyof M>(
@@ -229,8 +231,10 @@ export class FabricClientRepository<
     const { log, ctxArgs } = (
       await this.logCtx(args, PreparedStatementKeys.MIN_OF, true)
     ).for(this.minOf);
-    log.verbose(`finding min of ${key as string} in ${Model.tableName(this.class)}`);
-    return this.statement(this.minOf.name, key, ...ctxArgs);
+    log.verbose(
+      `finding min of ${key as string} in ${Model.tableName(this.class)}`
+    );
+    return this.statement(PreparedStatementKeys.MIN_OF, key, ...ctxArgs);
   }
 
   override async avgOf<K extends keyof M>(
@@ -240,8 +244,10 @@ export class FabricClientRepository<
     const { log, ctxArgs } = (
       await this.logCtx(args, PreparedStatementKeys.AVG_OF, true)
     ).for(this.avgOf);
-    log.verbose(`calculating avg of ${key as string} in ${Model.tableName(this.class)}`);
-    return this.statement(this.avgOf.name, key, ...ctxArgs);
+    log.verbose(
+      `calculating avg of ${key as string} in ${Model.tableName(this.class)}`
+    );
+    return this.statement(PreparedStatementKeys.AVG_OF, key, ...ctxArgs);
   }
 
   override async sumOf<K extends keyof M>(
@@ -251,8 +257,10 @@ export class FabricClientRepository<
     const { log, ctxArgs } = (
       await this.logCtx(args, PreparedStatementKeys.SUM_OF, true)
     ).for(this.sumOf);
-    log.verbose(`calculating sum of ${key as string} in ${Model.tableName(this.class)}`);
-    return this.statement(this.sumOf.name, key, ...ctxArgs);
+    log.verbose(
+      `calculating sum of ${key as string} in ${Model.tableName(this.class)}`
+    );
+    return this.statement(PreparedStatementKeys.SUM_OF, key, ...ctxArgs);
   }
 
   override async distinctOf<K extends keyof M>(
@@ -265,7 +273,7 @@ export class FabricClientRepository<
     log.verbose(
       `finding distinct values of ${key as string} in ${Model.tableName(this.class)}`
     );
-    return this.statement(this.distinctOf.name, key, ...ctxArgs);
+    return this.statement(PreparedStatementKeys.DISTINCT_OF, key, ...ctxArgs);
   }
 
   override async groupOf<K extends keyof M>(
@@ -276,7 +284,7 @@ export class FabricClientRepository<
       await this.logCtx(args, PreparedStatementKeys.GROUP_OF, true)
     ).for(this.groupOf);
     log.verbose(`grouping ${Model.tableName(this.class)} by ${key as string}`);
-    return this.statement(this.groupOf.name, key, ...ctxArgs);
+    return this.statement(PreparedStatementKeys.GROUP_OF, key, ...ctxArgs);
   }
 
   override async create(
