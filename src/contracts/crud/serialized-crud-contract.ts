@@ -177,4 +177,39 @@ export class SerializedCrudContract<
     const result = (await super.createAll(context, modelList)) as M[];
     return JSON.stringify(result.map((m) => this.serialize(m) as string));
   }
+
+  @Transaction(false)
+  override async countOf(ctx: Ctx, key?: string): Promise<string> {
+    return JSON.stringify(await super.countOf(ctx as any, key));
+  }
+
+  @Transaction(false)
+  override async maxOf(ctx: Ctx, key: string): Promise<string> {
+    return JSON.stringify(await super.maxOf(ctx as any, key));
+  }
+
+  @Transaction(false)
+  override async minOf(ctx: Ctx, key: string): Promise<string> {
+    return JSON.stringify(await super.minOf(ctx as any, key));
+  }
+
+  @Transaction(false)
+  override async avgOf(ctx: Ctx, key: string): Promise<string> {
+    return JSON.stringify(await super.avgOf(ctx as any, key));
+  }
+
+  @Transaction(false)
+  override async sumOf(ctx: Ctx, key: string): Promise<string> {
+    return JSON.stringify(await super.sumOf(ctx as any, key));
+  }
+
+  @Transaction(false)
+  override async distinctOf(ctx: Ctx, key: string): Promise<string> {
+    return JSON.stringify(await super.distinctOf(ctx as any, key));
+  }
+
+  @Transaction(false)
+  override async groupOf(ctx: Ctx, key: string): Promise<string> {
+    return JSON.stringify(await super.groupOf(ctx as any, key));
+  }
 }

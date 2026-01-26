@@ -302,10 +302,15 @@ const extractCollections = new Command()
       throw new InternalError(`Must pass a file or a folder`);
 
     const injectableModels = models.filter(
-      (model) => Model.isShared(model) || Model.isPrivate(model) || !!Model.mirroredAt(model)
+      (model) =>
+        Model.isShared(model) ||
+        Model.isPrivate(model) ||
+        !!Model.mirroredAt(model)
     );
     if (!injectableModels.length) {
-      log.info(`No shared, private, or mirrored models found to extract collections`);
+      log.info(
+        `No shared, private, or mirrored models found to extract collections`
+      );
       return;
     }
 
@@ -405,8 +410,21 @@ const extractCollections = new Command()
 
     if (collectionsTo.length) {
       writeCollections(collectionsTo, outDir);
+      const metaCollectionsConfig = path.join(
+        outDir,
+        "META-INF",
+        "collections_config.json"
+      );
+      const contractCollectionsConfig = path.join(
+        outDir,
+        "collections_config.json"
+      );
+      fs.copyFileSync(metaCollectionsConfig, contractCollectionsConfig);
       log.info(
-        `Stored ${collectionsTo.length} collections to ${outDir}/collection_config.json`
+        `Stored ${collectionsTo.length} collections to ${metaCollectionsConfig}`
+      );
+      log.info(
+        `Copied collections_config to ${contractCollectionsConfig} alongside the package.json`
       );
 
       cols.forEach((c, i) => {
@@ -464,6 +482,10 @@ const deployContract = new Command()
   .option("--name <String>", "Contract Name (and folder)")
   .option("--input <String>", "input folder")
   .option(
+    "--collections-config <String>",
+    "path to collections_config.json to configure private collections"
+  )
+  .option(
     "--incrementVersion <String>",
     "(true | false) if should use version or sequence to update contracts",
     false
@@ -489,8 +511,15 @@ const deployContract = new Command()
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { name, input, peers, trackerFolder, incrementVersion } = options;
+
+    const {
+      name,
+      input,
+      peers,
+      trackerFolder,
+      incrementVersion,
+      collectionsConfig,
+    } = options;
     const peerIds = peers.split(",");
 
     const countPath = path.resolve(path.join(trackerFolder, `${name}.count`));
@@ -522,14 +551,15 @@ const deployContract = new Command()
             ? "tls-ca-cert.pem"
             : "orderer-tls-ca-cert.pem",
           sequence,
-          version
+          version,
+          collectionsConfig
         );
       }
       fs.writeFileSync(countPath, sequence.toString());
     } catch (err: any) {
       log.error("Error deploying contract:", err);
     }
-    commitChaincode(name, sequence, version);
+    commitChaincode(name, sequence, version, collectionsConfig);
   });
 
 const getCryptoMaterial = new Command()

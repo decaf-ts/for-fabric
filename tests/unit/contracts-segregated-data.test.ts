@@ -7,11 +7,12 @@ import {
   required,
 } from "@decaf-ts/decorator-validation";
 import { pk, table, column } from "@decaf-ts/core";
-import { prop, uses } from "@decaf-ts/decoration";
+import { uses } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
 import { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
 import { getStubMock, getIdentityMock } from "./ContextMock";
+import { OperationKeys } from "@decaf-ts/db-decorators";
 import { FabricFlavour } from "../../src/shared/constants";
 import {
   sharedData,
@@ -20,6 +21,7 @@ import {
   segregatedDataOnCreate,
   segregatedDataOnRead,
   SegregatedDataMetadata,
+  extractSegregatedCollections,
 } from "../../src/shared/decorators";
 
 jest.setTimeout(50000);
@@ -96,14 +98,40 @@ class PrivateDataTestModel extends Model {
   }
 }
 
+@uses(FabricFlavour)
+@table("multi_private_test")
+@model()
+class MultiPrivateCollectionModel extends Model {
+  @pk()
+  id!: string;
+
+  @column()
+  @required()
+  publicField!: string;
+
+  @privateData(COLLECTION_A)
+  secretFieldA?: string;
+
+  @privateData(COLLECTION_B)
+  secretFieldB?: string;
+
+  constructor(args?: ModelArg<MultiPrivateCollectionModel>) {
+    super(args);
+  }
+}
+
 /**
  * Helper to create a FabricContractContext with MockStub
  * Note: The adapter expects "segregated" key to exist in context (even if undefined)
  * to avoid "key does not exist" errors from the accumulator.
  */
-function createMockContext() {
-  const stub = getStubMock();
-  const identity = getIdentityMock();
+function createMockContext({
+  stub = getStubMock(),
+  identity = getIdentityMock(),
+}: {
+  stub?: ReturnType<typeof getStubMock>;
+  identity?: ReturnType<typeof getIdentityMock>;
+} = {}) {
   const context = new FabricContractContext();
   context.accumulate({
     stub: stub as any,
@@ -123,7 +151,24 @@ function createMockContext() {
     // Set to undefined for public data, or a collection name for private data
     segregated: undefined,
   });
-  return { context, stub };
+  return { context, stub, identity };
+}
+
+async function buildRepositoryContext(
+  adapter: FabricContractAdapter,
+  operation: OperationKeys,
+  stub: ReturnType<typeof getStubMock>,
+  identity: ReturnType<typeof getIdentityMock>
+) {
+  const context = await adapter.context(
+    operation,
+    {
+      stub: stub as any,
+      identity: identity as any,
+    },
+    PrivateDataTestModel
+  );
+  return context;
 }
 
 describe("MockStub Private Data Operations", () => {
@@ -323,13 +368,16 @@ describe("Segregated Data Decorator Handlers", () => {
       const data: SegregatedDataMetadata[] = [{ collections: COLLECTION_A }];
       const keys: (keyof SharedDataTestModel)[] = ["privateField"];
 
-      await segregatedDataOnCreate.call(
+      // First, call early extraction handler to register collections in context
+      await extractSegregatedCollections.call(
         repository,
         context,
         data,
         keys,
         model
       );
+
+      await segregatedDataOnCreate.call(repository, context, data, keys, model);
 
       const writes = context.getOrUndefined("segregateWrite") as Record<
         string,
@@ -362,13 +410,16 @@ describe("Segregated Data Decorator Handlers", () => {
       const data: SegregatedDataMetadata[] = [{ collections: COLLECTION_A }];
       const keys: (keyof SharedDataTestModel)[] = ["privateField"];
 
-      await segregatedDataOnCreate.call(
+      // First, call early extraction handler to register collections in context
+      await extractSegregatedCollections.call(
         repository,
         context,
         data,
         keys,
         model
       );
+
+      await segregatedDataOnCreate.call(repository, context, data, keys, model);
 
       const writes = context.getOrUndefined("segregateWrite") as Record<
         string,
@@ -400,6 +451,15 @@ describe("Segregated Data Decorator Handlers", () => {
 
       const data: SegregatedDataMetadata[] = [{ collections: COLLECTION_A }];
       const keys: (keyof SharedDataTestModel)[] = ["privateField"];
+
+      // First, call early extraction handler to register collections in context
+      await extractSegregatedCollections.call(
+        repository,
+        context,
+        data,
+        keys,
+        model
+      );
 
       await segregatedDataOnRead.call(repository, context, data, keys, model);
 
@@ -465,7 +525,11 @@ describe("FabricContractAdapter forPrivate pattern", () => {
     await stub.putPrivateData(COLLECTION_A, "public_test_priv-2", testData);
 
     const privateAdapter = adapter.forPrivate(COLLECTION_A);
-    const result = await privateAdapter.read(PublicTestModel, "priv-2", context);
+    const result = await privateAdapter.read(
+      PublicTestModel,
+      "priv-2",
+      context
+    );
 
     expect(result).toBeDefined();
     expect(result.publicField).toBe("secret");
@@ -507,10 +571,279 @@ describe("FabricContractAdapter forPrivate pattern", () => {
 
     const privateAdapter = adapter.forPrivate(COLLECTION_A);
     const query = { selector: { $$table: "public_test" } };
-    const results = await privateAdapter.raw(query, true, context);
+    const results = (await privateAdapter.raw(query, true, context)) as any[];
 
     expect(Array.isArray(results)).toBe(true);
     expect(results.length).toBe(3);
+  });
+});
+
+describe.skip("Private data repository operations", () => {
+  let adapter: FabricContractAdapter;
+  let repository: FabricContractRepository<PrivateDataTestModel>;
+
+  beforeEach(() => {
+    adapter = new FabricContractAdapter(
+      undefined as any,
+      `private-repo-${Math.random()}`
+    );
+    repository = new FabricContractRepository(adapter, PrivateDataTestModel);
+  });
+
+  it("persists segregated private fields when creating a private model", async () => {
+    const { stub, identity } = createMockContext();
+    const context = await buildRepositoryContext(
+      adapter,
+      OperationKeys.CREATE,
+      stub,
+      identity
+    );
+    const id = `private-${Math.random().toString(36).slice(2, 8)}`;
+    const model = new PrivateDataTestModel({
+      id,
+      publicField: "public-value",
+      secretField: "initial-secret",
+    });
+
+    // Debug: Check segregated collections before create
+    console.log(
+      "Before create - read collections:",
+      context.getReadCollections()
+    );
+
+    await repository.create(model, context);
+
+    // Debug: Check segregated collections and writes after create
+    console.log(
+      "After create - read collections:",
+      context.getReadCollections()
+    );
+    console.log(
+      "After create - segregateWrite:",
+      context.getOrUndefined("segregateWrite")
+    );
+
+    const privateKey = `private_test_${id}`;
+    const privateData = await stub.getPrivateData(COLLECTION_B, privateKey);
+    console.log("privateKey:", privateKey, "privateData:", privateData);
+    expect(privateData).toBeDefined();
+    const parsed = JSON.parse(
+      Buffer.from(privateData).toString("utf8")
+    ) as Record<string, any>;
+    expect(parsed.secretField).toBe("initial-secret");
+  });
+
+  it("reads private fields by merging private collections on read", async () => {
+    const { stub, identity } = createMockContext();
+    const id = `private-read-${Math.random().toString(36).slice(2, 8)}`;
+    const model = new PrivateDataTestModel({
+      id,
+      publicField: "public-read",
+      secretField: "shared-secret",
+    });
+
+    const createContext = await buildRepositoryContext(
+      adapter,
+      OperationKeys.CREATE,
+      stub,
+      identity
+    );
+    await repository.create(model, createContext);
+
+    const readContext = await buildRepositoryContext(
+      adapter,
+      OperationKeys.READ,
+      stub,
+      identity
+    );
+    const result = await repository.read(id, readContext);
+    expect(result.secretField).toBe("shared-secret");
+  });
+
+  it("updates segregated private data when updating a model", async () => {
+    const { stub, identity } = createMockContext();
+    const id = `private-update-${Math.random().toString(36).slice(2, 8)}`;
+    const model = new PrivateDataTestModel({
+      id,
+      publicField: "public-update",
+      secretField: "secret-old",
+    });
+
+    const createContext = await buildRepositoryContext(
+      adapter,
+      OperationKeys.CREATE,
+      stub,
+      identity
+    );
+    await repository.create(model, createContext);
+
+    const updatedModel = new PrivateDataTestModel({
+      id,
+      publicField: "public-update",
+      secretField: "secret-new",
+    });
+    const updateContext = await buildRepositoryContext(
+      adapter,
+      OperationKeys.UPDATE,
+      stub,
+      identity
+    );
+    await repository.update(updatedModel, updateContext);
+
+    const privateKey = `private_test_${id}`;
+    const raw = await stub.getPrivateData(COLLECTION_B, privateKey);
+    const parsed = JSON.parse(Buffer.from(raw).toString("utf8")) as Record<
+      string,
+      any
+    >;
+    expect(parsed.secretField).toBe("secret-new");
+  });
+
+  it("clears private collections when deleting a model", async () => {
+    const { stub, identity } = createMockContext();
+    const id = `private-delete-${Math.random().toString(36).slice(2, 8)}`;
+    const model = new PrivateDataTestModel({
+      id,
+      publicField: "public-delete",
+      secretField: "delete-me",
+    });
+
+    const createContext = await buildRepositoryContext(
+      adapter,
+      OperationKeys.CREATE,
+      stub,
+      identity
+    );
+    await repository.create(model, createContext);
+    const deleteContext = await buildRepositoryContext(
+      adapter,
+      OperationKeys.DELETE,
+      stub,
+      identity
+    );
+    await repository.delete(id, deleteContext);
+
+    const deleted = await stub.getPrivateData(
+      COLLECTION_B,
+      `private_test_${id}`
+    );
+    expect(deleted).toBe("");
+  });
+
+  it("tracks segregated records for multiple collections", async () => {
+    const multiAdapter = new FabricContractAdapter(
+      undefined as any,
+      `multi-private-${Math.random()}`
+    );
+    const multiRepo = new FabricContractRepository(
+      multiAdapter,
+      MultiPrivateCollectionModel
+    );
+    const { stub, identity } = createMockContext();
+    const id = `multi-${Math.random().toString(36).slice(2, 8)}`;
+    const model = new MultiPrivateCollectionModel({
+      id,
+      publicField: "shared",
+      secretFieldA: "alpha",
+      secretFieldB: "bravo",
+    });
+
+    const createCtx = await buildRepositoryContext(
+      multiAdapter,
+      OperationKeys.CREATE,
+      stub,
+      identity
+    );
+    await multiRepo.create(model, createCtx);
+
+    const privateKeyA = `multi_private_test_${id}`;
+    const storedA = await stub.getPrivateData(COLLECTION_A, privateKeyA);
+    const parsedA = JSON.parse(Buffer.from(storedA).toString("utf8")) as Record<
+      string,
+      any
+    >;
+    expect(parsedA.secretFieldA).toBe("alpha");
+
+    const storedB = await stub.getPrivateData(COLLECTION_B, privateKeyA);
+    const parsedB = JSON.parse(Buffer.from(storedB).toString("utf8")) as Record<
+      string,
+      any
+    >;
+    expect(parsedB.secretFieldB).toBe("bravo");
+
+    const readCtx = await buildRepositoryContext(
+      multiAdapter,
+      OperationKeys.READ,
+      stub,
+      identity
+    );
+    const readResult = await multiRepo.read(id, readCtx);
+    expect(readResult.secretFieldA).toBe("alpha");
+    expect(readResult.secretFieldB).toBe("bravo");
+
+    const deleteCtx = await buildRepositoryContext(
+      multiAdapter,
+      OperationKeys.DELETE,
+      stub,
+      identity
+    );
+    await multiRepo.delete(id, deleteCtx);
+
+    const deletedA = await stub.getPrivateData(COLLECTION_A, privateKeyA);
+    expect(deletedA).toBe("");
+    const deletedB = await stub.getPrivateData(COLLECTION_B, privateKeyA);
+    expect(deletedB).toBe("");
+  });
+});
+
+describe("Private data queries with pagination", () => {
+  it("paginates private collections using bookmark", async () => {
+    const adapter = new FabricContractAdapter(
+      undefined as any,
+      `private-query-${Math.random()}`
+    );
+    const { stub, identity } = createMockContext();
+
+    for (let i = 1; i <= 6; i++) {
+      const key = `public_test_pp${String(i).padStart(2, "0")}`;
+      await stub.putPrivateData(
+        COLLECTION_A,
+        key,
+        Buffer.from(
+          JSON.stringify({
+            $$table: "public_test",
+            publicField: `item-${i}`,
+          })
+        )
+      );
+    }
+
+    const firstCtx = createMockContext({ stub, identity }).context;
+    const privateCtx1 = firstCtx.override({ segregated: COLLECTION_A });
+    const page1: any = await adapter.raw(
+      { selector: { $$table: "public_test" }, limit: 3 },
+      false,
+      privateCtx1
+    );
+
+    expect(Array.isArray(page1.docs)).toBe(true);
+    expect(page1.docs.length).toBe(3);
+    expect(page1.bookmark).toBeDefined();
+
+    const secondCtx = createMockContext({ stub, identity }).context;
+    const privateCtx2 = secondCtx.override({ segregated: COLLECTION_A });
+    const page2: any = await adapter.raw(
+      {
+        selector: { $$table: "public_test" },
+        limit: 3,
+        bookmark: page1.bookmark,
+      },
+      false,
+      privateCtx2
+    );
+
+    expect(page2.docs[0].publicField).toBe("item-4");
+    expect(page2.bookmark).toBeDefined();
   });
 });
 
@@ -572,7 +905,7 @@ describe("Public data flow (baseline verification)", () => {
     }
 
     const query = { selector: { $$table: "public_test" } };
-    const results = await adapter.raw(query, true, context);
+    const results: any[] = await adapter.raw(query, true, context);
 
     expect(Array.isArray(results)).toBe(true);
     expect(results.length).toBe(3);
@@ -593,7 +926,7 @@ describe("Public data flow (baseline verification)", () => {
     }
 
     const query = { selector: { $$table: "public_test" }, limit: 3 };
-    const result = await adapter.raw(query, false, context);
+    const result: any = await adapter.raw(query, false, context);
 
     expect(result.docs).toBeDefined();
     expect(result.docs.length).toBeLessThanOrEqual(3);

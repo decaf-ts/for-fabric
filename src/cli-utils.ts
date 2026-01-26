@@ -60,14 +60,18 @@ export function approveContract(
   contractName: string,
   tlsCertName: string,
   sequence: number = 1,
-  version: string = "1.0"
+  version: string = "1.0",
+  collectionsConfig?: string
 ) {
+  const collectionsFlag = collectionsConfig
+    ? ` --collections-config "${collectionsConfig}"`
+    : "";
   execSync(`docker exec ${dockerName} node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
     --orderer-address org-a-orderer-0:7021 \
     --channel-id simple-channel \
     --chaincode-name ${contractName} \
     --chaincode-version ${version} \
-    --sequence ${sequence} \
+    --sequence ${sequence}${collectionsFlag} \
     --enable-tls \
     --tls-ca-cert-file /weaver/peer/${tlsCertName}`);
 }
@@ -116,14 +120,18 @@ export function deployContract(
 export function commitChaincode(
   contractName: string,
   sequence: number = 1,
-  version: string = "1.0"
+  version: string = "1.0",
+  collectionsConfig?: string
 ): void {
+  const collectionsFlag = collectionsConfig
+    ? ` --collections-config "${collectionsConfig}"`
+    : "";
   execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs commit-chaincode -d -s \
     --orderer-address org-a-orderer-0:7021 \
     --channel-id simple-channel \
     --chaincode-name ${contractName} \
     --chaincode-version ${version} \
-    --sequence ${sequence} \
+    --sequence ${sequence}${collectionsFlag} \
     --enable-tls \
     --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem \
     --peer-addresses org-a-peer-0:7031,org-b-peer-0:7032,org-c-peer-0:7033 \

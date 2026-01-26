@@ -14,6 +14,8 @@ import {
   Serial,
   UUID,
 } from "@decaf-ts/core";
+import { FabricContractContext } from "./ContractContext";
+import type { FabricContractAdapter } from "./ContractAdapter";
 
 /**
  * @description Abstract base class for sequence generation
@@ -221,7 +223,63 @@ export class FabricContractSequence extends Sequence {
       log.debug(
         `Sequence.increment ${name} current=${currentValue as any} next=${next as any}`
       );
+
+      // Replicate sequence to segregated collections if model uses private/shared data
+      await this.replicateToSegregatedCollections(ctx, seq);
+
       return seq.current as string | number | bigint;
     }, name);
+  }
+
+  /**
+   * @description Replicates the sequence to all segregated collections
+   * @summary When a model uses privateData or sharedData decorators, its sequence must be
+   * replicated to all collections the model is stored in. This ensures clients with access
+   * to only one collection can still read the model's sequence, while clients without
+   * access to any collection won't see the sequence on the public chain.
+   * @param {Context<any>} ctx - The execution context
+   * @param {SequenceModel} seq - The sequence model to replicate
+   */
+  private async replicateToSegregatedCollections(
+    ctx: Context<any>,
+    seq: SequenceModel
+  ): Promise<void> {
+    if (!(ctx instanceof FabricContractContext)) {
+      return;
+    }
+
+    const collections = ctx.getReadCollections();
+    if (!collections.length) {
+      return;
+    }
+
+    const log = ctx.logger.for(this.replicateToSegregatedCollections);
+    log.info(
+      `Replicating sequence ${seq.id} to ${collections.length} segregated collections: ${collections.join(", ")}`
+    );
+
+    const adapter = this.adapter as unknown as FabricContractAdapter;
+    const tableName = "sequence";
+    const composedKey = ctx.stub.createCompositeKey(tableName, [
+      String(seq.id),
+    ]);
+
+    for (const collection of collections) {
+      try {
+        const privateAdapter = adapter.forPrivate(collection);
+        const record = {
+          $$table: tableName,
+          id: seq.id,
+          current: seq.current,
+        };
+        await privateAdapter["putState"](composedKey, record, ctx);
+        log.debug(`Sequence ${seq.id} replicated to collection ${collection}`);
+      } catch (e: unknown) {
+        log.warn(
+          `Failed to replicate sequence ${seq.id} to collection ${collection}: ${e}`
+        );
+        // Continue with other collections even if one fails
+      }
+    }
   }
 }

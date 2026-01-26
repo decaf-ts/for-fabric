@@ -183,6 +183,90 @@ export abstract class FabricCrudContract<M extends Model>
     return this.repo.statement(method, ...ctxArgs);
   }
 
+  async countOf(
+    ctx: Ctx | FabricContractContext,
+    key?: string | keyof M,
+    ...args: any[]
+  ): Promise<number | string> {
+    const { ctxArgs, log } = (
+      await this.logCtx([...args, ctx], PreparedStatementKeys.COUNT_OF, true)
+    ).for(this.countOf);
+    log.info(`Running countOf${key ? ` key ${key as string}` : ""}`);
+    return this.repo.countOf(key as keyof M | undefined, ...ctxArgs);
+  }
+
+  async maxOf(
+    ctx: Ctx | FabricContractContext,
+    key: string | keyof M,
+    ...args: any[]
+  ): Promise<M[keyof M] | string> {
+    const { ctxArgs, log } = (
+      await this.logCtx([...args, ctx], PreparedStatementKeys.MAX_OF, true)
+    ).for(this.maxOf);
+    log.info(`Running maxOf key ${key as string}`);
+    return this.repo.maxOf(key as keyof M, ...ctxArgs);
+  }
+
+  async minOf(
+    ctx: Ctx | FabricContractContext,
+    key: string | keyof M,
+    ...args: any[]
+  ): Promise<M[keyof M] | string> {
+    const { ctxArgs, log } = (
+      await this.logCtx([...args, ctx], PreparedStatementKeys.MIN_OF, true)
+    ).for(this.minOf);
+    log.info(`Running minOf key ${key as string}`);
+    return this.repo.minOf(key as keyof M, ...ctxArgs);
+  }
+
+  async avgOf(
+    ctx: Ctx | FabricContractContext,
+    key: string | keyof M,
+    ...args: any[]
+  ): Promise<number | string> {
+    const { ctxArgs, log } = (
+      await this.logCtx([...args, ctx], PreparedStatementKeys.AVG_OF, true)
+    ).for(this.avgOf);
+    log.info(`Running avgOf key ${key as string}`);
+    return this.repo.avgOf(key as keyof M, ...ctxArgs);
+  }
+
+  async sumOf(
+    ctx: Ctx | FabricContractContext,
+    key: string | keyof M,
+    ...args: any[]
+  ): Promise<number | string> {
+    const { ctxArgs, log } = (
+      await this.logCtx([...args, ctx], PreparedStatementKeys.SUM_OF, true)
+    ).for(this.sumOf);
+    log.info(`Running sumOf key ${key as string}`);
+    return this.repo.sumOf(key as keyof M, ...ctxArgs);
+  }
+
+  async distinctOf(
+    ctx: Ctx | FabricContractContext,
+    key: string | keyof M,
+    ...args: any[]
+  ): Promise<M[keyof M][] | string> {
+    const { ctxArgs, log } = (
+      await this.logCtx([...args, ctx], PreparedStatementKeys.DISTINCT_OF, true)
+    ).for(this.distinctOf);
+    log.info(`Running distinctOf key ${key as string}`);
+    return this.repo.distinctOf(key as keyof M, ...ctxArgs);
+  }
+
+  async groupOf(
+    ctx: Ctx | FabricContractContext,
+    key: string | keyof M,
+    ...args: any[]
+  ): Promise<Record<string, M[]> | string> {
+    const { ctxArgs, log } = (
+      await this.logCtx([...args, ctx], PreparedStatementKeys.GROUP_OF, true)
+    ).for(this.groupOf);
+    log.info(`Running groupOf key ${key as string}`);
+    return this.repo.groupOf(key as keyof M, ...ctxArgs);
+  }
+
   /**
    * @description Creates a single model in the state database
    * @summary Delegates to the repository's create method

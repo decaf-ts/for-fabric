@@ -7,6 +7,7 @@ import {
 import { Model, ValidationKeys } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
+import { SegregatedModel } from "../shared/types";
 import {
   BadRequestError,
   BaseError,
@@ -279,6 +280,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     try {
       const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
       model = await this.readState(composedKey, ctx);
+      model = await this.mergeSegregatedReads(ctx, composedKey, model);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -337,6 +339,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       model = await this.read(clazz, id, ...ctxArgs);
       log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
       await this.deleteState(composedKey, ctx);
+      await this.deleteSegregatedCollections(ctx, composedKey);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
@@ -346,7 +349,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
   protected async deleteState(id: string, context: FabricContractContext) {
     const { ctx } = this.logCtx([context], this.deleteState);
-    await ctx.stub.deleteState(id);
+    const collection = ctx.getOrUndefined("segregated") as string | undefined;
+    if (collection) await ctx.stub.deletePrivateData(collection, id);
+    else await ctx.stub.deleteState(id);
   }
 
   forPrivate(collection: string): FabricContractAdapter {
@@ -373,11 +378,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     false
                   )
                 );
-                await ctx.stub.putPrivateData(
-                  collection,
-                  id.toString(),
-                  data
-                );
+                await ctx.stub.putPrivateData(collection, id.toString(), data);
                 return model;
               }
               case "deleteState": {
@@ -389,7 +390,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
               case "readState": {
                 // readState signature: (id: string, ctx: FabricContractContext)
                 const [id, ctx] = argsList;
-                return ctx.stub.getPrivateData(collection, id);
+                const data = await ctx.stub.getPrivateData(collection, id);
+                if (!data) return "";
+                try {
+                  return FabricContractAdapter.serializer.deserialize(
+                    data.toString("utf8")
+                  );
+                } catch {
+                  return data.toString("utf8");
+                }
               }
               case "queryResult": {
                 const [stub, rawInput] = argsList;
@@ -484,15 +493,115 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
     }
 
-    const collection = ctx.get("segregated");
-    if (collection)
+    const collection = ctx.getOrUndefined("segregated") as string | undefined;
+    if (collection) {
       await ctx.stub.putPrivateData(collection, id.toString(), data);
-    else await ctx.stub.putState(id.toString(), data);
+    } else {
+      await ctx.stub.putState(id.toString(), data);
+      await this.flushSegregatedWrites(ctx, id);
+    }
 
     log.silly(
       `state stored${collection ? ` in ${collection} collection` : ""} under id ${id}`
     );
     return model;
+  }
+
+  private async flushSegregatedWrites(
+    ctx: FabricContractContext,
+    id: string
+  ): Promise<void> {
+    const writes = ctx.getOrUndefined("segregateWrite") as
+      | Record<string, SegregatedModel<any>[]>
+      | undefined;
+    if (!writes) return;
+    for (const [collection, entries] of Object.entries(writes)) {
+      for (const entry of entries) {
+        const payload = this.buildSegregatedPayload(entry);
+        if (!payload) continue;
+        const privateCtx = ctx.override({
+          segregated: collection,
+        });
+        await this.putState(id, payload, privateCtx);
+      }
+    }
+    ctx.cache.remove("segregateWrite");
+  }
+
+  private buildSegregatedPayload(
+    entry: SegregatedModel<any>
+  ): Record<string, any> | null {
+    const payload: Record<string, any> = {};
+
+    if (entry.model) {
+      payload["$$table"] = Model.tableName(
+        entry.model.constructor as Constructor<any>
+      );
+    }
+
+    const merge = (source?: Record<string, any>) => {
+      if (!source) return;
+      Object.entries(source).forEach(([key, value]) => {
+        if (typeof value === "undefined") return;
+        payload[key] = value;
+      });
+    };
+
+    merge(entry.privates);
+    merge(entry.shared);
+    merge(entry.transient);
+
+    if (!Object.keys(payload).length) return null;
+    return payload;
+  }
+
+  private async mergeSegregatedReads(
+    ctx: FabricContractContext,
+    id: string,
+    model: Record<string, any>
+  ): Promise<Record<string, any>> {
+    const reads = ctx.getOrUndefined("segregateRead") as string[] | undefined;
+    if (!reads?.length) return model;
+    for (const collection of reads) {
+      const privateRecord = await this.readPrivateRecord(ctx, collection, id);
+      if (!privateRecord) continue;
+      Object.entries(privateRecord).forEach(([key, value]) => {
+        if (typeof value === "undefined") return;
+        model[key] = value;
+      });
+    }
+    return model;
+  }
+
+  private async readPrivateRecord(
+    ctx: FabricContractContext,
+    collection: string,
+    id: string
+  ): Promise<Record<string, any> | undefined> {
+    const data = await ctx.stub.getPrivateData(collection, id);
+    if (!data) return undefined;
+    const text = data.toString();
+    if (!text) return undefined;
+    try {
+      return FabricContractAdapter.serializer.deserialize(text);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async deleteSegregatedCollections(
+    ctx: FabricContractContext,
+    id: string
+  ): Promise<void> {
+    const reads = ctx.getOrUndefined("segregateRead") as string[] | undefined;
+    if (!reads?.length) return;
+    for (const collection of reads) {
+      try {
+        await ctx.stub.deletePrivateData(collection, id);
+      } catch {
+        // ignore missing private data
+      }
+    }
   }
 
   protected async readState(id: string, ctx: FabricContractContext) {
@@ -541,6 +650,28 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return res;
   }
 
+  private createRowsIterator(
+    rows: Array<{ key: string; value: Buffer }>
+  ): Iterators.StateQueryIterator {
+    let index = 0;
+    return {
+      // @ts-expect-error typeing of iterator?
+      async next() {
+        if (index < rows.length) {
+          const row = rows[index++];
+          return {
+            value: { key: row.key, value: row.value },
+            done: false,
+          };
+        }
+        return { done: true };
+      },
+      async close() {
+        // noop
+      },
+    };
+  }
+
   protected async queryResultPaginated(
     stub: ChaincodeStub,
     rawInput: any,
@@ -553,16 +684,34 @@ export class FabricContractAdapter extends CouchDBAdapter<
     let res: StateQueryResponse<Iterators.StateQueryIterator>;
     const collection = ctx.get("segregated");
     if (collection) {
-      if (bookmark) rawInput.selector._id = { $gt: bookmark.toString() };
-      const it = await stub.getPrivateDataQueryResult(
+      const clonedInput = JSON.parse(JSON.stringify(rawInput));
+      clonedInput.selector = clonedInput.selector || {};
+      if (bookmark) clonedInput.selector._id = { $gt: bookmark.toString() };
+      const limitValue =
+        typeof limit === "number" && limit > 0 ? limit : Number.MAX_VALUE;
+      const iterator = await stub.getPrivateDataQueryResult(
         collection,
-        JSON.stringify(rawInput)
+        JSON.stringify(clonedInput)
       );
+      const rows: Array<{ key: string; value: Buffer }> = [];
+      let lastKey = "";
+      while (rows.length < limitValue) {
+        const resRow = await iterator.next();
+        if (resRow.done) break;
+        if (resRow.value && resRow.value.value) {
+          rows.push({
+            key: resRow.value.key,
+            value: resRow.value.value as Buffer,
+          });
+          lastKey = resRow.value.key;
+        }
+      }
+      await iterator.close();
       res = {
-        iterator: it,
+        iterator: this.createRowsIterator(rows),
         metadata: {
-          fetchedRecordsCount: limit,
-          bookmark: "",
+          fetchedRecordsCount: rows.length,
+          bookmark: rows.length ? lastKey : "",
         },
       };
     } else
@@ -622,24 +771,28 @@ export class FabricContractAdapter extends CouchDBAdapter<
       },
       flags
     );
-    if (flags instanceof FabricContractContext) {
-      // do nothing
-    } else if ((flags as Ctx).stub) {
+    const stubFromFlags =
+      (flags as FabricContractContext).stub || (flags as Ctx).stub;
+    const identityFromFlags =
+      (flags as FabricContractContext).identity ||
+      (flags as Ctx).clientIdentity;
+    if (stubFromFlags && identityFromFlags) {
+      const txId = stubFromFlags.getTxID();
       Object.assign(baseFlags, {
-        stub: flags.stub,
-        identity: (flags as Ctx).clientIdentity,
-        cert: (flags as Ctx).clientIdentity.getIDBytes().toString(),
-        roles: (flags as Ctx).clientIdentity.getAttributeValue("roles"),
+        stub: stubFromFlags,
+        identity: identityFromFlags,
+        cert: identityFromFlags.getIDBytes().toString(),
+        roles: identityFromFlags.getAttributeValue("roles"),
         logger: Logging.for(
           operation,
           {
             logLevel: false,
             timestamp: false,
-            correlationId: (flags as Ctx).stub.getTxID(),
+            correlationId: txId,
           },
           flags
         ),
-        correlationId: (flags as Ctx).stub.getTxID(),
+        correlationId: txId,
       });
     } else {
       baseFlags = Object.assign(baseFlags, flags || {});
@@ -800,12 +953,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   async view<R>(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ddoc: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     viewName: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     options: Record<string, any>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ..._args: ContextualArgs<FabricContractContext>
   ): Promise<ViewResponse<R>> {
-    throw new UnsupportedError("Fabric contracts do not support CouchDB views.");
+    throw new UnsupportedError(
+      "Fabric contracts do not support CouchDB views."
+    );
   }
 
   override Statement<M extends Model>(): FabricStatement<M, any> {

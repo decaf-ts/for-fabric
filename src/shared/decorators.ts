@@ -21,6 +21,8 @@ import {
   transient,
   ValidationError,
   DBKeys,
+  DBOperations,
+  on,
 } from "@decaf-ts/db-decorators";
 import { Model, required } from "@decaf-ts/decorator-validation";
 import { FabricModelKeys } from "./constants";
@@ -403,14 +405,76 @@ export type SegregatedDataMetadata = {
   collections: string | CollectionResolver;
 };
 
+/**
+ * @description Priority for early collection extraction (before pk generation at priority 60)
+ * @summary This priority ensures collections are registered in context before any sequence
+ * operations occur, allowing sequences to be replicated to private/shared collections.
+ */
+export const SEGREGATED_COLLECTION_EXTRACTION_PRIORITY = 35;
+
+/**
+ * @description Early handler to extract and register collections in context
+ * @summary Runs with priority < 40 to extract collection names before pk generation (priority 60).
+ * This allows FabricContractSequence to know which collections to replicate to.
+ * @template M - Type that extends Model
+ * @param {ContextOf<Repository<M, any>>} context - The execution context
+ * @param {SegregatedDataMetadata | SegregatedDataMetadata[]} data - The segregated data metadata
+ * @param {string | string[]} keys - The property key(s) being segregated
+ * @param {M} model - The model instance
+ * @return {Promise<void>}
+ */
+export async function extractSegregatedCollections<M extends Model>(
+  this: Repository<M, any>,
+  context: ContextOf<typeof this>,
+  data: SegregatedDataMetadata | SegregatedDataMetadata[],
+  keys: keyof M | (keyof M)[],
+  model: M
+): Promise<void> {
+  const dataArray = (
+    Array.isArray(data) ? data : [data]
+  ) as SegregatedDataMetadata[];
+
+  const msp =
+    Model.ownerOf(model) ||
+    extractMspId(
+      context.get("identity") as string | ClientIdentity | undefined
+    );
+  if (!msp) {
+    // Can't extract collections without MSP, will be caught by later handlers
+    return;
+  }
+
+  const collections: string[] = [];
+  for (const metadata of dataArray) {
+    const collectionResolver = metadata.collections;
+    const collection =
+      typeof collectionResolver === "string"
+        ? collectionResolver
+        : collectionResolver(model, msp, context);
+    if (collection && !collections.includes(collection)) {
+      collections.push(collection);
+    }
+  }
+
+  // Register collections early using readFrom - this allows sequence code
+  // to know which collections to replicate to during pk generation
+  if (collections.length > 0) {
+    (context as FabricContractContext).readFrom(collections);
+  }
+}
+
 export async function segregatedDataOnCreate<M extends Model>(
   this: Repository<M, any>,
   context: ContextOf<typeof this>,
-  data: SegregatedDataMetadata[],
-  keys: (keyof M)[],
+  data: SegregatedDataMetadata | SegregatedDataMetadata[],
+  keys: keyof M | (keyof M)[],
   model: M
 ): Promise<void> {
-  if (keys.length !== data.length)
+  const dataArray = (
+    Array.isArray(data) ? data : [data]
+  ) as SegregatedDataMetadata[];
+  const keyArray = (Array.isArray(keys) ? keys : [keys]) as (keyof M)[];
+  if (keyArray.length !== dataArray.length)
     throw new InternalError(
       `Segregated data keys and metadata length mismatch`
     );
@@ -425,18 +489,18 @@ export async function segregatedDataOnCreate<M extends Model>(
       `There's no assigned organization for model ${model.constructor.name}`
     );
 
-  const collectionResolver = data[0].collections;
+  const collectionResolver = dataArray[0].collections;
   const collection =
     typeof collectionResolver === "string"
       ? collectionResolver
       : collectionResolver(model, msp, context);
 
-  const rebuilt = keys.reduce(
+  const rebuilt = keyArray.reduce(
     (acc: Record<keyof M, any>, k, i) => {
       const c =
-        typeof data[i].collections === "string"
-          ? data[i].collections
-          : data[i].collections(model, msp, context);
+        typeof dataArray[i].collections === "string"
+          ? dataArray[i].collections
+          : dataArray[i].collections(model, msp, context);
       if (c !== collection)
         throw new UnsupportedError(
           `Segregated data collection mismatch: ${c} vs ${collection}`
@@ -457,11 +521,15 @@ export async function segregatedDataOnCreate<M extends Model>(
 export async function segregatedDataOnRead<M extends Model>(
   this: Repository<M, any>,
   context: Context<FabricFlags>,
-  data: SegregatedDataMetadata[],
-  keys: (keyof M)[],
+  data: SegregatedDataMetadata | SegregatedDataMetadata[],
+  keys: keyof M | (keyof M)[],
   model: M
 ): Promise<void> {
-  if (keys.length !== data.length)
+  const dataArray = (
+    Array.isArray(data) ? data : [data]
+  ) as SegregatedDataMetadata[];
+  const keyArray = (Array.isArray(keys) ? keys : [keys]) as (keyof M)[];
+  if (keyArray.length !== dataArray.length)
     throw new InternalError(
       `Segregated data keys and metadata length mismatch`
     );
@@ -472,43 +540,62 @@ export async function segregatedDataOnRead<M extends Model>(
       `There's no assigned organization for model ${model.constructor.name}`
     );
 
-  const collectionResolver = data[0].collections;
+  const collectionResolver = dataArray[0].collections;
   const collection =
     typeof collectionResolver === "string"
       ? collectionResolver
       : await collectionResolver(model, msp, context);
 
-  const rebuilt = keys.reduce(
-    (acc: Record<keyof M, any>, k, i) => {
-      const c =
-        typeof data[i].collections === "string"
-          ? data[i].collections
-          : data[i].collections(model, msp, context);
-      if (c !== collection) return acc;
-      acc[k] = model[k];
-      return acc;
-    },
-    {} as Record<keyof M, any>
-  );
-
   (context as FabricContractContext).readFrom(collection);
-  // const segregated = Model.segregate(model);
-  //
-  // const created = await this.override({ segregated: collection } as any).readAll(
-  //   toCreate,
-  //   context
-  // );
-  // Object.assign(model, created);
 }
 
 export async function segregatedDataOnUpdate<M extends Model>(
   this: Repository<M, any>,
   context: ContextOf<typeof this>,
-  data: SegregatedDataMetadata[],
-  key: keyof M[],
+  data: SegregatedDataMetadata | SegregatedDataMetadata[],
+  key: keyof M | (keyof M)[],
   model: M,
   oldModel: M
-): Promise<void> {}
+): Promise<void> {
+  const dataArray = (
+    Array.isArray(data) ? data : [data]
+  ) as SegregatedDataMetadata[];
+  const keyArray = (Array.isArray(key) ? key : [key]) as (keyof M)[];
+  if (keyArray.length !== dataArray.length)
+    throw new InternalError(
+      `Segregated data keys and metadata length mismatch`
+    );
+
+  const msp =
+    Model.ownerOf(model) ||
+    extractMspId(
+      context.get("identity") as string | ClientIdentity | undefined
+    );
+  if (!msp)
+    throw new ValidationError(
+      `There's no assigned organization for model ${model.constructor.name}`
+    );
+
+  const collectionResolver = dataArray[0].collections;
+  const collection =
+    typeof collectionResolver === "string"
+      ? collectionResolver
+      : collectionResolver(model, msp, context);
+
+  keyArray.forEach((k, i) => {
+    const c =
+      typeof dataArray[i].collections === "string"
+        ? dataArray[i].collections
+        : dataArray[i].collections(model, msp, context);
+    if (c !== collection)
+      throw new UnsupportedError(
+        `Segregated data collection mismatch: ${c} vs ${collection}`
+      );
+  });
+
+  const segregated = Model.segregate(model);
+  (context as FabricContractContext).writeTo(collection, segregated);
+}
 
 export async function segregatedDataOnDelete<
   M extends Model,
@@ -517,10 +604,35 @@ export async function segregatedDataOnDelete<
 >(
   this: R,
   context: ContextOf<R>,
-  data: V[],
-  key: keyof M[],
+  data: V | V[],
+  key: (keyof M)[],
   model: M
-): Promise<void> {}
+): Promise<void> {
+  const dataArray = (Array.isArray(data) ? data : [data]) as V[];
+  const keyArray = (Array.isArray(key) ? key : [key]) as (keyof M)[];
+  if (keyArray.length !== dataArray.length)
+    throw new InternalError(
+      `Segregated data keys and metadata length mismatch`
+    );
+
+  const msp =
+    Model.ownerOf(model) ||
+    extractMspId(
+      context.get("identity") as string | ClientIdentity | undefined
+    );
+  if (!msp)
+    throw new ValidationError(
+      `There's no assigned organization for model ${model.constructor.name}`
+    );
+
+  const collectionResolver = dataArray[0].collections;
+  const collection =
+    typeof collectionResolver === "string"
+      ? collectionResolver
+      : collectionResolver(model, msp, context);
+
+  (context as FabricContractContext).readFrom(collection);
+}
 
 function segregated(
   collection: string | CollectionResolver,
@@ -567,19 +679,33 @@ function segregated(
         }
       });
     } else {
+      const groupName =
+        typeof collection === "string" ? collection : collection.toString();
+      const earlyExtractionMeta = { collections: collection };
+      const earlyExtractionGroupSort = {
+        priority: SEGREGATED_COLLECTION_EXTRACTION_PRIORITY,
+        group: groupName,
+      };
       decs.push(
         prop(),
         transient(),
         segregatedDec,
+        // Early extraction handlers - run BEFORE pk generation (priority 60)
+        // This ensures collections are registered in context for sequence replication
+        // We register for each operation explicitly to ensure proper handler lookup
+        on(
+          DBOperations.ALL,
+          extractSegregatedCollections as any,
+          earlyExtractionMeta,
+          earlyExtractionGroupSort
+        ),
+        // Main handlers for segregated data operations (priority 95)
         onCreate(
           segregatedDataOnCreate,
           { collections: collection },
           {
             priority: 95,
-            group:
-              typeof collection === "string"
-                ? collection
-                : collection.toString(),
+            group: groupName,
           }
         ),
         onRead(
@@ -587,10 +713,7 @@ function segregated(
           { collections: collection },
           {
             priority: 95,
-            group:
-              typeof collection === "string"
-                ? collection
-                : collection.toString(),
+            group: groupName,
           }
         ),
         onUpdate(
@@ -598,10 +721,7 @@ function segregated(
           { collections: collection },
           {
             priority: 95,
-            group:
-              typeof collection === "string"
-                ? collection
-                : collection.toString(),
+            group: groupName,
           }
         ),
         onDelete(
@@ -609,10 +729,7 @@ function segregated(
           { collections: collection },
           {
             priority: 95,
-            group:
-              typeof collection === "string"
-                ? collection
-                : collection.toString(),
+            group: groupName,
           }
         )
       );

@@ -68,21 +68,37 @@ export class FabricContractContext extends Context<FabricContractFlags> {
     return this.get("identity");
   }
 
-  writeTo(col: string, record: any) {
-    const cols: Record<string, any> = (this.getOrUndefined("segregateWrite") ||
-      {}) as Record<string, any>;
-    if (!(col in cols)) cols[col] = [];
+  private _segregateWrite: Record<string, any[]> = {};
+  private _segregateRead: string[] = [];
 
-    cols[col].push(record);
-    this.cache.put("segregateWrite", cols);
+  writeTo(col: string, record: any) {
+    if (!(col in this._segregateWrite)) this._segregateWrite[col] = [];
+    this._segregateWrite[col].push(record);
+    this.cache.put("segregateWrite", this._segregateWrite);
   }
 
   readFrom(cols: string | string[]) {
     cols = Array.isArray(cols) ? cols : [cols];
-    let current: string[] = (this.getOrUndefined("segregateRead") ||
-      []) as string[];
-    current = [...new Set([...current, ...cols])];
-    this.cache.put("segregateRead", current);
+    this._segregateRead = [...new Set([...this._segregateRead, ...cols])];
+    this.cache.put("segregateRead", this._segregateRead);
+  }
+
+  /**
+   * @description Gets the collections registered for writing
+   * @summary Returns collection names from segregateWrite, used by sequences to know where to replicate.
+   * @return {string[]} Array of collection names, empty if none registered
+   */
+  getWriteCollections(): string[] {
+    return Object.keys(this._segregateWrite);
+  }
+
+  /**
+   * @description Gets the collections registered for reading
+   * @summary Returns collection names from segregateRead.
+   * @return {string[]} Array of collection names, empty if none registered
+   */
+  getReadCollections(): string[] {
+    return this._segregateRead;
   }
 
   override toString() {

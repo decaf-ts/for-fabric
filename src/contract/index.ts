@@ -6,6 +6,8 @@ import { BatchContract } from "./BatchContract";
 import { UserContract } from "./UserContract";
 import { AddressContract } from "./AddressContract";
 import { OtherProductSharedContract } from "./OtherProductSharedContract";
+import { SegregatedPrivateDocumentContract } from "./SegregatedPrivateDocumentContract";
+import { SegregatedSharedDocumentContract } from "./SegregatedSharedDocumentContract";
 
 export const contracts: (typeof Contract)[] = [
   ProductContract,
@@ -13,4 +15,6 @@ export const contracts: (typeof Contract)[] = [
   UserContract,
   AddressContract,
   OtherProductSharedContract,
+  SegregatedPrivateDocumentContract,
+  SegregatedSharedDocumentContract,
 ];
