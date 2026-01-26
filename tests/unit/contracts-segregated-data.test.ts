@@ -578,7 +578,11 @@ describe("FabricContractAdapter forPrivate pattern", () => {
   });
 });
 
-describe.skip("Private data repository operations", () => {
+// TODO: These tests are skipped because decorator handlers are not being invoked
+// during FabricContractRepository operations. The handler infrastructure is in place
+// (see passing handler tests above), but integration with the base Repository class
+// from @decaf-ts/core needs investigation. The handlers work when called directly.
+describe("Private data repository operations", () => {
   let adapter: FabricContractAdapter;
   let repository: FabricContractRepository<PrivateDataTestModel>;
 
@@ -605,27 +609,10 @@ describe.skip("Private data repository operations", () => {
       secretField: "initial-secret",
     });
 
-    // Debug: Check segregated collections before create
-    console.log(
-      "Before create - read collections:",
-      context.getReadCollections()
-    );
-
     await repository.create(model, context);
-
-    // Debug: Check segregated collections and writes after create
-    console.log(
-      "After create - read collections:",
-      context.getReadCollections()
-    );
-    console.log(
-      "After create - segregateWrite:",
-      context.getOrUndefined("segregateWrite")
-    );
 
     const privateKey = `private_test_${id}`;
     const privateData = await stub.getPrivateData(COLLECTION_B, privateKey);
-    console.log("privateKey:", privateKey, "privateData:", privateData);
     expect(privateData).toBeDefined();
     const parsed = JSON.parse(
       Buffer.from(privateData).toString("utf8")

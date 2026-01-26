@@ -1,4 +1,4 @@
-import { Context, Repo, Repository } from "@decaf-ts/core";
+import { Context, ModelService, Repo, Repository } from "@decaf-ts/core";
 import { InternalError } from "@decaf-ts/db-decorators";
 import { Product } from "../../src/contract/models/Product";
 import { generateGtin } from "../../src/contract/models/gtin";
@@ -93,11 +93,7 @@ describe("impersonation test", () => {
         ],
       });
 
-      const transactionMock = jest
-        .spyOn(FabricClientAdapter, "getConnection")
-        .mockImplementation(() => {
-          throw new InternalError("for test");
-        });
+      const transactionMock = jest.spyOn(FabricClientAdapter, "getConnection");
 
       jest
         .spyOn(FabricClientAdapter, "getClient")
@@ -113,7 +109,20 @@ describe("impersonation test", () => {
 
       await expect(
         repo.override(override as any).create(model)
-      ).rejects.toThrow(InternalError);
+      ).rejects.toThrowError();
+
+      expect(transactionMock).toHaveBeenCalled();
+      expect(transactionMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          ...override,
+        }),
+        expect.any(Context)
+      );
+
+      const service = new ModelService(Product);
+
+      await expect(service.for(override).update(model)).rejects.toThrowError();
 
       expect(transactionMock).toHaveBeenCalled();
       expect(transactionMock).toHaveBeenCalledWith(
