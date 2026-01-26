@@ -1,5 +1,9 @@
 import "../shared/overrides";
-import { CouchDBKeys, type MangoQuery, type ViewResponse } from "@decaf-ts/for-couchdb";
+import {
+  CouchDBKeys,
+  type MangoQuery,
+  type ViewResponse,
+} from "@decaf-ts/for-couchdb";
 import { Client } from "@grpc/grpc-js";
 import * as grpc from "@grpc/grpc-js";
 import {
@@ -145,7 +149,16 @@ export class FabricClientAdapter extends Adapter<
    * @param {string} [alias] - Optional alias for the adapter instance
    */
   constructor(config: PeerConfig, alias?: string) {
-    super(config, FabricFlavour, alias);
+    super(
+      Object.assign({}, config, {
+        evaluateTimeout: 5,
+        endorseTimeout: 15,
+        submitTimeout: 5,
+        commitTimeout: 60,
+      }),
+      FabricFlavour,
+      alias
+    );
   }
 
   override Statement<M extends Model>(

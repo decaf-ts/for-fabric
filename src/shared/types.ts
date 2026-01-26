@@ -51,6 +51,10 @@ export type PeerConfig = {
   ca?: string;
   mspId: string;
   channel: string;
+  evaluateTimeout: number;
+  endorseTimeout: number;
+  submitTimeout: number;
+  commitTimeout: number;
   hsm?: HSMOptions;
 };
 
