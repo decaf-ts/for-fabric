@@ -314,102 +314,115 @@ const extractCollections = new Command()
       return;
     }
 
-    const cols: {
-      indexes: CreateIndexRequest[];
-      designDocs: CouchDBDesignDoc[];
-      mirror?: PrivateCollection;
-      collections: PrivateCollection[];
-    }[] = await Promise.all(
-      injectableModels.map(async (clazz) => {
-        const tableName = Model.tableName(clazz);
-        const meta = Metadata.get(clazz);
-        const mirrorMeta = Model.mirroredAt(clazz);
+    async function getCols(mspIdsList?: string[]) {
+      const cols: {
+        indexes: CreateIndexRequest[];
+        designDocs: CouchDBDesignDoc[];
+        mirror?: PrivateCollection;
+        collections: PrivateCollection[];
+      }[] = await Promise.all(
+        injectableModels.map(async (clazz) => {
+          const tableName = Model.tableName(clazz);
+          const meta = Metadata.get(clazz);
+          const mirrorMeta = Model.mirroredAt(clazz);
 
-        console.log(tableName);
-        const collections: Record<string, any> = {};
-        for (const msp of mspIds) {
-          collections[msp] = await exCollections(
-            clazz,
-            [msp, mainMspId],
-            {},
-            // {
-            //   sharedCols: Object.assign({}, overrides.sharedCols),
-            //   privateCols: Object.assign({}, overrides.privateCols),
-            // },
-            !!mirrorMeta
-          );
-        }
+          console.log(tableName);
+          const collections: Record<string, any> = {};
+          for (const msp of mspIdsList || mspIds || []) {
+            collections[msp] = await exCollections(
+              clazz,
+              [msp, mainMspId],
+              {},
+              // {
+              //   sharedCols: Object.assign({}, overrides.sharedCols),
+              //   privateCols: Object.assign({}, overrides.privateCols),
+              // },
+              !!mirrorMeta
+            );
+          }
 
-        let mirrorCollection: PrivateCollection | undefined = undefined;
+          let mirrorCollection: PrivateCollection | undefined = undefined;
 
-        if (mirrorMeta) {
-          collections[mainMspId] = collections[mainMspId] || {};
-          Object.keys(collections).forEach((msp: string) => {
-            collections[mainMspId].privates = collections[msp].privates?.filter(
-              (p: any) => {
+          if (mirrorMeta) {
+            collections[mainMspId] = collections[mainMspId] || {};
+            Object.keys(collections).forEach((msp: string) => {
+              collections[mainMspId].privates = collections[
+                msp
+              ].privates?.filter((p: any) => {
                 if (p.name !== (mirrorMeta.resolver as string)) return true;
                 mirrorCollection = p as any;
                 return false;
-              }
-            );
-          });
-        }
+              });
+            });
+          }
 
-        const privatesCount = Object.values(collections)
-          .map((c) => c.privates)
-          .flat().length;
-        if (privatesCount)
-          log
-            .for(Model.tableName(clazz))
-            .info(`Found ${privatesCount} private collections to create`);
-        const sharedCount = Object.values(collections)
-          .map((c) => c.shared)
-          .flat().length;
+          const privatesCount = Object.values(collections)
+            .map((c) => c.privates)
+            .flat().length;
+          if (privatesCount)
+            log
+              .for(Model.tableName(clazz))
+              .info(`Found ${privatesCount} private collections to create`);
+          const sharedCount = Object.values(collections)
+            .map((c) => c.shared)
+            .flat().length;
 
-        log
-          .for(Model.tableName(clazz))
-          .info(`Found ${sharedCount} shared collections to create`);
-        if (mirrorCollection)
           log
             .for(Model.tableName(clazz))
-            .info(
-              `Found one mirror collection ${mirrorMeta?.resolver as string}`
-            );
+            .info(`Found ${sharedCount} shared collections to create`);
+          if (mirrorCollection)
+            log
+              .for(Model.tableName(clazz))
+              .info(
+                `Found one mirror collection ${mirrorMeta?.resolver as string}`
+              );
 
-        const colList = Object.values(collections)
-          .map((c) => [...(c.privates || []), ...(c.shared || [])])
-          .flat();
-        let indexes: CreateIndexRequest[] = [];
-        let designDocs: CouchDBDesignDoc[] = [];
-        if (colList.length) {
-          log
-            .for(Model.tableName(clazz))
-            .verbose(`generating indexes for collections`);
-          indexes = generateModelIndexes(clazz);
-          log
-            .for(Model.tableName(clazz))
-            .info(`found ${indexes.length} indexes`);
-          designDocs = generateModelDesignDocs(clazz);
-          log
-            .for(Model.tableName(clazz))
-            .info(`found ${designDocs.length} design docs`);
-        }
-        return {
-          indexes,
-          designDocs,
-          collections: colList,
-          mirror: mirrorCollection,
-        };
-      })
-    );
+          const colList = Object.values(collections)
+            .map((c) => [...(c.privates || []), ...(c.shared || [])])
+            .flat();
+          let indexes: CreateIndexRequest[] = [];
+          let designDocs: CouchDBDesignDoc[] = [];
+          if (colList.length) {
+            log
+              .for(Model.tableName(clazz))
+              .verbose(`generating indexes for collections`);
+            indexes = generateModelIndexes(clazz);
+            log
+              .for(Model.tableName(clazz))
+              .info(`found ${indexes.length} indexes`);
+            designDocs = generateModelDesignDocs(clazz);
+            log
+              .for(Model.tableName(clazz))
+              .info(`found ${designDocs.length} design docs`);
+          }
+          return {
+            indexes,
+            designDocs,
+            collections: colList,
+            mirror: mirrorCollection,
+          };
+        })
+      );
+      return cols;
+    }
+
+    const cols = await getCols();
+    const onlyMirror = await getCols([mainMspId]);
 
     const collectionsTo = [
+      ...onlyMirror.filter((c) => c.mirror).map((c) => c.mirror),
       ...cols.map((c) => c.collections).flat(),
       ...cols.filter((c) => c.mirror).map((c) => c.mirror),
     ] as PrivateCollection[];
 
-    if (collectionsTo.length) {
-      writeCollections(collectionsTo, outDir);
+    const uniqueByCollection = [
+      ...new Map(
+        collectionsTo.map((item: PrivateCollection) => [item.name, item])
+      ).values(),
+    ];
+
+    if (uniqueByCollection.length) {
+      writeCollections(uniqueByCollection, outDir);
       const metaCollectionsConfig = path.join(
         outDir,
         "META-INF",
