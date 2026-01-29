@@ -69,7 +69,9 @@ export class FabricClientRepository<
   }
 
   override override(flags: Partial<FlagsOf<ContextOf<A>>>): this {
-    return super.override(flags).for(flags as any);
+    return super
+      .override(Object.assign({}, flags, this._overrides))
+      .for(flags as any);
   }
 
   protected override ObserverHandler(): ObserverHandler {
