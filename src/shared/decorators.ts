@@ -44,6 +44,8 @@ import { FabricContractFlags } from "../contracts/types";
 import "../shared/overrides";
 import { FabricContractContext } from "../contracts/index";
 
+const MIRROR_SKIP_FLAG_PREFIX = "mirror:skip:";
+
 /**
  * @description Extracts the MSP ID from either a string or ClientIdentity object
  * @param identity - The identity value which can be a string MSP ID or ClientIdentity object
@@ -323,6 +325,49 @@ export async function deleteMirrorHandler<
   );
 }
 
+export async function readMirrorHandler<
+  M extends Model,
+  R extends Repository<M, any>,
+>(
+  this: R,
+  context: Context<FabricContractFlags>,
+  data: MirrorMetadata,
+  key: keyof M,
+  model: M
+): Promise<void> {
+  // Get the current MSP ID from the context
+  const msp = extractMspId(
+    context.get("identity") as string | ClientIdentity | undefined
+  );
+
+  if (!msp) {
+    context.logger.debug(
+      `Mirror read: No MSP ID available, using default read behavior`
+    );
+    return;
+  }
+
+  // Evaluate the mirror condition
+  const collection = await evalMirrorMetadata(model, data.resolver, context);
+  const skipFlagKey = `${MIRROR_SKIP_FLAG_PREFIX}${collection}`;
+  const fabricCtx = context as FabricContractContext;
+  const matches = !data.condition || data.condition(msp);
+
+  if (matches) {
+    context.logger.info(
+      `Mirror read: MSP ${msp} matches condition, routing ALL reads exclusively to collection ${collection}`
+    );
+
+    // Set the segregated flag in context to route ALL reads to the mirror collection
+    // This ensures no reads go to world state or other collections
+    fabricCtx.put("segregated", collection);
+    fabricCtx.readFrom(collection);
+    fabricCtx.put(skipFlagKey, false);
+  } else {
+    fabricCtx.put(skipFlagKey, true);
+  }
+}
+
 export function mirror(
   collection: CollectionResolver | string,
   condition?: MirrorCondition
@@ -341,6 +386,8 @@ export function mirror(
         meta
       ),
       privateData(collection),
+      // Read handler runs early (priority 30) to set up context before any reads
+      onRead(readMirrorHandler as any, meta, { priority: 30 }),
       afterCreate(createMirrorHandler as any, meta, { priority: 95 }),
       afterUpdate(updateMirrorHandler as any, meta, { priority: 95 }),
       afterDelete(deleteMirrorHandler as any, meta, { priority: 95 })
@@ -511,8 +558,6 @@ export async function segregatedDataOnCreate<M extends Model>(
     {} as Record<keyof M, any>
   );
 
-  const toCreate = new this.class(rebuilt);
-
   const segregated = Model.segregate(model);
   //  to the context the model, seggregated bu colelction (and including the non transient part)
   (context as FabricContractContext).writeTo(collection, segregated);
@@ -545,6 +590,10 @@ export async function segregatedDataOnRead<M extends Model>(
     typeof collectionResolver === "string"
       ? collectionResolver
       : await collectionResolver(model, msp, context);
+
+  const skipFlagKey = `${MIRROR_SKIP_FLAG_PREFIX}${collection}`;
+  const fabricCtx = context as FabricContractContext;
+  if (fabricCtx.getOrUndefined(skipFlagKey as any)) return;
 
   (context as FabricContractContext).readFrom(collection);
 }
@@ -681,10 +730,13 @@ function segregated(
     } else {
       const groupName =
         typeof collection === "string" ? collection : collection.toString();
+      // Use different group names for extraction vs data handlers to prevent merging
+      const extractGroupName = `${groupName}:extract`;
+      const dataGroupName = `${groupName}:data`;
       const earlyExtractionMeta = { collections: collection };
       const earlyExtractionGroupSort = {
         priority: SEGREGATED_COLLECTION_EXTRACTION_PRIORITY,
-        group: groupName,
+        group: extractGroupName,
       };
       decs.push(
         prop(),
@@ -705,7 +757,7 @@ function segregated(
           { collections: collection },
           {
             priority: 95,
-            group: groupName,
+            group: dataGroupName,
           }
         ),
         onRead(
@@ -713,7 +765,7 @@ function segregated(
           { collections: collection },
           {
             priority: 95,
-            group: groupName,
+            group: dataGroupName,
           }
         ),
         onUpdate(
@@ -721,7 +773,7 @@ function segregated(
           { collections: collection },
           {
             priority: 95,
-            group: groupName,
+            group: dataGroupName,
           }
         ),
         onDelete(
@@ -729,7 +781,7 @@ function segregated(
           { collections: collection },
           {
             priority: 95,
-            group: groupName,
+            group: dataGroupName,
           }
         )
       );

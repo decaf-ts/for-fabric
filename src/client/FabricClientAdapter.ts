@@ -54,6 +54,7 @@ import {
   MaybeContextualArg,
   ContextualArgs,
   type PreparedModel,
+  AllOperationKeys,
 } from "@decaf-ts/core";
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
@@ -181,7 +182,7 @@ export class FabricClientAdapter extends Adapter<
     flags: Partial<FabricClientFlags>,
     ...args: any[]
   ): Promise<FabricClientFlags> {
-    return Object.assign(
+    const f = Object.assign(
       await super.flags(
         operation,
         model,
@@ -189,6 +190,77 @@ export class FabricClientAdapter extends Adapter<
         ...args
       )
     );
+    return f;
+  }
+
+  override async context<M extends Model>(
+    operation: ((...args: any[]) => any) | AllOperationKeys,
+    overrides: Partial<FabricClientFlags>,
+    model: Constructor<M> | Constructor<M>[],
+    ...args: MaybeContextualArg<Context<any>>
+  ): Promise<Context<FabricClientFlags>> {
+    const log = this.log.for(this.context);
+    log.silly(
+      `creating new context for ${operation} operation on ${model ? (Array.isArray(model) ? model.map((m) => Model.tableName(m)) : Model.tableName(model)) : "no"} table ${overrides && Object.keys(overrides) ? Object.keys(overrides).length : "no"} with flag overrides`
+    );
+    let ctx = args.pop();
+    if (typeof ctx !== "undefined" && !(ctx instanceof Context)) {
+      args.push(ctx);
+      ctx = undefined;
+    }
+
+    overrides = ctx
+      ? Object.assign({}, ctx.toOverrides(), overrides)
+      : overrides;
+    const flags = await this.flags(
+      typeof operation === "string" ? operation : operation.name,
+      model,
+      overrides as Partial<FabricClientFlags>,
+      ...[...args, ctx].filter(Boolean)
+    );
+
+    if (ctx) {
+      if (!(ctx instanceof this.Context)) {
+        const newCtx = new this.Context().accumulate({
+          ...ctx["cache"],
+          ...flags,
+          parentContext: ctx,
+        }) as any;
+        ctx.accumulate({
+          childContexts: [
+            ...(ctx.getOrUndefined("childContexts") || []),
+            newCtx,
+          ],
+        });
+        return newCtx;
+      }
+      const currentOp = ctx.getOrUndefined("operation");
+      const currentModel = ctx.getOrUndefined("affectedTables");
+      if (
+        !currentOp ||
+        currentOp !== operation ||
+        (model && model !== currentModel)
+      ) {
+        const newCtx = new this.Context().accumulate({
+          ...ctx["cache"],
+          ...flags,
+          parentContext: ctx,
+        }) as any;
+
+        ctx.accumulate({
+          childContexts: [
+            ...(ctx.getOrUndefined("childContexts") || []),
+            newCtx,
+          ],
+        });
+        return newCtx;
+      }
+      return ctx.accumulate(flags) as any;
+    }
+
+    return new this.Context().accumulate({
+      ...flags,
+    }) as any;
   }
 
   /**

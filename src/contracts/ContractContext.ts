@@ -77,6 +77,10 @@ export class FabricContractContext extends Context<FabricContractFlags> {
     this.cache.put("segregateWrite", this._segregateWrite);
   }
 
+  put(key: string, value: any) {
+    this.accumulate({ [key]: value });
+  }
+
   readFrom(cols: string | string[]) {
     cols = Array.isArray(cols) ? cols : [cols];
     this._segregateRead = [...new Set([...this._segregateRead, ...cols])];

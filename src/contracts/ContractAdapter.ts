@@ -73,6 +73,8 @@ import {
 import { FabricContractPaginator } from "./FabricContractPaginator";
 import { MissingContextError } from "../shared/errors";
 
+const MIRROR_SKIP_FLAG_PREFIX = "mirror:skip:";
+
 export type FabricContextualizedArgs<
   ARGS extends any[] = any[],
   EXTEND extends boolean = false,
@@ -511,7 +513,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ctx: FabricContractContext,
     id: string
   ): Promise<void> {
-    const writes = ctx.getOrUndefined("segregateWrite") as
+    // Use getWriteCollections which reads from the private _segregateWrite property
+    const writeCollections = ctx.getWriteCollections();
+    if (!writeCollections.length) return;
+
+    // Get the actual write data
+    const writes = (ctx as any)._segregateWrite as
       | Record<string, SegregatedModel<any>[]>
       | undefined;
     if (!writes) return;
@@ -560,9 +567,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     id: string,
     model: Record<string, any>
   ): Promise<Record<string, any>> {
-    const reads = ctx.getOrUndefined("segregateRead") as string[] | undefined;
+    // Use getReadCollections which reads from the private _segregateRead property
+    const reads = ctx.getReadCollections();
     if (!reads?.length) return model;
     for (const collection of reads) {
+      const skipFlagKey = `${MIRROR_SKIP_FLAG_PREFIX}${collection}`;
+      if (ctx.getOrUndefined(skipFlagKey as any)) continue;
       const privateRecord = await this.readPrivateRecord(ctx, collection, id);
       if (!privateRecord) continue;
       Object.entries(privateRecord).forEach(([key, value]) => {
@@ -593,7 +603,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ctx: FabricContractContext,
     id: string
   ): Promise<void> {
-    const reads = ctx.getOrUndefined("segregateRead") as string[] | undefined;
+    // Use getReadCollections which reads from the private _segregateRead property
+    const reads = ctx.getReadCollections();
     if (!reads?.length) return;
     for (const collection of reads) {
       try {

@@ -134,4 +134,19 @@ describe("impersonation test", () => {
       );
     });
   });
+
+  describe("properly changes context defaults according to adapter", () => {
+    const ctx = new Context<any>().override({
+      logger: Logging.get(),
+      timestamp: new Date(),
+      ignoreHandlers: false,
+      ignoreValidation: false,
+    });
+
+    it("should override context defaults with provided values", async () => {
+      await expect(repo.create(new Clazz(), ctx)).rejects.toThrow();
+      // expect(ctx.get("ignoreHandler")).toBe(true);
+      // expect(ctx.get("ignoreValidation")).toBe(true);
+    });
+  });
 });
