@@ -36,7 +36,7 @@ export function hlfAllowIf(handler: AuthHandler, ...argz: any[]) {
 }
 
 export function mspHandler(...args: any[]) {
-  const context = args.shift();
+  const context = args.pop();
   if (!context)
     throw new InternalError("Context is required for namespace authorization");
   const msp = args.pop();
@@ -51,7 +51,7 @@ export function mspHandler(...args: any[]) {
 }
 
 export function namespaceHandler(...args: any[]) {
-  const context = args.shift();
+  const context = args.pop();
   if (!context)
     throw new InternalError("Context is required for namespace authorization");
   const { role, namespace } = args.pop();
@@ -59,15 +59,21 @@ export function namespaceHandler(...args: any[]) {
     throw new InternalError(
       "namespace is required for namespace authorization"
     );
-  const { clientIdentity } = context;
+  const { identity } = context;
   let roles: string[];
   try {
-    roles = JSON.parse(clientIdentity.getAttributeValue("roles")) as string[];
+    roles = JSON.parse(identity.getAttributeValue("roles")) as string[];
   } catch (e: unknown) {
     return new AuthorizationError(
       `Namespace authorization no namespaces found: ${e}`
     );
   }
+
+  if (!roles)
+    return new AuthorizationError(
+      `no roles or namespaces found for namespace authorization`
+    );
+
   const allowedNamespaces = [
     ...new Set(roles.map((role) => role.split(/[:-]/g)[0])),
   ];
