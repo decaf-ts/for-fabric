@@ -1,5 +1,39 @@
-import { allowIf, AuthorizationError } from "@decaf-ts/core";
+import {
+  AuthHandler,
+  AuthorizationError,
+  ContextualLoggedClass,
+} from "@decaf-ts/core";
 import { InternalError } from "@decaf-ts/db-decorators";
+import { MissingContextError } from "../../shared/index";
+
+export function hlfAllowIf(handler: AuthHandler, ...argz: any[]) {
+  return function allowIf(target: object, propertyKey?: any, descriptor?: any) {
+    descriptor.value = new Proxy(descriptor.value, {
+      async apply(target, thisArg: ContextualLoggedClass<any>, args) {
+        const context = args.unshift();
+        if (!context || !(context as any).stub)
+          throw new MissingContextError(
+            `"invalid context provided. this decorator only works on fabric contract methods`
+          );
+        const { ctx, ctxArgs } = await thisArg["logCtx"](
+          [...args, context],
+          target.name,
+          true
+        );
+        let error: void | AuthorizationError;
+        try {
+          error = handler(...args, ...argz, ctx);
+        } catch (e: unknown) {
+          throw new InternalError(
+            `Failed to execute auth validation handler: ${e}`
+          );
+        }
+        if (error) throw error;
+        return target.call(thisArg, ...ctxArgs);
+      },
+    });
+  };
+}
 
 export function mspHandler(...args: any[]) {
   const context = args.shift();
@@ -62,9 +96,9 @@ export function namespaceHandler(...args: any[]) {
 }
 
 export function onlyMsp(msp: string) {
-  return allowIf(mspHandler, msp);
+  return hlfAllowIf(mspHandler, msp);
 }
 
 export function onlyNamespaceRole(namespace: string, role?: string) {
-  return allowIf(namespaceHandler, { namespace: namespace, role: role });
+  return hlfAllowIf(namespaceHandler, { namespace: namespace, role: role });
 }
