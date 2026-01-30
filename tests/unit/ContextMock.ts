@@ -2,7 +2,7 @@ import { Logging, LogLevel } from "@decaf-ts/logging";
 import { Contract } from "fabric-contract-api";
 import { ModelKeys } from "@decaf-ts/decorator-validation";
 import { InternalError } from "@decaf-ts/db-decorators";
-import { Iterators } from "fabric-shim-api";
+import { ClientIdentity, Iterators } from "fabric-shim-api";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 
 function parseQuery(query: string) {
@@ -98,7 +98,11 @@ function matchesSelector(doc: any, selector?: any): boolean {
     if (key === "$nor" && Array.isArray(condition))
       return !condition.some((sub) => matchesSelector(doc, sub));
     const value = getFieldValue(doc, key);
-    if (condition && typeof condition === "object" && !Array.isArray(condition)) {
+    if (
+      condition &&
+      typeof condition === "object" &&
+      !Array.isArray(condition)
+    ) {
       for (const [op, comp] of Object.entries(condition)) {
         if (!applyOperator(op, value, comp)) return false;
       }
@@ -109,11 +113,7 @@ function matchesSelector(doc: any, selector?: any): boolean {
   return true;
 }
 
-function filterRows(
-  store: Record<string, any>,
-  selector?: any,
-  sort?: any[]
-) {
+function filterRows(store: Record<string, any>, selector?: any, sort?: any[]) {
   const entries = Object.entries(store).map(([key, value]) => ({
     key,
     value,
@@ -229,7 +229,9 @@ export function getStubMock() {
       const paginated = rows.slice(startIndex, startIndex + pageSize);
       const iterator = createIterator(paginated);
       const lastKey =
-        paginated.length > 0 ? paginated[paginated.length - 1].key : bookmark || "";
+        paginated.length > 0
+          ? paginated[paginated.length - 1].key
+          : bookmark || "";
       return {
         iterator,
         metadata: {
@@ -277,7 +279,7 @@ export function getStubMock() {
   };
 }
 
-export function getIdentityMock() {
+export function getIdentityMock(): ClientIdentity {
   return {
     getID: () => "id",
     getMSPID: () => "Aeon",
