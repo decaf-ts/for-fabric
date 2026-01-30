@@ -10,7 +10,7 @@ export function hlfAllowIf(handler: AuthHandler, ...argz: any[]) {
   return function allowIf(target: object, propertyKey?: any, descriptor?: any) {
     descriptor.value = new Proxy(descriptor.value, {
       async apply(target, thisArg: ContextualLoggedClass<any>, args) {
-        const context = args.unshift();
+        const context = args.shift();
         if (!context || !(context as any).stub)
           throw new MissingContextError(
             `"invalid context provided. this decorator only works on fabric contract methods`
