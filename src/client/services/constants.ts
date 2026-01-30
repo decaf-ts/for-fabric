@@ -5,7 +5,7 @@
  * @readonly
  * @memberOf module:for-fabric.client
  */
-export declare enum CA_ROLE {
+export enum CA_ROLE {
   /** Administrator role with elevated privileges for managing identities and affiliations */
   ADMIN = "admin",
   /** Standard user role for application clients interacting with the network */
