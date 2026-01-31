@@ -29,7 +29,7 @@ export function hlfAllowIf(handler: AuthHandler, ...argz: any[]) {
           );
         }
         if (error) throw error;
-        return target.call(thisArg, ...ctxArgs);
+        return target.call(thisArg, ctx, ...args);
       },
     });
   };
