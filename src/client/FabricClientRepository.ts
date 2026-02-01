@@ -149,12 +149,55 @@ export class FabricClientRepository<
       await this.logCtx(args, PreparedStatementKeys.FIND_ONE_BY, true)
     ).for(this.findOneBy);
     log.verbose(
-      `finding One ${Model.tableName(this.class)} with ${key as string} ${value}`
+    `finding One ${Model.tableName(this.class)} with ${key as string} ${value}`
     );
     return (await this.statement(
       this.findOneBy.name,
       key,
       value,
+      ...ctxArgs
+    )) as any;
+  }
+
+  override async find(
+    value: string,
+    order: OrderDirection = OrderDirection.ASC,
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<M[]> {
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.FIND, true)
+    ).for(this.find);
+    log.verbose(
+      `finding ${Model.tableName(this.class)} by default query attributes`
+    );
+    return (await this.statement(
+      this.find.name,
+      value,
+      order,
+      ...ctxArgs
+    )) as any;
+  }
+
+  override async page(
+    value: string,
+    direction: OrderDirection = OrderDirection.ASC,
+    ref: Omit<DirectionLimitOffset, "direction"> = {
+      offset: 1,
+      limit: 10,
+    },
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<SerializedPage<M>> {
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.PAGE, true)
+    ).for(this.page);
+    log.verbose(
+      `paging ${Model.tableName(this.class)} by default query attributes`
+    );
+    return (await this.statement(
+      this.page.name,
+      value,
+      direction,
+      ref,
       ...ctxArgs
     )) as any;
   }
