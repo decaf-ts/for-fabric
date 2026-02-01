@@ -7,7 +7,7 @@ import { InternalError } from "@decaf-ts/db-decorators";
 import { MissingContextError } from "../../shared/index";
 
 export function hlfAllowIf(handler: AuthHandler, ...argz: any[]) {
-  return function allowIf(target: object, propertyKey?: any, descriptor?: any) {
+  return function allowIf(obj: object, propertyKey?: any, descriptor?: any) {
     descriptor.value = new Proxy(descriptor.value, {
       async apply(target, thisArg: ContextualLoggedClass<any>, args) {
         const context = args.shift();
@@ -25,10 +25,13 @@ export function hlfAllowIf(handler: AuthHandler, ...argz: any[]) {
           error = handler(...args, ...argz, ctx);
         } catch (e: unknown) {
           throw new InternalError(
-            `Failed to execute auth validation handler: ${e}`
+            `Failed to execute auth validation handler for ${obj.constructor.name}.${propertyKey}: ${e}`
           );
         }
-        if (error) throw error;
+        if (error)
+          throw new AuthorizationError(
+            `UNAUTHORIZED ${obj.constructor.name}.${propertyKey}: ${error}`
+          );
         return target.call(thisArg, ctx, ...args);
       },
     });
