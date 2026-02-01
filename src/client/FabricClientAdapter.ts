@@ -69,10 +69,12 @@ import {
   EndorsementPolicyError,
   MvccReadConflictError,
   PhantomReadConflictError,
+  TransactionTimeoutError,
 } from "../shared/errors";
 import { FabricClientFlags } from "./types";
 import { DefaultFabricClientFlags } from "./constants";
 import fs from "fs";
+import { CryptoUtils } from "./crypto";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -1152,7 +1154,13 @@ export class FabricClientAdapter extends Adapter<
       config.mspId,
       config.certCertOrDirectoryPath as any
     );
-    log.debug(`Retrieving signer key from ${config.keyCertOrDirectoryPath}`);
+    try {
+      log.debug(
+        `preparing transaction signer for ${CryptoUtils.fabricIdFromCertificate(identity.credentials.toString())}`
+      );
+    } catch (e: unknown) {
+      log.error(`Failed to extract Fabric ID from certificate`, e as Error);
+    }
 
     let signer: Signer,
       close = () => {};
@@ -1240,6 +1248,9 @@ export class FabricClientAdapter extends Adapter<
 
     if (msg.includes("MVCC_READ_CONFLICT"))
       return new MvccReadConflictError(err) as E;
+
+    if (msg.includes("DEADLINE_EXCEEDED"))
+      return new TransactionTimeoutError(err) as E;
 
     if (msg.includes("ENDORSEMENT_POLICY_FAILURE"))
       return new EndorsementPolicyError(err) as E;

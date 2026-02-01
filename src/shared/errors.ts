@@ -165,3 +165,25 @@ export class EndorsementPolicyError extends InternalError {
     super(message, EndorsementPolicyError.name, 500);
   }
 }
+
+export class TransactionLimitsError extends InternalError {
+  constructor(
+    message: string | Error,
+    name: string = TransactionLimitsError.name,
+    code = 590
+  ) {
+    super(message, name, code);
+  }
+}
+
+export class TransactionTimeoutError extends InternalError {
+  constructor(message: string | Error) {
+    super(message, TransactionTimeoutError.name, 591);
+  }
+}
+
+export class TransactionBufferSizeError extends InternalError {
+  constructor(message: string | Error) {
+    super(message, TransactionBufferSizeError.name, 592);
+  }
+}
