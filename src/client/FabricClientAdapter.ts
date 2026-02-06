@@ -188,7 +188,7 @@ export class FabricClientAdapter extends Adapter<
       await super.flags(
         operation,
         model,
-        Object.assign({}, this.config, flags),
+        Object.assign({}, DefaultFabricClientFlags, this.config, flags),
         ...args
       )
     );
@@ -363,7 +363,7 @@ export class FabricClientAdapter extends Adapter<
       throw new InternalError("Ids and models must have the same length");
     //HERE!
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = ctxArgs.shift() as Record<string, any>;
+    let transient = ctxArgs.shift() as Record<string, any>;
     const { log, ctx } = this.logCtx(
       ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.createAll
@@ -372,6 +372,11 @@ export class FabricClientAdapter extends Adapter<
 
     log.info(`adding ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
+
+    transient =
+      transient && Object.keys(transient).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       BulkCrudOperationKeys.CREATE_ALL,
@@ -380,7 +385,7 @@ export class FabricClientAdapter extends Adapter<
           models.map((m) => this.serializer.serialize(m, clazz.name))
         ),
       ],
-      { [tableName]: transient } as any,
+      transient,
       undefined,
       clazz.name
     );
@@ -440,7 +445,7 @@ export class FabricClientAdapter extends Adapter<
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = ctxArgs.shift() as Record<string, any>;
+    let transient = ctxArgs.shift() as Record<string, any>;
     const { log, ctx } = this.logCtx(
       ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.updateAll
@@ -448,7 +453,10 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.info(`updating ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
-
+    transient =
+      transient && Object.keys(transient).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       BulkCrudOperationKeys.UPDATE_ALL,
@@ -457,7 +465,7 @@ export class FabricClientAdapter extends Adapter<
           models.map((m) => this.serializer.serialize(m, clazz.name))
         ),
       ],
-      { [tableName]: transient } as any,
+      transient,
       undefined,
       clazz.name
     );
@@ -587,11 +595,15 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.verbose(`adding entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
+    transient =
+      transient && Object.keys(transient).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       OperationKeys.CREATE,
       [this.serializer.serialize(model, clazz.name)],
-      { [tableName]: transient } as any,
+      transient,
       undefined,
       clazz.name
     );
@@ -670,11 +682,15 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
+    transient =
+      transient && Object.keys(transient).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       OperationKeys.UPDATE,
       [this.serializer.serialize(model, clazz.name || clazz)], // TODO should be receving class but is receiving string
-      { [tableName]: transient } as any,
+      transient,
       undefined,
       clazz.name
     );
@@ -1162,8 +1178,8 @@ export class FabricClientAdapter extends Adapter<
       log.error(`Failed to extract Fabric ID from certificate`, e as Error);
     }
 
-    let signer: Signer,
-      close = () => {};
+    let signer: Signer;
+    const close = () => {};
     if (!config.hsm) {
       signer = await getSigner(config.keyCertOrDirectoryPath as any);
     } else {

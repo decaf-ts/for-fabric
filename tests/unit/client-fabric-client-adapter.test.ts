@@ -137,7 +137,7 @@ const createContext = () => {
       expect.any(Context),
       expect.any(String),
       expect.any(Array),
-      { erc20_wallets: {} },
+      {},
       undefined,
       "ERC20Wallet"
     );
