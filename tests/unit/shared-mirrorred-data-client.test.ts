@@ -171,7 +171,7 @@ describe("shared and mirrored data - client", () => {
         "create",
         true,
         [new PrivateClass().serialize()],
-        { name: "name", id: undefined, createdAt: undefined },
+        { private_class: { name: "name", id: undefined, createdAt: undefined } },
         undefined,
         PrivateClass.name
       );

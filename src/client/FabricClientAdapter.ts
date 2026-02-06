@@ -380,7 +380,7 @@ export class FabricClientAdapter extends Adapter<
           models.map((m) => this.serializer.serialize(m, clazz.name))
         ),
       ],
-      transient,
+      { [tableName]: transient } as any,
       undefined,
       clazz.name
     );
@@ -457,7 +457,7 @@ export class FabricClientAdapter extends Adapter<
           models.map((m) => this.serializer.serialize(m, clazz.name))
         ),
       ],
-      transient,
+      { [tableName]: transient } as any,
       undefined,
       clazz.name
     );
@@ -591,7 +591,7 @@ export class FabricClientAdapter extends Adapter<
       ctx,
       OperationKeys.CREATE,
       [this.serializer.serialize(model, clazz.name)],
-      transient,
+      { [tableName]: transient } as any,
       undefined,
       clazz.name
     );
@@ -674,7 +674,7 @@ export class FabricClientAdapter extends Adapter<
       ctx,
       OperationKeys.UPDATE,
       [this.serializer.serialize(model, clazz.name || clazz)], // TODO should be receving class but is receiving string
-      transient,
+      { [tableName]: transient } as any,
       undefined,
       clazz.name
     );
