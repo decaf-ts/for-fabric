@@ -1094,7 +1094,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     tableName: Constructor<M>,
     id: PrimaryKeyType,
     model: Record<string, any>,
-    ...args: MaybeContextualArg<FabricContractContext>
+    ...args: ContextualArgs<FabricContractContext>
   ) {
     const { ctxArgs } = this.logCtx(args, this.createPrefix);
     const record: Record<string, any> = {};

@@ -18,8 +18,14 @@ import { FabricContractRepositoryObservableHandler } from "./FabricContractRepos
 import {
   BaseError,
   BulkCrudOperationKeys,
+  ConflictError,
+  enforceDBDecorators,
   InternalError,
+  NotFoundError,
   OperationKeys,
+  PrimaryKeyType,
+  reduceErrorsToPrint,
+  ValidationError,
 } from "@decaf-ts/db-decorators";
 import { Constructor } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "./ContractAdapter";
@@ -217,5 +223,135 @@ export class FabricContractRepository<M extends Model> extends Repository<
   ): Promise<void> {
     if (!this.trackedEvents || this.trackedEvents.indexOf(event) !== -1)
       return await super.updateObservers(table, event, id, ...args);
+  }
+
+  protected override async createPrefix(
+    model: M,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<[M, ...any[], FabricContractContext]> {
+    const { ctx, ctxArgs, log } = (
+      await this.logCtx(args, OperationKeys.CREATE, true)
+    ).for(this.createPrefix);
+
+    const ignoreHandlers = ctx.get("ignoreHandlers");
+    const ignoreValidate = ctx.get("ignoreValidation");
+    log.silly(
+      `handlerSetting: ${ignoreHandlers}, validationSetting: ${ignoreValidate}`
+    );
+    model = new this.class(model);
+
+    if (!ignoreValidate) {
+      try {
+        const id = model[this.pk];
+        const existingElement = await this.read(id as PrimaryKeyType);
+        if (existingElement)
+          throw new ConflictError(`Record with id ${id} already exists.`);
+      } catch (error) {
+        if (!(error instanceof NotFoundError)) throw error;
+      }
+    }
+    if (!ignoreHandlers)
+      await enforceDBDecorators(
+        this,
+        ctx,
+        model,
+        OperationKeys.CREATE,
+        OperationKeys.ON
+      );
+
+    if (!ignoreValidate) {
+      const propsToIgnore = ctx.get("ignoredValidationProperties") || [];
+      log.silly(`ignored validation properties: ${propsToIgnore}`);
+      const errors = await Promise.resolve(model.hasErrors(...propsToIgnore));
+      if (errors) throw new ValidationError(errors.toString());
+    }
+
+    return [model, ...ctxArgs];
+  }
+
+  protected override async createAllPrefix(
+    models: M[],
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<[M[], ...any[], FabricContractContext]> {
+    const { ctx, ctxArgs, log } = (
+      await this.logCtx(args, BulkCrudOperationKeys.CREATE_ALL, true)
+    ).for(this.createAllPrefix);
+
+    const ignoreHandlers = ctx.get("ignoreHandlers");
+    const ignoreValidate = ctx.get("ignoreValidation");
+    log.silly(
+      `handlerSetting: ${ignoreHandlers}, validationSetting: ${ignoreValidate}`
+    );
+    if (!models.length) return [models, ...ctxArgs];
+
+    if (!ignoreValidate) {
+      try {
+        const ids = models.map((model) => model[this.pk]);
+        const existingElements = await this.readAll(ids as PrimaryKeyType[]);
+        if (existingElements?.length)
+          throw new ConflictError(
+            `Records with id ${ids.join()} already exist.`
+          );
+      } catch (error) {
+        if (!(error instanceof NotFoundError)) throw error;
+      }
+    }
+
+    const opts = Model.sequenceFor(models[0]);
+    let ids: (string | number | bigint | undefined)[] = [];
+    if (Model.generatedBySequence(this.class)) {
+      if (!opts.name) opts.name = Model.sequenceName(models[0], "pk");
+      ids = await (
+        await this.adapter.Sequence(opts)
+      ).range(models.length, ...ctxArgs);
+    } else if (!Model.generated(this.class, this.pk)) {
+      ids = models.map((m, i) => {
+        if (typeof m[this.pk] === "undefined")
+          throw new InternalError(
+            `Primary key is not defined for model in position ${i}`
+          );
+        return m[this.pk] as string;
+      });
+    } else {
+      // do nothing. The pk is tagged as generated, so it'll be handled by some other decorator
+    }
+
+    models = await Promise.all(
+      models.map(async (m, i) => {
+        m = new this.class(m);
+        if (opts.type) {
+          m[this.pk] = (
+            opts.type !== "String"
+              ? ids[i]
+              : opts.generated
+                ? ids[i]
+                : `${m[this.pk]}`.toString()
+          ) as M[keyof M];
+        }
+
+        if (!ignoreHandlers)
+          await enforceDBDecorators(
+            this,
+            ctx,
+            m,
+            OperationKeys.CREATE,
+            OperationKeys.ON
+          );
+        return m;
+      })
+    );
+
+    if (!ignoreValidate) {
+      const propsToIgnore = ctx.get("ignoredValidationProperties") || [];
+      log.silly(`ignored validation properties: ${propsToIgnore}`);
+      const errors = await Promise.all(
+        models.map((m) => Promise.resolve(m.hasErrors(...propsToIgnore)))
+      );
+
+      const errorMessages = reduceErrorsToPrint(errors);
+
+      if (errorMessages) throw new ValidationError(errorMessages);
+    }
+    return [models, ...ctxArgs];
   }
 }
