@@ -59,7 +59,7 @@ import {
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import { FabricClientDispatch } from "./FabricClientDispatch";
-import { HSMSignerFactoryCustom } from "./fabric-hsm";
+// import { HSMSignerFactoryCustom } from "./fabric-hsm";
 import { type Constructor } from "@decaf-ts/decoration";
 import { FabricClientStatement } from "./FabricClientStatement";
 import { FabricClientPaginator } from "./FabricClientPaginator";
@@ -1167,19 +1167,19 @@ export class FabricClientAdapter extends Adapter<
     if (!config.hsm) {
       signer = await getSigner(config.keyCertOrDirectoryPath as any);
     } else {
-      const hsm = new HSMSignerFactoryCustom(config.hsm.library);
-      const identifier = hsm.getSKIFromCertificatePath(
-        config.certCertOrDirectoryPath as any
-      );
-      const pkcs11Signer = hsm.newSigner({
-        label: config.hsm.tokenLabel as string,
-        pin: String(config.hsm.pin) as string,
-        identifier: identifier,
-        // userType: 1 /*CKU_USER */,
-      });
-      signer = pkcs11Signer.signer;
-
-      close = pkcs11Signer.close;
+      // const hsm = new HSMSignerFactoryCustom(config.hsm.library);
+      // const identifier = hsm.getSKIFromCertificatePath(
+      //   config.certCertOrDirectoryPath as any
+      // );
+      // const pkcs11Signer = hsm.newSigner({
+      //   label: config.hsm.tokenLabel as string,
+      //   pin: String(config.hsm.pin) as string,
+      //   identifier: identifier,
+      //   // userType: 1 /*CKU_USER */,
+      // });
+      // signer = pkcs11Signer.signer;
+      // close = pkcs11Signer.close;
+      throw new UnsupportedError("HSM NOT IMPLEMENTED");
     }
 
     const options = {
