@@ -5,11 +5,35 @@ import { OtherProductSharedContract } from "../../src/contract/OtherProductShare
 import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
 import { generateGtin } from "../../src/contract/models/gtin";
 
-describe.skip("Tests Shared and mirrored models", () => {
+describe("Tests Shared and mirrored models", () => {
   const ctx = getMockCtx();
   const contract = new OtherProductSharedContract();
 
   let created: OtherProductShared;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.resetAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it.only("segregates properly", () => {
+    const id = generateGtin();
+    const model = new OtherProductShared({
+      productCode: id,
+      inventedName: "test_name",
+      nameMedicinalProduct: "123456789",
+    });
+
+    const split = Model.segregate(model);
+    Object.keys(split.transient).forEach((e) => {
+      if (e === "productCode" && typeof split.transient[e] === "string") {
+        expect(split.transient[e]).toEqual(model[e]);
+      } else {
+        expect(split.transient[e]).toEqual(model[e]);
+      }
+    });
+  });
 
   it("should create and mirror", async () => {
     const id = generateGtin();
@@ -17,6 +41,12 @@ describe.skip("Tests Shared and mirrored models", () => {
       productCode: id,
       inventedName: "test_name",
       nameMedicinalProduct: "123456789",
+    });
+
+    const split = Model.segregate(model);
+
+    jest.spyOn(contract, "getTransientData" as any).mockImplementation(() => {
+      return split.transient;
     });
 
     created = Model.deserialize(
@@ -35,11 +65,15 @@ describe.skip("Tests Shared and mirrored models", () => {
   });
 
   it("should update model", async () => {
+    const toUpdate = new OtherProductShared({ ...created, name: "Jane Doe" });
+    const split = Model.segregate(toUpdate);
+
+    jest.spyOn(contract, "getTransientData" as any).mockImplementation(() => {
+      return split.transient;
+    });
+
     const res = Model.deserialize(
-      await contract.update(
-        ctx as any,
-        new OtherProductShared({ ...created, name: "Jane Doe" }).serialize()
-      )
+      await contract.update(ctx as any, toUpdate.serialize())
     );
     expect(res.equals(created)).toEqual(false);
     expect(res.equals(created, "name", "updatedAt", "version")).toEqual(true);

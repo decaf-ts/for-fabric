@@ -1080,8 +1080,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
       Object.entries(transient).forEach(([key, val]) => {
         if (key in result && (result as any)[key] !== undefined)
-          throw new InternalError(
-            `Transient property ${key} already exists on model ${m.constructor.name}. should be impossible`
+          log.warn(
+            `overwriting existing ${key}. if this is not a default value, this may pose a problem`
           );
         result[key as keyof M] = val;
       });
