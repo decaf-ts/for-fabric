@@ -374,7 +374,8 @@ export class FabricClientAdapter extends Adapter<
     log.verbose(`pks: ${ids}`);
 
     transient =
-      transient && Object.keys(transient).length
+      transient &&
+      (Array.isArray(transient) ? transient : Object.keys(transient)).length
         ? { [tableName]: transient }
         : {};
     const result = await this.submitTransaction(
@@ -454,7 +455,8 @@ export class FabricClientAdapter extends Adapter<
     log.info(`updating ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     transient =
-      transient && Object.keys(transient).length
+      transient &&
+      (Array.isArray(transient) ? transient : Object.keys(transient)).length
         ? { [tableName]: transient }
         : {};
     const result = await this.submitTransaction(
