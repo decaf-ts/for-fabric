@@ -915,7 +915,7 @@ export class FabricClientAdapter extends Adapter<
     api: string,
     submit = true,
     args?: any[],
-    transientData?: Record<string, string>,
+    transientData: Record<string, string> = {},
     endorsingOrganizations?: Array<string>,
     className?: string
   ): Promise<Uint8Array> {
@@ -937,7 +937,13 @@ export class FabricClientAdapter extends Adapter<
         : undefined;
       const proposalOptions: ProposalOptions = {
         arguments: args || [],
-        transientData: transientData,
+        transientData: Object.entries(transientData).reduce(
+          (acc, [key, val]) => {
+            acc[key] = JSON.stringify(val);
+            return acc;
+          },
+          {} as typeof transientData
+        ),
         // ...(endorsingOrganizations && { endorsingOrganizations }) // mspId list
       };
 
