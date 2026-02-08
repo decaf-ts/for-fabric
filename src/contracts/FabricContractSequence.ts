@@ -84,13 +84,15 @@ export class FabricContractSequence extends Sequence {
     const { ctx, log } = (
       await this.logCtx(args, OperationKeys.READ, true)
     ).for(this.current);
+    let cachedCurrent: any;
     const { name, startWith } = this.options;
     try {
+      cachedCurrent = ctx.getOrUndefined(name);
+      if (cachedCurrent) return this.parse(cachedCurrent);
       const sequence: SequenceModel = await this.repo.read(name as string, ctx);
       return this.parse(sequence.current as string | number);
     } catch (e: any) {
       if (e instanceof NotFoundError) {
-        let cachedCurrent: any;
         try {
           log.debug(
             `Trying to resolve current sequence ${name} value from context`

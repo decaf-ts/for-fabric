@@ -113,28 +113,6 @@ describe("e2e Repository test", () => {
       }
     })();
     // repo.observe(observer);
-
-    adapterContextFactory = adapter.context.bind(adapter);
-    contextFactoryMock = jest.spyOn(adapter, "context");
-    // .mockImplementation(MockCtxFactory)
-    // .mockImplementationOnce(
-    //   (
-    //     op: string,
-    //     overrides: Partial<any>,
-    //     model: Constructor,
-    //     ...args: any[]
-    //   ) => {
-    //     const ctx = MockCtxFactory(
-    //       op,
-    //       Object.assign({}, overrides, {
-    //         PERSISTENT_PROPERTY: true,
-    //       }),
-    //       model,
-    //       ...args
-    //     );
-    //     return ctx;
-    //   }
-    // );
   });
 
   afterEach(() => {
@@ -175,36 +153,6 @@ describe("e2e Repository test", () => {
           },
         ],
       });
-
-      contextFactoryMock.mockImplementationOnce(
-        (
-          op: string,
-          overrides: Partial<any>,
-          model: Constructor,
-          ...args: any[]
-        ) => {
-          const log = logger
-            .for(style("adapter context factory").blue.bold)
-            .for(expect.getState().currentTestName);
-          try {
-            log.info(
-              `adapter context called for the first time with ${op}, ${JSON.stringify(overrides)}, ${model ? `name ${model.name}, ` : ""}${JSON.stringify(args)}`
-            );
-          } catch (e: unknown) {
-            log.warn(
-              `adapter context called for the first time with ${op}, ${model ? `name ${model.name}, ` : ""}, and not stringifyable args or overrides`
-            );
-          }
-          return adapterContextFactory(
-            op,
-            Object.assign({}, overrides, {
-              PERSISTENT_PROPERTY: true,
-            }),
-            model,
-            ...args
-          );
-        }
-      );
 
       created = await repo.create(model);
 

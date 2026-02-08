@@ -63,7 +63,7 @@
     "build:contract2": "npx decaf fabric compile-contract --debug --bundle --name ${CONTRACT_NAME:-GlobalContract} --input ./src/contract --output ./docker/infrastructure/chaincode && LEVEL=verbose node ./lib/bin/cli.cjs extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract}",
     "update:contract": "npm run build:contract && npm run deploy:contract",
     "build:contract": "node ./lib/bin/cli.cjs compile-contract --dev --debug --bundle --name ${CONTRACT_NAME:-GlobalContract} --input ./src/contract --output ./docker/infrastructure/chaincode && LEVEL=verbose node ./lib/bin/cli.cjs extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract}",
-    "deploy:contract": "node ./lib/bin/cli.cjs deploy-contract --name ${CONTRACT_NAME:-GlobalContract} --input ${CONTRACT_NAME:-GlobalContract} --collections-config /home/tvenceslau/local-workspace/decaf-ts/for-fabric/docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract}/collections-config.json",
+    "deploy:contract": "node ./lib/bin/cli.cjs deploy-contract --name ${CONTRACT_NAME:-GlobalContract} --input ${CONTRACT_NAME:-GlobalContract}",
     "publish-docs": "docker run -it --rm --user $(id -u):$(id -g) -v \"$(pwd)/workdocs/confluence:/content\" -e ATLASSIAN_API_TOKEN=$(cat .confluence-token) ghcr.io/markdown-confluence/publish:latest",
     "copy-storage": "sudo cp -R docker/infrastructure/storage docker/docker-data/ && sudo chmod -R 755 docker/docker-data",
     "copy:crypto": "node ./lib/bin/cli.cjs get-crypto-material --folder ./docker/docker-data",

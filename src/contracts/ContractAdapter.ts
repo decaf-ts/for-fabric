@@ -250,9 +250,22 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const { ctx, log } = this.logCtx(args, this.create);
     log.info(`in ADAPTER create with args ${args}`);
     const tableName = Model.tableName(clazz);
+    const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    let existing: any;
+    try {
+      existing = await this.readState(composedKey, ctx);
+    } catch (e: unknown) {
+      // eslint-disable-next-line no-ex-assign
+      e = this.parseError(e as Error);
+      if (!(e instanceof NotFoundError)) throw e;
+    }
+    if (existing)
+      throw new ConflictError(
+        `record with id ${id} in table ${tableName} already exists`
+      );
+
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
-      const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
       model = await this.putState(composedKey, model, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
@@ -308,10 +321,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ): Promise<Record<string, any>> {
     const { ctx, log } = this.logCtx(args, this.update);
     const tableName = Model.tableName(clazz);
+    const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
 
     try {
       log.verbose(`updating entry to ${tableName} table with pk ${id}`);
-      const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
       model = await this.putState(composedKey, model, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
