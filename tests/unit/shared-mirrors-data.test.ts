@@ -52,6 +52,7 @@ describe("Tests Shared and mirrored models", () => {
     created = Model.deserialize(
       await contract.create(ctx as any, model.serialize())
     );
+    stub.commit();
 
     console.log("Result: ", created);
   });
@@ -75,6 +76,7 @@ describe("Tests Shared and mirrored models", () => {
     const res = Model.deserialize(
       await contract.update(ctx as any, toUpdate.serialize())
     );
+    stub.commit();
     expect(res.equals(created)).toEqual(false);
     expect(res.equals(created, "name", "updatedAt", "version")).toEqual(true);
     created = res;
@@ -85,11 +87,13 @@ describe("Tests Shared and mirrored models", () => {
     const res = Model.deserialize(
       await contract.delete(ctx as any, created.productCode.toString())
     );
+    stub.commit();
     expect(res.equals(created)).toEqual(true);
     console.log("Result: ", res);
     await expect(
       contract.read(ctx as any, created.productCode.toString())
     ).rejects.toThrow(NotFoundError);
+    stub.commit();
   });
 
   let bulk: OtherProductShared[];
@@ -110,6 +114,7 @@ describe("Tests Shared and mirrored models", () => {
         JSON.stringify(models.map((m) => m.serialize()))
       )
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(bulk).toBeDefined();
     expect(bulk.length).toEqual(models.length);
   });
@@ -120,6 +125,7 @@ describe("Tests Shared and mirrored models", () => {
     const read = JSON.parse(
       await contract.readAll(ctx as any, JSON.stringify(keys))
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(read).toBeDefined();
     expect(read.length).toEqual(bulk.length);
   });
@@ -140,6 +146,7 @@ describe("Tests Shared and mirrored models", () => {
         JSON.stringify(models.map((m) => m.serialize()))
       )
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(bulk).toBeDefined();
     expect(bulk.length).toEqual(models.length);
   });
@@ -160,11 +167,13 @@ describe("Tests Shared and mirrored models", () => {
         JSON.stringify(models.map((m) => m.serialize()))
       )
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     const keys = bulk.map((b) => b.productCode);
 
     const read = JSON.parse(
       await contract.deleteAll(ctx as any, JSON.stringify(keys))
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(read).toBeDefined();
     expect(read.length).toEqual(bulk.length);
   });
@@ -177,6 +186,7 @@ describe("Tests Shared and mirrored models", () => {
         JSON.stringify(["productCode", "asc"])
       )
     );
+    stub.commit();
     expect(bulk).toBeDefined();
   });
 
@@ -187,6 +197,7 @@ describe("Tests Shared and mirrored models", () => {
       "desc",
       JSON.stringify({ offset: 1, limit: 3 })
     );
+    stub.commit();
     expect(page).toBeDefined();
   });
 
@@ -196,6 +207,7 @@ describe("Tests Shared and mirrored models", () => {
       "paginateBy",
       JSON.stringify(["productCode", "desc", { offset: 1, limit: 3 }])
     );
+    stub.commit();
     expect(page).toBeDefined();
   });
 });

@@ -7,6 +7,7 @@ import { Product } from "../../src/contract/models/Product";
 
 describe("Tests product contract", () => {
   const ctx = getMockCtx();
+  const stub = ctx.stub as ReturnType<typeof import("./ContextMock").getStubMock>;
   const contract = new ProductContract();
 
   let created: Product;
@@ -48,12 +49,19 @@ describe("Tests product contract", () => {
     created = Model.deserialize(
       await contract.create(ctx as any, model.serialize())
     );
+    stub.commit();
+
+    expect(created.strengths).toBeDefined();
+    expect(created.strengths.length).toEqual(2);
+    expect(created.markets).toBeDefined();
+    expect(created.markets.length).toEqual(2);
 
     // fails to create a second
 
     await expect(contract.create(ctx, model.serialize())).rejects.toThrow(
       ConflictError
     );
+    stub.commit();
 
     console.log("Result: ", created);
   });
@@ -62,6 +70,7 @@ describe("Tests product contract", () => {
     const res = Model.deserialize(
       await contract.read(ctx as any, created.productCode.toString())
     );
+    stub.commit();
     expect(res.equals(created)).toEqual(true);
     console.log("Result: ", res);
   });
@@ -73,6 +82,7 @@ describe("Tests product contract", () => {
         new Product({ ...created, inventedName: "Jane Doe" }).serialize()
       )
     );
+    stub.commit();
     expect(res.equals(created)).toEqual(false);
     expect(res.equals(created, "inventedName", "updatedAt", "version")).toEqual(
       true
@@ -85,11 +95,13 @@ describe("Tests product contract", () => {
     const res = Model.deserialize(
       await contract.delete(ctx as any, created.productCode.toString())
     );
+    stub.commit();
     expect(res.equals(created)).toEqual(true);
     console.log("Result: ", res);
     await expect(
       contract.read(ctx as any, created.productCode.toString())
     ).rejects.toThrow(NotFoundError);
+    stub.commit();
   });
 
   let bulk: Product[];
@@ -110,6 +122,7 @@ describe("Tests product contract", () => {
         JSON.stringify(models.map((m) => m.serialize()))
       )
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(bulk).toBeDefined();
     expect(bulk.length).toEqual(models.length);
   });
@@ -120,6 +133,7 @@ describe("Tests product contract", () => {
     const read = JSON.parse(
       await contract.readAll(ctx as any, JSON.stringify(keys))
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(read).toBeDefined();
     expect(read.length).toEqual(bulk.length);
   });
@@ -140,6 +154,7 @@ describe("Tests product contract", () => {
         JSON.stringify(models.map((m) => m.serialize()))
       )
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(bulk).toBeDefined();
     expect(bulk.length).toEqual(models.length);
   });
@@ -160,11 +175,13 @@ describe("Tests product contract", () => {
         JSON.stringify(models.map((m) => m.serialize()))
       )
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     const keys = bulk.map((b) => b.productCode);
 
     const read = JSON.parse(
       await contract.deleteAll(ctx as any, JSON.stringify(keys))
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(read).toBeDefined();
     expect(read.length).toEqual(bulk.length);
   });
@@ -177,6 +194,7 @@ describe("Tests product contract", () => {
         JSON.stringify(["productCode", "asc"])
       )
     );
+    stub.commit();
     expect(bulk).toBeDefined();
   });
 
@@ -187,6 +205,7 @@ describe("Tests product contract", () => {
       "desc",
       JSON.stringify({ offset: 1, limit: 3 })
     );
+    stub.commit();
     expect(page).toBeDefined();
   });
 
@@ -196,6 +215,7 @@ describe("Tests product contract", () => {
       "paginateBy",
       JSON.stringify(["productCode", "desc", { offset: 1, limit: 3 }])
     );
+    stub.commit();
     expect(page).toBeDefined();
   });
 });

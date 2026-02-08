@@ -87,22 +87,28 @@ export class FabricContractSequence extends Sequence {
     let cachedCurrent: any;
     const { name, startWith } = this.options;
     try {
-      cachedCurrent = ctx.getOrUndefined(name);
-      if (cachedCurrent) return this.parse(cachedCurrent);
+      cachedCurrent = ctx.getFromChildren(name as any);
+      if (cachedCurrent !== undefined && cachedCurrent !== null)
+        return this.parse(cachedCurrent);
       const sequence: SequenceModel = await this.repo.read(name as string, ctx);
       return this.parse(sequence.current as string | number);
     } catch (e: any) {
       if (e instanceof NotFoundError) {
         try {
           log.debug(
-            `Trying to resolve current sequence ${name} value from context`
+            `Trying to resolve current sequence ${name} value from context tree`
           );
-          cachedCurrent = ctx.get(name);
-          log.debug(
-            `Retrieved cached current value for sequence ${name}: ${cachedCurrent}`
-          );
+          cachedCurrent = ctx.getFromChildren(name as any);
+          if (cachedCurrent !== undefined && cachedCurrent !== null) {
+            log.debug(
+              `Retrieved cached current value for sequence ${name}: ${cachedCurrent}`
+            );
+          }
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e: unknown) {
+          // fall through
+        }
+        if (cachedCurrent === undefined || cachedCurrent === null) {
           log.info(`No cached value for sequence ${name} in context`);
           cachedCurrent = startWith;
         }

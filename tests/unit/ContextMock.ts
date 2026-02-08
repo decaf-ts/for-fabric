@@ -158,10 +158,60 @@ function createIterator(rows: Array<{ key: string; value: any }>) {
 }
 
 export function getStubMock() {
+  // Committed (persisted) state — only visible after commit()
   const state: Record<string, Buffer> = {};
   const privateState: Record<string, Record<string, Buffer>> = {};
 
+  // Pending (uncommitted) write set — mimics Fabric's transaction write set
+  // In real Fabric, getState does NOT see uncommitted putState writes within the same transaction.
+  const pendingState: Record<string, Buffer> = {};
+  const pendingDeletes: Set<string> = new Set();
+  const pendingPrivateState: Record<string, Record<string, Buffer>> = {};
+  const pendingPrivateDeletes: Record<string, Set<string>> = {};
+
   return {
+    /**
+     * Commits all pending writes/deletes to the committed state.
+     * Call this after every contract method invocation to simulate
+     * end-of-transaction persistence in Hyperledger Fabric.
+     */
+    commit: () => {
+      // Apply public state writes
+      for (const [key, value] of Object.entries(pendingState)) {
+        state[key] = value;
+      }
+      // Apply public state deletes
+      for (const key of pendingDeletes) {
+        delete state[key];
+      }
+      // Clear public pending buffers
+      Object.keys(pendingState).forEach((k) => delete pendingState[k]);
+      pendingDeletes.clear();
+
+      // Apply private state writes
+      for (const [collection, entries] of Object.entries(pendingPrivateState)) {
+        if (!privateState[collection]) privateState[collection] = {};
+        for (const [key, value] of Object.entries(entries)) {
+          privateState[collection][key] = value;
+        }
+      }
+      // Apply private state deletes
+      for (const [collection, keys] of Object.entries(pendingPrivateDeletes)) {
+        if (privateState[collection]) {
+          for (const key of keys) {
+            delete privateState[collection][key];
+          }
+        }
+      }
+      // Clear private pending buffers
+      Object.keys(pendingPrivateState).forEach(
+        (k) => delete pendingPrivateState[k]
+      );
+      Object.keys(pendingPrivateDeletes).forEach(
+        (k) => delete pendingPrivateDeletes[k]
+      );
+    },
+
     getCreator: async () => {
       return {
         idBytes: Buffer.from("creatorID"),
@@ -192,6 +242,7 @@ export function getStubMock() {
       return objectType + "_" + attributes.join("_");
     },
     getState: async (key: string) => {
+      // Reads only from committed state (Fabric behaviour)
       if (key in state) return state[key];
       return "";
     },
@@ -199,16 +250,21 @@ export function getStubMock() {
       const testStr = typeof value === "string" ? value : value.toString();
       if (testStr.includes(ModelKeys.ANCHOR))
         throw new InternalError("Anchor keys are not allowed");
-      state[key] = toBuffer(value);
+      // Write to pending (uncommitted) buffer
+      pendingState[key] = toBuffer(value);
+      pendingDeletes.delete(key);
     },
     deleteState: async (key: string) => {
-      if (key in state) {
-        delete state[key];
+      if (key in state || key in pendingState) {
+        // Mark for deletion in pending buffer
+        pendingDeletes.add(key);
+        delete pendingState[key];
         return;
       }
       throw new Error("Missing");
     },
     getQueryResult: async (query: string) => {
+      // Queries only committed state (Fabric behaviour)
       const { selector, sort } = parseQuery(query);
       const rows = filterRows(state, selector, sort);
       return createIterator(rows);
@@ -219,6 +275,7 @@ export function getStubMock() {
       pageSize: number,
       bookmark: string
     ) => {
+      // Queries only committed state (Fabric behaviour)
       const { selector, sort } = parseQuery(query);
       const rows = filterRows(state, selector, sort);
       let startIndex = 0;
@@ -242,6 +299,7 @@ export function getStubMock() {
     },
 
     getPrivateData(collection: string, key: string): Promise<any> {
+      // Reads only from committed private state
       if (collection in privateState && key in privateState[collection])
         return privateState[collection][key];
       return "";
@@ -255,12 +313,24 @@ export function getStubMock() {
       const testStr = typeof value === "string" ? value : value.toString();
       if (testStr.includes(ModelKeys.ANCHOR))
         throw new InternalError("Anchor keys are not allowed");
-      if (!privateState[collection]) privateState[collection] = {};
-      privateState[collection][key] = toBuffer(value);
+      // Write to pending private buffer
+      if (!pendingPrivateState[collection])
+        pendingPrivateState[collection] = {};
+      pendingPrivateState[collection][key] = toBuffer(value);
+      if (pendingPrivateDeletes[collection])
+        pendingPrivateDeletes[collection].delete(key);
     },
     deletePrivateData(collection: string, key: string): Promise<void> {
-      if (privateState[collection] && key in privateState[collection]) {
-        delete privateState[collection][key];
+      if (
+        (privateState[collection] && key in privateState[collection]) ||
+        (pendingPrivateState[collection] &&
+          key in pendingPrivateState[collection])
+      ) {
+        if (!pendingPrivateDeletes[collection])
+          pendingPrivateDeletes[collection] = new Set();
+        pendingPrivateDeletes[collection].add(key);
+        if (pendingPrivateState[collection])
+          delete pendingPrivateState[collection][key];
         return;
       }
       throw new Error("Missing");
@@ -272,6 +342,7 @@ export function getStubMock() {
     // getPrivateDataByPartialCompositeKey(collection: string, objectType: string, attributes: string[]): Promise<Iterators.StateQueryIterator> & AsyncIterable<Iterators.KV>;
 
     async getPrivateDataQueryResult(collection: string, query: string) {
+      // Queries only committed private state
       const { selector, sort } = parseQuery(query);
       const rows = filterRows(privateState[collection] || {}, selector, sort);
       return createIterator(rows);

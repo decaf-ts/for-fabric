@@ -37,6 +37,7 @@ describe("Inheritance and attribute generation", () => {
     created = new Product(
       JSON.parse(await contract.create(ctx as any, model.serialize()))
     );
+    ctx.stub.commit();
 
     expect(created).toBeDefined();
     expect(created.hasErrors()).toBeUndefined();
@@ -61,6 +62,7 @@ describe("Inheritance and attribute generation", () => {
     const updated = Model.deserialize(
       await contract.update(ctx as any, toUpdate.serialize())
     );
+    stub.commit();
 
     expect(created).toBeDefined();
     expect(created.hasErrors()).toBeUndefined();
@@ -78,11 +80,13 @@ describe("Inheritance and attribute generation", () => {
 
   it("deletes", async () => {
     const deleted = new Product(await contract.read(ctx, created.productCode));
+    stub.commit();
 
     expect(deleted).toBeDefined();
     expect(deleted.productCode).toEqual(created.productCode); // same model
     await expect(
       contract.read(ctx, created.productCode as string)
     ).rejects.toThrowError(NotFoundError);
+    stub.commit();
   });
 });

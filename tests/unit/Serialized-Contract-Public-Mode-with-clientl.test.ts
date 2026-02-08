@@ -6,6 +6,7 @@ import { NotFoundError } from "@decaf-ts/db-decorators";
 
 describe("Tests Public contract", () => {
   const ctx = getMockCtx();
+  const stub = ctx.stub as ReturnType<typeof import("./ContextMock").getStubMock>;
   const contract = new TestPublicModelContract();
 
   let created: TestPublicModel;
@@ -23,6 +24,7 @@ describe("Tests Public contract", () => {
     created = Model.deserialize(
       await contract.create(ctx as any, model.serialize())
     );
+    stub.commit();
 
     console.log("Result: ", created);
   });
@@ -31,6 +33,7 @@ describe("Tests Public contract", () => {
     const res = Model.deserialize(
       await contract.read(ctx as any, created.id.toString())
     );
+    stub.commit();
     expect(res.equals(created)).toEqual(true);
     console.log("Result: ", res);
   });
@@ -42,6 +45,7 @@ describe("Tests Public contract", () => {
         new TestPublicModel({ ...created, name: "Jane Doe" }).serialize()
       )
     );
+    stub.commit();
     expect(res.equals(created)).toEqual(false);
     expect(res.equals(created, "name", "updatedAt", "version")).toEqual(true);
     created = res;
@@ -60,6 +64,7 @@ describe("Tests Public contract", () => {
         }).serialize()
       )
     );
+    stub.commit();
     expect(res.equals(created)).toEqual(false);
     expect(
       res.equals(created, "name", "updatedAt", "version", "child")
@@ -84,6 +89,7 @@ describe("Tests Public contract", () => {
         }).serialize()
       )
     );
+    stub.commit();
     expect(res.equals(created)).toEqual(false);
     expect(
       res.equals(created, "name", "updatedAt", "version", "children")
@@ -96,11 +102,13 @@ describe("Tests Public contract", () => {
     const res = Model.deserialize(
       await contract.delete(ctx as any, created.id.toString())
     );
+    stub.commit();
     expect(res.equals(created)).toEqual(true);
     console.log("Result: ", res);
     await expect(
       contract.read(ctx as any, created.id.toString())
     ).rejects.toThrow(NotFoundError);
+    stub.commit();
   });
 
   let bulk: TestPublicModel[];
@@ -121,6 +129,7 @@ describe("Tests Public contract", () => {
         JSON.stringify(models.map((m) => m.serialize()))
       )
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(bulk).toBeDefined();
     expect(bulk.length).toEqual(models.length);
   });
@@ -131,6 +140,7 @@ describe("Tests Public contract", () => {
     const read = JSON.parse(
       await contract.readAll(ctx as any, JSON.stringify(keys))
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(read).toBeDefined();
     expect(read.length).toEqual(bulk.length);
   });
@@ -151,6 +161,7 @@ describe("Tests Public contract", () => {
         JSON.stringify(models.map((m) => m.serialize()))
       )
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(bulk).toBeDefined();
     expect(bulk.length).toEqual(models.length);
   });
@@ -171,11 +182,13 @@ describe("Tests Public contract", () => {
         JSON.stringify(models.map((m) => m.serialize()))
       )
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     const keys = bulk.map((b) => b.id);
 
     const read = JSON.parse(
       await contract.deleteAll(ctx as any, JSON.stringify(keys))
     ).map((m) => Model.deserialize(m));
+    stub.commit();
     expect(read).toBeDefined();
     expect(read.length).toEqual(bulk.length);
   });
@@ -188,6 +201,7 @@ describe("Tests Public contract", () => {
         JSON.stringify(["productCode", "asc"])
       )
     );
+    stub.commit();
     expect(bulk).toBeDefined();
   });
 
@@ -198,6 +212,7 @@ describe("Tests Public contract", () => {
       "desc",
       JSON.stringify({ offset: 1, limit: 3 })
     );
+    stub.commit();
     expect(page).toBeDefined();
   });
 });
