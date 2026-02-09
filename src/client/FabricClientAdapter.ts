@@ -153,12 +153,7 @@ export class FabricClientAdapter extends Adapter<
    */
   constructor(config: PeerConfig, alias?: string) {
     super(
-      Object.assign({}, config, {
-        evaluateTimeout: 5,
-        endorseTimeout: 15,
-        submitTimeout: 5,
-        commitTimeout: 60,
-      }),
+      Object.assign({}, DefaultFabricClientFlags, config),
       FabricFlavour,
       alias
     );
@@ -188,7 +183,7 @@ export class FabricClientAdapter extends Adapter<
       await super.flags(
         operation,
         model,
-        Object.assign({}, DefaultFabricClientFlags, this.config, flags),
+        Object.assign({}, this.config, flags),
         ...args
       )
     );
