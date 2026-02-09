@@ -261,7 +261,7 @@ export async function createMirrorHandler<
 
   const repo = this.override(
     Object.assign({}, this._overrides, {
-      segregate: collection,
+      segregated: collection,
       ignoreValidation: true,
       ignoreHandlers: true,
     } as any)
@@ -287,7 +287,7 @@ export async function updateMirrorHandler<
 
   const repo = this.override(
     Object.assign({}, this._overrides, {
-      segregate: collection,
+      segregated: collection,
       ignoreValidation: true,
       ignoreHandlers: true,
     } as any)
@@ -313,7 +313,7 @@ export async function deleteMirrorHandler<
 
   const repo = this.override(
     Object.assign({}, this._overrides, {
-      segregate: collection,
+      segregated: collection,
       ignoreValidation: true,
       ignoreHandlers: true,
     } as any)
@@ -727,6 +727,7 @@ function segregated(
           segregated(collection, type)((target as any).prototype, p);
         }
       });
+      return target;
     } else {
       const groupName =
         typeof collection === "string" ? collection : collection.toString();

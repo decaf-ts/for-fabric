@@ -1,5 +1,6 @@
 import { getMockCtx } from "./ContextMock";
 import { Model } from "@decaf-ts/decorator-validation";
+import { Metadata } from "@decaf-ts/decoration";
 import { NotFoundError } from "@decaf-ts/db-decorators";
 import { OtherProductSharedContract } from "../../src/contract/OtherProductSharedContract";
 import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
@@ -19,6 +20,9 @@ describe("Tests Shared and mirrored models", () => {
 
   it.only("segregates properly", () => {
     const id = generateGtin();
+
+    const t = Metadata.type(OtherProductShared, "productCode");
+    const meta = Metadata.get(OtherProductShared);
     const model = new OtherProductShared({
       productCode: id,
       inventedName: "test_name",
