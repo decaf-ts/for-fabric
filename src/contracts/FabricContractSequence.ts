@@ -16,6 +16,7 @@ import {
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import type { FabricContractAdapter } from "./ContractAdapter";
+import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 
 /**
  * @description Abstract base class for sequence generation
@@ -304,11 +305,11 @@ export class FabricContractSequence extends Sequence {
       try {
         const privateAdapter = adapter.forPrivate(collection);
         const record = {
-          $$table: tableName,
+          [CouchDBKeys.TABLE]: tableName,
           id: seq.id,
           current: seq.current,
         };
-        await privateAdapter["putState"](composedKey, record, ctx);
+        await privateAdapter["putState"](composedKey, record, ctx as any);
         log.debug(`Sequence ${seq.id} written to collection ${collection}`);
       } catch (e: unknown) {
         log.warn(

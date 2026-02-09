@@ -1586,7 +1586,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     expect(parsed.mirroredField).toBe("PRIVATE_VALUE");
 
     // The mirror handler writes a FULL model copy directly
-    expect(parsed.$$table).toBe("mirror_test");
+    expect(parsed["??table"]).toBe("mirror_test");
   });
 
   it("mirror provides ADDITIONAL write beyond @privateData standard behavior", async () => {

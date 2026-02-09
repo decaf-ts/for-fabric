@@ -48,13 +48,13 @@ function uuidSeed(m: Audit, ...args: ContextualArgs<any>) {
   OperationKeys.DELETE,
 ])
 @uses(FabricFlavour)
-@sharedData(NamespaceCollection("decaf-namespace"))
+// @sharedData(NamespaceCollection("decaf-namespace"))
 @table("audit")
 @model()
 export class Audit extends BaseModel {
   @pk()
   @uuid(uuidSeed)
-  @mirror("mirror-collection", (mspId: string) => mspId === "main-org")
+  // @mirror("mirror-collection", (mspId: string) => mspId === "main-org")
   @description("Unique identifier of the audit record.")
   id!: string;
 

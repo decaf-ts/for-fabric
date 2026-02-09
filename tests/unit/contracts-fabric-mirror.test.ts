@@ -115,21 +115,18 @@ describe("mirror decorator handlers", () => {
 
   const logger = createLogger();
 
-  it("writes full model directly to the mirror collection via putPrivateData", async () => {
-    const putPrivateDataSpy = jest.fn().mockResolvedValue(undefined);
-    const createCompositeKeySpy = jest.fn().mockImplementation(
-      (table: string, parts: string[]) => `${table}_${parts.join("_")}`
-    );
+  it("creates mirror via repo.override with segregated + mirror flags", async () => {
+    const createSpy = jest.fn().mockResolvedValue(new MirrorTestModel({ id: "mirror-id" }));
+    const overrideSpy = jest.fn().mockReturnValue({ create: createSpy });
 
-    const stub = {
-      putPrivateData: putPrivateDataSpy,
-      createCompositeKey: createCompositeKeySpy,
-    };
-
-    const repository = {} as unknown as FabricContractRepository<MirrorTestModel>;
+    const repository = {
+      _overrides: {},
+      override: overrideSpy,
+      class: MirrorTestModel,
+    } as unknown as FabricContractRepository<MirrorTestModel>;
 
     const context = new FabricContractContext();
-    context.accumulate({ stub, logger } as any);
+    context.accumulate({ logger } as any);
 
     const model = new MirrorTestModel({ id: "mirror-id" });
 
@@ -141,12 +138,15 @@ describe("mirror decorator handlers", () => {
       model
     );
 
-    expect(createCompositeKeySpy).toHaveBeenCalled();
-    expect(putPrivateDataSpy).toHaveBeenCalledWith(
-      "mirror-collection",
-      expect.any(String),
-      expect.any(Buffer)
+    expect(overrideSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        segregated: "mirror-collection",
+        mirror: true,
+        ignoreValidation: true,
+        ignoreHandlers: true,
+      })
     );
+    expect(createSpy).toHaveBeenCalledWith(model, context);
   });
 
   it("marks reads to always target the mirror collection when the MSP matches", async () => {

@@ -25,7 +25,7 @@ import { FabricFlavour } from "../../shared/constants";
 @model()
 export class Product extends BaseIdentifiedModel {
   @gtin()
-  // @audit(Product)
+  @audit(Product)
   @pk()
   productCode!: string;
 
