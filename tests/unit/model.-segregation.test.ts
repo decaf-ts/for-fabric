@@ -54,23 +54,23 @@ describe("Model segregation", () => {
     expect(gtin.productCode).toBeDefined();
     expect(gtin.ownedBy).toBeDefined();
     expect(gtin.endpoint).toBeDefined();
-    // const split = gtin.segregate();
-    // expect(split).toBeDefined();
-    //
-    // const { privates, shared, model, transient } = split;
-    //
-    // expect(privates).toBeUndefined();
-    // expect(shared).toBeDefined();
-    // expect(model).toEqual(
-    //   expect.objectContaining({
-    //     productCode: productCode,
-    //     ownedBy: "owner",
-    //   })
-    // );
-    // expect(transient).toEqual(
-    //   expect.objectContaining({
-    //     endpoint: "https://api.gtin.com/v1/products",
-    //   })
-    // );
+    const split = gtin.segregate();
+    expect(split).toBeDefined();
+
+    const { privates, shared, model, transient } = split;
+
+    expect(privates).toEqual({});
+    expect(shared).toBeDefined();
+    expect(model).toEqual(
+      expect.objectContaining({
+        productCode: productCode,
+        ownedBy: "owner",
+      })
+    );
+    expect(transient).toEqual(
+      expect.objectContaining({
+        endpoint: "https://api.gtin.com/v1/products",
+      })
+    );
   });
 });

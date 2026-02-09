@@ -59,7 +59,7 @@ import {
 import { FabricFlavour } from "../shared/constants";
 import { ClientSerializer } from "../shared/ClientSerializer";
 import { FabricClientDispatch } from "./FabricClientDispatch";
-import { HSMSignerFactoryCustom } from "./fabric-hsm";
+// import { HSMSignerFactoryCustom } from "./fabric-hsm";
 import { type Constructor } from "@decaf-ts/decoration";
 import { FabricClientStatement } from "./FabricClientStatement";
 import { FabricClientPaginator } from "./FabricClientPaginator";
@@ -188,7 +188,7 @@ export class FabricClientAdapter extends Adapter<
       await super.flags(
         operation,
         model,
-        Object.assign({}, this.config, flags),
+        Object.assign({}, DefaultFabricClientFlags, this.config, flags),
         ...args
       )
     );
@@ -363,7 +363,7 @@ export class FabricClientAdapter extends Adapter<
       throw new InternalError("Ids and models must have the same length");
     //HERE!
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = ctxArgs.shift() as Record<string, any>;
+    let transient = ctxArgs.shift() as Record<string, any>;
     const { log, ctx } = this.logCtx(
       ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.createAll
@@ -372,6 +372,12 @@ export class FabricClientAdapter extends Adapter<
 
     log.info(`adding ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
+
+    transient =
+      transient &&
+      (Array.isArray(transient) ? transient : Object.keys(transient)).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       BulkCrudOperationKeys.CREATE_ALL,
@@ -440,7 +446,7 @@ export class FabricClientAdapter extends Adapter<
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = ctxArgs.shift() as Record<string, any>;
+    let transient = ctxArgs.shift() as Record<string, any>;
     const { log, ctx } = this.logCtx(
       ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.updateAll
@@ -448,7 +454,11 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.info(`updating ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
-
+    transient =
+      transient &&
+      (Array.isArray(transient) ? transient : Object.keys(transient)).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       BulkCrudOperationKeys.UPDATE_ALL,
@@ -587,6 +597,10 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.verbose(`adding entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
+    transient =
+      transient && Object.keys(transient).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       OperationKeys.CREATE,
@@ -670,6 +684,10 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
+    transient =
+      transient && Object.keys(transient).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       OperationKeys.UPDATE,
@@ -897,7 +915,7 @@ export class FabricClientAdapter extends Adapter<
     api: string,
     submit = true,
     args?: any[],
-    transientData?: Record<string, string>,
+    transientData: Record<string, string> = {},
     endorsingOrganizations?: Array<string>,
     className?: string
   ): Promise<Uint8Array> {
@@ -919,7 +937,13 @@ export class FabricClientAdapter extends Adapter<
         : undefined;
       const proposalOptions: ProposalOptions = {
         arguments: args || [],
-        transientData: transientData,
+        transientData: Object.entries(transientData).reduce(
+          (acc, [key, val]) => {
+            acc[key] = JSON.stringify(val);
+            return acc;
+          },
+          {} as typeof transientData
+        ),
         // ...(endorsingOrganizations && { endorsingOrganizations }) // mspId list
       };
 
@@ -1162,24 +1186,24 @@ export class FabricClientAdapter extends Adapter<
       log.error(`Failed to extract Fabric ID from certificate`, e as Error);
     }
 
-    let signer: Signer,
-      close = () => {};
+    let signer: Signer;
+    const close = () => {};
     if (!config.hsm) {
       signer = await getSigner(config.keyCertOrDirectoryPath as any);
     } else {
-      const hsm = new HSMSignerFactoryCustom(config.hsm.library);
-      const identifier = hsm.getSKIFromCertificatePath(
-        config.certCertOrDirectoryPath as any
-      );
-      const pkcs11Signer = hsm.newSigner({
-        label: config.hsm.tokenLabel as string,
-        pin: String(config.hsm.pin) as string,
-        identifier: identifier,
-        // userType: 1 /*CKU_USER */,
-      });
-      signer = pkcs11Signer.signer;
-
-      close = pkcs11Signer.close;
+      // const hsm = new HSMSignerFactoryCustom(config.hsm.library);
+      // const identifier = hsm.getSKIFromCertificatePath(
+      //   config.certCertOrDirectoryPath as any
+      // );
+      // const pkcs11Signer = hsm.newSigner({
+      //   label: config.hsm.tokenLabel as string,
+      //   pin: String(config.hsm.pin) as string,
+      //   identifier: identifier,
+      //   // userType: 1 /*CKU_USER */,
+      // });
+      // signer = pkcs11Signer.signer;
+      // close = pkcs11Signer.close;
+      throw new UnsupportedError("HSM NOT IMPLEMENTED");
     }
 
     const options = {

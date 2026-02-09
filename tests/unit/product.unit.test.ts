@@ -1,27 +1,65 @@
-import { TestPublicModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
-import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
+import { ProductContract } from "../../src/contract/ProductContract";
 import { getMockCtx } from "./ContextMock";
 import { Model } from "@decaf-ts/decorator-validation";
-import { NotFoundError } from "@decaf-ts/db-decorators";
+import { ConflictError, NotFoundError } from "@decaf-ts/db-decorators";
+import { generateGtin } from "../../src/contract/models/gtin";
+import { Product } from "../../src/contract/models/Product";
 
-describe("Tests Public contract", () => {
+describe("Tests product contract", () => {
   const ctx = getMockCtx();
   const stub = ctx.stub as ReturnType<typeof import("./ContextMock").getStubMock>;
-  const contract = new TestPublicModelContract();
+  const contract = new ProductContract();
 
-  let created: TestPublicModel;
+  let created: Product;
 
   it("should create model", async () => {
-    const model = new TestPublicModel({
-      name: "John Doe",
-      nif: "123456789",
-      child: {
-        name: "Child",
-      },
+    const id = generateGtin();
+    const model = new Product({
+      productCode: id,
+      inventedName: "test_name",
+      nameMedicinalProduct: "123456789",
+      strengths: [
+        {
+          productCode: id,
+          strength: "200mg",
+          substance: "Ibuprofen",
+        },
+        {
+          productCode: id,
+          strength: "400mg",
+          substance: "Ibuprofen",
+        },
+      ],
+      markets: [
+        {
+          productCode: id,
+          marketId: "BR",
+          nationalCode: "BR",
+          mahName: "ProPharma BR",
+        },
+        {
+          productCode: id,
+          marketId: "US",
+          nationalCode: "US",
+          mahName: "ProPharma US",
+        },
+      ],
     });
 
     created = Model.deserialize(
       await contract.create(ctx as any, model.serialize())
+    );
+    stub.commit();
+
+    expect(created.strengths).toBeDefined();
+    expect(created.strengths.length).toEqual(2);
+    expect(created.markets).toBeDefined();
+    expect(created.markets.length).toEqual(2);
+
+    // fails to create a second
+
+    await expect(contract.create(ctx, model.serialize())).rejects.toThrow(
+      ConflictError
     );
     stub.commit();
 
@@ -30,7 +68,7 @@ describe("Tests Public contract", () => {
 
   it("should read model", async () => {
     const res = Model.deserialize(
-      await contract.read(ctx as any, created.id.toString())
+      await contract.read(ctx as any, created.productCode.toString())
     );
     stub.commit();
     expect(res.equals(created)).toEqual(true);
@@ -41,40 +79,42 @@ describe("Tests Public contract", () => {
     const res = Model.deserialize(
       await contract.update(
         ctx as any,
-        new TestPublicModel({ ...created, name: "Jane Doe" }).serialize()
+        new Product({ ...created, inventedName: "Jane Doe" }).serialize()
       )
     );
     stub.commit();
     expect(res.equals(created)).toEqual(false);
-    expect(res.equals(created, "name", "updatedAt", "version")).toEqual(true);
+    expect(res.equals(created, "inventedName", "updatedAt", "version")).toEqual(
+      true
+    );
     created = res;
     console.log("Result: ", res);
   });
 
   it("should delete model", async () => {
     const res = Model.deserialize(
-      await contract.delete(ctx as any, created.id.toString())
+      await contract.delete(ctx as any, created.productCode.toString())
     );
     stub.commit();
     expect(res.equals(created)).toEqual(true);
     console.log("Result: ", res);
     await expect(
-      contract.read(ctx as any, created.id.toString())
+      contract.read(ctx as any, created.productCode.toString())
     ).rejects.toThrow(NotFoundError);
     stub.commit();
   });
 
-  let bulk: TestPublicModel[];
+  let bulk: Product[];
 
   it("should create in bulk", async () => {
-    const models = Object.keys(new Array(10).fill(0)).map(
-      (i) =>
-        new TestPublicModel({
-          name: "john" + i,
-          nif: "123456789",
-          child: { name: "any" + i },
-        })
-    );
+    const models = Object.keys(new Array(10).fill(0)).map(() => {
+      const id = generateGtin();
+      return new Product({
+        productCode: id,
+        inventedName: "test_name",
+        nameMedicinalProduct: "123456789",
+      });
+    });
 
     bulk = JSON.parse(
       await contract.createAll(
@@ -88,7 +128,7 @@ describe("Tests Public contract", () => {
   });
 
   it("should read in bulk", async () => {
-    const keys = bulk.map((b) => b.id);
+    const keys = bulk.map((b) => b.productCode);
 
     const read = JSON.parse(
       await contract.readAll(ctx as any, JSON.stringify(keys))
@@ -101,9 +141,9 @@ describe("Tests Public contract", () => {
   it("should update in bulk", async () => {
     const models = bulk.map(
       (b) =>
-        new TestPublicModel(
+        new Product(
           Object.assign({}, b, {
-            name: "updated" + b.id,
+            inventedName: "updated" + b.productCode,
           })
         )
     );
@@ -120,14 +160,14 @@ describe("Tests Public contract", () => {
   });
 
   it("should delete in bulk", async () => {
-    const models = Object.keys(new Array(10).fill(0)).map(
-      (i) =>
-        new TestPublicModel({
-          name: "john" + i,
-          nif: "123456789",
-          child: { name: "any" + i },
-        })
-    );
+    const models = Object.keys(new Array(10).fill(0)).map(() => {
+      const id = generateGtin();
+      return new Product({
+        productCode: id,
+        inventedName: "test_name",
+        nameMedicinalProduct: "123456789",
+      });
+    });
 
     bulk = JSON.parse(
       await contract.createAll(
@@ -136,7 +176,7 @@ describe("Tests Public contract", () => {
       )
     ).map((m) => Model.deserialize(m));
     stub.commit();
-    const keys = bulk.map((b) => b.id);
+    const keys = bulk.map((b) => b.productCode);
 
     const read = JSON.parse(
       await contract.deleteAll(ctx as any, JSON.stringify(keys))

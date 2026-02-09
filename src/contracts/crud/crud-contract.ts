@@ -322,11 +322,11 @@ export abstract class FabricCrudContract<M extends Model>
     const transientMap = ctx.stub.getTransient();
     let transient: any = {};
 
-    if (transientMap.has((this.repo as any).tableName)) {
+    if (transientMap.has(this.repo["tableName"])) {
       transient = JSON.parse(
-        (transientMap.get((this.repo as any).tableName) as Buffer)?.toString(
-          "utf8"
-        ) as string
+        (
+          transientMap.get(this.repo["tableName"]) as unknown as Buffer
+        )?.toString("utf8") as string
       );
     }
 

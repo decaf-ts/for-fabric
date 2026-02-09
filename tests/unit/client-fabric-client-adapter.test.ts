@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
-import { Context, InternalError } from "@decaf-ts/db-decorators";
+import { InternalError } from "@decaf-ts/db-decorators";
+import { Context } from "@decaf-ts/core";
 import { ERC20Wallet } from "../../src/contracts/erc20/models";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";
@@ -36,24 +37,30 @@ const config: PeerConfig = {
   channel: "mychannel",
 };
 
-const attachLoggerSpies = (adapter: FabricClientAdapter) => {
-  const log = (adapter as any).log;
-  const stub = {
+const createLogStub = () => {
+  const stub: Record<string, jest.Mock> = {
     info: jest.fn(),
     debug: jest.fn(),
     error: jest.fn(),
     verbose: jest.fn(),
     silly: jest.fn(),
+    warn: jest.fn(),
+    clear: jest.fn(),
   };
-  jest.spyOn(log, "for").mockReturnValue(stub);
-  ["info", "debug", "error", "verbose", "silly"].forEach((method) => {
-    if (typeof log[method] === "function") {
-      jest.spyOn(log, method).mockImplementation(() => undefined);
-    }
+  stub.for = jest.fn().mockReturnValue(stub);
+  stub.clear.mockReturnValue(stub);
+  return stub;
+};
+
+const attachLoggerSpies = (adapter: FabricClientAdapter) => {
+  const stub = createLogStub();
+  Object.defineProperty(adapter, "log", {
+    get: () => stub,
+    configurable: true,
   });
 };
 
-describe.skip("FabricClientAdapter", () => {
+describe("FabricClientAdapter", () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -107,7 +114,7 @@ const createContext = () => {
     (adapter as any).serializer = {
       serialize: jest.fn(() => JSON.stringify({ id: "wallet-1", balance: 33 })),
     };
-    jest
+    const submitSpy = jest
       .spyOn(adapter as any, "submitTransaction")
       .mockResolvedValue(
         new TextEncoder().encode(
@@ -126,6 +133,14 @@ const createContext = () => {
     );
 
     expect(result).toEqual([{ id: "wallet-1", balance: 33 }]);
+    expect(submitSpy).toHaveBeenCalledWith(
+      expect.any(Context),
+      expect.any(String),
+      expect.any(Array),
+      {},
+      undefined,
+      "ERC20Wallet"
+    );
   });
 
   it("wraps raw evaluation errors with parseError", async () => {
@@ -140,7 +155,7 @@ const createContext = () => {
     const context = createContext();
 
     await expect(
-      adapter.raw({ selector: {} }, true, context)
+      adapter.raw({ selector: {} }, true, ERC20Wallet, context)
     ).rejects.toThrow("parsed");
   });
 
