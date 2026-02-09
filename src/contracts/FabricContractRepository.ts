@@ -239,11 +239,10 @@ export class FabricContractRepository<M extends Model> extends Repository<
       `handlerSetting: ${ignoreHandlers}, validationSetting: ${ignoreValidate}`
     );
     model = new this.class(model);
-
-    if (!ignoreValidate) {
+    const id = model[this.pk];
+    if (!ignoreValidate && id) {
       try {
-        const id = model[this.pk];
-        const existingElement = await this.read(id as PrimaryKeyType);
+        const existingElement = await this.read(id as PrimaryKeyType, ...args);
         if (existingElement)
           throw new ConflictError(`Record with id ${id} already exists.`);
       } catch (error) {
@@ -286,8 +285,13 @@ export class FabricContractRepository<M extends Model> extends Repository<
 
     if (!ignoreValidate) {
       try {
-        const ids = models.map((model) => model[this.pk]);
-        const existingElements = await this.readAll(ids as PrimaryKeyType[]);
+        const ids = models.map((model) => model[this.pk]).filter(Boolean);
+        let existingElements = [];
+        if (ids.length)
+          existingElements = await this.readAll(
+            ids as PrimaryKeyType[],
+            ...args
+          );
         if (existingElements?.length)
           throw new ConflictError(
             `Records with id ${ids.join()} already exist.`
