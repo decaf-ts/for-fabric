@@ -6,7 +6,7 @@ import {
   ModelArg,
   required,
 } from "@decaf-ts/decorator-validation";
-import { pk, table, column } from "@decaf-ts/core";
+import { pk, table, column, AuthorizationError } from "@decaf-ts/core";
 import { uses } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
@@ -1007,18 +1007,20 @@ describe("Integration: Decorator metadata extraction", () => {
 /**
  * Test model with ALL private fields (no public properties except pk)
  * This model should NOT write anything to public state (world state)
+ * Uses class-level @privateData to catch ALL properties (including @ownedBy)
  */
 @uses(FabricFlavour)
+@privateData(COLLECTION_A)
 @table("fully_private_test")
 @model()
 class FullyPrivateModel extends Model {
   @pk()
   id!: string;
 
-  @privateData(COLLECTION_A)
+  @column()
   secretFieldA?: string;
 
-  @privateData(COLLECTION_A)
+  @column()
   secretFieldB?: string;
 
   @ownedBy()
@@ -1057,31 +1059,6 @@ class MirrorTestModel extends Model {
   }
 }
 
-/**
- * Test model with mirror that always matches (no condition)
- */
-@uses(FabricFlavour)
-@table("unconditional_mirror_test")
-@model()
-class UnconditionalMirrorModel extends Model {
-  @pk()
-  id!: string;
-
-  @column()
-  @required()
-  publicField!: string;
-
-  // Mirror with no condition - should always route reads to mirror
-  @mirror(MIRROR_COLLECTION)
-  mirroredField?: string;
-
-  @ownedBy()
-  owner?: string;
-
-  constructor(args?: ModelArg<UnconditionalMirrorModel>) {
-    super(args);
-  }
-}
 
 /**
  * Creates a mock stub that tracks API calls for verification
@@ -1208,6 +1185,21 @@ function createMockContextWithTracking({
     segregated: undefined,
   });
   return context;
+}
+
+/**
+ * Returns a non-matching MSP identity ("WriterOrg") for mirror write tests.
+ * The mirror condition `(msp) => msp === "Aeon"` does NOT match this MSP,
+ * so writes are allowed.
+ */
+function getWriterIdentity(): ReturnType<typeof getIdentityMock> {
+  return {
+    getID: () => "writer-id",
+    getMSPID: () => "WriterOrg",
+    getIDBytes: () => Buffer.from("writerCreatorID"),
+    getAttributeValue: (name: string) =>
+      name === "roles" ? ["admin"] : undefined,
+  };
 }
 
 async function buildRepositoryContextGeneric<M extends Model>(
@@ -1522,7 +1514,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
   });
 
   it("writes mirror data to the mirror collection on create", async () => {
-    const identity = getIdentityMock(); // MSP = "Aeon"
+    const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
     const context = await buildRepositoryContextGeneric(
       adapter,
       OperationKeys.CREATE,
@@ -1558,12 +1550,11 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
 
   it("mirror afterCreate writes FULL model copy (not just mirrored field) to mirror collection", async () => {
     /**
-     * The @mirror decorator's afterCreate handler uses repo.create(model, context)
-     * with segregate override, which should write a FULL copy of the model
-     * to the mirror collection - including public fields.
+     * The @mirror decorator's afterCreate handler writes a FULL copy of the model
+     * directly to the mirror collection — including public fields.
      * This is different from @privateData which only stores the private fields.
      */
-    const identity = getIdentityMock();
+    const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
     const context = await buildRepositoryContextGeneric(
       adapter,
       OperationKeys.CREATE,
@@ -1591,11 +1582,10 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     expect(mirrorData).toBeDefined();
     const parsed = JSON.parse(Buffer.from(mirrorData).toString("utf8"));
 
-    // The mirror should contain the mirrored field
+    // The mirror should contain the mirrored field (full model copy)
     expect(parsed.mirroredField).toBe("PRIVATE_VALUE");
 
-    // The mirror handler creates a FULL model copy via repo.create with segregate
-    // So the mirror collection should have the complete model data
+    // The mirror handler writes a FULL model copy directly
     expect(parsed.$$table).toBe("mirror_test");
   });
 
@@ -1604,7 +1594,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
      * @mirror includes @privateData but also adds afterCreate handler
      * that writes a full model copy. This test verifies BOTH writes occur.
      */
-    const identity = getIdentityMock();
+    const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
     const context = await buildRepositoryContextGeneric(
       adapter,
       OperationKeys.CREATE,
@@ -1640,15 +1630,16 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
   });
 
   it("routes ALL reads to mirror collection when MSP matches condition", async () => {
-    const identity = getIdentityMock(); // MSP = "Aeon" - matches condition
+    const writerIdentity = getWriterIdentity(); // MSP = "WriterOrg" — for CREATE
+    const readerIdentity = getIdentityMock(); // MSP = "Aeon" — matches condition for READ
     const id = `mirror-read-match-${Math.random().toString(36).slice(2, 8)}`;
 
-    // Create model first
+    // Create model first with writer identity (non-matching MSP)
     const createContext = await buildRepositoryContextGeneric(
       adapter,
       OperationKeys.CREATE,
       trackingMock.stub,
-      identity,
+      writerIdentity,
       MirrorTestModel
     );
     const model = new MirrorTestModel({
@@ -1665,7 +1656,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       adapter,
       OperationKeys.READ,
       trackingMock.stub,
-      identity,
+      readerIdentity,
       MirrorTestModel
     );
     const result = await repository.read(id, readContext);
@@ -1680,15 +1671,15 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
   });
 
   it("does NOT route reads to mirror when MSP does NOT match condition", async () => {
-    // Create with Aeon identity first
-    const aeonIdentity = getIdentityMock(); // MSP = "Aeon"
+    // Create with writer identity (non-matching MSP)
+    const writerIdentity = getWriterIdentity(); // MSP = "WriterOrg"
     const id = `mirror-no-match-${Math.random().toString(36).slice(2, 8)}`;
 
     const createContext = await buildRepositoryContextGeneric(
       adapter,
       OperationKeys.CREATE,
       trackingMock.stub,
-      aeonIdentity,
+      writerIdentity,
       MirrorTestModel
     );
     const model = new MirrorTestModel({
@@ -1726,56 +1717,9 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     // The mirrorCalls may still exist for read attempts, but the skip flag should be set
   });
 
-  it("routes reads to mirror when no condition is specified (always matches)", async () => {
-    const unconditionalAdapter = new FabricContractAdapter(
-      undefined as any,
-      `unconditional-mirror-${Math.random()}`
-    );
-    const unconditionalRepo = new FabricContractRepository(
-      unconditionalAdapter,
-      UnconditionalMirrorModel
-    );
-    trackingMock = createTrackingStubMock();
-
-    const identity = getIdentityMock();
-    const id = `unconditional-${Math.random().toString(36).slice(2, 8)}`;
-
-    // Create
-    const createContext = await buildRepositoryContextGeneric(
-      unconditionalAdapter,
-      OperationKeys.CREATE,
-      trackingMock.stub,
-      identity,
-      UnconditionalMirrorModel
-    );
-    const model = new UnconditionalMirrorModel({
-      id,
-      publicField: "public",
-      mirroredField: "always-mirrored",
-    });
-    await unconditionalRepo.create(model, createContext);
-    trackingMock.stub.commit();
-    trackingMock.clearLog();
-
-    // Read - should always route to mirror since no condition
-    const readContext = await buildRepositoryContextGeneric(
-      unconditionalAdapter,
-      OperationKeys.READ,
-      trackingMock.stub,
-      identity,
-      UnconditionalMirrorModel
-    );
-    const result = await unconditionalRepo.read(id, readContext);
-    trackingMock.stub.commit();
-
-    // Verify mirror collection was accessed
-    const mirrorReads = trackingMock.getCallsToCollection(MIRROR_COLLECTION);
-    expect(mirrorReads.some((c) => c.method === "getPrivateData")).toBe(true);
-    expect(result.mirroredField).toBe("always-mirrored");
-  });
 
   it("updates mirror data in the mirror collection", async () => {
-    const identity = getIdentityMock();
+    const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
     const id = `mirror-update-${Math.random().toString(36).slice(2, 8)}`;
 
     // Create
@@ -1829,7 +1773,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
   });
 
   it("deletes primary data and marks mirror collection for cleanup on delete", async () => {
-    const identity = getIdentityMock();
+    const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
     const id = `mirror-delete-${Math.random().toString(36).slice(2, 8)}`;
 
     // Create
@@ -1896,7 +1840,228 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       .filter((c) => c.method === "deleteState");
     expect(publicDeletes.length).toBeGreaterThan(0);
   });
+
+  it("rejects create when MSP matches mirror condition", async () => {
+    const matchingIdentity = getIdentityMock(); // MSP = "Aeon" — matches condition
+    const context = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      trackingMock.stub,
+      matchingIdentity,
+      MirrorTestModel
+    );
+
+    const id = `mirror-reject-create-${Math.random().toString(36).slice(2, 8)}`;
+    const model = new MirrorTestModel({
+      id,
+      publicField: "public",
+      mirroredField: "should-fail",
+    });
+
+    await expect(repository.create(model, context)).rejects.toThrow(
+      AuthorizationError
+    );
+  });
+
+  it("rejects update when MSP matches mirror condition", async () => {
+    // Create with non-matching MSP first
+    const writerIdentity = getWriterIdentity();
+    const id = `mirror-reject-update-${Math.random().toString(36).slice(2, 8)}`;
+
+    const createContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      trackingMock.stub,
+      writerIdentity,
+      MirrorTestModel
+    );
+    const model = new MirrorTestModel({
+      id,
+      publicField: "public",
+      mirroredField: "original",
+    });
+    await repository.create(model, createContext);
+    trackingMock.stub.commit();
+
+    // Update with matching MSP — should be rejected
+    const matchingIdentity = getIdentityMock(); // MSP = "Aeon"
+    const updateContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.UPDATE,
+      trackingMock.stub,
+      matchingIdentity,
+      MirrorTestModel
+    );
+    const updatedModel = new MirrorTestModel({
+      id,
+      publicField: "public-updated",
+      mirroredField: "should-fail",
+    });
+
+    await expect(repository.update(updatedModel, updateContext)).rejects.toThrow(
+      AuthorizationError
+    );
+  });
+
+  it("rejects delete when MSP matches mirror condition", async () => {
+    // Create with non-matching MSP first
+    const writerIdentity = getWriterIdentity();
+    const id = `mirror-reject-delete-${Math.random().toString(36).slice(2, 8)}`;
+
+    const createContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      trackingMock.stub,
+      writerIdentity,
+      MirrorTestModel
+    );
+    const model = new MirrorTestModel({
+      id,
+      publicField: "public",
+      mirroredField: "original",
+    });
+    await repository.create(model, createContext);
+    trackingMock.stub.commit();
+
+    // Delete with matching MSP — should be rejected
+    const matchingIdentity = getIdentityMock(); // MSP = "Aeon"
+    const deleteContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.DELETE,
+      trackingMock.stub,
+      matchingIdentity,
+      MirrorTestModel
+    );
+
+    await expect(repository.delete(id, deleteContext)).rejects.toThrow(
+      AuthorizationError
+    );
+  });
+
+  it("allows create/read/update/delete when MSP does NOT match condition", async () => {
+    const writerIdentity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match
+    const id = `mirror-full-crud-${Math.random().toString(36).slice(2, 8)}`;
+
+    // CREATE
+    const createContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      trackingMock.stub,
+      writerIdentity,
+      MirrorTestModel
+    );
+    const model = new MirrorTestModel({
+      id,
+      publicField: "public",
+      mirroredField: "mirrored-value",
+    });
+    await repository.create(model, createContext);
+    trackingMock.stub.commit();
+
+    // READ
+    const readContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.READ,
+      trackingMock.stub,
+      writerIdentity,
+      MirrorTestModel
+    );
+    const readResult = await repository.read(id, readContext);
+    trackingMock.stub.commit();
+    expect(readResult.publicField).toBe("public");
+
+    // UPDATE
+    const updateContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.UPDATE,
+      trackingMock.stub,
+      writerIdentity,
+      MirrorTestModel
+    );
+    const updatedModel = new MirrorTestModel({
+      id,
+      publicField: "public-updated",
+      mirroredField: "mirrored-updated",
+    });
+    await repository.update(updatedModel, updateContext);
+    trackingMock.stub.commit();
+
+    // DELETE
+    const deleteContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.DELETE,
+      trackingMock.stub,
+      writerIdentity,
+      MirrorTestModel
+    );
+    await repository.delete(id, deleteContext);
+    trackingMock.stub.commit();
+
+    // Verify primary data is gone
+    const publicData = await trackingMock.stub.getState(`mirror_test_${id}`);
+    expect(publicData).toBe("");
+  });
+
 });
+
+/**
+ * Test models with auto-generated numeric PKs for sequence behavior testing.
+ * String PKs default to generated=false, so the sequence never fires.
+ * Number PKs default to generated=true, triggering sequence writes.
+ */
+@uses(FabricFlavour)
+@privateData(COLLECTION_A)
+@table("seq_fully_private")
+@model()
+class SeqFullyPrivateModel extends Model {
+  @pk()
+  id!: number;
+
+  @column()
+  secretFieldA?: string;
+
+  @column()
+  secretFieldB?: string;
+
+  constructor(args?: ModelArg<SeqFullyPrivateModel>) {
+    super(args);
+  }
+}
+
+@uses(FabricFlavour)
+@table("seq_mixed")
+@model()
+class SeqMixedModel extends Model {
+  @pk()
+  id!: number;
+
+  @column()
+  @required()
+  publicField!: string;
+
+  @privateData(COLLECTION_B)
+  secretField?: string;
+
+  constructor(args?: ModelArg<SeqMixedModel>) {
+    super(args);
+  }
+}
+
+@uses(FabricFlavour)
+@table("seq_public")
+@model()
+class SeqPublicModel extends Model {
+  @pk()
+  id!: number;
+
+  @column()
+  @required()
+  publicField!: string;
+
+  constructor(args?: ModelArg<SeqPublicModel>) {
+    super(args);
+  }
+}
 
 describe("Sequence Replication to Private Collections", () => {
   /**
@@ -1980,5 +2145,154 @@ describe("Sequence Replication to Private Collections", () => {
       const privateCalls = trackingMock.getCallsToCollection(COLLECTION_B);
       expect(privateCalls.length).toBeGreaterThan(0);
     }
+  });
+
+  it("does NOT write sequence to public state for fully private models", async () => {
+    const trackingMock = createTrackingStubMock();
+    const adapter = new FabricContractAdapter(
+      undefined as any,
+      `seq-private-only-${Math.random()}`
+    );
+    const repository = new FabricContractRepository(
+      adapter,
+      SeqFullyPrivateModel
+    );
+    const identity = getIdentityMock();
+
+    const createContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      trackingMock.stub,
+      identity,
+      SeqFullyPrivateModel
+    );
+
+    // No id — sequence auto-generates (Number pk, generated=true)
+    const model = new SeqFullyPrivateModel({
+      secretFieldA: "secret-a",
+      secretFieldB: "secret-b",
+    });
+
+    await repository.create(model, createContext);
+    trackingMock.stub.commit();
+
+    // Check public putState calls for sequence data (key contains "sequence")
+    const publicPuts = trackingMock
+      .getPublicCalls()
+      .filter((c) => c.method === "putState");
+    const publicSequencePuts = publicPuts.filter((c) => {
+      const key = c.args[0] as string;
+      return key.toLowerCase().includes("sequence");
+    });
+
+    // CRITICAL: No sequence data should be on the public chain
+    expect(publicSequencePuts.length).toBe(0);
+
+    // Verify sequence WAS written to private collection (key contains "sequence")
+    const privatePuts = trackingMock
+      .getCallsToCollection(COLLECTION_A)
+      .filter((c) => c.method === "putPrivateData");
+    const privateSequencePuts = privatePuts.filter((c) => {
+      // putPrivateData args: [collection, key, value]
+      const key = c.args[1] as string;
+      return key.toLowerCase().includes("sequence");
+    });
+    expect(privateSequencePuts.length).toBeGreaterThan(0);
+  });
+
+  it("writes sequence to public state for mixed models (public + private fields)", async () => {
+    const trackingMock = createTrackingStubMock();
+    const adapter = new FabricContractAdapter(
+      undefined as any,
+      `seq-mixed-${Math.random()}`
+    );
+    const repository = new FabricContractRepository(
+      adapter,
+      SeqMixedModel
+    );
+    const identity = getIdentityMock();
+
+    const createContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      trackingMock.stub,
+      identity,
+      SeqMixedModel
+    );
+
+    // No id — sequence auto-generates
+    const model = new SeqMixedModel({
+      publicField: "public-value",
+      secretField: "secret-value",
+    });
+
+    await repository.create(model, createContext);
+    trackingMock.stub.commit();
+
+    // For mixed models, sequence SHOULD be on the public chain (key contains "sequence")
+    const publicPuts = trackingMock
+      .getPublicCalls()
+      .filter((c) => c.method === "putState");
+    const publicSequencePuts = publicPuts.filter((c) => {
+      const key = c.args[0] as string;
+      return key.toLowerCase().includes("sequence");
+    });
+    expect(publicSequencePuts.length).toBeGreaterThan(0);
+
+    // Sequence should ALSO be replicated to private collections (key contains "sequence")
+    const privatePuts = trackingMock
+      .getCallsToCollection(COLLECTION_B)
+      .filter((c) => c.method === "putPrivateData");
+    const privateSequencePuts = privatePuts.filter((c) => {
+      // putPrivateData args: [collection, key, value]
+      const key = c.args[1] as string;
+      return key.toLowerCase().includes("sequence");
+    });
+    expect(privateSequencePuts.length).toBeGreaterThan(0);
+  });
+
+  it("writes sequence to public state only for fully public models", async () => {
+    const trackingMock = createTrackingStubMock();
+    const adapter = new FabricContractAdapter(
+      undefined as any,
+      `seq-public-${Math.random()}`
+    );
+    const repository = new FabricContractRepository(
+      adapter,
+      SeqPublicModel
+    );
+    const identity = getIdentityMock();
+
+    const createContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      trackingMock.stub,
+      identity,
+      SeqPublicModel
+    );
+
+    // No id — sequence auto-generates
+    const model = new SeqPublicModel({
+      publicField: "public-value",
+    });
+
+    await repository.create(model, createContext);
+    trackingMock.stub.commit();
+
+    // Sequence should be on public chain (key contains "sequence")
+    const publicPuts = trackingMock
+      .getPublicCalls()
+      .filter((c) => c.method === "putState");
+    const publicSequencePuts = publicPuts.filter((c) => {
+      const key = c.args[0] as string;
+      return key.toLowerCase().includes("sequence");
+    });
+    expect(publicSequencePuts.length).toBeGreaterThan(0);
+
+    // No private data calls at all for public models
+    const privatePuts = trackingMock
+      .getPrivateCalls()
+      .filter((c) => c.method === "putPrivateData");
+    expect(privatePuts.length).toBe(0);
   });
 });

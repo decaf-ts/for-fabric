@@ -210,10 +210,34 @@ export class FabricContractSequence extends Sequence {
         }
       };
 
+      // Check if model is fully segregated — sequence goes ONLY to private collections.
+      // We check the adapter's stored metadata because the Sequence creates its own
+      // context via logCtx, losing flags set by extractSegregatedCollections.
+      const adapterMeta = (
+        this.adapter as unknown as FabricContractAdapter
+      ).getSequenceSegregation(name);
+      const isFullySegregated =
+        adapterMeta !== undefined &&
+        adapterMeta.fullySegregated &&
+        adapterMeta.collections.length > 0;
+
       if (typeName === "uuid") {
         while (true) {
           const next = await UUID.instance.generate(currentValue as string);
           try {
+            if (isFullySegregated) {
+              const seqModel = new SequenceModel({ id: name, current: next });
+              await this.writeSequenceToCollections(
+                ctx,
+                seqModel,
+                adapterMeta!.collections
+              );
+              log.debug(
+                `Sequence uuid increment (private-only) ${name} current=${currentValue as any} next=${next as any}`
+              );
+              ctx.cache.put(name as string, next);
+              return next;
+            }
             const result = await performUpsert(next);
             log.debug(
               `Sequence uuid increment ${name} current=${currentValue as any} next=${next as any}`
@@ -227,6 +251,21 @@ export class FabricContractSequence extends Sequence {
       }
 
       const next = await incrementSerial(currentValue);
+
+      if (isFullySegregated) {
+        const seqModel = new SequenceModel({ id: name, current: next });
+        await this.writeSequenceToCollections(
+          ctx,
+          seqModel,
+          adapterMeta!.collections
+        );
+        log.debug(
+          `Sequence.increment (private-only) ${name} current=${currentValue as any} next=${next as any}`
+        );
+        ctx.cache.put(name as string, next);
+        return next;
+      }
+
       const seq = await performUpsert(next);
       log.debug(
         `Sequence.increment ${name} current=${currentValue as any} next=${next as any}`
@@ -248,29 +287,18 @@ export class FabricContractSequence extends Sequence {
    * @param {Context<any>} ctx - The execution context
    * @param {SequenceModel} seq - The sequence model to replicate
    */
-  private async replicateToSegregatedCollections(
+  private async writeSequenceToCollections(
     ctx: Context<any>,
-    seq: SequenceModel
+    seq: SequenceModel,
+    collections: string[]
   ): Promise<void> {
-    if (!(ctx instanceof FabricContractContext)) {
-      return;
-    }
-
-    const collections = ctx.getReadCollections();
-    if (!collections.length) {
-      return;
-    }
-
-    const log = ctx.logger.for(this.replicateToSegregatedCollections);
-    log.info(
-      `Replicating sequence ${seq.id} to ${collections.length} segregated collections: ${collections.join(", ")}`
-    );
-
+    const log = ctx.logger.for(this.writeSequenceToCollections);
     const adapter = this.adapter as unknown as FabricContractAdapter;
     const tableName = "sequence";
-    const composedKey = ctx.stub.createCompositeKey(tableName, [
-      String(seq.id),
-    ]);
+    const composedKey = (ctx as FabricContractContext).stub.createCompositeKey(
+      tableName,
+      [String(seq.id)]
+    );
 
     for (const collection of collections) {
       try {
@@ -281,13 +309,39 @@ export class FabricContractSequence extends Sequence {
           current: seq.current,
         };
         await privateAdapter["putState"](composedKey, record, ctx);
-        log.debug(`Sequence ${seq.id} replicated to collection ${collection}`);
+        log.debug(`Sequence ${seq.id} written to collection ${collection}`);
       } catch (e: unknown) {
         log.warn(
-          `Failed to replicate sequence ${seq.id} to collection ${collection}: ${e}`
+          `Failed to write sequence ${seq.id} to collection ${collection}: ${e}`
         );
-        // Continue with other collections even if one fails
       }
     }
+  }
+
+  private async replicateToSegregatedCollections(
+    ctx: Context<any>,
+    seq: SequenceModel
+  ): Promise<void> {
+    // Use adapter metadata instead of ctx.getReadCollections() because the Sequence
+    // creates its own context via logCtx, losing collections set by extractSegregatedCollections.
+    const adapterMeta = (
+      this.adapter as unknown as FabricContractAdapter
+    ).getSequenceSegregation(String(seq.id));
+
+    if (!adapterMeta || !adapterMeta.collections.length) {
+      return;
+    }
+
+    // Only replicate for non-fully-segregated models (fully segregated is handled separately)
+    if (adapterMeta.fullySegregated) {
+      return;
+    }
+
+    const log = ctx.logger.for(this.replicateToSegregatedCollections);
+    log.info(
+      `Replicating sequence ${seq.id} to ${adapterMeta.collections.length} segregated collections: ${adapterMeta.collections.join(", ")}`
+    );
+
+    await this.writeSequenceToCollections(ctx, seq, adapterMeta.collections);
   }
 }

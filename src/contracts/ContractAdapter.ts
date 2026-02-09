@@ -184,6 +184,31 @@ export class FabricContractAdapter extends CouchDBAdapter<
   protected static readonly serializer = new SimpleDeterministicSerializer();
 
   /**
+   * @description Stores segregation metadata per sequence name
+   * @summary Needed because the Sequence creates its own context (via logCtx),
+   * losing flags set by extractSegregatedCollections on the handler context.
+   * The adapter persists across operations, making it a reliable store.
+   */
+  private _sequenceSegregation: Map<
+    string,
+    { fullySegregated: boolean; collections: string[] }
+  > = new Map();
+
+  setSequenceSegregation(
+    seqName: string,
+    fullySegregated: boolean,
+    collections: string[]
+  ): void {
+    this._sequenceSegregation.set(seqName, { fullySegregated, collections });
+  }
+
+  getSequenceSegregation(
+    seqName: string
+  ): { fullySegregated: boolean; collections: string[] } | undefined {
+    return this._sequenceSegregation.get(seqName);
+  }
+
+  /**
    * @description Context constructor for this adapter
    * @summary Overrides the base Context constructor with FabricContractContext
    */
