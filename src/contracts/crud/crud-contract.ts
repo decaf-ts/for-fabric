@@ -32,6 +32,7 @@ import {
   PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
 import { MissingContextError } from "../../shared/index";
+import { PACKAGE_NAME, VERSION } from "../../version";
 
 FabricObject()(Date);
 /**
@@ -524,8 +525,15 @@ export abstract class FabricCrudContract<M extends Model>
       this.healthcheck
     );
     log.info(`Running Healthcheck: ${this.initialized}...`);
-    return { healthcheck: this.initialized };
+    return {
+      healthcheck: this.initialized,
+      version: VERSION,
+      package: PACKAGE_NAME,
+    };
   }
+
+  // export const VERSION = "##VERSION##";
+  // export const PACKAGE_NAME = "##PACKAGE##";
 
   /**
    * @description Creates multiple models in the state database
