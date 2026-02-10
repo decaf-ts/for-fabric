@@ -607,6 +607,27 @@ export class FabricClientAdapter extends Adapter<
     return this.serializer.deserialize(this.decode(result));
   }
 
+  @debug()
+  @final()
+  async healthcheck<M extends Model>(
+    clazz: Constructor<M>,
+    ...args: ContextualArgs<Context<FabricClientFlags>>
+  ): Promise<Record<string, any>> {
+    const { log, ctx } = this.logCtx(args, this.healthcheck);
+    const tableName = Model.tableName(clazz);
+
+    log.verbose(`reading entry from ${tableName} table`);
+    const result = await this.evaluateTransaction(
+      ctx,
+      OperationKeys.READ,
+      [],
+      undefined,
+      undefined,
+      clazz.name
+    );
+    return JSON.parse(this.decode(result));
+  }
+
   /**
    * @description Reads a single record
    * @summary Evaluates a transaction to read a record from the Fabric ledger
@@ -621,7 +642,7 @@ export class FabricClientAdapter extends Adapter<
     id: PrimaryKeyType,
     ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>> {
-    const { log, ctx } = this.logCtx(args, this.readAll);
+    const { log, ctx } = this.logCtx(args, this.read);
     const tableName = Model.tableName(clazz);
 
     log.verbose(`reading entry from ${tableName} table`);

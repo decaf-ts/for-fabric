@@ -18,4 +18,8 @@ export interface Checkable {
   healthcheck(ctx: Context): Promise<string | healthcheck>;
 }
 
-export type healthcheck = { healthcheck: boolean };
+export type healthcheck = {
+  healthcheck: boolean;
+  version: string | number;
+  package: string;
+};

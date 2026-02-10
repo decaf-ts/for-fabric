@@ -149,7 +149,7 @@ export class FabricClientRepository<
       await this.logCtx(args, PreparedStatementKeys.FIND_ONE_BY, true)
     ).for(this.findOneBy);
     log.verbose(
-    `finding One ${Model.tableName(this.class)} with ${key as string} ${value}`
+      `finding One ${Model.tableName(this.class)} with ${key as string} ${value}`
     );
     return (await this.statement(
       this.findOneBy.name,
@@ -330,6 +330,14 @@ export class FabricClientRepository<
     ).for(this.groupOf);
     log.verbose(`grouping ${Model.tableName(this.class)} by ${key as string}`);
     return this.statement(PreparedStatementKeys.GROUP_OF, key, ...ctxArgs);
+  }
+
+  async healthcheck(...args: MaybeContextualArg<ContextOf<A>>) {
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.healthcheck);
+
+    const result = await this.adapter.healthcheck(this.class, ...ctxArgs);
+
+    return result;
   }
 
   override async create(
