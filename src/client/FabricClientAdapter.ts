@@ -153,12 +153,7 @@ export class FabricClientAdapter extends Adapter<
    */
   constructor(config: PeerConfig, alias?: string) {
     super(
-      Object.assign({}, config, {
-        evaluateTimeout: 5,
-        endorseTimeout: 15,
-        submitTimeout: 5,
-        commitTimeout: 60,
-      }),
+      Object.assign({}, DefaultFabricClientFlags, config),
       FabricFlavour,
       alias
     );
@@ -363,7 +358,7 @@ export class FabricClientAdapter extends Adapter<
       throw new InternalError("Ids and models must have the same length");
     //HERE!
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = ctxArgs.shift() as Record<string, any>;
+    let transient = ctxArgs.shift() as Record<string, any>;
     const { log, ctx } = this.logCtx(
       ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.createAll
@@ -372,6 +367,12 @@ export class FabricClientAdapter extends Adapter<
 
     log.info(`adding ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
+
+    transient =
+      transient &&
+      (Array.isArray(transient) ? transient : Object.keys(transient)).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       BulkCrudOperationKeys.CREATE_ALL,
@@ -380,7 +381,7 @@ export class FabricClientAdapter extends Adapter<
           models.map((m) => this.serializer.serialize(m, clazz.name))
         ),
       ],
-      { [tableName]: transient } as any,
+      transient,
       undefined,
       clazz.name
     );
@@ -440,7 +441,7 @@ export class FabricClientAdapter extends Adapter<
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = ctxArgs.shift() as Record<string, any>;
+    let transient = ctxArgs.shift() as Record<string, any>;
     const { log, ctx } = this.logCtx(
       ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.updateAll
@@ -448,7 +449,11 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.info(`updating ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
-
+    transient =
+      transient &&
+      (Array.isArray(transient) ? transient : Object.keys(transient)).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       BulkCrudOperationKeys.UPDATE_ALL,
@@ -457,7 +462,7 @@ export class FabricClientAdapter extends Adapter<
           models.map((m) => this.serializer.serialize(m, clazz.name))
         ),
       ],
-      { [tableName]: transient } as any,
+      transient,
       undefined,
       clazz.name
     );
@@ -587,11 +592,15 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.verbose(`adding entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
+    transient =
+      transient && Object.keys(transient).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       OperationKeys.CREATE,
       [this.serializer.serialize(model, clazz.name)],
-      { [tableName]: transient } as any,
+      transient,
       undefined,
       clazz.name
     );
@@ -670,11 +679,15 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
+    transient =
+      transient && Object.keys(transient).length
+        ? { [tableName]: transient }
+        : {};
     const result = await this.submitTransaction(
       ctx,
       OperationKeys.UPDATE,
       [this.serializer.serialize(model, clazz.name || clazz)], // TODO should be receving class but is receiving string
-      { [tableName]: transient } as any,
+      transient,
       undefined,
       clazz.name
     );
@@ -897,7 +910,7 @@ export class FabricClientAdapter extends Adapter<
     api: string,
     submit = true,
     args?: any[],
-    transientData?: Record<string, string>,
+    transientData: Record<string, string> = {},
     endorsingOrganizations?: Array<string>,
     className?: string
   ): Promise<Uint8Array> {
@@ -919,7 +932,13 @@ export class FabricClientAdapter extends Adapter<
         : undefined;
       const proposalOptions: ProposalOptions = {
         arguments: args || [],
-        transientData: transientData,
+        transientData: Object.entries(transientData).reduce(
+          (acc, [key, val]) => {
+            acc[key] = JSON.stringify(val);
+            return acc;
+          },
+          {} as typeof transientData
+        ),
         // ...(endorsingOrganizations && { endorsingOrganizations }) // mspId list
       };
 
@@ -1162,8 +1181,8 @@ export class FabricClientAdapter extends Adapter<
       log.error(`Failed to extract Fabric ID from certificate`, e as Error);
     }
 
-    let signer: Signer,
-      close = () => {};
+    let signer: Signer;
+    const close = () => {};
     if (!config.hsm) {
       signer = await getSigner(config.keyCertOrDirectoryPath as any);
     } else {

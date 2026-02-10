@@ -70,6 +70,15 @@ export class FabricContractContext extends Context<FabricContractFlags> {
 
   private _segregateWrite: Record<string, any[]> = {};
   private _segregateRead: string[] = [];
+  private _fullySegregated: boolean = false;
+
+  markFullySegregated(): void {
+    this._fullySegregated = true;
+  }
+
+  get isFullySegregated(): boolean {
+    return this._fullySegregated;
+  }
 
   writeTo(col: string, record: any) {
     if (!(col in this._segregateWrite)) this._segregateWrite[col] = [];

@@ -16,6 +16,7 @@ import {
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import type { FabricContractAdapter } from "./ContractAdapter";
+import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 
 /**
  * @description Abstract base class for sequence generation
@@ -84,23 +85,31 @@ export class FabricContractSequence extends Sequence {
     const { ctx, log } = (
       await this.logCtx(args, OperationKeys.READ, true)
     ).for(this.current);
+    let cachedCurrent: any;
     const { name, startWith } = this.options;
     try {
+      cachedCurrent = ctx.getFromChildren(name as any);
+      if (cachedCurrent !== undefined && cachedCurrent !== null)
+        return this.parse(cachedCurrent);
       const sequence: SequenceModel = await this.repo.read(name as string, ctx);
       return this.parse(sequence.current as string | number);
     } catch (e: any) {
       if (e instanceof NotFoundError) {
-        let cachedCurrent: any;
         try {
           log.debug(
-            `Trying to resolve current sequence ${name} value from context`
+            `Trying to resolve current sequence ${name} value from context tree`
           );
-          cachedCurrent = ctx.get(name);
-          log.debug(
-            `Retrieved cached current value for sequence ${name}: ${cachedCurrent}`
-          );
+          cachedCurrent = ctx.getFromChildren(name as any);
+          if (cachedCurrent !== undefined && cachedCurrent !== null) {
+            log.debug(
+              `Retrieved cached current value for sequence ${name}: ${cachedCurrent}`
+            );
+          }
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e: unknown) {
+          // fall through
+        }
+        if (cachedCurrent === undefined || cachedCurrent === null) {
           log.info(`No cached value for sequence ${name} in context`);
           cachedCurrent = startWith;
         }
@@ -134,101 +143,135 @@ export class FabricContractSequence extends Sequence {
     const { type, incrementBy, name } = this.options;
     if (!name) throw new InternalError("Sequence name is required");
     log.info(`Obtaining sequence lock for sequence ${name}`);
-    return FabricContractSequence.lock.execute(async () => {
-      const toIncrementBy = count || incrementBy;
-      if (toIncrementBy % incrementBy !== 0)
-        throw new InternalError(
-          `Value to increment does not consider the incrementBy setting: ${incrementBy}`
+    // return FabricContractSequence.lock.execute(async () => {
+    const toIncrementBy = count || incrementBy;
+    if (toIncrementBy % incrementBy !== 0)
+      throw new InternalError(
+        `Value to increment does not consider the incrementBy setting: ${incrementBy}`
+      );
+    const typeName =
+      typeof type === "function" && (type as any)?.name
+        ? (type as any).name
+        : type;
+    const currentValue = await this.current(ctx);
+
+    async function returnAndCache(res: SequenceModel | Promise<SequenceModel>) {
+      if (res instanceof Promise) res = await res;
+      log
+        .for(returnAndCache)
+        .info(`Storing new ${name} seq value in cache: ${res.current}`);
+      ctx.cache.put(name as string, res.current);
+      return res;
+    }
+
+    const performUpsert = async (
+      next: string | number | bigint
+    ): Promise<SequenceModel> => {
+      try {
+        return await returnAndCache(
+          this.repo.update(new SequenceModel({ id: name, current: next }), ctx)
         );
-      const typeName =
-        typeof type === "function" && (type as any)?.name
-          ? (type as any).name
-          : type;
-      const currentValue = await this.current(ctx);
-
-      async function returnAndCache(
-        res: SequenceModel | Promise<SequenceModel>
-      ) {
-        if (res instanceof Promise) res = await res;
-        log
-          .for(returnAndCache)
-          .info(`Storing new ${name} seq value in cache: ${res.current}`);
-        ctx.cache.put(name as string, res.current);
-        return res;
-      }
-
-      const performUpsert = async (
-        next: string | number | bigint
-      ): Promise<SequenceModel> => {
-        try {
-          return await returnAndCache(
-            this.repo.update(
+      } catch (e: any) {
+        if (e instanceof NotFoundError) {
+          log.debug(
+            `Sequence create ${name} current=${currentValue as any} next=${next as any}`
+          );
+          return returnAndCache(
+            this.repo.create(
               new SequenceModel({ id: name, current: next }),
               ctx
             )
           );
-        } catch (e: any) {
-          if (e instanceof NotFoundError) {
+        }
+        throw e;
+      }
+    };
+
+    const incrementSerial = async (
+      base: string | number | bigint
+    ): Promise<string | number | bigint> => {
+      switch (typeName) {
+        case Number.name:
+          return (this.parse(base) as number) + toIncrementBy;
+        case BigInt.name:
+          return (this.parse(base) as bigint) + BigInt(toIncrementBy);
+        case String.name:
+          return this.parse(base);
+        case "serial":
+          return await Promise.resolve(
+            Serial.instance.generate(base as string)
+          );
+        default:
+          throw new InternalError("Should never happen");
+      }
+    };
+
+    // Check if model is fully segregated — sequence goes ONLY to private collections.
+    // We check the adapter's stored metadata because the Sequence creates its own
+    // context via logCtx, losing flags set by extractSegregatedCollections.
+    const adapterMeta = (
+      this.adapter as unknown as FabricContractAdapter
+    ).getSequenceSegregation(name);
+    const isFullySegregated =
+      adapterMeta !== undefined &&
+      adapterMeta.fullySegregated &&
+      adapterMeta.collections.length > 0;
+
+    if (typeName === "uuid") {
+      while (true) {
+        const next = await UUID.instance.generate(currentValue as string);
+        try {
+          if (isFullySegregated) {
+            const seqModel = new SequenceModel({ id: name, current: next });
+            await this.writeSequenceToCollections(
+              ctx,
+              seqModel,
+              adapterMeta!.collections
+            );
             log.debug(
-              `Sequence create ${name} current=${currentValue as any} next=${next as any}`
+              `Sequence uuid increment (private-only) ${name} current=${currentValue as any} next=${next as any}`
             );
-            return returnAndCache(
-              this.repo.create(
-                new SequenceModel({ id: name, current: next }),
-                ctx
-              )
-            );
+            ctx.cache.put(name as string, next);
+            return next;
           }
+          const result = await performUpsert(next);
+          log.debug(
+            `Sequence uuid increment ${name} current=${currentValue as any} next=${next as any}`
+          );
+          return result.current as string | number | bigint;
+        } catch (e: unknown) {
+          if (e instanceof ConflictError) continue;
           throw e;
         }
-      };
-
-      const incrementSerial = async (
-        base: string | number | bigint
-      ): Promise<string | number | bigint> => {
-        switch (typeName) {
-          case Number.name:
-            return (this.parse(base) as number) + toIncrementBy;
-          case BigInt.name:
-            return (this.parse(base) as bigint) + BigInt(toIncrementBy);
-          case String.name:
-            return this.parse(base);
-          case "serial":
-            return await Promise.resolve(
-              Serial.instance.generate(base as string)
-            );
-          default:
-            throw new InternalError("Should never happen");
-        }
-      };
-
-      if (typeName === "uuid") {
-        while (true) {
-          const next = await UUID.instance.generate(currentValue as string);
-          try {
-            const result = await performUpsert(next);
-            log.debug(
-              `Sequence uuid increment ${name} current=${currentValue as any} next=${next as any}`
-            );
-            return result.current as string | number | bigint;
-          } catch (e: unknown) {
-            if (e instanceof ConflictError) continue;
-            throw e;
-          }
-        }
       }
+    }
 
-      const next = await incrementSerial(currentValue);
-      const seq = await performUpsert(next);
-      log.debug(
-        `Sequence.increment ${name} current=${currentValue as any} next=${next as any}`
+    const next = await incrementSerial(currentValue);
+
+    if (isFullySegregated) {
+      const seqModel = new SequenceModel({ id: name, current: next });
+      await this.writeSequenceToCollections(
+        ctx,
+        seqModel,
+        adapterMeta!.collections
       );
+      log.debug(
+        `Sequence.increment (private-only) ${name} current=${currentValue as any} next=${next as any}`
+      );
+      ctx.cache.put(name as string, next);
+      return next;
+    }
 
-      // Replicate sequence to segregated collections if model uses private/shared data
-      await this.replicateToSegregatedCollections(ctx, seq);
+    const seq = await performUpsert(next);
+    log.debug(
+      `Sequence.increment ${name} current=${currentValue as any} next=${next as any}`
+    );
 
-      return seq.current as string | number | bigint;
-    }, name);
+    // Replicate sequence to segregated collections if model uses private/shared data
+    await this.replicateToSegregatedCollections(ctx, seq);
+
+    return seq.current as string | number | bigint;
+    // }, name);
   }
 
   /**
@@ -240,46 +283,61 @@ export class FabricContractSequence extends Sequence {
    * @param {Context<any>} ctx - The execution context
    * @param {SequenceModel} seq - The sequence model to replicate
    */
-  private async replicateToSegregatedCollections(
+  private async writeSequenceToCollections(
     ctx: Context<any>,
-    seq: SequenceModel
+    seq: SequenceModel,
+    collections: string[]
   ): Promise<void> {
-    if (!(ctx instanceof FabricContractContext)) {
-      return;
-    }
-
-    const collections = ctx.getReadCollections();
-    if (!collections.length) {
-      return;
-    }
-
-    const log = ctx.logger.for(this.replicateToSegregatedCollections);
-    log.info(
-      `Replicating sequence ${seq.id} to ${collections.length} segregated collections: ${collections.join(", ")}`
-    );
-
+    const log = ctx.logger.for(this.writeSequenceToCollections);
     const adapter = this.adapter as unknown as FabricContractAdapter;
     const tableName = "sequence";
-    const composedKey = ctx.stub.createCompositeKey(tableName, [
-      String(seq.id),
-    ]);
+    const composedKey = (ctx as FabricContractContext).stub.createCompositeKey(
+      tableName,
+      [String(seq.id)]
+    );
 
     for (const collection of collections) {
       try {
         const privateAdapter = adapter.forPrivate(collection);
         const record = {
-          $$table: tableName,
+          [CouchDBKeys.TABLE]: tableName,
           id: seq.id,
           current: seq.current,
         };
-        await privateAdapter["putState"](composedKey, record, ctx);
-        log.debug(`Sequence ${seq.id} replicated to collection ${collection}`);
+        await privateAdapter["putState"](composedKey, record, ctx as any);
+        log.debug(`Sequence ${seq.id} written to collection ${collection}`);
       } catch (e: unknown) {
         log.warn(
-          `Failed to replicate sequence ${seq.id} to collection ${collection}: ${e}`
+          `Failed to write sequence ${seq.id} to collection ${collection}: ${e}`
         );
-        // Continue with other collections even if one fails
       }
     }
+  }
+
+  private async replicateToSegregatedCollections(
+    ctx: Context<any>,
+    seq: SequenceModel
+  ): Promise<void> {
+    // Use adapter metadata instead of ctx.getReadCollections() because the Sequence
+    // creates its own context via logCtx, losing collections set by extractSegregatedCollections.
+    const adapterMeta = (
+      this.adapter as unknown as FabricContractAdapter
+    ).getSequenceSegregation(String(seq.id));
+
+    if (!adapterMeta || !adapterMeta.collections.length) {
+      return;
+    }
+
+    // Only replicate for non-fully-segregated models (fully segregated is handled separately)
+    if (adapterMeta.fullySegregated) {
+      return;
+    }
+
+    const log = ctx.logger.for(this.replicateToSegregatedCollections);
+    log.info(
+      `Replicating sequence ${seq.id} to ${adapterMeta.collections.length} segregated collections: ${adapterMeta.collections.join(", ")}`
+    );
+
+    await this.writeSequenceToCollections(ctx, seq, adapterMeta.collections);
   }
 }

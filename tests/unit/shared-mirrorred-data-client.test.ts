@@ -108,14 +108,14 @@ describe("shared and mirrored data - client", () => {
       expect(model).not.toEqual(instance);
       expect(transient).toEqual(
         expect.objectContaining({
-          id: "id,",
+          id: "id",
           name: "name",
           createdAt: undefined,
         })
       );
       expect(privates).toEqual(
         expect.objectContaining({
-          id: "id,",
+          id: "id",
           name: "name",
           createdAt: undefined,
         })
@@ -171,7 +171,9 @@ describe("shared and mirrored data - client", () => {
         "create",
         true,
         [new PrivateClass().serialize()],
-        { private_class: { name: "name", id: undefined, createdAt: undefined } },
+        {
+          private_class: { name: "name", id: undefined, createdAt: undefined },
+        },
         undefined,
         PrivateClass.name
       );

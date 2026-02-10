@@ -258,15 +258,14 @@ export async function createMirrorHandler<
   model: M
 ): Promise<void> {
   const collection = await evalMirrorMetadata(model, data.resolver, context);
-
   const repo = this.override(
-    Object.assign({}, this._overrides, {
-      segregate: collection,
+    Object.assign({}, (this as any)._overrides, {
+      segregated: collection,
+      mirror: true,
       ignoreValidation: true,
       ignoreHandlers: true,
     } as any)
   );
-
   const mirror = await repo.create(model, context);
   context.logger.info(
     `Mirror for ${Model.tableName(this.class)} created with ${Model.pk(model) as string}: ${mirror[Model.pk(model)]}`
@@ -284,18 +283,19 @@ export async function updateMirrorHandler<
   model: M
 ): Promise<void> {
   const collection = await evalMirrorMetadata(model, data.resolver, context);
-
   const repo = this.override(
-    Object.assign({}, this._overrides, {
-      segregate: collection,
+    Object.assign({}, (this as any)._overrides, {
+      segregated: collection,
+      mirror: true,
       ignoreValidation: true,
       ignoreHandlers: true,
+      applyUpdateValidation: false,
+      mergeForUpdate: false,
     } as any)
   );
-
-  const mirror = await repo.update(model, context);
+  await repo.update(model, context);
   context.logger.info(
-    `Mirror for ${Model.tableName(this.class)} updated with ${Model.pk(model) as string}: ${mirror[Model.pk(model)]}`
+    `Mirror for ${Model.tableName(this.class)} updated: ${(model as any)[Model.pk(model)]}`
   );
 }
 
@@ -310,19 +310,45 @@ export async function deleteMirrorHandler<
   model: M
 ): Promise<void> {
   const collection = await evalMirrorMetadata(model, data.resolver, context);
-
+  const pkProp = Model.pk(model) as keyof M;
+  const id = model[pkProp];
   const repo = this.override(
-    Object.assign({}, this._overrides, {
-      segregate: collection,
+    Object.assign({}, (this as any)._overrides, {
+      segregated: collection,
+      mirror: true,
       ignoreValidation: true,
       ignoreHandlers: true,
     } as any)
   );
-
-  const mirror = await repo.delete(Model.pk(model) as string, context);
+  try {
+    await repo.delete(id as any, context);
+  } catch {
+    // May already be deleted by adapter.deleteSegregatedCollections
+  }
   context.logger.info(
-    `Mirror for ${Model.tableName(this.class)} deleted with ${Model.pk(model) as string}: ${mirror[Model.pk(model)]}`
+    `Mirror for ${Model.tableName(this.class)} deleted: ${String(id)}`
   );
+}
+
+export async function mirrorWriteGuard<
+  M extends Model,
+  R extends Repository<M, any>,
+>(
+  this: R,
+  context: Context<FabricContractFlags>,
+  data: MirrorMetadata,
+  key: keyof M,
+  model: M
+): Promise<void> {
+  const msp = extractMspId(
+    context.get("identity") as string | ClientIdentity | undefined
+  );
+  if (!msp) return;
+  if (data.condition(msp)) {
+    throw new AuthorizationError(
+      `Organization ${msp} is not authorized to modify mirrored data`
+    );
+  }
 }
 
 export async function readMirrorHandler<
@@ -351,7 +377,7 @@ export async function readMirrorHandler<
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const skipFlagKey = `${MIRROR_SKIP_FLAG_PREFIX}${collection}`;
   const fabricCtx = context as FabricContractContext;
-  const matches = !data.condition || data.condition(msp);
+  const matches = data.condition(msp);
 
   if (matches) {
     context.logger.info(
@@ -370,7 +396,7 @@ export async function readMirrorHandler<
 
 export function mirror(
   collection: CollectionResolver | string,
-  condition?: MirrorCondition
+  condition: MirrorCondition
 ) {
   function mirror(
     resolver: CollectionResolver | string,
@@ -388,6 +414,11 @@ export function mirror(
       privateData(collection),
       // Read handler runs early (priority 30) to set up context before any reads
       onRead(readMirrorHandler as any, meta, { priority: 30 }),
+      // Write guards — reject matching MSPs before any processing
+      onCreate(mirrorWriteGuard as any, meta, { priority: 20 }),
+      onUpdate(mirrorWriteGuard as any, meta, { priority: 20 }),
+      onDelete(mirrorWriteGuard as any, meta, { priority: 20 }),
+      // Mirror sync handlers — write full model AFTER operation completes
       afterCreate(createMirrorHandler as any, meta, { priority: 95 }),
       afterUpdate(updateMirrorHandler as any, meta, { priority: 95 }),
       afterDelete(deleteMirrorHandler as any, meta, { priority: 95 })
@@ -508,6 +539,33 @@ export async function extractSegregatedCollections<M extends Model>(
   if (collections.length > 0) {
     (context as FabricContractContext).readFrom(collections);
   }
+
+  // Check if model is fully segregated (all non-pk properties are private/shared/transient).
+  // Use Model.segregate() which is the canonical way to determine what's transient,
+  // rather than reading DBKeys.TRANSIENT metadata which may not accumulate correctly
+  // when class-level @privateData applies decorators iteratively.
+  const fabricCtx = context as FabricContractContext;
+  if (!fabricCtx.isFullySegregated) {
+    const pkProp = Model.pk(model) as string;
+    const segregated = Model.segregate(model);
+    const publicKeys = Object.keys(segregated.model).filter(
+      (k) => k !== pkProp && (segregated.model as any)[k] !== undefined
+    );
+    if (publicKeys.length === 0) {
+      fabricCtx.markFullySegregated();
+    }
+  }
+
+  // Store segregation metadata on the adapter (persists across context chains).
+  // The Sequence creates its own context via logCtx, losing context-stored flags.
+  const adapter = (this as any).adapter as any;
+  const tableName = Model.tableName(model.constructor as Constructor<M>);
+  const seqName = `${tableName}_pk`;
+  adapter.setSequenceSegregation(
+    seqName,
+    fabricCtx.isFullySegregated,
+    collections
+  );
 }
 
 export async function segregatedDataOnCreate<M extends Model>(
@@ -542,25 +600,20 @@ export async function segregatedDataOnCreate<M extends Model>(
       ? collectionResolver
       : collectionResolver(model, msp, context);
 
-  const rebuilt = keyArray.reduce(
-    (acc: Record<keyof M, any>, k, i) => {
-      const c =
-        typeof dataArray[i].collections === "string"
-          ? dataArray[i].collections
-          : dataArray[i].collections(model, msp, context);
-      if (c !== collection)
-        throw new UnsupportedError(
-          `Segregated data collection mismatch: ${c} vs ${collection}`
-        );
-      acc[k] = model[k];
-      return acc;
-    },
-    {} as Record<keyof M, any>
-  );
+  // Validate all keys resolve to the same collection
+  keyArray.forEach((_k, i) => {
+    const c =
+      typeof dataArray[i].collections === "string"
+        ? dataArray[i].collections
+        : dataArray[i].collections(model, msp, context);
+    if (c !== collection)
+      throw new UnsupportedError(
+        `Segregated data collection mismatch: ${c} vs ${collection}`
+      );
+  });
 
-  const segregated = Model.segregate(model);
-  //  to the context the model, seggregated bu colelction (and including the non transient part)
-  (context as FabricContractContext).writeTo(collection, segregated);
+  // Store the original model — prepare() will filter to collection-specific fields
+  (context as FabricContractContext).writeTo(collection, model);
 }
 
 export async function segregatedDataOnRead<M extends Model>(
@@ -642,8 +695,8 @@ export async function segregatedDataOnUpdate<M extends Model>(
       );
   });
 
-  const segregated = Model.segregate(model);
-  (context as FabricContractContext).writeTo(collection, segregated);
+  // Store the original model — prepare() will filter to collection-specific fields
+  (context as FabricContractContext).writeTo(collection, model);
 }
 
 export async function segregatedDataOnDelete<
@@ -727,6 +780,7 @@ function segregated(
           segregated(collection, type)((target as any).prototype, p);
         }
       });
+      return target;
     } else {
       const groupName =
         typeof collection === "string" ? collection : collection.toString();

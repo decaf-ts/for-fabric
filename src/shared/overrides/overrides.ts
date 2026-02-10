@@ -55,28 +55,25 @@ Model.prototype.segregate = function segregate<M extends Model>(
   const privateKeys = Object.keys(privateProperties || {});
   const sharedKeys = Object.keys(sharedProperties || {});
 
-  const pkKey = Model.pk(model.constructor as any);
+  // const pkKey = Model.pk(model.constructor as any);
   for (const key of decoratedProperties) {
     const value = model[key as keyof M];
     const isTransient = transientKeys.includes(key);
     const isPrivate = privateKeys.includes(key);
     const isShared = sharedKeys.includes(key);
-    const isPrimaryKey = key === pkKey;
-    const decoratedValue =
-      isPrimaryKey && typeof value === "string" && !value.endsWith(",")
-        ? `${value},`
-        : value;
+    // const isPrimaryKey = key === pkKey;
+
     if (isTransient || isPrivate || isShared) {
       result.transient = result.transient || ({} as any);
-      (result.transient as any)[key] = decoratedValue;
+      (result.transient as any)[key] = value;
     }
     if (isPrivate) {
       result.privates = result.privates || ({} as any);
-      (result.privates as any)[key] = decoratedValue;
+      (result.privates as any)[key] = value;
     }
     if (isShared) {
       result.shared = result.shared || ({} as any);
-      (result.shared as any)[key] = decoratedValue;
+      (result.shared as any)[key] = value;
     }
     const shouldIncludeInModel = !isTransient && !isPrivate && !isShared;
     if (shouldIncludeInModel) {

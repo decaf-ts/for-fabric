@@ -7,7 +7,6 @@ import {
 import { Model, ValidationKeys } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
 import { FabricContractContext } from "./ContractContext";
-import { SegregatedModel } from "../shared/types";
 import {
   BadRequestError,
   BaseError,
@@ -62,7 +61,7 @@ import {
 } from "fabric-shim-api";
 import { FabricStatement } from "./FabricContractStatement";
 import { FabricContractSequence } from "./FabricContractSequence";
-import { FabricFlavour } from "../shared/constants";
+import { FabricFlavour, FabricModelKeys } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
 import {
   Constructor,
@@ -184,6 +183,31 @@ export class FabricContractAdapter extends CouchDBAdapter<
   protected static readonly serializer = new SimpleDeterministicSerializer();
 
   /**
+   * @description Stores segregation metadata per sequence name
+   * @summary Needed because the Sequence creates its own context (via logCtx),
+   * losing flags set by extractSegregatedCollections on the handler context.
+   * The adapter persists across operations, making it a reliable store.
+   */
+  private _sequenceSegregation: Map<
+    string,
+    { fullySegregated: boolean; collections: string[] }
+  > = new Map();
+
+  setSequenceSegregation(
+    seqName: string,
+    fullySegregated: boolean,
+    collections: string[]
+  ): void {
+    this._sequenceSegregation.set(seqName, { fullySegregated, collections });
+  }
+
+  getSequenceSegregation(
+    seqName: string
+  ): { fullySegregated: boolean; collections: string[] } | undefined {
+    return this._sequenceSegregation.get(seqName);
+  }
+
+  /**
    * @description Context constructor for this adapter
    * @summary Overrides the base Context constructor with FabricContractContext
    */
@@ -250,9 +274,22 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const { ctx, log } = this.logCtx(args, this.create);
     log.info(`in ADAPTER create with args ${args}`);
     const tableName = Model.tableName(clazz);
+    const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    let existing: any;
+    try {
+      existing = await this.readState(composedKey, ctx);
+    } catch (e: unknown) {
+      // eslint-disable-next-line no-ex-assign
+      e = this.parseError(e as Error);
+      if (!(e instanceof NotFoundError)) throw e;
+    }
+    if (existing)
+      throw new ConflictError(
+        `record with id ${id} in table ${tableName} already exists`
+      );
+
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
-      const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
       model = await this.putState(composedKey, model, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
@@ -308,10 +345,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ): Promise<Record<string, any>> {
     const { ctx, log } = this.logCtx(args, this.update);
     const tableName = Model.tableName(clazz);
+    const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
 
     try {
       log.verbose(`updating entry to ${tableName} table with pk ${id}`);
-      const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
       model = await this.putState(composedKey, model, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
@@ -511,55 +548,25 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
   private async flushSegregatedWrites(
     ctx: FabricContractContext,
-    id: string
+    compositeKey: string
   ): Promise<void> {
-    // Use getWriteCollections which reads from the private _segregateWrite property
     const writeCollections = ctx.getWriteCollections();
     if (!writeCollections.length) return;
 
-    // Get the actual write data
     const writes = (ctx as any)._segregateWrite as
-      | Record<string, SegregatedModel<any>[]>
+      | Record<string, Model[]>
       | undefined;
     if (!writes) return;
     for (const [collection, entries] of Object.entries(writes)) {
-      for (const entry of entries) {
-        const payload = this.buildSegregatedPayload(entry);
-        if (!payload) continue;
+      for (const model of entries) {
         const privateCtx = ctx.override({
           segregated: collection,
         });
-        await this.putState(id, payload, privateCtx);
+        const { record } = this.prepare(model, privateCtx);
+        await this.putState(compositeKey, record, privateCtx);
       }
     }
     ctx.cache.remove("segregateWrite");
-  }
-
-  private buildSegregatedPayload(
-    entry: SegregatedModel<any>
-  ): Record<string, any> | null {
-    const payload: Record<string, any> = {};
-
-    if (entry.model) {
-      payload["$$table"] = Model.tableName(
-        entry.model.constructor as Constructor<any>
-      );
-    }
-
-    const merge = (source?: Record<string, any>) => {
-      if (!source) return;
-      Object.entries(source).forEach(([key, value]) => {
-        if (typeof value === "undefined") return;
-        payload[key] = value;
-      });
-    };
-
-    merge(entry.privates);
-    merge(entry.shared);
-    merge(entry.transient);
-
-    if (!Object.keys(payload).length) return null;
-    return payload;
   }
 
   private async mergeSegregatedReads(
@@ -886,7 +893,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       res = await iterator.next();
     }
     log.debug(`Closing iterator after ${allResults.length} results`);
-    iterator.close(); // purposely not await. let iterator close on its own
+    await iterator.close();
     return allResults;
   }
 
@@ -1024,14 +1031,37 @@ export class FabricContractAdapter extends CouchDBAdapter<
     model: M,
     ...args: ContextualArgs<FabricContractContext>
   ): PreparedModel {
-    const { log } = this.logCtx(args, this.prepare);
+    const { log, ctx } = this.logCtx(args, this.prepare);
 
     const tableName = Model.tableName(model.constructor as any);
     const pk = Model.pk(model.constructor as any);
-    const split = Model.segregate(model);
-    const result = Object.entries(split.model).reduce(
+
+    const collection = ctx.getOrUndefined("segregated") as string | undefined;
+    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+
+    let entries: [string, any][];
+
+    if (collection && isMirror) {
+      // MIRROR mode: keep ALL properties (full model copy)
+      entries = Object.keys(model)
+        .map((key) => [key, (model as any)[key]] as [string, any])
+        .filter(([, val]) => typeof val !== "undefined");
+    } else if (collection) {
+      // SEGREGATED mode: keep only properties decorated for this collection + pk
+      const collectionFields = this.getFieldsForCollection(model, collection);
+      entries = [...new Set([pk as string, ...collectionFields])]
+        .map((key) => [key, (model as any)[key]] as [string, any])
+        .filter(([, val]) => typeof val !== "undefined");
+    } else {
+      // NORMAL mode: strip transient (current behavior)
+      const split = Model.segregate(model);
+      entries = Object.entries(split.model).filter(
+        ([, val]) => typeof val !== "undefined"
+      );
+    }
+
+    const record = entries.reduce(
       (accum: Record<string, any>, [key, val]) => {
-        if (typeof val === "undefined") return accum;
         const mappedProp = Model.columnName(model, key as any);
         if (this.isReserved(mappedProp))
           throw new InternalError(`Property name ${mappedProp} is reserved`);
@@ -1042,15 +1072,41 @@ export class FabricContractAdapter extends CouchDBAdapter<
       {}
     );
 
+    // Add table identifier
+    record[CouchDBKeys.TABLE] = tableName;
+
     log.silly(
       `Preparing record for ${tableName} table with pk ${(model as any)[pk]}`
     );
 
     return {
-      record: result,
+      record,
       id: (model as any)[pk] as string,
-      transient: split.transient,
+      transient: collection ? undefined : Model.segregate(model).transient,
     };
+  }
+
+  /**
+   * @description Gets the property names that belong to a specific private/shared collection
+   * @summary Looks up per-property metadata set by @privateData/@sharedData decorators
+   * to determine which properties are decorated for the given collection name.
+   */
+  private getFieldsForCollection<M extends Model>(
+    model: M,
+    collection: string
+  ): string[] {
+    const constr = model.constructor as Constructor<M>;
+    const properties = Metadata.validatableProperties(constr);
+    if (!properties) return [];
+    return properties.filter((prop: string) => {
+      const privateKey = Metadata.key(FabricModelKeys.PRIVATE, prop);
+      const privateMeta = Metadata.get(constr, privateKey);
+      if (privateMeta?.collections?.includes(collection)) return true;
+      const sharedKey = Metadata.key(FabricModelKeys.SHARED, prop);
+      const sharedMeta = Metadata.get(constr, sharedKey);
+      if (sharedMeta?.collections?.includes(collection)) return true;
+      return false;
+    });
   }
 
   override revert<M extends Model>(
@@ -1080,8 +1136,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
       Object.entries(transient).forEach(([key, val]) => {
         if (key in result && (result as any)[key] !== undefined)
-          throw new InternalError(
-            `Transient property ${key} already exists on model ${m.constructor.name}. should be impossible`
+          log.warn(
+            `overwriting existing ${key}. if this is not a default value, this may pose a problem`
           );
         result[key as keyof M] = val;
       });

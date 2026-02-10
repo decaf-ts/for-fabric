@@ -115,11 +115,10 @@ describe("mirror decorator handlers", () => {
 
   const logger = createLogger();
 
-  it("overrides the repository to create a mirror in the segregated collection", async () => {
-    const mirrorRepo = {
-      create: jest.fn().mockResolvedValue({}),
-    };
-    const overrideSpy = jest.fn().mockReturnValue(mirrorRepo);
+  it("creates mirror via repo.override with segregated + mirror flags", async () => {
+    const createSpy = jest.fn().mockResolvedValue(new MirrorTestModel({ id: "mirror-id" }));
+    const overrideSpy = jest.fn().mockReturnValue({ create: createSpy });
+
     const repository = {
       _overrides: {},
       override: overrideSpy,
@@ -141,12 +140,13 @@ describe("mirror decorator handlers", () => {
 
     expect(overrideSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        segregate: "mirror-collection",
+        segregated: "mirror-collection",
+        mirror: true,
         ignoreValidation: true,
         ignoreHandlers: true,
       })
     );
-    expect(mirrorRepo.create).toHaveBeenCalledWith(model, context);
+    expect(createSpy).toHaveBeenCalledWith(model, context);
   });
 
   it("marks reads to always target the mirror collection when the MSP matches", async () => {
