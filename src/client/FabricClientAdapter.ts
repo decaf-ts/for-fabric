@@ -619,7 +619,7 @@ export class FabricClientAdapter extends Adapter<
     log.verbose(`reading entry from ${tableName} table`);
     const result = await this.evaluateTransaction(
       ctx,
-      OperationKeys.READ,
+      "healthcheck",
       [],
       undefined,
       undefined,
