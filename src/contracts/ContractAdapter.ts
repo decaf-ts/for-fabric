@@ -893,7 +893,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       res = await iterator.next();
     }
     log.debug(`Closing iterator after ${allResults.length} results`);
-    iterator.close(); // purposely not await. let iterator close on its own
+    await iterator.close();
     return allResults;
   }
 

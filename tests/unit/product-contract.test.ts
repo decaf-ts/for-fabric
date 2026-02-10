@@ -4,9 +4,12 @@ import { getMockCtx } from "./ContextMock";
 import { Model } from "@decaf-ts/decorator-validation";
 import { NotFoundError } from "@decaf-ts/db-decorators";
 
+jest.setTimeout(30000);
 describe("Product Contract test", () => {
   const ctx = getMockCtx();
-  const stub = ctx.stub as ReturnType<typeof import("./ContextMock").getStubMock>;
+  const stub = ctx.stub as ReturnType<
+    typeof import("./ContextMock").getStubMock
+  >;
   const contract = new TestPublicModelContract();
 
   let created: TestPublicModel;

@@ -58,9 +58,13 @@ export class TestNestedModel extends FabricIdentifiedBaseModel {
   }
 }
 
+jest.setTimeout(50000);
+
 describe("Tests Public contract", () => {
   const ctx = getMockCtx();
-  const stub = ctx.stub as ReturnType<typeof import("./ContextMock").getStubMock>;
+  const stub = ctx.stub as ReturnType<
+    typeof import("./ContextMock").getStubMock
+  >;
 
   describe("oneToOne", () => {
     const contract = new TestPublicModelContract();

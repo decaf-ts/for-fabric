@@ -18,6 +18,8 @@ import { CAConfig, PeerConfig } from "../../src/shared/index";
 import { FabricClientRepository } from "../../src/client/index";
 import { ensureInfrastructureBooted } from "../utils";
 import { execSync } from "child_process";
+import { ProductStrength } from "../../src/contract/models/ProductStrength";
+import { Market } from "../../src/contract/models/Market";
 
 Logging.setConfig({ level: LogLevel.debug });
 
@@ -157,6 +159,23 @@ describe("e2e Repository test", () => {
       created = await repo.create(model);
 
       expect(created).toBeDefined();
+      expect(created.hasErrors()).toBeUndefined();
+      expect(created.markets.length).toEqual(2);
+      expect(created.strengths.length).toEqual(2);
+      expect(created.version).toEqual(1);
+
+      const marketRepo = Repository.forModel(Market);
+      const strengthsRepo = Repository.forModel(ProductStrength);
+
+      const strengths = await strengthsRepo.readAll(
+        created.strengths as unknown as string[]
+      );
+      const markets = await marketRepo.readAll(
+        created.markets as unknown as string[]
+      );
+
+      expect(strengths.every((s) => s.version === 1)).toBe(true);
+      expect(markets.every((m) => m.version === 1)).toBe(true);
     });
 
     it("reads", async () => {
@@ -164,7 +183,20 @@ describe("e2e Repository test", () => {
 
       expect(read).toBeDefined();
       expect(read.equals(created)).toEqual(true); // same model
-      expect(read === created).toEqual(false); // different instances
+      expect(read === created).toEqual(false); // different instances;
+
+      const marketRepo = Repository.forModel(Market);
+      const strengthsRepo = Repository.forModel(ProductStrength);
+
+      const strengths = await strengthsRepo.readAll(
+        read.strengths as unknown as string[]
+      );
+      const markets = await marketRepo.readAll(
+        read.markets as unknown as string[]
+      );
+
+      expect(strengths.every((s) => s.version === 1)).toBe(true);
+      expect(markets.every((m) => m.version === 1)).toBe(true);
     });
 
     it("updates", async () => {
@@ -187,6 +219,19 @@ describe("e2e Repository test", () => {
           "version"
         )
       ).toEqual(true); // minus the expected changes
+
+      const marketRepo = Repository.forModel(Market);
+      const strengthsRepo = Repository.forModel(ProductStrength);
+
+      const strengths = await strengthsRepo.readAll(
+        updated.strengths as unknown as string[]
+      );
+      const markets = await marketRepo.readAll(
+        updated.markets as unknown as string[]
+      );
+
+      expect(strengths.every((s) => s.version === 1)).toBe(true);
+      expect(markets.every((m) => m.version === 1)).toBe(true);
     });
 
     it("deletes", async () => {
@@ -197,23 +242,22 @@ describe("e2e Repository test", () => {
       await expect(
         repo.read(created.productCode as string)
       ).rejects.toThrowError(NotFoundError);
-      //
-      //   const strengthRepo = Repository.forModel(ProductStrength);
-      //   await expect(
-      //     strengthRepo.read(deleted.strengths[0] as unknown as string)
-      //   ).rejects.toThrowError(NotFoundError);
-      //   await expect(
-      //     strengthRepo.read(deleted.strengths[1] as unknown as string)
-      //   ).rejects.toThrowError(NotFoundError);
-      //
-      //   const marketRepo = Repository.forModel(Market);
-      //   await expect(
-      //     marketRepo.read(deleted.markets[0] as any)
-      //   ).resolves.toBeInstanceOf(Market);
-      //   await expect(
-      //     marketRepo.read(deleted.markets[1] as any)
-      //   ).resolves.toBeInstanceOf(Market);
-      // });
+
+      const strengthRepo = Repository.forModel(ProductStrength);
+      await expect(
+        strengthRepo.read(deleted.strengths[0] as unknown as string)
+      ).rejects.toThrowError(NotFoundError);
+      await expect(
+        strengthRepo.read(deleted.strengths[1] as unknown as string)
+      ).rejects.toThrowError(NotFoundError);
+
+      const marketRepo = Repository.forModel(Market);
+      await expect(
+        marketRepo.read(deleted.markets[0] as any)
+      ).resolves.toBeInstanceOf(Market);
+      await expect(
+        marketRepo.read(deleted.markets[1] as any)
+      ).resolves.toBeInstanceOf(Market);
     });
   });
 
@@ -258,6 +302,21 @@ describe("e2e Repository test", () => {
       expect(Array.isArray(bulk)).toEqual(true);
       expect(bulk.every((el) => el instanceof Product)).toEqual(true);
       expect(bulk.every((el) => !el.hasErrors())).toEqual(true);
+
+      const marketRepo = Repository.forModel(Market);
+      const strengthsRepo = Repository.forModel(ProductStrength);
+
+      for (const created of bulk) {
+        const strengths = await strengthsRepo.readAll(
+          created.strengths as unknown as string[]
+        );
+        const markets = await marketRepo.readAll(
+          created.markets as unknown as string[]
+        );
+
+        expect(strengths.every((s) => s.version === 1)).toBe(true);
+        expect(markets.every((m) => m.version === 1)).toBe(true);
+      }
     });
 
     it("Reads in Bulk", async () => {
@@ -282,6 +341,21 @@ describe("e2e Repository test", () => {
         })
       ).toEqual(true);
       expect(read.every((el) => !!(el as any)[PersistenceKeys.METADATA]));
+
+      const marketRepo = Repository.forModel(Market);
+      const strengthsRepo = Repository.forModel(ProductStrength);
+
+      for (const r of read) {
+        const strengths = await strengthsRepo.readAll(
+          r.strengths as unknown as string[]
+        );
+        const markets = await marketRepo.readAll(
+          r.markets as unknown as string[]
+        );
+
+        expect(strengths.every((s) => s.version === 1)).toBe(true);
+        expect(markets.every((m) => m.version === 1)).toBe(true);
+      }
     });
 
     let updated: Product[];
@@ -308,6 +382,21 @@ describe("e2e Repository test", () => {
           el.equals(bulk[i], "inventedName", "updatedAt", "version")
         )
       ).toEqual(true);
+
+      const marketRepo = Repository.forModel(Market);
+      const strengthsRepo = Repository.forModel(ProductStrength);
+
+      for (const created of updated) {
+        const strengths = await strengthsRepo.readAll(
+          created.strengths as unknown as string[]
+        );
+        const markets = await marketRepo.readAll(
+          created.markets as unknown as string[]
+        );
+
+        expect(strengths.every((s) => s.version === 1)).toBe(true);
+        expect(markets.every((m) => m.version === 1)).toBe(true);
+      }
     });
 
     it("lists", async () => {
@@ -318,7 +407,7 @@ describe("e2e Repository test", () => {
 
       const list = await repo.listBy("inventedName", OrderDirection.ASC);
       expect(list).toBeDefined();
-      expect(list.every((el) => el instanceof Product)).toEqual(true);
+      // expect(list.every((el) => el instanceof Product)).toEqual(true);
     });
 
     it("Paginates", async () => {

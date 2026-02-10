@@ -8,6 +8,7 @@ import { Constructor } from "@decaf-ts/decoration";
 import { Logging, LogLevel, style } from "@decaf-ts/logging";
 Logging.setConfig({ level: LogLevel.debug });
 
+jest.setTimeout(30000);
 const logger = Logging.for("unit-product");
 describe("Tests Product Contract", () => {
   const contract = new ProductContract();

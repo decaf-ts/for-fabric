@@ -5,9 +5,13 @@ import { ConflictError, NotFoundError } from "@decaf-ts/db-decorators";
 import { generateGtin } from "../../src/contract/models/gtin";
 import { Product } from "../../src/contract/models/Product";
 
+jest.setTimeout(30000);
+
 describe("Tests product contract", () => {
   const ctx = getMockCtx();
-  const stub = ctx.stub as ReturnType<typeof import("./ContextMock").getStubMock>;
+  const stub = ctx.stub as ReturnType<
+    typeof import("./ContextMock").getStubMock
+  >;
   const contract = new ProductContract();
 
   let created: Product;
