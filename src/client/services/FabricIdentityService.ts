@@ -7,6 +7,7 @@ import {
 } from "@decaf-ts/core";
 import FabricCAServices, {
   AffiliationService,
+  IAttributeRequest,
   IdentityService,
   IEnrollResponse,
   IRegisterRequest,
@@ -391,6 +392,55 @@ export class FabricIdentityService extends ClientBasedService<
     );
     const { userName } = model;
     return this.enroll(userName as string, registration, ctx);
+  }
+
+  /**
+   * @description Re-enroll an existing identity using its current enrollment.
+   * @summary Renews the enrollment certificate by calling the CA reenroll.
+   * @param {User} currentUser - Already enrolled user, must have a signing identity.
+   * @return {Promise<Identity>} The renewed identity object with new credentials.
+   */
+  async reenroll(
+    enrollmentId: string,
+    identity: Identity,
+    attrReqs: IAttributeRequest[] = [],
+    ...args: MaybeContextualArg<any>
+  ): Promise<Identity> {
+    const { log, ctx } = (await this.logCtx(args, "reenroll", true)).for(
+      this.reenroll
+    );
+
+    try {
+      log.debug(`Re-enrolling ${enrollmentId}`);
+
+      const { mspId, credentials } = identity;
+
+      const user = User.createUser(
+        enrollmentId,
+        "", // enrollmentSecret
+        mspId || this.user.getMspid(),
+        credentials.certificate,
+        credentials.privateKey
+      );
+
+      // Reuse cryptoSuite config
+      user.setCryptoSuite(this.user.getCryptoSuite());
+
+      const enrollment = await this.client.reenroll(user, attrReqs);
+      const newIdentity = FabricIdentityService.identityFromEnrollment(
+        enrollment,
+        this.config.caName,
+        ctx
+      );
+
+      log.info(
+        `Successfully re-enrolled ${enrollmentId} under ${this.config.caName} as ${newIdentity.id}`
+      );
+
+      return newIdentity;
+    } catch (e: any) {
+      throw this.parseError(e);
+    }
   }
 
   /**
