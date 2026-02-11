@@ -34,6 +34,7 @@ import {
   ConflictError,
   BadRequestError,
   type PrimaryKeyType,
+  ValidationError,
 } from "@decaf-ts/db-decorators";
 import {
   Context,
@@ -1309,6 +1310,8 @@ export class FabricClientAdapter extends Adapter<
       }
     }
 
+    if (msg.includes(ValidationError.name))
+      return new ValidationError(err) as E;
     if (msg.includes(NotFoundError.name)) return new NotFoundError(err) as E;
     if (msg.includes(ConflictError.name)) return new ConflictError(err) as E;
     if (msg.includes(BadRequestError.name))
