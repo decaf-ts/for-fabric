@@ -21,6 +21,7 @@ import {
   ProposalOptions,
   Contract as Contrakt,
   type Signer,
+  GatewayError,
 } from "@hyperledger/fabric-gateway";
 import { getIdentity, getSigner } from "./fabric-fs";
 import {
@@ -966,9 +967,6 @@ export class FabricClientAdapter extends Adapter<
 
       return await method.call(contract, api, proposalOptions);
     } catch (e: any) {
-      if (e.code === 10) {
-        throw new Error(`${e.details[0].message}`);
-      }
       throw this.parseError(e);
     } finally {
       this.log.debug(`Closing ${this.config.mspId} gateway connection`);
@@ -1278,14 +1276,20 @@ export class FabricClientAdapter extends Adapter<
    * @param {string} [reason] - Optional reason for the error
    * @return {BaseError} The parsed error
    */
-  protected static parseError<E extends BaseError>(err: Error | string): E {
+  protected static parseError<E extends BaseError>(
+    err: Error | string | GatewayError
+  ): E {
     // if (
     //   MISSING_PRIVATE_DATA_REGEX.test(
     //     typeof err === "string" ? err : err.message
     //   )
     // )
     //   return new UnauthorizedPrivateDataAccess(err) as E;
-    const msg = typeof err === "string" ? err : err.message;
+
+    let msg = typeof err === "string" ? err : err.message;
+    if (err instanceof GatewayError && err.details.length && err.code === 10) {
+      msg = `${err.details[0].message}`;
+    }
 
     if (msg.includes("MVCC_READ_CONFLICT"))
       return new MvccReadConflictError(err) as E;
