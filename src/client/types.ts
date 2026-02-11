@@ -5,6 +5,7 @@ export type FabricClientFlags = FabricFlags & {
   endorseTimeout: number;
   submitTimeout: number;
   commitTimeout: number;
+  endorsingOrgs?: string[];
   keyCertOrDirectoryPath?: string | Buffer;
   certCertOrDirectoryPath?: string | Buffer;
   chaincodeName?: string;

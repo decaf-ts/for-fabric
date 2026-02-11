@@ -109,6 +109,7 @@
   "devDependencies": {
     "@decaf-ts/cli": "latest",
     "@decaf-ts/fabric-weaver": "latest",
+    "@decaf-ts/ui-decorators": "^0.6.15",
     "@decaf-ts/utils": "latest"
   },
   "dependencies": {

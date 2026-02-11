@@ -19,6 +19,11 @@ import { description, uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { audit } from "./decorators";
 import { FabricFlavour } from "../../shared/index";
+import {
+  ElementPositions,
+  ElementSizes,
+  uielement,
+} from "@decaf-ts/ui-decorators";
 
 @description(
   "Represents a medical leaflet linked to a specific product, batch, and language."

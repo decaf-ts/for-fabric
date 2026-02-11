@@ -384,7 +384,7 @@ export class FabricClientAdapter extends Adapter<
         ),
       ],
       transient,
-      undefined,
+      ctx.getOrUndefined("endorsingOrgs"),
       clazz.name
     );
     try {
@@ -465,7 +465,7 @@ export class FabricClientAdapter extends Adapter<
         ),
       ],
       transient,
-      undefined,
+      ctx.getFromChildren("endorsingOrgs"),
       clazz.name
     );
     try {
@@ -497,7 +497,7 @@ export class FabricClientAdapter extends Adapter<
       BulkCrudOperationKeys.DELETE_ALL,
       [JSON.stringify(ids)],
       undefined,
-      undefined,
+      ctx.getFromChildren("endorsingOrgs"),
       clazz.name
     );
     try {
@@ -520,7 +520,7 @@ export class FabricClientAdapter extends Adapter<
     model: M,
     ...args: ContextualArgs<Context<FabricClientFlags>>
   ): SegregatedModel<M> & PreparedModel {
-    const { log } = this.logCtx(args, this.prepare);
+    const { log, ctx } = this.logCtx(args, this.prepare);
     const split = Model.segregate(model);
     if ((model as any)[PersistenceKeys.METADATA]) {
       log.silly(
@@ -532,6 +532,22 @@ export class FabricClientAdapter extends Adapter<
         configurable: true,
         value: (model as any)[PersistenceKeys.METADATA],
       });
+    }
+
+    const mirrorMeta = Model.mirroredAt(model);
+    if (mirrorMeta) {
+      let mirrorMsp: string | undefined;
+      try {
+        mirrorMsp =
+          typeof mirrorMeta.resolver === "string"
+            ? mirrorMeta.resolver
+            : mirrorMeta.resolver(model);
+      } catch (e: unknown) {
+        throw new InternalError(`Failed to resolve mirror MSP: ${e}`);
+      }
+      if (!mirrorMsp) throw new InternalError(`No mirror MSP could be found`);
+      const msps = ctx.getFromChildren("endorsingOrgs") || [];
+      ctx.accumulate({ endorsingOrgs: [...new Set([...msps, mirrorMsp])] });
     }
 
     return {
@@ -603,7 +619,7 @@ export class FabricClientAdapter extends Adapter<
       OperationKeys.CREATE,
       [this.serializer.serialize(model, clazz.name)],
       transient,
-      undefined,
+      ctx.getFromChildren("endorsingOrgs"),
       clazz.name
     );
     return this.serializer.deserialize(this.decode(result));
@@ -711,7 +727,7 @@ export class FabricClientAdapter extends Adapter<
       OperationKeys.UPDATE,
       [this.serializer.serialize(model, clazz.name || clazz)], // TODO should be receving class but is receiving string
       transient,
-      undefined,
+      ctx.getFromChildren("endorsingOrgs"),
       clazz.name
     );
     return this.serializer.deserialize(this.decode(result));
@@ -740,7 +756,7 @@ export class FabricClientAdapter extends Adapter<
       OperationKeys.DELETE,
       [id.toString()],
       undefined,
-      undefined,
+      ctx.getFromChildren("endorsingOrgs"),
       clazz.name
     );
     return this.serializer.deserialize(this.decode(result));
@@ -934,7 +950,7 @@ export class FabricClientAdapter extends Adapter<
     submit = true,
     args?: any[],
     transientData: Record<string, string> = {},
-    endorsingOrganizations?: Array<string>,
+    endorsingOrganizations?: string[],
     className?: string
   ): Promise<Uint8Array> {
     const log = this.log.for(this.transaction);
@@ -962,7 +978,7 @@ export class FabricClientAdapter extends Adapter<
           },
           {} as typeof transientData
         ),
-        // ...(endorsingOrganizations && { endorsingOrganizations }) // mspId list
+        endorsingOrganizations: endorsingOrganizations || undefined, // mspId list
       };
 
       return await method.call(contract, api, proposalOptions);

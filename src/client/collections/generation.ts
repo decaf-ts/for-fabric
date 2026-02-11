@@ -198,7 +198,6 @@ export async function extractCollections<M extends Model>(
             maxPeerCount,
             blockToLive,
             memberOnlyRead,
-            memberOnlyWrite,
           } = privateDefaults;
           return privateCollectionFor(
             mspId,
@@ -207,7 +206,7 @@ export async function extractCollections<M extends Model>(
             maxPeerCount,
             blockToLive,
             memberOnlyRead,
-            memberOnlyWrite
+            false
           );
         })
     )
