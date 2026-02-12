@@ -3,6 +3,7 @@ import { FabricClientRepository } from "../../src/client";
 import { E2eConfig } from "./e2e.config";
 import { AuthorizationError, Repository } from "@decaf-ts/core";
 import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
+import { execSync } from "child_process";
 
 const { adapterFactory } = E2eConfig;
 const makeId = (prefix: string) =>
@@ -15,6 +16,9 @@ describe("OtherProductShared contract mirror coverage (e2e)", () => {
   let otherRepo: FabricClientRepository<OtherProductShared>;
 
   beforeAll(async () => {
+    execSync(`npm run copy:crypto -- --org=org-a`, {
+      cwd: process.cwd(),
+    });
     adapter = await adapterFactory();
     otherRepo = Repository.forModel(
       OtherProductShared

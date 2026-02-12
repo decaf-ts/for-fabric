@@ -23,11 +23,7 @@ import { version } from "@decaf-ts/db-decorators";
 export class OtherProductShared extends BaseIdentifiedModel {
   @pk()
   @gtin()
-  @mirror(
-    "mirror-collection",
-    "main-org",
-    (mspId: string) => mspId === "main-org"
-  )
+  @mirror("mirror-collection", "org-a")
   @audit(OtherProductShared)
   productCode!: string;
 

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { NotFoundError, OperationKeys } from "@decaf-ts/db-decorators";
 import { Repository, AuthorizationError } from "@decaf-ts/core";
-import { FabricClientRepository } from "../../src/client";
+import { CAConfig, FabricClientRepository, PeerConfig } from "../../src/client";
 import { E2eConfig } from "./e2e.config";
 import {
   SegregatedPrivateDocument,
@@ -16,6 +16,32 @@ const makeId = (prefix: string) =>
 
 jest.setTimeout(45000);
 
+const contractName = "GlobalContract";
+
+const caConfig: CAConfig = {
+  url: "https://localhost:7011",
+  tls: {
+    trustedRoots: ["./docker/docker-data/tls-ca-cert.pem"],
+    verify: true,
+  },
+  caName: "org-a",
+  caCert: "./docker/docker-data/admin/msp/signcerts",
+  caKey: "./docker/docker-data/admin/msp/keystore",
+};
+
+const peerConfig: PeerConfig = {
+  cryptoPath: "./docker/infrastructure/crypto-config",
+  keyCertOrDirectoryPath: "./docker/docker-data/admin/msp/keystore",
+  certCertOrDirectoryPath: "./docker/docker-data/admin/msp/signcerts",
+  tlsCert: "./docker/docker-data/tls-ca-cert.pem",
+  peerEndpoint: "localhost:7032",
+  peerHostAlias: "localhost",
+  chaincodeName: contractName,
+  ca: "org-b",
+  mspId: "Peer0OrgbMSP",
+  channel: "simple-channel",
+};
+
 describe("Segregated private/shared data flows (e2e)", () => {
   let adapter: Awaited<ReturnType<typeof adapterFactory>>;
   let privateRepo: FabricClientRepository<SegregatedPrivateDocument>;
@@ -27,7 +53,7 @@ describe("Segregated private/shared data flows (e2e)", () => {
       cwd: process.cwd(),
     });
 
-    adapter = await adapterFactory();
+    adapter = await adapterFactory(peerConfig);
     privateRepo = Repository.forModel(
       SegregatedPrivateDocument
     ) as FabricClientRepository<SegregatedPrivateDocument>;
