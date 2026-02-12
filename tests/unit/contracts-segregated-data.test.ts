@@ -9,7 +9,10 @@ import {
 import { pk, table, column, AuthorizationError } from "@decaf-ts/core";
 import { uses } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
-import { FabricContractContext } from "../../src/contracts/ContractContext";
+import {
+  FabricContractContext,
+  SegregatedWriteEntry,
+} from "../../src/contracts/ContractContext";
 import { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
 import { getStubMock, getIdentityMock } from "./ContextMock";
 import { OperationKeys } from "@decaf-ts/db-decorators";
@@ -307,19 +310,31 @@ describe("FabricContractContext segregation methods", () => {
   it("writeTo accumulates collections and records for segregateWrite", () => {
     const { context } = createMockContext();
 
-    context.writeTo(COLLECTION_A, { id: "1", data: "test1" });
-    context.writeTo(COLLECTION_A, { id: "2", data: "test2" });
-    context.writeTo(COLLECTION_B, { id: "3", data: "test3" });
+    context.writeTo(COLLECTION_A, {
+      model: { id: "1", data: "test1" },
+      keys: ["id", "data"],
+    });
+    context.writeTo(COLLECTION_A, {
+      model: { id: "2", data: "test2" },
+      keys: ["id", "data"],
+    });
+    context.writeTo(COLLECTION_B, {
+      model: { id: "3", data: "test3" },
+      keys: ["id", "data"],
+    });
 
     const writes = context.getOrUndefined("segregateWrite") as Record<
       string,
-      any[]
+      SegregatedWriteEntry[]
     >;
 
     expect(writes).toBeDefined();
     expect(writes[COLLECTION_A]).toHaveLength(2);
     expect(writes[COLLECTION_B]).toHaveLength(1);
-    expect(writes[COLLECTION_A][0]).toEqual({ id: "1", data: "test1" });
+    expect(writes[COLLECTION_A][0]).toEqual({
+      model: { id: "1", data: "test1" },
+      keys: ["id", "data"],
+    });
   });
 
   it("readFrom accumulates unique collections for segregateRead", () => {
@@ -390,12 +405,16 @@ describe("Segregated Data Decorator Handlers", () => {
 
       const writes = context.getOrUndefined("segregateWrite") as Record<
         string,
-        any[]
+        SegregatedWriteEntry[]
       >;
 
       expect(writes).toBeDefined();
       expect(writes[COLLECTION_A]).toBeDefined();
-      expect(writes[COLLECTION_A].length).toBeGreaterThan(0);
+      expect(writes[COLLECTION_A]).toHaveLength(1);
+      expect(writes[COLLECTION_A][0]).toEqual({
+        model,
+        keys: ["privateField"],
+      });
     });
 
     it("extracts MSP from identity if model has no owner", async () => {
@@ -633,6 +652,7 @@ describe("Private data repository operations", () => {
       Buffer.from(privateData).toString("utf8")
     ) as Record<string, any>;
     expect(parsed.secretField).toBe("initial-secret");
+    expect(parsed.id).toBe(id);
   });
 
   it("reads private fields by merging private collections on read", async () => {
@@ -703,6 +723,52 @@ describe("Private data repository operations", () => {
       any
     >;
     expect(parsed.secretField).toBe("secret-new");
+  });
+
+  it("stores multi-collection private data with primary key in each collection", async () => {
+    const { stub, identity } = createMockContext();
+    const multiRepository = new FabricContractRepository(
+      adapter,
+      MultiPrivateCollectionModel
+    );
+
+    const context = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      stub,
+      identity,
+      MultiPrivateCollectionModel
+    );
+
+    const id = `multi-private-${Math.random().toString(36).slice(2, 8)}`;
+    const model = new MultiPrivateCollectionModel({
+      id,
+      publicField: "public-value",
+      secretFieldA: "secret-A",
+      secretFieldB: "secret-B",
+    });
+
+    await multiRepository.create(model, context);
+    stub.commit();
+
+    const privateKey = `multi_private_test_${id}`;
+    const recordA = JSON.parse(
+      Buffer.from(await stub.getPrivateData(COLLECTION_A, privateKey)).toString(
+        "utf8"
+      )
+    ) as Record<string, any>;
+    expect(recordA.id).toBe(id);
+    expect(recordA.secretFieldA).toBe("secret-A");
+    expect(recordA.secretFieldB).toBeUndefined();
+
+    const recordB = JSON.parse(
+      Buffer.from(await stub.getPrivateData(COLLECTION_B, privateKey)).toString(
+        "utf8"
+      )
+    ) as Record<string, any>;
+    expect(recordB.id).toBe(id);
+    expect(recordB.secretFieldB).toBe("secret-B");
+    expect(recordB.secretFieldA).toBeUndefined();
   });
 
   it("clears private collections when deleting a model", async () => {
@@ -1031,6 +1097,28 @@ class FullyPrivateModel extends Model {
   }
 }
 
+@uses(FabricFlavour)
+@sharedData(COLLECTION_B)
+@table("fully_shared_test")
+@model()
+class FullySharedModel extends Model {
+  @pk()
+  id!: string;
+
+  @column()
+  sharedFieldA?: string;
+
+  @column()
+  sharedFieldB?: string;
+
+  @ownedBy()
+  owner?: string;
+
+  constructor(args?: ModelArg<FullySharedModel>) {
+    super(args);
+  }
+}
+
 /**
  * Test model with @mirror decorator for testing mirror read/write routing
  */
@@ -1048,7 +1136,7 @@ class MirrorTestModel extends Model {
   publicField!: string;
 
   // Mirror condition: only route reads to mirror when MSP is "Aeon"
-  @mirror(MIRROR_COLLECTION, (msp: string) => msp === "Aeon")
+  @mirror(MIRROR_COLLECTION, "Aeon", (msp: string) => msp === "Aeon")
   mirroredField?: string;
 
   // Note: @ownedBy() omitted to simplify testing mirror functionality
@@ -1058,7 +1146,6 @@ class MirrorTestModel extends Model {
     super(args);
   }
 }
-
 
 /**
  * Creates a mock stub that tracks API calls for verification
@@ -1139,7 +1226,10 @@ function createTrackingStubMock() {
     return originalDeletePrivateData(collection, key);
   };
 
-  stub.getPrivateDataQueryResult = async (collection: string, query: string) => {
+  stub.getPrivateDataQueryResult = async (
+    collection: string,
+    query: string
+  ) => {
     callLog.push({
       method: "getPrivateDataQueryResult",
       args: [collection, query],
@@ -1263,15 +1353,17 @@ describe("Fully Private Models (no public state writes)", () => {
     const publicPuts = trackingMock
       .getPublicCalls()
       .filter((c) => c.method === "putState");
+
+    expect(publicPuts.length).toBe(0);
     const privatePuts = trackingMock
       .getPrivateCalls()
       .filter((c) => c.method === "putPrivateData");
 
+    expect(publicPuts.length).toBe(0);
+
     // Private data should be written to collection
     expect(privatePuts.length).toBeGreaterThan(0);
-    expect(
-      privatePuts.some((c) => c.collection === COLLECTION_A)
-    ).toBe(true);
+    expect(privatePuts.some((c) => c.collection === COLLECTION_A)).toBe(true);
 
     // CRITICAL: For fully private models, any public state writes should NOT
     // contain the secret data. The public record should only contain metadata
@@ -1491,6 +1583,104 @@ describe("Fully Private Models (no public state writes)", () => {
       privateKey
     );
     expect(privateData).toBe("");
+  });
+});
+
+describe("Fully Shared Models (no public state writes)", () => {
+  let adapter: FabricContractAdapter;
+  let repository: FabricContractRepository<FullySharedModel>;
+  let trackingMock: ReturnType<typeof createTrackingStubMock>;
+
+  beforeEach(() => {
+    adapter = new FabricContractAdapter(
+      undefined as any,
+      `fully-shared-${Math.random()}`
+    );
+    repository = new FabricContractRepository(adapter, FullySharedModel);
+    trackingMock = createTrackingStubMock();
+  });
+
+  it("does NOT call putState when creating a fully shared model", async () => {
+    const identity = getIdentityMock();
+    const context = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      trackingMock.stub,
+      identity,
+      FullySharedModel
+    );
+
+    const id = `fully-shared-${Math.random().toString(36).slice(2, 8)}`;
+    const model = new FullySharedModel({
+      id,
+      sharedFieldA: "shared-a",
+      sharedFieldB: "shared-b",
+    });
+
+    await repository.create(model, context);
+    trackingMock.stub.commit();
+
+    const publicPuts = trackingMock
+      .getPublicCalls()
+      .filter((c) => c.method === "putState");
+    const sharedPuts = trackingMock
+      .getPrivateCalls()
+      .filter((c) => c.method === "putPrivateData");
+
+    expect(publicPuts.length).toBe(0);
+    expect(sharedPuts.length).toBeGreaterThan(0);
+    expect(sharedPuts.some((c) => c.collection === COLLECTION_B)).toBe(true);
+
+    const sharedKey = `fully_shared_test_${id}`;
+    const sharedData = await trackingMock.stub.getPrivateData(
+      COLLECTION_B,
+      sharedKey
+    );
+    const parsed = JSON.parse(Buffer.from(sharedData).toString("utf8"));
+    expect(parsed.id).toBe(id);
+    expect(parsed.sharedFieldA).toBe("shared-a");
+    expect(parsed.sharedFieldB).toBe("shared-b");
+  });
+
+  it("reads shared data correctly for fully shared models", async () => {
+    const identity = getIdentityMock();
+    const id = `fully-shared-read-${Math.random().toString(36).slice(2, 8)}`;
+
+    const createContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      trackingMock.stub,
+      identity,
+      FullySharedModel
+    );
+
+    const model = new FullySharedModel({
+      id,
+      sharedFieldA: "read-shared-a",
+      sharedFieldB: "read-shared-b",
+    });
+
+    await repository.create(model, createContext);
+    trackingMock.stub.commit();
+    trackingMock.clearLog();
+
+    const readContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.READ,
+      trackingMock.stub,
+      identity,
+      FullySharedModel
+    );
+
+    const result = await repository.read(id, readContext);
+    trackingMock.stub.commit();
+
+    const sharedReads = trackingMock
+      .getPrivateCalls()
+      .filter((c) => c.method === "getPrivateData");
+    expect(sharedReads.some((c) => c.collection === COLLECTION_B)).toBe(true);
+    expect(result.sharedFieldA).toBe("read-shared-a");
+    expect(result.sharedFieldB).toBe("read-shared-b");
   });
 });
 
@@ -1717,7 +1907,6 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     // The mirrorCalls may still exist for read attempts, but the skip flag should be set
   });
 
-
   it("updates mirror data in the mirror collection", async () => {
     const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
     const id = `mirror-update-${Math.random().toString(36).slice(2, 8)}`;
@@ -1799,7 +1988,9 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       privateKey
     );
     expect(mirrorDataBeforeDelete).toBeDefined();
-    const parsedBefore = JSON.parse(Buffer.from(mirrorDataBeforeDelete).toString("utf8"));
+    const parsedBefore = JSON.parse(
+      Buffer.from(mirrorDataBeforeDelete).toString("utf8")
+    );
     expect(parsedBefore.mirroredField).toBe("to-delete");
 
     trackingMock.clearLog();
@@ -1898,9 +2089,9 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       mirroredField: "should-fail",
     });
 
-    await expect(repository.update(updatedModel, updateContext)).rejects.toThrow(
-      AuthorizationError
-    );
+    await expect(
+      repository.update(updatedModel, updateContext)
+    ).rejects.toThrow(AuthorizationError);
   });
 
   it("rejects delete when MSP matches mirror condition", async () => {
@@ -2001,7 +2192,6 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     const publicData = await trackingMock.stub.getState(`mirror_test_${id}`);
     expect(publicData).toBe("");
   });
-
 });
 
 /**
@@ -2206,10 +2396,7 @@ describe("Sequence Replication to Private Collections", () => {
       undefined as any,
       `seq-mixed-${Math.random()}`
     );
-    const repository = new FabricContractRepository(
-      adapter,
-      SeqMixedModel
-    );
+    const repository = new FabricContractRepository(adapter, SeqMixedModel);
     const identity = getIdentityMock();
 
     const createContext = await buildRepositoryContextGeneric(
@@ -2257,10 +2444,7 @@ describe("Sequence Replication to Private Collections", () => {
       undefined as any,
       `seq-public-${Math.random()}`
     );
-    const repository = new FabricContractRepository(
-      adapter,
-      SeqPublicModel
-    );
+    const repository = new FabricContractRepository(adapter, SeqPublicModel);
     const identity = getIdentityMock();
 
     const createContext = await buildRepositoryContextGeneric(

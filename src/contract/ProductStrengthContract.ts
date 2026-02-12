@@ -1,6 +1,5 @@
 import { Info } from "fabric-contract-api";
 import { SerializedCrudContract } from "../contracts/crud/serialized-crud-contract";
-import { Product } from "./models/Product";
 import { ProductStrength } from "./models/ProductStrength";
 
 @Info({

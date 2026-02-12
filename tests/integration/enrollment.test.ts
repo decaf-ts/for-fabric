@@ -1,6 +1,5 @@
 import { execSync } from "child_process";
 import * as fs from "fs";
-import * as path from "path";
 import { Credentials, CAConfig, PeerConfig } from "../../src/shared/types";
 import { FabricEnrollmentService } from "../../src/client/services";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";

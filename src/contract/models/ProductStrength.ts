@@ -17,7 +17,7 @@ import { FabricFlavour } from "../../shared/index";
 import { composed, InternalError } from "@decaf-ts/db-decorators";
 import { gtin } from "./gtin";
 
-function strengthSeed(m: ProductStrength, ...args: ContextualArgs<any>) {
+function strengthSeed(m: ProductStrength) {
   try {
     return `${m.productCode}${m.strength}${m.substance ? m.substance : ""}`;
   } catch (e: unknown) {

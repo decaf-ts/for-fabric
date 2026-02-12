@@ -28,7 +28,7 @@ export enum AuditOperations {
   BREAK_GLASS_RECOVERY = "Wallet recovered with the break Glass Recovery Code",
   AUTHORIZE = "Authorize integration user",
   REVOKE = "Revoke integration user",
-  USER_ACCESS = "Access wallet",
+  USER_ACCESS = "Access wallet (user)",
   DATA_RECOVERY = "Use of the Data Recovery Key",
   RECOVERY_KEY_COPIED = "Copy Data Recovery Key",
 }

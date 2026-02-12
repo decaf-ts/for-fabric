@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { InternalError } from "@decaf-ts/db-decorators";
 import { Context } from "@decaf-ts/core";
+import { ModelKeys } from "@decaf-ts/decorator-validation";
 import { ERC20Wallet } from "../../src/contracts/erc20/models";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";
@@ -235,5 +236,67 @@ const createContext = () => {
 
     expect(txnSpy).toHaveBeenCalled();
     txnSpy.mockRestore();
+  });
+
+  it("refreshes model after create when transient data exist", async () => {
+    const adapter = newAdapter();
+    const ctx = createContext();
+    const payload = { foo: "bar" };
+    const transient = { secret: "value" };
+    const serializedResult = {
+      [ModelKeys.ANCHOR]: "ERC20Wallet",
+      id: "wallet-1",
+      foo: "bar",
+    };
+    jest
+      .spyOn(adapter as any, "submitTransaction")
+      .mockResolvedValue(
+        new TextEncoder().encode(JSON.stringify(serializedResult))
+      );
+    const readSpy = jest
+      .spyOn(adapter, "read")
+      .mockResolvedValueOnce({ ...serializedResult, secret: "value" } as any);
+
+    const result = await adapter.create(
+      ERC20Wallet,
+      "wallet-1",
+      payload,
+      transient,
+      ctx
+    );
+
+    expect(readSpy).toHaveBeenCalledWith(ERC20Wallet, "wallet-1", ctx);
+    expect(result).toEqual({ ...serializedResult, secret: "value" });
+  });
+
+  it("refreshes model after update when transient data exist", async () => {
+    const adapter = newAdapter();
+    const ctx = createContext();
+    const payload = { foo: "baz" };
+    const transient = { secret: "new" };
+    const serializedResult = {
+      [ModelKeys.ANCHOR]: "ERC20Wallet",
+      id: "wallet-1",
+      foo: "baz",
+    };
+    jest
+      .spyOn(adapter as any, "submitTransaction")
+      .mockResolvedValue(
+        new TextEncoder().encode(JSON.stringify(serializedResult))
+      );
+    const readSpy = jest
+      .spyOn(adapter, "read")
+      .mockResolvedValueOnce({ ...serializedResult, secret: "new" } as any);
+
+    const result = await adapter.update(
+      ERC20Wallet,
+      "wallet-1",
+      payload,
+      transient,
+      ctx
+    );
+
+    expect(readSpy).toHaveBeenCalledWith(ERC20Wallet, "wallet-1", ctx);
+    expect(result).toEqual({ ...serializedResult, secret: "new" });
   });
 });

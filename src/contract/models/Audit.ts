@@ -24,13 +24,7 @@ import {
 } from "@decaf-ts/core";
 import { BaseModel } from "./BaseModel";
 import { AuditOperations } from "./constants";
-import {
-  FabricFlavour,
-  mirror,
-  NamespaceCollection,
-  sharedData,
-  transactionId,
-} from "../../shared/index";
+import { FabricFlavour, transactionId } from "../../shared/index";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function uuidSeed(m: Audit, ...args: ContextualArgs<any>) {
@@ -54,7 +48,7 @@ function uuidSeed(m: Audit, ...args: ContextualArgs<any>) {
 export class Audit extends BaseModel {
   @pk()
   @uuid(uuidSeed)
-  // @mirror("mirror-collection", (mspId: string) => mspId === "main-org")
+  // @mirror("mirror-collection", "main-org", (mspId: string) => mspId === "main-org")
   @description("Unique identifier of the audit record.")
   id!: string;
 

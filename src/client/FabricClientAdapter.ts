@@ -181,13 +181,9 @@ export class FabricClientAdapter extends Adapter<
     flags: Partial<FabricClientFlags>,
     ...args: any[]
   ): Promise<FabricClientFlags> {
+    const mergedFlags = Object.assign({}, this.config, flags);
     const f = Object.assign(
-      await super.flags(
-        operation,
-        model,
-        Object.assign({}, this.config, flags),
-        ...args
-      )
+      await super.flags(operation, model, mergedFlags, ...args)
     );
     return f;
   }
@@ -465,7 +461,7 @@ export class FabricClientAdapter extends Adapter<
         ),
       ],
       transient,
-      ctx.getFromChildren("endorsingOrgs"),
+      this.getEndorsingOrganizations(ctx),
       clazz.name
     );
     try {
@@ -497,7 +493,7 @@ export class FabricClientAdapter extends Adapter<
       BulkCrudOperationKeys.DELETE_ALL,
       [JSON.stringify(ids)],
       undefined,
-      ctx.getFromChildren("endorsingOrgs"),
+      this.getEndorsingOrganizations(ctx),
       clazz.name
     );
     try {
@@ -538,9 +534,11 @@ export class FabricClientAdapter extends Adapter<
     if (mirrorMeta) {
       const mirrorMsp = mirrorMeta.mspId;
       if (!mirrorMsp) throw new InternalError(`No mirror MSP could be found`);
-      const msps = ctx.getFromChildren("endorsingOrgs") || [];
+      const msps = this.getEndorsingOrganizations(ctx) || [];
+      const merged = [...new Set([...msps, mirrorMsp])];
       ctx.accumulate({
-        endorsingOrgs: [...new Set([...msps, mirrorMsp])],
+        endorsingOrgs: merged,
+        endorsingOrganizations: merged,
         legacy: true,
       });
     }
@@ -562,8 +560,14 @@ export class FabricClientAdapter extends Adapter<
     transient?: Record<string, any>,
     ...args: ContextualArgs<Context<FabricClientFlags>>
   ): M {
-    const { log } = this.logCtx(args, this.revert);
-    if (transient) {
+    const { log, ctx } = this.logCtx(args, this.revert);
+    if (
+      transient &&
+      this.shouldRebuildWithTransient(
+        ctx,
+        ctx.getOrUndefined("operation") as string | undefined
+      )
+    ) {
       log.verbose(
         `re-adding transient properties: ${Object.keys(transient).join(", ")}`
       );
@@ -577,6 +581,47 @@ export class FabricClientAdapter extends Adapter<
     }
 
     return new (clazz as Constructor<M>)(obj);
+  }
+
+  private shouldRebuildWithTransient(
+    ctx: Context<FabricClientFlags>,
+    operation?: string
+  ): boolean {
+    if (!ctx) return false;
+    if (ctx.getOrUndefined("rebuildWithTransient")) return true;
+    if (!operation) return false;
+    const op = operation.toString().toLowerCase();
+    return (
+      op.includes("read") ||
+      op.includes("find") ||
+      op.includes("query") ||
+      op.includes("statement") ||
+      op.includes("page")
+    );
+  }
+
+  private shouldRefreshAfterWrite(
+    ctx: Context<FabricClientFlags>,
+    hasTransient: boolean,
+    id?: PrimaryKeyType
+  ): boolean {
+    if (!hasTransient) return false;
+    if (id === undefined || id === null) return false;
+    if (ctx.getOrUndefined("mirror")) return false;
+    return true;
+  }
+
+  private getEndorsingOrganizations(
+    ctx: Context<FabricClientFlags>
+  ): string[] | undefined {
+    const direct =
+      ctx.getOrUndefined("endorsingOrgs") ||
+      (ctx.getOrUndefined("endorsingOrgs") as string[] | undefined);
+    if (direct && direct.length) return direct;
+    return (
+      (ctx.getFromChildren("endorsingOrgs") as string[] | undefined) ||
+      (ctx.getFromChildren("endorsingOrgs") as string[] | undefined)
+    );
   }
 
   /**
@@ -605,19 +650,21 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.verbose(`adding entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
-    transient =
-      transient && Object.keys(transient).length
-        ? { [tableName]: transient }
-        : {};
+    const hasTransient = transient && Object.keys(transient).length > 0;
+    const transientPayload = hasTransient ? { [tableName]: transient } : {};
     const result = await this.submitTransaction(
       ctx,
       OperationKeys.CREATE,
       [this.serializer.serialize(model, clazz.name)],
-      transient,
-      ctx.getFromChildren("endorsingOrgs"),
+      transientPayload as any,
+      this.getEndorsingOrganizations(ctx),
       clazz.name
     );
-    return this.serializer.deserialize(this.decode(result));
+    const deserialized = this.serializer.deserialize(this.decode(result));
+    if (this.shouldRefreshAfterWrite(ctx, hasTransient, id)) {
+      return this.read(clazz, id, ctx);
+    }
+    return deserialized;
   }
 
   @debug()
@@ -707,25 +754,27 @@ export class FabricClientAdapter extends Adapter<
     const ctxArgs = [...(args as unknown as any[])];
     const { log, ctx } = this.logCtx(
       ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
-      this.updateAll
+      this.update
     );
     log.info(`CLIENT UPDATE class : ${typeof clazz}`);
     const tableName = Model.tableName(clazz);
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
-    transient =
-      transient && Object.keys(transient).length
-        ? { [tableName]: transient }
-        : {};
+    const hasTransient = transient && Object.keys(transient).length > 0;
+    const transientPayload = hasTransient ? { [tableName]: transient } : {};
     const result = await this.submitTransaction(
       ctx,
       OperationKeys.UPDATE,
       [this.serializer.serialize(model, clazz.name || clazz)], // TODO should be receving class but is receiving string
-      transient,
-      ctx.getFromChildren("endorsingOrgs"),
+      transientPayload as any,
+      this.getEndorsingOrganizations(ctx),
       clazz.name
     );
-    return this.serializer.deserialize(this.decode(result));
+    const deserialized = this.serializer.deserialize(this.decode(result));
+    if (this.shouldRefreshAfterWrite(ctx, hasTransient, id)) {
+      return this.read(clazz, id, ctx);
+    }
+    return deserialized;
   }
 
   /**
@@ -751,7 +800,7 @@ export class FabricClientAdapter extends Adapter<
       OperationKeys.DELETE,
       [id.toString()],
       undefined,
-      ctx.getFromChildren("endorsingOrgs"),
+      this.getEndorsingOrganizations(ctx),
       clazz.name
     );
     return this.serializer.deserialize(this.decode(result));
@@ -1053,7 +1102,7 @@ export class FabricClientAdapter extends Adapter<
       log.debug(`Explicit peers: ${peerConfigs.map((p) => p.peerEndpoint)}`);
       const endorsers = new Set<string>();
       if (this.config.mspId) endorsers.add(this.config.mspId);
-      const ctxOrgs = ctx.getOrUndefined("endorsingOrgs") || [];
+      const ctxOrgs = this.getEndorsingOrganizations(ctx) || [];
       ctxOrgs.forEach((org) => endorsers.add(org));
 
       const proposalOptions: ProposalOptions = {

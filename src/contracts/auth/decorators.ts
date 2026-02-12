@@ -15,7 +15,7 @@ export function hlfAllowIf(handler: AuthHandler, ...argz: any[]) {
           throw new MissingContextError(
             `"invalid context provided. this decorator only works on fabric contract methods`
           );
-        const { ctx, ctxArgs } = await thisArg["logCtx"](
+        const { ctx } = await thisArg["logCtx"](
           [...args, context],
           target.name,
           true

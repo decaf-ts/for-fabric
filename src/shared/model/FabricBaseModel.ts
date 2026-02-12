@@ -3,7 +3,6 @@ import { column, createdAt, updatedAt } from "@decaf-ts/core";
 import { version } from "@decaf-ts/db-decorators";
 import { description, uses } from "@decaf-ts/decoration";
 import { FabricFlavour } from "../constants";
-import { Property } from "fabric-contract-api";
 
 @uses(FabricFlavour)
 export class FabricBaseModel extends Model {

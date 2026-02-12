@@ -1,9 +1,5 @@
 import { execSync } from "child_process";
-import {
-  commitChaincode,
-  deployContract,
-  ensureInfrastructureBooted,
-} from "../utils";
+import { ensureInfrastructureBooted } from "../utils";
 import * as fs from "fs";
 import * as path from "path";
 import { CAConfig, PeerConfig } from "../../src/shared/types";
@@ -44,21 +40,6 @@ describe("Tests global contract implementation", () => {
     });
     // Ensure Infrastructure is ready
     await ensureInfrastructureBooted();
-    const location = path.join(
-      __dirname,
-      "../../docker/infrastructure/chaincode",
-      contractFolderName
-    );
-    // if (!fs.existsSync(location)) {
-    //   execSync("npm run build:contract", { stdio: "inherit" });
-    //   execSync("npm run extract:indexes", { stdio: "inherit" });
-    //   execSync(
-    //     `cp -r  ${path.join(__dirname, "../..", contractFolderName)} ${path.join(__dirname, "../../docker/infrastructure/chaincode")}/`,
-    //     { stdio: "inherit" }
-    //   );
-    //   deployContract(contractFolderName, contractName);
-    //   commitChaincode(contractName);
-    // }
     // Copy client config to local directory for testing purposes
     execSync(`docker cp org-a:/weaver/client/. docker/docker-data`, {
       stdio: "inherit",

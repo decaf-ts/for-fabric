@@ -1,14 +1,6 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
-import {
-  Cascade,
-  column,
-  index,
-  manyToOne,
-  OrderDirection,
-  pk,
-  table,
-} from "@decaf-ts/core";
+import { column, index, OrderDirection, pk, table } from "@decaf-ts/core";
 import { TableNames } from "./constants";
 import { description, uses } from "@decaf-ts/decoration";
 import { FabricFlavour } from "../../../../src/shared/constants";

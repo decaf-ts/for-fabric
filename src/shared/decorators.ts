@@ -399,9 +399,18 @@ export async function readMirrorHandler<
 
 export function mirror(
   collection: CollectionResolver | string,
-  mspId: string,
+  mspIdOrCondition?: string | MirrorCondition,
   condition?: MirrorCondition
 ) {
+  const isConditionOnly =
+    typeof mspIdOrCondition !== "string" && Boolean(mspIdOrCondition);
+  const mspId = isConditionOnly
+    ? undefined
+    : (mspIdOrCondition as string | undefined);
+  const cond = isConditionOnly
+    ? (mspIdOrCondition as MirrorCondition)
+    : condition;
+
   function mirror(
     resolver: CollectionResolver | string,
     mspId: string,
@@ -434,7 +443,7 @@ export function mirror(
   return Decoration.for(FabricModelKeys.MIRROR)
     .define({
       decorator: mirror,
-      args: [collection, condition],
+      args: [collection, mspId, cond],
     })
     .apply();
 }
@@ -618,8 +627,12 @@ export async function segregatedDataOnCreate<M extends Model>(
       );
   });
 
+  const keyStrings = keyArray.map((key) => String(key));
   // Store the original model — prepare() will filter to collection-specific fields
-  (context as FabricContractContext).writeTo(collection, model);
+  (context as FabricContractContext).writeTo(collection, {
+    model,
+    keys: keyStrings,
+  });
 }
 
 export async function segregatedDataOnRead<M extends Model>(
@@ -702,8 +715,12 @@ export async function segregatedDataOnUpdate<M extends Model>(
       );
   });
 
+  const keyStrings = (keyArray as (keyof M)[]).map((key) => String(key));
   // Store the original model — prepare() will filter to collection-specific fields
-  (context as FabricContractContext).writeTo(collection, model);
+  (context as FabricContractContext).writeTo(collection, {
+    model,
+    keys: keyStrings,
+  });
 }
 
 export async function segregatedDataOnDelete<

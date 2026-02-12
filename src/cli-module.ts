@@ -34,7 +34,6 @@ import {
   writeCollectionDesignDocs,
 } from "./client/collections/index";
 import { CouchDBDesignDoc, CreateIndexRequest } from "@decaf-ts/for-couchdb";
-import { Metadata } from "@decaf-ts/decoration";
 
 const logger = Logging.for("fabric");
 
@@ -270,7 +269,7 @@ const extractCollections = new Command()
     );
 
     // eslint-disable-next-line prefer-const
-    let { file, folder, outDir, mspIds, overrides, mainMspId } = options;
+    let { file, folder, outDir, mspIds, mainMspId } = options;
 
     try {
       try {
@@ -279,13 +278,8 @@ const extractCollections = new Command()
       } catch (e: unknown) {
         //  do nothing
       }
-      overrides = overrides
-        ? JSON.parse(overrides)
-        : { privateCols: {}, sharedCols: {} };
     } catch (e: unknown) {
-      throw new SerializationError(
-        `Unable to extract mspids or overrides:  ${e}`
-      );
+      throw new SerializationError(`Unable to extract mspids:  ${e}`);
     }
 
     const models: any[] = [];
@@ -323,7 +317,6 @@ const extractCollections = new Command()
       }[] = await Promise.all(
         injectableModels.map(async (clazz) => {
           const tableName = Model.tableName(clazz);
-          const meta = Metadata.get(clazz);
           const mirrorMeta = Model.mirroredAt(clazz);
 
           console.log(tableName);
@@ -440,7 +433,7 @@ const extractCollections = new Command()
         `Copied collections_config to ${contractCollectionsConfig} alongside the package.json`
       );
 
-      cols.forEach((c, i) => {
+      cols.forEach((c) => {
         const { indexes, designDocs, collections, mirror } = c;
         const toIndex: PrivateCollection[] = [...collections, mirror].filter(
           Boolean
@@ -530,6 +523,7 @@ const deployContract = new Command()
       input,
       peers,
       trackerFolder,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       incrementVersion,
       collectionsConfig,
     } = options;

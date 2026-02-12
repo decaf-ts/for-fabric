@@ -14,6 +14,7 @@ import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
 import { type FabricClientAdapter } from "./FabricClientAdapter";
+import { SegregatedModel } from "../shared/types";
 import {
   OperationKeys,
   PrimaryKeyType,
@@ -333,7 +334,7 @@ export class FabricClientRepository<
   }
 
   async healthcheck(...args: MaybeContextualArg<ContextOf<A>>) {
-    const { ctx, log, ctxArgs } = this.logCtx(args, this.healthcheck);
+    const { log, ctxArgs } = this.logCtx(args, this.healthcheck);
 
     const result = await this.adapter.healthcheck(this.class, ...ctxArgs);
 
@@ -348,16 +349,31 @@ export class FabricClientRepository<
     log.debug(
       `Creating new ${this.class.name} in table ${Model.tableName(this.class)}`
     );
-    // eslint-disable-next-line prefer-const
-    let { record, id, transient } = this.adapter.prepare(model, ctx);
-    record = await this.adapter.create(
+    this.ensureLegacyMirrorFlag(ctx, model);
+    const prepared = this.adapter.prepare(model, ctx);
+    const { record, id, transient } = prepared;
+    const result = await this.adapter.create(
       this.class,
       id,
       record,
       transient,
       ...ctxArgs
     );
-    return this.adapter.revert<M>(record, this.class, id, transient, ctx);
+    if (
+      this.shouldRefreshAfterWrite(prepared, ctx) &&
+      id !== undefined &&
+      id !== null
+    ) {
+      const refreshed = await this.adapter.read(this.class, id, ctx);
+      return this.adapter.revert<M>(
+        refreshed,
+        this.class,
+        id,
+        ctx.get("rebuildWithTransient") ? prepared.transient : undefined,
+        ctx
+      );
+    }
+    return this.adapter.revert<M>(result, this.class, id, transient, ctx);
   }
 
   override async update(
@@ -365,8 +381,10 @@ export class FabricClientRepository<
     ...args: MaybeContextualArg<ContextOf<A>>
   ): Promise<M> {
     const { ctxArgs, log, ctx } = this.logCtx(args, this.update);
-    // eslint-disable-next-line prefer-const
-    let { record, id, transient } = this.adapter.prepare(model, ctx);
+    this.ensureLegacyMirrorFlag(ctx, model);
+    const prepared = this.adapter.prepare(model, ctx);
+    const { id, transient } = prepared;
+    let record = prepared.record;
     log.debug(
       `updating ${this.class.name} in table ${Model.tableName(this.class)} with id ${id}`
     );
@@ -377,6 +395,20 @@ export class FabricClientRepository<
       transient,
       ...ctxArgs
     );
+    if (
+      this.shouldRefreshAfterWrite(prepared, ctx) &&
+      id !== undefined &&
+      id !== null
+    ) {
+      const refreshed = await this.adapter.read(this.class, id, ctx);
+      return this.adapter.revert<M>(
+        refreshed,
+        this.class,
+        id,
+        ctx.get("rebuildWithTransient") ? prepared.transient : undefined,
+        ctx
+      );
+    }
     return this.adapter.revert<M>(record, this.class, id, transient, ctx);
   }
 
@@ -430,25 +462,38 @@ export class FabricClientRepository<
       `Creating ${models.length} new ${this.class.name} in table ${Model.tableName(this.class)}`
     );
 
+    models.forEach((model) => this.ensureLegacyMirrorFlag(ctx, model));
     const prepared = models.map((m) => this.adapter.prepare(m, ctx));
     const ids = prepared.map((p) => p.id);
-    let records = prepared.map((p) => p.record);
-    const transient = prepared.map((p) => p.transient);
-    records = await this.adapter.createAll(
+    const payloads = prepared.map((p) => p.record);
+    const transients = prepared.map((p) => p.transient);
+    const created = await this.adapter.createAll(
       this.class,
       ids as PrimaryKeyType[],
-      records,
-      transient,
+      payloads,
+      transients,
       ...ctxArgs
     );
-    return records.map((r, i) =>
-      this.adapter.revert(
-        r,
-        this.class,
-        ids[i],
-        ctx.get("rebuildWithTransient") ? prepared[i].transient : undefined,
-        ctx
-      )
+    return Promise.all(
+      created.map(async (r, i) => {
+        const id = ids[i];
+        if (
+          this.shouldRefreshAfterWrite(prepared[i], ctx) &&
+          id !== undefined &&
+          id !== null
+        ) {
+          const refreshed = await this.adapter.read(this.class, id, ctx);
+          return this.adapter.revert<M>(
+            refreshed,
+            this.class,
+            id,
+            ctx.get("rebuildWithTransient") ? prepared[i].transient : undefined,
+            ctx
+          );
+        }
+
+        return this.adapter.revert<M>(r, this.class, id, transients[i], ctx);
+      })
     );
   }
 
@@ -461,22 +506,63 @@ export class FabricClientRepository<
       `Updating ${models.length} new ${this.class.name} in table ${Model.tableName(this.class)}`
     );
 
-    const records = models.map((m) => this.adapter.prepare(m, ctx));
+    models.forEach((model) => this.ensureLegacyMirrorFlag(ctx, model));
+    const prepared = models.map((m) => this.adapter.prepare(m, ctx));
+    const ids = prepared.map((p) => p.id);
     const updated = await this.adapter.updateAll(
       this.class,
-      records.map((r) => r.id),
-      records.map((r) => r.record),
-      records.map((r) => r.transient),
+      ids as PrimaryKeyType[],
+      prepared.map((r) => r.record),
+      prepared.map((r) => r.transient),
       ...ctxArgs
     );
-    return updated.map((u, i) =>
-      this.adapter.revert(
-        u,
-        this.class,
-        records[i].id,
-        ctx.get("rebuildWithTransient") ? records[i].transient : undefined,
-        ctx
-      )
+    return Promise.all(
+      updated.map(async (u, i) => {
+        const id = ids[i];
+        if (
+          this.shouldRefreshAfterWrite(prepared[i], ctx) &&
+          id !== undefined &&
+          id !== null
+        ) {
+          const refreshed = await this.adapter.read(this.class, id, ctx);
+          return this.adapter.revert<M>(
+            refreshed,
+            this.class,
+            id,
+            ctx.get("rebuildWithTransient") ? prepared[i].transient : undefined,
+            ctx
+          );
+        }
+        return this.adapter.revert<M>(
+          u,
+          this.class,
+          id,
+          prepared[i].transient,
+          ctx
+        );
+      })
     );
+  }
+
+  private shouldRefreshAfterWrite(
+    prepared: SegregatedModel<M>,
+    ctx: ContextOf<A>
+  ): boolean {
+    const hasPrivate =
+      prepared.privates && Object.keys(prepared.privates).length > 0;
+    const hasShared =
+      prepared.shared && Object.keys(prepared.shared).length > 0;
+    return (
+      hasPrivate ||
+      hasShared ||
+      !!ctx.getOrUndefined("segregated") ||
+      !!ctx.getOrUndefined("mirror")
+    );
+  }
+
+  private ensureLegacyMirrorFlag(ctx: ContextOf<A>, model: M): void {
+    if (Model.mirroredAt(model)) {
+      ctx.accumulate({ legacy: true });
+    }
   }
 }

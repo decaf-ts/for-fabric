@@ -2,6 +2,11 @@ import { Context } from "@decaf-ts/core";
 import { FabricContractFlags } from "./types";
 import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
 
+export type SegregatedWriteEntry = {
+  model: Record<string, any>;
+  keys: string[];
+};
+
 /**
  * @description Context class for Fabric chaincode operations
  * @summary Provides access to Fabric-specific context elements like stub, identity, and logger to be used by repositories and adapters during contract execution.
@@ -68,7 +73,7 @@ export class FabricContractContext extends Context<FabricContractFlags> {
     return this.get("identity");
   }
 
-  private _segregateWrite: Record<string, any[]> = {};
+  private _segregateWrite: Record<string, SegregatedWriteEntry[]> = {};
   private _segregateRead: string[] = [];
   private _fullySegregated: boolean = false;
 
@@ -80,9 +85,9 @@ export class FabricContractContext extends Context<FabricContractFlags> {
     return this._fullySegregated;
   }
 
-  writeTo(col: string, record: any) {
+  writeTo(col: string, entry: SegregatedWriteEntry) {
     if (!(col in this._segregateWrite)) this._segregateWrite[col] = [];
-    this._segregateWrite[col].push(record);
+    this._segregateWrite[col].push(entry);
     this.cache.put("segregateWrite", this._segregateWrite);
   }
 

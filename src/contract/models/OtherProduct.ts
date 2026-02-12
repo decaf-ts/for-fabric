@@ -1,18 +1,8 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
-import {
-  Cascade,
-  column,
-  index,
-  oneToMany,
-  OrderDirection,
-  pk,
-  table,
-} from "@decaf-ts/core";
+import { column, index, OrderDirection, pk, table } from "@decaf-ts/core";
 // import {BlockOperations, OperationKeys, readonly} from "@decaf-ts/db-decorators";
 import { uses } from "@decaf-ts/decoration";
-import { ProductStrength } from "./ProductStrength";
-import { Market } from "./Market";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { gtin } from "./gtin";
 

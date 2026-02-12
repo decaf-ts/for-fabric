@@ -95,24 +95,20 @@ export class ChaincodeManager {
   }
 
   deploy() {
-    try {
-      for (const [i, peer] of this.peers.entries()) {
-        const tlsCert = i === 0 ? "tls-ca-cert.pem" : "orderer-tls-ca-cert.pem";
-        ChaincodeManager.deployContract(
-          peer,
-          this.contractFolder,
-          this.contractName,
-          tlsCert,
-          this.ordererAddress,
-          this.channelName,
-          this.sequence,
-          this.version
-        );
-      }
-      console.info("[deploy] Contract deployment completed.");
-    } catch (e: any) {
-      throw e;
+    for (const [i, peer] of this.peers.entries()) {
+      const tlsCert = i === 0 ? "tls-ca-cert.pem" : "orderer-tls-ca-cert.pem";
+      ChaincodeManager.deployContract(
+        peer,
+        this.contractFolder,
+        this.contractName,
+        tlsCert,
+        this.ordererAddress,
+        this.channelName,
+        this.sequence,
+        this.version
+      );
     }
+    console.info("[deploy] Contract deployment completed.");
     return this;
   }
 
@@ -131,7 +127,7 @@ export class ChaincodeManager {
     return this;
   }
 
-  invoke(functionName: string, args: any[], transient: any = {}) {
+  invoke(_functionName: string, _args: any[], _transient: any = {}) {
     // return invokeChaincode(
     //     this.contractName,
     //     functionName,
@@ -140,7 +136,7 @@ export class ChaincodeManager {
     // );
   }
 
-  query(functionName: string, args: any[]) {
+  query(_functionName: string, _args: any[]) {
     // return queryChaincode(
     //     this.contractName,
     //     functionName,
