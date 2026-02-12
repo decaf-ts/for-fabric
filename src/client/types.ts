@@ -13,4 +13,8 @@ export type FabricClientFlags = FabricFlags & {
   sizeLimit?: number;
   mspId?: string;
   channel?: string;
+  legacy?: boolean;
+  allowGatewayOverride?: boolean;
+  allowManualEndorsingOrgs: boolean;
+  encryptTransient?: false | string | (() => string);
 };

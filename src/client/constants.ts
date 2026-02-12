@@ -5,4 +5,8 @@ export const DefaultFabricClientFlags: FabricClientFlags = Object.assign({
   endorseTimeout: 15,
   submitTimeout: 5,
   commitTimeout: 60,
+  legacy: false,
+  allowManualEndorsingOrgs: false,
+  allowGatewayOverride: false,
+  encryptTransient: false,
 }) as any;

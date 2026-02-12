@@ -536,18 +536,13 @@ export class FabricClientAdapter extends Adapter<
 
     const mirrorMeta = Model.mirroredAt(model);
     if (mirrorMeta) {
-      let mirrorMsp: string | undefined;
-      try {
-        mirrorMsp =
-          typeof mirrorMeta.resolver === "string"
-            ? mirrorMeta.resolver
-            : mirrorMeta.resolver(model);
-      } catch (e: unknown) {
-        throw new InternalError(`Failed to resolve mirror MSP: ${e}`);
-      }
+      const mirrorMsp = mirrorMeta.mspId;
       if (!mirrorMsp) throw new InternalError(`No mirror MSP could be found`);
       const msps = ctx.getFromChildren("endorsingOrgs") || [];
-      ctx.accumulate({ endorsingOrgs: [...new Set([...msps, mirrorMsp])] });
+      ctx.accumulate({
+        endorsingOrgs: [...new Set([...msps, mirrorMsp])],
+        legacy: true,
+      });
     }
 
     return {
@@ -978,7 +973,9 @@ export class FabricClientAdapter extends Adapter<
           },
           {} as typeof transientData
         ),
-        endorsingOrganizations: endorsingOrganizations || undefined, // mspId list
+        endorsingOrganizations: ctx.getOrUndefined("allowManualEndorsingOrgs")
+          ? endorsingOrganizations || undefined
+          : undefined, // mspId list
       };
 
       return await method.call(contract, api, proposalOptions);
@@ -986,6 +983,99 @@ export class FabricClientAdapter extends Adapter<
       throw this.parseError(e);
     } finally {
       this.log.debug(`Closing ${this.config.mspId} gateway connection`);
+      gateway.close();
+    }
+  }
+
+  private shouldUseLegacyGateway(ctx: Context<FabricClientFlags>): boolean {
+    return (
+      !!ctx.getOrUndefined("legacy") &&
+      !!ctx.getOrUndefined("allowGatewayOverride")
+    );
+  }
+
+  private prepareLegacyArgs(args?: any[]): string[] {
+    return (args || []).map((arg) =>
+      typeof arg === "string" ? arg : JSON.stringify(arg)
+    );
+  }
+
+  private buildLegacyTransient(
+    transientData?: Record<string, string>
+  ): Record<string, Buffer> | undefined {
+    if (!transientData) return undefined;
+    const entries = Object.entries(transientData);
+    if (!entries.length) return undefined;
+    const map: Record<string, Buffer> = {};
+    for (const [key, value] of entries) {
+      map[key] = Buffer.from(JSON.stringify(value));
+    }
+    return map;
+  }
+
+  private buildLegacyPeerConfigs(): {
+    peerEndpoint: string;
+    tlsCert: string | Buffer;
+    peerHostAlias?: string;
+  }[] {
+    return [
+      {
+        peerEndpoint: this.config.peerEndpoint,
+        tlsCert: this.config.tlsCert,
+        peerHostAlias: this.config.peerHostAlias,
+      },
+    ];
+  }
+
+  private async submitLegacyWithExplicitEndorsers(
+    ctx: Context<FabricClientFlags>,
+    fcn: string,
+    args: string[],
+    transientMap: Record<string, Buffer> | undefined,
+    peerConfigs: {
+      peerEndpoint: string;
+      tlsCert: string | Buffer;
+      peerHostAlias?: string;
+    }[],
+    className?: string
+  ): Promise<Uint8Array> {
+    const log = this.log.for(this.submitLegacyWithExplicitEndorsers);
+    const gateway = await this.Gateway(ctx);
+    try {
+      const contract = FabricClientAdapter.getContract(
+        gateway,
+        this.config,
+        this.getContractName(className)
+      );
+      log.verbose(
+        `Legacy submitting ${this.getContractName(className) || this.config.contractName}.${fcn}`
+      );
+      log.debug(`Explicit peers: ${peerConfigs.map((p) => p.peerEndpoint)}`);
+      const endorsers = new Set<string>();
+      if (this.config.mspId) endorsers.add(this.config.mspId);
+      const ctxOrgs = ctx.getOrUndefined("endorsingOrgs") || [];
+      ctxOrgs.forEach((org) => endorsers.add(org));
+
+      const proposalOptions: ProposalOptions = {
+        arguments: args,
+        transientData: transientMap,
+        endorsingOrganizations:
+          endorsers.size > 0 ? Array.from(endorsers) : undefined,
+      };
+
+      const proposal = contract.newProposal(fcn, proposalOptions);
+      const transaction = await proposal.endorse();
+      const submission = await transaction.submit();
+      const status = await submission.getStatus();
+      if (!status.successful) {
+        throw new Error(
+          `Legacy endorsement failed for ${transaction.getTransactionId()}: ${status.code}`
+        );
+      }
+      return transaction.getResult();
+    } catch (e: any) {
+      throw this.parseError(e);
+    } finally {
       gateway.close();
     }
   }
@@ -1018,6 +1108,19 @@ export class FabricClientAdapter extends Adapter<
     endorsingOrganizations?: Array<string>,
     className?: string
   ): Promise<Uint8Array> {
+    if (this.shouldUseLegacyGateway(ctx)) {
+      const legacyArgs = this.prepareLegacyArgs(args);
+      const transientMap = this.buildLegacyTransient(transientData);
+      const peerConfigs = this.buildLegacyPeerConfigs();
+      return this.submitLegacyWithExplicitEndorsers(
+        ctx,
+        api,
+        legacyArgs,
+        transientMap,
+        peerConfigs,
+        className
+      );
+    }
     return this.transaction(
       ctx,
       api,

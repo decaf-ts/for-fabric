@@ -191,4 +191,49 @@ const createContext = () => {
 
     expect(client.close).toHaveBeenCalledTimes(1);
   });
+
+  it("submits through legacy flow when mirror flags are set", async () => {
+    const adapter = newAdapter();
+    const legacyResult = new TextEncoder().encode("legacy");
+    const legacySpy = jest
+      .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
+      .mockResolvedValue(legacyResult);
+    const ctx = createContext();
+    ctx.accumulate({ legacy: true, allowGatewayOverride: true });
+
+    const payload = { foo: "bar" };
+    const transient = { private: "secret" };
+
+    const result = await adapter.submitTransaction(
+      ctx,
+      "create",
+      [payload],
+      transient
+    );
+
+    expect(result).toBe(legacyResult);
+    expect(legacySpy).toHaveBeenCalledTimes(1);
+    const [calledCtx, method, args, transientMap, peerConfigs] =
+      legacySpy.mock.calls[0];
+    expect(calledCtx).toBe(ctx);
+    expect(method).toBe("create");
+    expect(args).toEqual([JSON.stringify(payload)]);
+    expect(transientMap.private.toString()).toBe(JSON.stringify("secret"));
+    expect(peerConfigs[0].peerEndpoint).toBe(config.peerEndpoint);
+    legacySpy.mockRestore();
+  });
+
+  it("uses default transaction when legacy override is disabled", async () => {
+    const adapter = newAdapter();
+    const txnSpy = jest
+      .spyOn(adapter as any, "transaction")
+      .mockResolvedValue(new TextEncoder().encode("submit"));
+    const ctx = createContext();
+    ctx.accumulate({ legacy: true, allowGatewayOverride: false });
+
+    await adapter.submitTransaction(ctx, "create");
+
+    expect(txnSpy).toHaveBeenCalled();
+    txnSpy.mockRestore();
+  });
 });

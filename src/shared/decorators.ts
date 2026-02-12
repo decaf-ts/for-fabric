@@ -219,8 +219,9 @@ export function transactionId() {
 export type MirrorCondition = (msp: string) => boolean;
 
 export type MirrorMetadata = {
-  condition: MirrorCondition;
+  condition?: MirrorCondition;
   resolver: CollectionResolver | string;
+  mspId: string;
 };
 
 export async function evalMirrorMetadata<M extends Model>(
@@ -337,14 +338,16 @@ export async function mirrorWriteGuard<
   this: R,
   context: Context<FabricContractFlags>,
   data: MirrorMetadata,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   key: keyof M,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   model: M
 ): Promise<void> {
   const msp = extractMspId(
     context.get("identity") as string | ClientIdentity | undefined
   );
   if (!msp) return;
-  if (data.condition(msp)) {
+  if (msp === data.mspId || (data.condition && data.condition(msp))) {
     throw new AuthorizationError(
       `Organization ${msp} is not authorized to modify mirrored data`
     );
@@ -377,7 +380,7 @@ export async function readMirrorHandler<
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const skipFlagKey = `${MIRROR_SKIP_FLAG_PREFIX}${collection}`;
   const fabricCtx = context as FabricContractContext;
-  const matches = data.condition(msp);
+  const matches = msp === data.mspId || (data.condition && data.condition(msp));
 
   if (matches) {
     context.logger.info(
@@ -396,14 +399,17 @@ export async function readMirrorHandler<
 
 export function mirror(
   collection: CollectionResolver | string,
-  condition: MirrorCondition
+  mspId: string,
+  condition?: MirrorCondition
 ) {
   function mirror(
     resolver: CollectionResolver | string,
-    condition: MirrorCondition
+    mspId: string,
+    condition?: MirrorCondition
   ) {
     const meta: MirrorMetadata = {
       condition: condition,
+      mspId: mspId,
       resolver: resolver,
     };
     return apply(
@@ -657,6 +663,7 @@ export async function segregatedDataOnUpdate<M extends Model>(
   data: SegregatedDataMetadata | SegregatedDataMetadata[],
   key: keyof M | (keyof M)[],
   model: M,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   oldModel: M
 ): Promise<void> {
   const dataArray = (
