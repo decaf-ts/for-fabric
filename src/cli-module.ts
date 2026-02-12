@@ -573,6 +573,7 @@ const getCryptoMaterial = new Command()
   .name("get-crypto-material")
   .description("copies the crypto material to the selected folder")
   .option("--folder <String>", "output folder", "docker/docker-data")
+  .option("--org [String]", "the org/peer to extract from", "org-a")
   .action(async (options: any) => {
     const pkg = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
@@ -584,8 +585,8 @@ const getCryptoMaterial = new Command()
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );
-    const { folder } = options;
-    execSync(`docker cp org-a:/weaver/client/. ${folder}`, {
+    const { folder, org } = options;
+    execSync(`docker cp ${org}:/weaver/client/. ${folder}`, {
       cwd: process.cwd(),
     });
   });
