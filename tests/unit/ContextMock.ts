@@ -251,7 +251,7 @@ export function getStubMock() {
       if (testStr.includes(ModelKeys.ANCHOR))
         throw new InternalError("Anchor keys are not allowed");
       // Write to pending (uncommitted) buffer
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       pendingState[key] = toBuffer(value);
       pendingDeletes.delete(key);
     },
