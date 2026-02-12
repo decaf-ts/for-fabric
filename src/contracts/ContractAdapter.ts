@@ -275,18 +275,21 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.info(`in ADAPTER create with args ${args}`);
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    let existing: any;
-    try {
-      existing = await this.readState(composedKey, ctx);
-    } catch (e: unknown) {
-      // eslint-disable-next-line no-ex-assign
-      e = this.parseError(e as Error);
-      if (!(e instanceof NotFoundError)) throw e;
+    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+    if (!isMirror) {
+      let existing: any;
+      try {
+        existing = await this.readState(composedKey, ctx);
+      } catch (e: unknown) {
+        // eslint-disable-next-line no-ex-assign
+        e = this.parseError(e as Error);
+        if (!(e instanceof NotFoundError)) throw e;
+      }
+      if (existing)
+        throw new ConflictError(
+          `record with id ${id} in table ${tableName} already exists`
+        );
     }
-    if (existing)
-      throw new ConflictError(
-        `record with id ${id} in table ${tableName} already exists`
-      );
 
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
@@ -372,10 +375,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ): Promise<Record<string, any>> {
     const { ctx, log, ctxArgs } = this.logCtx(args, this.delete);
     const tableName = Model.tableName(clazz);
+    const pkProp = Model.pk(clazz);
+    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
     let model: Record<string, any>;
     try {
       const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-      model = await this.read(clazz, id, ...ctxArgs);
+      if (!isMirror) {
+        model = await this.read(clazz, id, ...ctxArgs);
+      } else {
+        model = { [pkProp as string]: id } as Record<string, any>;
+      }
       log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
       await this.deleteState(composedKey, ctx);
       await this.deleteSegregatedCollections(ctx, composedKey);
