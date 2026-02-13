@@ -6,7 +6,15 @@ import {
   ModelArg,
   required,
 } from "@decaf-ts/decorator-validation";
-import { pk, table, column, AuthorizationError } from "@decaf-ts/core";
+import { version } from "@decaf-ts/db-decorators";
+import {
+  Cascade,
+  column,
+  oneToMany,
+  pk,
+  table,
+  AuthorizationError,
+} from "@decaf-ts/core";
 import { uses } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
 import {
@@ -32,6 +40,7 @@ jest.setTimeout(50000);
 
 const COLLECTION_A = "collectionA";
 const COLLECTION_B = "collectionB";
+const SHARED_CHILD_COLLECTION = "sharedChildCollection";
 
 /**
  * Test model WITHOUT segregated data for baseline comparison
@@ -52,9 +61,6 @@ class PublicTestModel extends Model {
   }
 }
 
-/**
- * Test model WITH @sharedData decorator for segregated data testing
- */
 @uses(FabricFlavour)
 @table("shared_test")
 @model()
@@ -69,10 +75,85 @@ class SharedDataTestModel extends Model {
   @sharedData(COLLECTION_A)
   privateField?: string;
 
-  @ownedBy()
+@ownedBy()
   owner?: string;
 
   constructor(args?: ModelArg<SharedDataTestModel>) {
+    super(args);
+  }
+}
+
+@uses(FabricFlavour)
+@table("shared_versioned")
+@model()
+class SharedVersionedModel extends Model {
+  @pk()
+  id!: string;
+
+  @column()
+  @required()
+  publicField!: string;
+
+  @column()
+  @version()
+  version!: number;
+
+  @sharedData(COLLECTION_A)
+  secretField?: string;
+
+  constructor(args?: ModelArg<SharedVersionedModel>) {
+    super(args);
+  }
+}
+
+@uses(FabricFlavour)
+@table("shared_child")
+@model()
+class SharedChildModel extends Model {
+  @pk()
+  id!: string;
+
+  @column()
+  name!: string;
+
+  @column()
+  @version()
+  version!: number;
+
+  @sharedData(SHARED_CHILD_COLLECTION)
+  sharedNote?: string;
+
+  constructor(args?: ModelArg<SharedChildModel>) {
+    super(args);
+  }
+}
+
+@uses(FabricFlavour)
+@table("shared_parent")
+@model()
+class SharedParentModel extends Model {
+  @pk()
+  id!: string;
+
+  @column()
+  name!: string;
+
+  @column()
+  @version()
+  version!: number;
+
+  @oneToMany(
+    () => SharedChildModel,
+    {
+      update: Cascade.CASCADE,
+      delete: Cascade.CASCADE,
+    },
+    true
+  )
+  @required()
+  children!: SharedChildModel[];
+
+  constructor(args?: ModelArg<SharedParentModel>) {
     super(args);
   }
 }
@@ -1681,6 +1762,77 @@ describe("Fully Shared Models (no public state writes)", () => {
     expect(sharedReads.some((c) => c.collection === COLLECTION_B)).toBe(true);
     expect(result.sharedFieldA).toBe("read-shared-a");
     expect(result.sharedFieldB).toBe("read-shared-b");
+  });
+});
+
+describe("Shared versioned model updates", () => {
+  let adapter: FabricContractAdapter;
+  let repository: FabricContractRepository<SharedVersionedModel>;
+  let trackingMock: ReturnType<typeof createTrackingStubMock>;
+
+  beforeEach(() => {
+    adapter = new FabricContractAdapter(
+      undefined as any,
+      `versioned-test-${Math.random()}`
+    );
+    repository = new FabricContractRepository(
+      adapter,
+      SharedVersionedModel
+    );
+    trackingMock = createTrackingStubMock();
+  });
+
+  it("creates and updates using the full shared data without version mismatch", async () => {
+    const identity = getIdentityMock();
+    const id = `shared-version-${Math.random().toString(36).slice(2, 8)}`;
+
+    const createContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.CREATE,
+      trackingMock.stub,
+      identity,
+      SharedVersionedModel
+    );
+
+    const model = new SharedVersionedModel({
+      id,
+      publicField: "initial",
+      secretField: "secret-1",
+    });
+
+    const created = await repository.create(model, createContext);
+    trackingMock.stub.commit();
+    expect(created.version).toBe(1);
+
+    const updateContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.UPDATE,
+      trackingMock.stub,
+      identity,
+      SharedVersionedModel
+    );
+
+    const updatedModel = new SharedVersionedModel({
+      id,
+      publicField: "updated",
+      secretField: "secret-2",
+    });
+
+    const updated = await repository.update(updatedModel, updateContext);
+    trackingMock.stub.commit();
+    expect(updated.version).toBe(2);
+
+    const readContext = await buildRepositoryContextGeneric(
+      adapter,
+      OperationKeys.READ,
+      trackingMock.stub,
+      identity,
+      SharedVersionedModel
+    );
+    const reread = await repository.read(id, readContext);
+    trackingMock.stub.commit();
+    expect(reread.version).toBe(2);
+    expect(reread.secretField).toBe("secret-2");
   });
 });
 
