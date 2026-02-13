@@ -6,6 +6,7 @@ const config: Config.InitialOptions = {
   transform: { "^.+\\.ts?$": "ts-jest" },
   testEnvironment: "node",
   testRegex: "/tests/.*\\.(test|spec)\\.(ts|tsx)$",
+  watchman: false,
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   testPathIgnorePatterns: ["/src/bin"],
   collectCoverage: false,

@@ -580,7 +580,23 @@ export class FabricClientAdapter extends Adapter<
       });
     }
 
-    return new (clazz as Constructor<M>)(obj);
+    const result = new (clazz as Constructor<M>)(obj);
+
+    if (
+      transient &&
+      this.shouldRebuildWithTransient(
+        ctx,
+        ctx.getOrUndefined("operation") as string | undefined
+      )
+    ) {
+      // ensure transient values reach the returned instance, even if the constructor
+      // strips unexpected keys
+      Object.entries(transient as Record<string, any>).forEach(([key, val]) => {
+        (result as any)[key] = val;
+      });
+    }
+
+    return result;
   }
 
   private shouldRebuildWithTransient(
@@ -589,8 +605,14 @@ export class FabricClientAdapter extends Adapter<
   ): boolean {
     if (!ctx) return false;
     if (ctx.getOrUndefined("rebuildWithTransient")) return true;
-    if (!operation) return false;
-    const op = operation.toString().toLowerCase();
+    const childRebuild =
+      typeof (ctx as any).getFromChildren === "function"
+        ? (ctx as any).getFromChildren("rebuildWithTransient")
+        : undefined;
+    if (childRebuild) return true;
+    const resolvedOp = this.resolveOperation(ctx, operation);
+    if (!resolvedOp) return false;
+    const op = resolvedOp.toString().toLowerCase();
     return (
       op.includes("read") ||
       op.includes("find") ||
@@ -598,6 +620,17 @@ export class FabricClientAdapter extends Adapter<
       op.includes("statement") ||
       op.includes("page")
     );
+  }
+
+  private resolveOperation(
+    ctx: Context<FabricClientFlags>,
+    operation?: string
+  ): string | undefined {
+    if (operation) return operation;
+    if (typeof (ctx as any).getFromChildren === "function") {
+      return (ctx as any).getFromChildren("operation");
+    }
+    return undefined;
   }
 
   private shouldRefreshAfterWrite(

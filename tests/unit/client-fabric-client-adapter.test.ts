@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
-import { InternalError } from "@decaf-ts/db-decorators";
-import { Context } from "@decaf-ts/core";
+import { InternalError, OperationKeys } from "@decaf-ts/db-decorators";
+import { Context, PreparedStatementKeys } from "@decaf-ts/core";
 import { ModelKeys } from "@decaf-ts/decorator-validation";
 import { ERC20Wallet } from "../../src/contracts/erc20/models";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
@@ -266,6 +266,7 @@ const createContext = () => {
     );
 
     expect(readSpy).toHaveBeenCalledWith(ERC20Wallet, "wallet-1", ctx);
+    expect(result).not.toEqual(serializedResult);
     expect(result).toEqual({ ...serializedResult, secret: "value" });
   });
 
@@ -286,7 +287,16 @@ const createContext = () => {
       );
     const readSpy = jest
       .spyOn(adapter, "read")
-      .mockResolvedValueOnce({ ...serializedResult, secret: "new" } as any);
+      .mockResolvedValueOnce(
+        {
+          ...serializedResult,
+          secret: "new",
+          createdBy: "system",
+          createdAt: "2026-02-13T00:00:00.000Z",
+          updatedBy: "system",
+          updatedAt: "2026-02-13T00:00:00.000Z",
+        } as any
+      );
 
     const result = await adapter.update(
       ERC20Wallet,
@@ -297,6 +307,121 @@ const createContext = () => {
     );
 
     expect(readSpy).toHaveBeenCalledWith(ERC20Wallet, "wallet-1", ctx);
-    expect(result).toEqual({ ...serializedResult, secret: "new" });
+    expect(result).not.toEqual(serializedResult);
+    expect(result).toEqual({
+      ...serializedResult,
+      secret: "new",
+      createdBy: "system",
+      createdAt: "2026-02-13T00:00:00.000Z",
+      updatedBy: "system",
+      updatedAt: "2026-02-13T00:00:00.000Z",
+    });
+  });
+
+  const expectTransientApplied = (
+    adapter: FabricClientAdapter,
+    ctx: Context,
+    transient: Record<string, string>
+  ) =>
+    adapter.revert(
+      { id: "transient-wallet" },
+      ERC20Wallet,
+      "transient-wallet",
+      transient,
+      ctx
+    );
+
+  it("rebuilds transient data for read contexts", () => {
+    const adapter = newAdapter();
+    const ctx = new Context();
+    ctx.accumulate({ rebuildWithTransient: true, operation: "read" });
+    const rebuilt = expectTransientApplied(adapter, ctx, { secret: "read" });
+
+    expect((rebuilt as any).secret).toBe("read");
+  });
+
+  it("rebuilds transient data for query contexts", () => {
+    const adapter = newAdapter();
+    const ctx = new Context();
+    ctx.accumulate({ rebuildWithTransient: true, operation: "find" });
+    const rebuilt = expectTransientApplied(adapter, ctx, { secret: "query" });
+
+    expect((rebuilt as any).secret).toBe("query");
+  });
+
+  it("rebuilds transient data from a context override", () => {
+    const adapter = newAdapter();
+    const baseCtx = new Context();
+    const overrideCtx = (baseCtx.override({
+      rebuildWithTransient: true,
+      operation: "read",
+    }) as unknown) as Context;
+    const rebuilt = expectTransientApplied(adapter, overrideCtx, {
+      secret: "override",
+    });
+
+    expect((rebuilt as any).secret).toBe("override");
+  });
+
+  it("ensures rebuild applies transient for reads and queries", () => {
+    const adapter = newAdapter();
+    const readCtx = new Context();
+    readCtx.accumulate({ rebuildWithTransient: true, operation: "read" });
+    const queryCtx = new Context();
+    queryCtx.accumulate({ rebuildWithTransient: true, operation: "find" });
+
+    const readResult = adapter.revert(
+      { id: "read-wallet" },
+      ERC20Wallet,
+      "read-wallet",
+      { secret: "read" },
+      readCtx
+    );
+    const queryResult = adapter.revert(
+      { id: "query-wallet" },
+      ERC20Wallet,
+      "query-wallet",
+      { secret: "query" },
+      queryCtx
+    );
+    const overrideCtx = (new Context()
+      .accumulate({})
+      .override({
+        rebuildWithTransient: true,
+        operation: "read",
+      }) as unknown) as Context;
+    const overrideResult = adapter.revert(
+      { id: "override-wallet" },
+      ERC20Wallet,
+      "override-wallet",
+      { secret: "override" },
+      overrideCtx
+    );
+
+    expect((readResult as any).secret).toBe("read");
+    expect((queryResult as any).secret).toBe("query");
+    expect((overrideResult as any).secret).toBe("override");
+  });
+
+  it("implicitly rebuilds transient data for read operations", () => {
+    const adapter = newAdapter();
+    const ctx = new Context();
+    ctx.accumulate({ operation: OperationKeys.READ });
+    const result = expectTransientApplied(adapter, ctx, {
+      secret: "auto-read",
+    });
+
+    expect((result as any).secret).toBe("auto-read");
+  });
+
+  it("implicitly rebuilds transient data for query operations", () => {
+    const adapter = newAdapter();
+    const ctx = new Context();
+    ctx.accumulate({ operation: PreparedStatementKeys.FIND });
+    const result = expectTransientApplied(adapter, ctx, {
+      secret: "auto-query",
+    });
+
+    expect((result as any).secret).toBe("auto-query");
   });
 });
