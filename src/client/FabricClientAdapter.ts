@@ -571,30 +571,18 @@ export class FabricClientAdapter extends Adapter<
       log.verbose(
         `re-adding transient properties: ${Object.keys(transient).join(", ")}`
       );
-      Object.entries(transient as Record<string, any>).forEach(([key, val]) => {
-        if (key in obj && (obj as any)[key] !== undefined)
-          log.warn(
-            `overwriting existing ${key}. if this is not a default value, this may pose a problem`
-          );
-        (obj as M)[key as keyof M] = val;
-      });
+      Object.entries(transient as Record<string, any>)
+        .filter(([, v]) => typeof v !== "undefined")
+        .forEach(([key, val]) => {
+          if (key in obj && (obj as any)[key] !== undefined)
+            log.warn(
+              `overwriting existing ${key}. if this is not a default value, this may pose a problem`
+            );
+          (obj as M)[key as keyof M] = val;
+        });
     }
 
     const result = new (clazz as Constructor<M>)(obj);
-
-    if (
-      transient &&
-      this.shouldRebuildWithTransient(
-        ctx,
-        ctx.getOrUndefined("operation") as string | undefined
-      )
-    ) {
-      // ensure transient values reach the returned instance, even if the constructor
-      // strips unexpected keys
-      Object.entries(transient as Record<string, any>).forEach(([key, val]) => {
-        (result as any)[key] = val;
-      });
-    }
 
     return result;
   }
