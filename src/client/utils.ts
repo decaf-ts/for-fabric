@@ -5,6 +5,7 @@ import { CryptoSetting, ICryptoSuite, User } from "fabric-common";
 import { HSMOptions } from "../shared/types";
 import { normalizeImport } from "@decaf-ts/core";
 import crypto, { X509Certificate } from "crypto";
+import { X509Certificate as X509Cert } from "@peculiar/x509";
 
 /**
  * @description Core utilities for interacting with files, crypto identities, and Fabric SDK helpers
@@ -262,4 +263,44 @@ export class CoreUtils {
 
     return key;
   }
+}
+
+/**
+ * Extracts the certificate Serial Number and the AKI (Authority Key Identifier)
+ * in the format Fabric CA expects (plain hex, no colons).
+ */
+export function getAkiAndSerialFromCert(cert: string): {
+  aki: string;
+  serial: string;
+} {
+  const x509Certificate = new X509Cert(cert);
+
+  // Find the AKI (Authority Key Identifier) extension by its OID: 2.5.29.35
+  const akiExt = x509Certificate.extensions?.find(
+    (e) => e.type === "2.5.29.35"
+  );
+  if (!akiExt) {
+    throw new Error(
+      "Authority Key Identifier (AKI) extension not found in certificate."
+    );
+  }
+
+  // akiExt.value is the extension content in DER bytes. Convert it to a hex string.
+  let aki = Buffer.from(new Uint8Array(akiExt.value))
+    .toString("hex")
+    .toUpperCase();
+
+  /**
+   * Common case:
+   * The DER-encoded AKI extension often starts with:
+   *   30 16 80 14 <20-byte keyIdentifier>
+   * In hex, that's "30168014" + 40 hex chars (20 bytes).
+   *
+   * Fabric CA expects ONLY the 20-byte keyIdentifier (40 hex chars),
+   * so we strip the "30168014" prefix when present.
+   */
+  if (aki.startsWith("30168014") && aki.length >= 8 + 40)
+    aki = aki.slice(8, 8 + 40);
+
+  return { aki, serial: x509Certificate.serialNumber };
 }

@@ -10,7 +10,9 @@ import FabricCAServices, {
   IAttributeRequest,
   IdentityService,
   IEnrollResponse,
+  IIdentityRequest,
   IRegisterRequest,
+  IRevokeRequest,
   IServiceResponse,
   TLSOptions,
 } from "fabric-ca-client";
@@ -21,7 +23,7 @@ import {
   NotFoundError,
   OperationKeys,
 } from "@decaf-ts/db-decorators";
-import { CoreUtils } from "../utils";
+import { CoreUtils, getAkiAndSerialFromCert } from "../utils";
 import {
   CertificateResponse,
   FabricIdentity,
@@ -400,44 +402,56 @@ export class FabricIdentityService extends ClientBasedService<
    * @param {User} currentUser - Already enrolled user, must have a signing identity.
    * @return {Promise<Identity>} The renewed identity object with new credentials.
    */
-  async reenroll(
+  async reenrollAndRevoke(
     enrollmentId: string,
-    identity: Identity,
-    attrReqs: IAttributeRequest[] = [],
+    identity: { certificate: string; privateKey: string },
+    attr: IKeyValueAttribute[],
     ...args: MaybeContextualArg<any>
   ): Promise<Identity> {
     const { log, ctx } = (await this.logCtx(args, "reenroll", true)).for(
-      this.reenroll
+      this.reenrollAndRevoke
     );
 
     try {
       log.debug(`Re-enrolling ${enrollmentId}`);
 
-      const { mspId, credentials } = identity;
-
-      const user = User.createUser(
+      // Update attributes in the CA registry (admin operation). This changes the "source of truth".
+      const identityService = this.client.newIdentityService();
+      const caIdentityUpdateRequest: IIdentityRequest = {
+        enrollmentID: enrollmentId,
+        affiliation: "", // kept as-is to preserve current behavior
+        attrs: attr,
+      };
+      await identityService.update(
         enrollmentId,
-        "", // enrollmentSecret
-        mspId || this.user.getMspid(),
-        credentials.certificate,
-        credentials.privateKey
+        caIdentityUpdateRequest,
+        this.user
+      ); // as IServiceResponse & { result: IIdentityRequest };
+
+      // Reenroll as the user. Request must be signed using the existing certificate.
+      const reenrollUser = User.createUser(
+        enrollmentId,
+        "", // enrollmentSecret not required for reenroll
+        this.user.getMspid(),
+        identity.certificate,
+        identity.privateKey
       );
+      reenrollUser.setCryptoSuite(this.user.getCryptoSuite());
 
-      // Reuse cryptoSuite config
-      user.setCryptoSuite(this.user.getCryptoSuite());
+      // If you want attributes included in the *new* cert, pass AttributeRequests here (not KeyValue attrs).
+      const enrollment = await this.client.reenroll(reenrollUser, []);
 
-      const enrollment = await this.client.reenroll(user, attrReqs);
-      const newIdentity = FabricIdentityService.identityFromEnrollment(
+      const renewedIdentity = FabricIdentityService.identityFromEnrollment(
         enrollment,
         this.config.caName,
         ctx
       );
 
-      log.info(
-        `Successfully re-enrolled ${enrollmentId} under ${this.config.caName} as ${newIdentity.id}`
-      );
+      // Revoke the previous certificate only, so the old cert becomes invalid.
+      const { aki, serial } = getAkiAndSerialFromCert(identity.certificate);
+      await this.revoke(enrollmentId, { aki, serial }, args);
 
-      return newIdentity;
+      return renewedIdentity;
     } catch (e: any) {
       throw this.parseError(e);
     }
@@ -455,6 +469,7 @@ export class FabricIdentityService extends ClientBasedService<
    */
   async revoke(
     enrollmentId: string,
+    revokeOptions: Omit<IRevokeRequest, "enrollmentID">,
     ...args: MaybeContextualArg<any>
   ): Promise<IServiceResponse> {
     const { log } = (await this.logCtx(args, "revoke", true)).for(this.revoke);
@@ -466,10 +481,18 @@ export class FabricIdentityService extends ClientBasedService<
       );
     let result: IServiceResponse;
     try {
-      result = await this.client.revoke(
-        { enrollmentID: identity.id, reason: "User Deletion" },
-        this.user
-      );
+      const reason =
+        Boolean(revokeOptions.serial) || Boolean(revokeOptions.aki)
+          ? "Revoke User Certificate"
+          : "User Deletion";
+
+      const revokeRequest: IRevokeRequest = {
+        reason,
+        ...revokeOptions,
+        enrollmentID: identity.id,
+      };
+
+      result = await this.client.revoke(revokeRequest, this.user);
     } catch (e: unknown) {
       throw new InternalError(
         `Could not revoke enrollment with id ${enrollmentId}: ${e}`
