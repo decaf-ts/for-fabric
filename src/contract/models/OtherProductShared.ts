@@ -1,6 +1,14 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
-import { column, index, OrderDirection, pk, table } from "@decaf-ts/core";
+import {
+  Cascade,
+  column,
+  index,
+  oneToMany,
+  OrderDirection,
+  pk,
+  table,
+} from "@decaf-ts/core";
 // import {BlockOperations, OperationKeys, readonly} from "@decaf-ts/db-decorators";
 import { uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
@@ -14,6 +22,8 @@ import {
   sharedData,
 } from "../../shared/index";
 import { version } from "@decaf-ts/db-decorators";
+import { ProductStrength } from "./ProductStrength";
+import { Market } from "./Market";
 
 @sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
@@ -23,7 +33,7 @@ import { version } from "@decaf-ts/db-decorators";
 export class OtherProductShared extends BaseIdentifiedModel {
   @pk()
   @gtin()
-  @mirror("mirror-collection", "org-a")
+  // @mirror("mirror-collection", "org-a")
   @audit(OtherProductShared)
   productCode!: string;
 
@@ -65,20 +75,20 @@ export class OtherProductShared extends BaseIdentifiedModel {
 
   @version()
   counter?: number;
-  //
-  // @oneToMany(
-  //   () => ProductStrength,
-  //   { update: Cascade.CASCADE, delete: Cascade.CASCADE },
-  //   false
-  // )
-  // strengths!: ProductStrength[];
-  //
-  // @oneToMany(
-  //   () => Market,
-  //   { update: Cascade.NONE, delete: Cascade.NONE },
-  //   false
-  // )
-  // markets!: Market[];
+
+  @oneToMany(
+    () => ProductStrength,
+    { update: Cascade.CASCADE, delete: Cascade.CASCADE },
+    false
+  )
+  strengths!: ProductStrength[];
+
+  @oneToMany(
+    () => Market,
+    { update: Cascade.NONE, delete: Cascade.NONE },
+    false
+  )
+  markets!: Market[];
 
   @column()
   @ownedBy()

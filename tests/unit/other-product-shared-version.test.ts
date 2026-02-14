@@ -8,7 +8,6 @@ import { OtherProductShared } from "../../src/contract/models/OtherProductShared
 import { ProductStrength } from "../../src/contract/models/ProductStrength";
 import { Market } from "../../src/contract/models/Market";
 import { generateGtin } from "../../src/contract/models/gtin";
-import { DBKeys } from "@decaf-ts/db-decorators";
 
 describe("OtherProductShared contract version flow with relations", () => {
   let ctx: ReturnType<typeof getMockCtx>;
@@ -49,11 +48,21 @@ describe("OtherProductShared contract version flow with relations", () => {
     const transient = segregated.transient || {};
 
     transientSpy.mockImplementation(() => transient);
-    return new OtherProductShared(segregated.public);
+    return segregated.model;
   }
 
   let productCode: string = "";
   let created: OtherProductShared;
+
+  it.skip("holds the correct metadata", () => {
+    const instance = new OtherProductShared();
+    const properties = Metadata.properties(OtherProductShared);
+    const validatableProperties =
+      Metadata.validatableProperties(OtherProductShared);
+    const keys = Object.keys(instance);
+    expect(properties.length).toEqual(keys.length); // own-class properties only
+    expect(validatableProperties.length).toEqual(keys.length);
+  });
 
   it("creates with shared data", async () => {
     productCode = generateGtin();
@@ -75,10 +84,10 @@ describe("OtherProductShared contract version flow with relations", () => {
 
     const k = stub.createCompositeKey("other_product_shared", [productCode]);
     await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-    const sharedState = await stub.getPrivateData("decaf-namespaceOrg-a", k);
-    expect(new OtherProductShared(JSON.parse(sharedState)).hasErrors()).toBe(
-      false
-    );
+    const sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
+    expect(
+      new OtherProductShared(JSON.parse(sharedState)).hasErrors()
+    ).toBeUndefined();
   });
 
   it("reads the shared data", async () => {
@@ -115,7 +124,7 @@ describe("OtherProductShared contract version flow with relations", () => {
 
     const k = stub.createCompositeKey("other_product_shared", [productCode]);
     await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-    const sharedState = await stub.getPrivateData("decaf-namespaceOrg-a", k);
+    const sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
     updated = new OtherProductShared(JSON.parse(sharedState));
     expect(updated.hasErrors()).toBe(false);
 
@@ -141,8 +150,8 @@ describe("OtherProductShared contract version flow with relations", () => {
 
     const k = stub.createCompositeKey("other_product_shared", [productCode]);
     await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-    await expect(
-      stub.getPrivateData("decaf-namespaceOrg-a", k)
-    ).rejects.toThrow(NotFoundError);
+    await expect(stub.getPrivateData("decaf-namespaceAeon", k)).rejects.toThrow(
+      NotFoundError
+    );
   });
 });

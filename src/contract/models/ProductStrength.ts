@@ -13,7 +13,12 @@ import { TableNames } from "./constants";
 import { description, uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 
-import { FabricFlavour } from "../../shared/index";
+import {
+  FabricFlavour,
+  mirror,
+  NamespaceCollection,
+  sharedData,
+} from "../../shared/index";
 import { composed, InternalError } from "@decaf-ts/db-decorators";
 import { gtin } from "./gtin";
 
@@ -25,12 +30,14 @@ function strengthSeed(m: ProductStrength) {
   }
 }
 
+@sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
 @table(TableNames.ProductStrength)
 @model()
 @description("Represents the product’s strength and composition details.")
 export class ProductStrength extends BaseIdentifiedModel {
   @pk()
+  // @mirror("mirror-collection", "org-a")
   @composed(["productCode", "uuid"], ":")
   @description("Unique identifier of the product strength.")
   id!: string;

@@ -94,9 +94,10 @@ export interface Credentials {
 
 export type SegregatedModel<M extends Model> = {
   model: M;
+  public?: Record<keyof M, any>;
   transient?: Record<keyof M, any>;
-  privates?: Record<keyof M, any>;
-  shared?: Record<keyof M, any>;
+  privates?: Record<string, Record<keyof M, any>>;
+  shared?: Record<string, Record<keyof M, any>>;
 };
 
 export type FabricFlags<LOG extends Logger = Logger> = AdapterFlags<LOG> & {

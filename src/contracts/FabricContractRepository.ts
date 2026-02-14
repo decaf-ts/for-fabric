@@ -12,6 +12,7 @@ import {
   SerializedPage,
   Paginator,
   DirectionLimitOffset,
+  ContextOf,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -99,6 +100,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
     allowRawStatements: true,
     forcePrepareSimpleQueries: false,
     forcePrepareComplexQueries: false,
+    rebuildWithTransient: false,
   });
 
   constructor(
@@ -107,6 +109,24 @@ export class FabricContractRepository<M extends Model> extends Repository<
     protected trackedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
   ) {
     super(adapter, clazz);
+  }
+
+  override async create(
+    model: M,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<M> {
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.create);
+    log.debug(
+      `Creating new ${this.class.name} in table ${Model.tableName(this.class)}`
+    );
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient, segregated } = this.adapter.prepare(
+      model,
+      ctx
+    );
+    if (segregated) ctx.put("segregatedData", segregated);
+    record = await this.adapter.create(this.class, id, record, ...ctxArgs);
+    return this.adapter.revert<M>(record || {}, this.class, id, transient, ctx);
   }
 
   override async paginateBy(

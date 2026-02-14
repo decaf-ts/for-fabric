@@ -277,12 +277,12 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M>} Promise resolving to the created model
    */
   async create(
-    ctx: Ctx | FabricContractContext,
+    context: Ctx | FabricContractContext,
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
-    const { log, ctxArgs } = (
-      await this.logCtx([...args, ctx], OperationKeys.CREATE, true)
+    const { log, ctxArgs, ctx } = (
+      await this.logCtx([...args, context], OperationKeys.CREATE, true)
     ).for(this.create);
     log.info(`CONTRACT CREATE, ${ctxArgs}`);
 
@@ -295,7 +295,10 @@ export abstract class FabricCrudContract<M extends Model>
     log.info(`Merging transient data...`);
     model = Model.merge(model, transient, this.clazz) as M;
 
-    return this.repo.create(model, ...ctxArgs);
+    const created = await this.repo.create(model, ...ctxArgs);
+
+    const result = new this.clazz(Model.segregate(created).model);
+    return result;
   }
 
   /**
@@ -319,7 +322,7 @@ export abstract class FabricCrudContract<M extends Model>
     return this.repo.read(key, ...ctxArgs);
   }
 
-  protected getTransientData(ctx: Ctx | FabricContractContext): any {
+  protected getTransientData(ctx: FabricContractContext): any {
     const transientMap = ctx.stub.getTransient();
     let transient: any = {};
 
@@ -329,6 +332,16 @@ export abstract class FabricCrudContract<M extends Model>
           transientMap.get(this.repo["tableName"]) as unknown as Buffer
         )?.toString("utf8") as string
       );
+    }
+
+    if (transientMap.has("__overrides")) {
+      const overrides = JSON.parse(
+        (
+          transientMap.get(this.repo["tableName"]) as unknown as Buffer
+        )?.toString("utf8") as string
+      );
+
+      ctx.accumulate(overrides);
     }
 
     return transient;
@@ -343,12 +356,12 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M>} Promise resolving to the updated model
    */
   async update(
-    ctx: Ctx | FabricContractContext,
+    context: Ctx | FabricContractContext,
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
-    const { log, ctxArgs } = (
-      await this.logCtx([...args, ctx], OperationKeys.UPDATE, true)
+    const { log, ctxArgs, ctx } = (
+      await this.logCtx([...args, context], OperationKeys.UPDATE, true)
     ).for(this.update);
     if (typeof model === "string") model = this.deserialize<M>(model) as M;
 
@@ -510,7 +523,7 @@ export abstract class FabricCrudContract<M extends Model>
   }
 
   protected async init(ctx: Ctx | FabricContractContext): Promise<void> {
-    const { log, ctxArgs } = (
+    const { log } = (
       await this.logCtx([ctx], PersistenceKeys.INITIALIZATION, true)
     ).for(this.init);
     log.info(`Running contract ${this.getName()} initialization...`);
@@ -531,9 +544,6 @@ export abstract class FabricCrudContract<M extends Model>
       package: PACKAGE_NAME,
     };
   }
-
-  // export const VERSION = "##VERSION##";
-  // export const PACKAGE_NAME = "##PACKAGE##";
 
   /**
    * @description Creates multiple models in the state database
@@ -619,98 +629,4 @@ export abstract class FabricCrudContract<M extends Model>
     if (!(contextualized instanceof Promise)) return squashArgs(contextualized);
     return contextualized.then(squashArgs);
   }
-  //
-  // protected static async logCtx<ARGS extends any[]>(
-  //   this: any,
-  //   args: ARGS,
-  //   method: string
-  // ): Promise<
-  //   ContextualizedArgs<FabricContractContext, ARGS> & {
-  //     stub: ChaincodeStub;
-  //     identity: ClientIdentity;
-  //   }
-  // >;
-  // protected static async logCtx<ARGS extends any[]>(
-  //   this: any,
-  //   args: ARGS,
-  //   method: (...args: any[]) => any
-  // ): Promise<
-  //   ContextualizedArgs<FabricContractContext, ARGS> & {
-  //     stub: ChaincodeStub;
-  //     identity: ClientIdentity;
-  //   }
-  // >;
-  // protected static async logCtx<ARGS extends any[]>(
-  //   this: any,
-  //   args: ARGS,
-  //   method: ((...args: any[]) => any) | string
-  // ): Promise<
-  //   ContextualizedArgs<FabricContractContext, ARGS> & {
-  //     stub: ChaincodeStub;
-  //     identity: ClientIdentity;
-  //   }
-  // > {
-  //   if (args.length < 1) throw new InternalError("No context provided");
-  //   const ctx = args.pop() as FabricContractContext | Context;
-  //   if (ctx instanceof FabricContractContext)
-  //     return {
-  //       ctx,
-  //       log: (
-  //         ctx.logger ||
-  //         new ContractLogger((this as any)?.name || "Contract", undefined)
-  //       )
-  //         .clear()
-  //         .for(this)
-  //         .for(method),
-  //       ctxArgs: [...args, ctx],
-  //       stub: ctx.stub,
-  //       identity: ctx.identity,
-  //     };
-  //
-  //   if (!(ctx instanceof Ctx))
-  //     throw new InternalError("No valid context provided");
-  //
-  //   function getOp() {
-  //     if (typeof method === "string") return method;
-  //     switch (method.name) {
-  //       case OperationKeys.CREATE:
-  //       case OperationKeys.READ:
-  //       case OperationKeys.UPDATE:
-  //       case OperationKeys.DELETE:
-  //       case BulkCrudOperationKeys.CREATE_ALL:
-  //       case BulkCrudOperationKeys.READ_ALL:
-  //       case BulkCrudOperationKeys.UPDATE_ALL:
-  //       case BulkCrudOperationKeys.DELETE_ALL:
-  //         return method.name;
-  //       default:
-  //         return method.name;
-  //     }
-  //   }
-  //
-  //   const overrides = {
-  //     correlationId: ctx.stub.getTxID(),
-  //   };
-  //   const context = await FabricCrudContract.adapter.context(
-  //     getOp(),
-  //     overrides as any,
-  //     this.clazz,
-  //     ctx
-  //   );
-  //
-  //   const baseLogger =
-  //     context.logger ||
-  //     new ContractLogger((this as any)?.name || "Contract", undefined, ctx);
-  //   const log = (
-  //     this
-  //       ? baseLogger.for(this).for(method)
-  //       : baseLogger.clear().for(this).for(method)
-  //   ) as LoggerOf<FabricContractContext>;
-  //   return {
-  //     ctx: context,
-  //     log: log,
-  //     stub: context.stub,
-  //     identity: context.identity,
-  //     ctxArgs: [...args, context],
-  //   };
-  // }
 }

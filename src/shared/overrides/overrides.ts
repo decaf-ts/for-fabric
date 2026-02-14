@@ -27,9 +27,8 @@ Model.prototype.segregate = function segregate<M extends Model>(
   model: M
 ): SegregatedModel<M> {
   if (!Model.isTransient(model)) return { model: model };
-  const decoratedProperties = Metadata.validatableProperties(
-    model.constructor as any
-  );
+  const decoratedProperties =
+    Metadata.getAttributes(model.constructor as any) || [];
 
   const transientProps = Metadata.get(
     model.constructor as any,
@@ -46,6 +45,7 @@ Model.prototype.segregate = function segregate<M extends Model>(
 
   const result: SegregatedModel<M> = {
     model: {} as Record<keyof M, any>,
+    public: {} as Record<keyof M, any>,
     transient: {} as Record<keyof M, any>,
     privates: {} as Record<keyof M, any>,
     shared: {} as Record<keyof M, any>,
@@ -59,6 +59,7 @@ Model.prototype.segregate = function segregate<M extends Model>(
   for (const key of decoratedProperties) {
     const value = model[key as keyof M];
     const isTransient = transientKeys.includes(key);
+    const isPublic = !isTransient;
     const isPrivate = privateKeys.includes(key);
     const isShared = sharedKeys.includes(key);
     // const isPrimaryKey = key === pkKey;
@@ -75,14 +76,13 @@ Model.prototype.segregate = function segregate<M extends Model>(
       result.shared = result.shared || ({} as any);
       (result.shared as any)[key] = value;
     }
-    const shouldIncludeInModel = !isTransient && !isPrivate && !isShared;
-    if (shouldIncludeInModel) {
-      result.model = result.model || {};
-      (result.model as any)[key] = value;
+    if (isPublic) {
+      result.public = (result.public || {}) as any;
+      (result.public as any)[key] = value;
     }
   }
 
-  result.model = Model.build(result.model, model.constructor.name);
+  result.model = Model.build(result.public, model.constructor.name);
   return result as SegregatedModel<M>;
 }.bind(Model);
 

@@ -561,22 +561,15 @@ export async function extractSegregatedCollections<M extends Model>(
   // when class-level @privateData applies decorators iteratively.
   const fabricCtx = context as FabricContractContext;
   if (!fabricCtx.isFullySegregated) {
-    const pkProp = Model.pk(model) as string;
     const segregated = Model.segregate(model);
-    const publicKeys = Object.keys(segregated.model).filter(
-      (k) => k !== pkProp && (segregated.model as any)[k] !== undefined
-    );
-    if (publicKeys.length === 0) {
-      fabricCtx.markFullySegregated();
-    }
+    const publicData = segregated.public || {};
+    if (!Object.keys(publicData).length) fabricCtx.markFullySegregated();
   }
 
   // Store segregation metadata on the adapter (persists across context chains).
   // The Sequence creates its own context via logCtx, losing context-stored flags.
-  const adapter = (this as any).adapter as any;
-  const tableName = Model.tableName(model.constructor as Constructor<M>);
-  const seqName = `${tableName}_pk`;
-  adapter.setSequenceSegregation(
+  const seqName = Model.sequenceName(model, "pk");
+  fabricCtx.setSequenceSegregation(
     seqName,
     fabricCtx.isFullySegregated,
     collections
@@ -628,11 +621,8 @@ export async function segregatedDataOnCreate<M extends Model>(
   });
 
   const keyStrings = keyArray.map((key) => String(key));
-  // Store the original model — prepare() will filter to collection-specific fields
-  (context as FabricContractContext).writeTo(collection, {
-    model,
-    keys: keyStrings,
-  });
+  // Store the segregated model — prepare() will filter to collection-specific fields
+  (context as FabricContractContext).writeTo(collection, keyStrings);
 }
 
 export async function segregatedDataOnRead<M extends Model>(
@@ -798,7 +788,7 @@ function segregated(
     const decs: any[] = [];
     if (!propertyKey) {
       // decorated at the class level
-      const properties = Metadata.validatableProperties(target as Constructor);
+      const properties = Metadata.getAttributes(target as Constructor);
       properties?.forEach((p) => {
         if (!filter || filter(p)) {
           segregated(collection, type)((target as any).prototype, p);

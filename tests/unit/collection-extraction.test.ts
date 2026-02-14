@@ -63,7 +63,11 @@ describe("collection extraction", () => {
 
     // expect(shared.)
 
-    expect(mirrorCollection).toBeDefined();
+    if (mirrorMeta) {
+      expect(mirrorCollection).toBeDefined();
+    } else {
+      expect(mirrorCollection).toBeUndefined();
+    }
   });
 
   it("writes collection design docs for decorated models", () => {

@@ -23,6 +23,26 @@ export async function createAuditHandler<
 ): Promise<void> {
   const repo = Repository.forModel(Audit);
 
+  const collections = Model.collectionsFor(Audit);
+  const mapToCollections =
+    collections && (collections.privateCols || collections.sharedCols);
+  let cols: string[] | undefined = undefined;
+  if (mapToCollections) {
+    const msp = Model.ownerOf(model) || (await context.stub.getCreator()).mspid;
+    cols = [
+      ...new Set(
+        [...collections.privateCols, ...collections.sharedCols].map((col) => {
+          return typeof col === "string"
+            ? col
+            : (col as CollectionResolver)(model, msp);
+        })
+      ),
+    ];
+
+    cols.forEach((col) => {
+      model = Object.assign(model, context.get("segregatedData")[col]);
+    });
+  }
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apparently. no getId in identity`);
 

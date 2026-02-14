@@ -24,7 +24,12 @@ import {
 } from "@decaf-ts/core";
 import { BaseModel } from "./BaseModel";
 import { AuditOperations } from "./constants";
-import { FabricFlavour, transactionId } from "../../shared/index";
+import {
+  FabricFlavour,
+  NamespaceCollection,
+  sharedData,
+  transactionId,
+} from "../../shared/index";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function uuidSeed(m: Audit, ...args: ContextualArgs<any>) {
@@ -42,7 +47,7 @@ function uuidSeed(m: Audit, ...args: ContextualArgs<any>) {
   OperationKeys.DELETE,
 ])
 @uses(FabricFlavour)
-// @sharedData(NamespaceCollection("decaf-namespace"))
+@sharedData(NamespaceCollection("decaf-namespace"))
 @table("audit")
 @model()
 export class Audit extends BaseModel {

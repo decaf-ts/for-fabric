@@ -4,6 +4,8 @@ import { Model } from "@decaf-ts/decorator-validation";
 import { ConflictError, NotFoundError } from "@decaf-ts/db-decorators";
 import { generateGtin } from "../../src/contract/models/gtin";
 import { Product } from "../../src/contract/models/Product";
+import { ProductStrength } from "../../src/contract/models/ProductStrength";
+import { Market } from "../../src/contract/models/Market";
 
 jest.setTimeout(30000);
 
@@ -18,35 +20,28 @@ describe("Tests product contract", () => {
 
   it("should create model", async () => {
     const id = generateGtin();
+    const buildStrength = (value: string) =>
+      new ProductStrength({
+        productCode: id,
+        strength: value,
+      });
+    const buildMarket = (marketId: string) =>
+      new Market({
+        productCode: id,
+        marketId,
+      });
+
     const model = new Product({
       productCode: id,
       inventedName: "test_name",
       nameMedicinalProduct: "123456789",
       strengths: [
-        {
-          productCode: id,
-          strength: "200mg",
-          substance: "Ibuprofen",
-        },
-        {
-          productCode: id,
-          strength: "400mg",
-          substance: "Ibuprofen",
-        },
+        buildStrength("200mg"),
+        buildStrength("400mg"),
       ],
       markets: [
-        {
-          productCode: id,
-          marketId: "BR",
-          nationalCode: "BR",
-          mahName: "ProPharma BR",
-        },
-        {
-          productCode: id,
-          marketId: "US",
-          nationalCode: "US",
-          mahName: "ProPharma US",
-        },
+        buildMarket("BR"),
+        buildMarket("US"),
       ],
     });
 

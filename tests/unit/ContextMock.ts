@@ -1,8 +1,8 @@
 import { Logging, LogLevel } from "@decaf-ts/logging";
 import { Contract } from "fabric-contract-api";
 import { ModelKeys } from "@decaf-ts/decorator-validation";
-import { InternalError } from "@decaf-ts/db-decorators";
-import { ClientIdentity, Iterators } from "fabric-shim-api";
+import { InternalError, NotFoundError } from "@decaf-ts/db-decorators";
+import { ClientIdentity } from "fabric-shim-api";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 
 function parseQuery(query: string) {
@@ -170,6 +170,8 @@ export function getStubMock() {
   const pendingPrivateDeletes: Record<string, Set<string>> = {};
 
   return {
+    state: state,
+    privateState: privateState,
     /**
      * Commits all pending writes/deletes to the committed state.
      * Call this after every contract method invocation to simulate
@@ -181,7 +183,7 @@ export function getStubMock() {
         state[key] = value;
       }
       // Apply public state deletes
-      for (const key of pendingDeletes) {
+      for (const key of pendingDeletes as any[]) {
         delete state[key];
       }
       // Clear public pending buffers
@@ -198,7 +200,7 @@ export function getStubMock() {
       // Apply private state deletes
       for (const [collection, keys] of Object.entries(pendingPrivateDeletes)) {
         if (privateState[collection]) {
-          for (const key of keys) {
+          for (const key of keys as any[]) {
             delete privateState[collection][key];
           }
         }
@@ -215,7 +217,7 @@ export function getStubMock() {
     getCreator: async () => {
       return {
         idBytes: Buffer.from("creatorID"),
-        mspid: "MSPID",
+        mspid: "Aeon",
       };
     },
     getTxID: () => Date.now().toString(),
@@ -244,7 +246,7 @@ export function getStubMock() {
     getState: async (key: string) => {
       // Reads only from committed state (Fabric behaviour)
       if (key in state) return state[key];
-      return "";
+      throw new NotFoundError(`State key ${key} not found`);
     },
     putState: async (key: string, value: any) => {
       const testStr = typeof value === "string" ? value : value.toString();
@@ -299,14 +301,14 @@ export function getStubMock() {
       };
     },
 
-    getPrivateData(collection: string, key: string): Promise<any> {
+    async getPrivateData(collection: string, key: string): Promise<any> {
       // Reads only from committed private state
       if (collection in privateState && key in privateState[collection])
         return privateState[collection][key];
-      return "";
+      throw new NotFoundError(`State key ${key} not found`);
     },
     // getPrivateDataHash(collection: string, key: string): Promise<Uint8Array>;
-    putPrivateData(
+    async putPrivateData(
       collection: string,
       key: string,
       value: Uint8Array
