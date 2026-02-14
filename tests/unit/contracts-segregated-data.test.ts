@@ -1529,6 +1529,7 @@ describe("Fully Private Models (no public state writes)", () => {
       identity,
       FullyPrivateModel
     );
+    createContext.accumulate({ segregated: COLLECTION_A });
 
     const model = new FullyPrivateModel({
       id,
@@ -1592,6 +1593,7 @@ describe("Fully Private Models (no public state writes)", () => {
       identity,
       FullyPrivateModel
     );
+    updateContext.accumulate({ segregated: COLLECTION_A });
     const updatedModel = new FullyPrivateModel({
       id,
       secretFieldA: "updated-a",
