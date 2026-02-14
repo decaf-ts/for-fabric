@@ -584,7 +584,12 @@ export abstract class FabricCrudContract<M extends Model>
 
     log.info(`adding ${models.length} entries to the table`);
 
-    return this.repo.createAll(models as unknown as M[], ...ctxArgs);
+    const created = await this.repo.createAll(
+      models as unknown as M[],
+      ...ctxArgs
+    );
+    const result = created.map((c) => new this.clazz(Model.segregate(c).model));
+    return result;
   }
 
   protected logCtx<

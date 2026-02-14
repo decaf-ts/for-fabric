@@ -143,15 +143,19 @@ export class FabricContractRepository<M extends Model> extends Repository<
     const prepared = models.map((m) => this.adapter.prepare(m, ctx));
     const ids = prepared.map((p) => p.id);
     let records = prepared.map((p) => p.record);
-    const segregated = prepared.map((p) => p.segregated);
-    if (segregated.find((s) => !!s)) {
-      ctx.put(
-        "segregatedData",
-        segregated.reduce((acc, s, i) => {
-          acc[ids[i]] = s;
-          return acc;
-        }, {} as any)
-      );
+    const segregated = prepared.reduce(
+      (acc, p) => {
+        const cols = Object.keys(p.segregated || {});
+        cols.forEach((c) => {
+          acc[c] = acc[c] || {};
+          acc[c] = { ...acc[c], ...(p.segregated || {})[c] };
+        });
+        return acc;
+      },
+      {} as Record<string, any>
+    );
+    if (Object.keys(segregated).length) {
+      ctx.put("segregatedData", segregated);
     }
     records = await this.adapter.createAll(
       this.class,
