@@ -186,6 +186,50 @@ export class FabricContractRepository<M extends Model> extends Repository<
     return this.adapter.revert<M>(record, this.class, id, transient, ctx);
   }
 
+  override async updateAll(
+    models: M[],
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<M[]> {
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.updateAll);
+    log.verbose(
+      `Updating ${models.length} new ${this.class.name} in table ${Model.tableName(this.class)}`
+    );
+
+    const prepared = models.map((m) => this.adapter.prepare(m, ctx));
+    const ids = prepared.map((p) => p.id);
+    const records = prepared.map((p) => p.record);
+    const segregated = prepared.reduce(
+      (acc, p) => {
+        const cols = Object.keys(p.segregated || {});
+        cols.forEach((c) => {
+          acc[c] = acc[c] || {};
+          acc[c] = { ...acc[c], ...(p.segregated || {})[c] };
+        });
+        return acc;
+      },
+      {} as Record<string, any>
+    );
+    if (Object.keys(segregated).length) {
+      ctx.put("segregatedData", segregated);
+    }
+
+    const updated = await this.adapter.updateAll(
+      this.class,
+      ids,
+      records,
+      ...ctxArgs
+    );
+    return updated.map((u, i) =>
+      this.adapter.revert(
+        u,
+        this.class,
+        records[i].id,
+        records[i].transient,
+        ctx
+      )
+    );
+  }
+
   override async paginateBy(
     key: keyof M,
     order: OrderDirection,

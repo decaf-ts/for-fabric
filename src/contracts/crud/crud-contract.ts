@@ -446,20 +446,39 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M[]>} Promise resolving to the updated models
    */
   async updateAll(
-    ctx: Ctx | FabricContractContext,
+    context: Ctx | FabricContractContext,
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    const { log, ctxArgs } = (
-      await this.logCtx([...args, ctx], BulkCrudOperationKeys.UPDATE_ALL, true)
+    const { log, ctxArgs, ctx } = (
+      await this.logCtx(
+        [...args, context],
+        BulkCrudOperationKeys.UPDATE_ALL,
+        true
+      )
     ).for(this.updateAll);
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
         .map((m) => this.deserialize(m))
         .map((m) => new this.clazz(m)) as any;
 
-    log.info(`updating ${models.length} entries to the table`);
-    return this.repo.updateAll(models as unknown as M[], ...ctxArgs);
+    const transient = this.getTransientData(ctx);
+
+    log.info(`Merging transient data...`);
+    models = (models as M[]).map((m, i) => {
+      if (!transient || !transient[i])
+        throw new InternalError(`No transient data found for position ${i}`);
+      return Model.merge(m, transient[i], this.clazz) as M;
+    });
+
+    log.info(`adding ${models.length} entries to the table`);
+
+    const updated = await this.repo.updateAll(
+      models as unknown as M[],
+      ...ctxArgs
+    );
+    const result = updated.map((c) => new this.clazz(Model.segregate(c).model));
+    return result;
   }
 
   /**

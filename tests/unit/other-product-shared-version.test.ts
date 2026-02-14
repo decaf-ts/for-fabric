@@ -218,6 +218,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       stub.commit();
 
       let count = 0;
+      const newBulk: OtherProductShared[] = [];
       for (const b of bulk) {
         expect(b.hasErrors()).toBeDefined();
         const productCode = models[count++].productCode;
@@ -226,54 +227,39 @@ describe("OtherProductShared contract version flow with relations", () => {
         ]);
         await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
         const sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
-        expect(
-          new OtherProductShared(JSON.parse(sharedState)).hasErrors()
-        ).toBeUndefined();
+        const newObj = new OtherProductShared(JSON.parse(sharedState));
+        expect(newObj.hasErrors()).toBeUndefined();
+        newBulk.push(newObj);
       }
+
+      bulk = newBulk;
     });
 
-    it.skip("Reads in Bulk", async () => {
-      const repo: FabricClientRepository<Product> = Repository.forModel<
-        Product,
-        FabricClientRepository<Product>
-      >(Product);
+    it("Reads in Bulk", async () => {
+      const pk = Model.pk(OtherProductShared);
       const ids = bulk.map((c) => c[pk]) as number[];
-      const read = await repo.readAll(ids);
-      expect(read).toBeDefined();
-      expect(Array.isArray(read)).toEqual(true);
-      expect(read.every((el) => el instanceof Product)).toEqual(true);
-      expect(read.every((el) => !el.hasErrors())).toEqual(true);
-      expect(
-        read.every((el, i) => {
-          const equals = el.equals(bulk[i]);
-          if (!equals)
-            console.log(
-              `element ${i} is different ${JSON.stringify(el.compare(bulk[i]))}`
-            );
-          return equals;
-        })
-      ).toEqual(true);
-      expect(read.every((el) => !!(el as any)[PersistenceKeys.METADATA]));
 
-      const marketRepo = Repository.forModel(Market);
-      const strengthsRepo = Repository.forModel(ProductStrength);
+      const read: OtherProductShared[] = JSON.parse(
+        await contract.readAll(ctx as any, JSON.stringify(ids))
+      ).map((r: any) => Model.deserialize(r));
 
-      for (const r of read) {
-        const strengths = await strengthsRepo.readAll(
-          r.strengths as unknown as string[]
-        );
-        const markets = await marketRepo.readAll(
-          r.markets as unknown as string[]
-        );
-
-        expect(strengths.every((s) => s.version === 1)).toBe(true);
-        expect(markets.every((m) => m.version === 1)).toBe(true);
+      let count = 0;
+      for (const b of read) {
+        expect(b.hasErrors()).toBeUndefined();
+        const productCode = read[count++].productCode;
+        const k = stub.createCompositeKey("other_product_shared", [
+          productCode,
+        ]);
+        await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
+        await stub.getPrivateData("decaf-namespaceAeon", k);
       }
+
+      bulk = read;
     });
 
     let updated: Product[];
 
-    it.skip("Updates in Bulk", async () => {
+    it("Updates in Bulk", async () => {
       const repo: FabricClientRepository<Product> = Repository.forModel<
         Product,
         FabricClientRepository<Product>
@@ -284,32 +270,64 @@ describe("OtherProductShared contract version flow with relations", () => {
           inventedName: "inventedName_" + i,
         });
       });
-      updated = await repo.updateAll(toUpdate);
-      expect(updated).toBeDefined();
-      expect(Array.isArray(updated)).toEqual(true);
-      expect(updated.every((el) => el instanceof Product)).toEqual(true);
-      expect(updated.every((el) => !el.hasErrors())).toEqual(true);
-      expect(updated.every((el, i) => el.equals(bulk[i]))).toEqual(false);
-      expect(
-        updated.every((el, i) =>
-          el.equals(bulk[i], "inventedName", "updatedAt", "version")
-        )
-      ).toEqual(true);
+      const models = new Array(10).fill(0).map(() => {
+        const id = generateGtin();
+        return new OtherProductShared({
+          productCode: id,
+          inventedName: "test_name",
+          nameMedicinalProduct: "123456789",
+          strengths: [
+            {
+              productCode: id,
+              strength: "200mg",
+              substance: "Ibuprofen",
+            },
+            {
+              productCode: id,
+              strength: "400mg",
+              substance: "Ibuprofen",
+            },
+          ],
+          markets: [
+            {
+              productCode: id,
+              marketId: "BR",
+              nationalCode: "BR",
+              mahName: "ProPharma BR",
+            },
+            {
+              productCode: id,
+              marketId: "US",
+              nationalCode: "US",
+              mahName: "ProPharma US",
+            },
+          ],
+        });
+      });
 
-      const marketRepo = Repository.forModel(Market);
-      const strengthsRepo = Repository.forModel(ProductStrength);
+      const payload = JSON.stringify(preparePayloadBulk(toUpdate));
 
-      for (const created of updated) {
-        const strengths = await strengthsRepo.readAll(
-          created.strengths as unknown as string[]
-        );
-        const markets = await marketRepo.readAll(
-          created.markets as unknown as string[]
-        );
+      bulk = JSON.parse(await contract.updateAll(ctx as any, payload)).map(
+        (r: any) => Model.deserialize(r)
+      );
+      stub.commit();
 
-        expect(strengths.every((s) => s.version === 1)).toBe(true);
-        expect(markets.every((m) => m.version === 1)).toBe(true);
+      let count = 0;
+      const newBulk: OtherProductShared[] = [];
+      for (const b of bulk) {
+        expect(b.hasErrors()).toBeDefined();
+        const productCode = models[count++].productCode;
+        const k = stub.createCompositeKey("other_product_shared", [
+          productCode,
+        ]);
+        await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
+        const sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
+        const newObj = new OtherProductShared(JSON.parse(sharedState));
+        expect(newObj.hasErrors()).toBeUndefined();
+        newBulk.push(newObj);
       }
+
+      bulk = newBulk;
     });
 
     it.skip("lists", async () => {
