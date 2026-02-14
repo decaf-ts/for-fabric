@@ -402,14 +402,14 @@ export class FabricIdentityService extends ClientBasedService<
    * @param {User} currentUser - Already enrolled user, must have a signing identity.
    * @return {Promise<Identity>} The renewed identity object with new credentials.
    */
-  async reenrollAndRevoke(
+  async updateIdentity(
     enrollmentId: string,
     identity: { certificate: string; privateKey: string },
-    attr: IKeyValueAttribute[],
+    identityRequest: IIdentityRequest,
     ...args: MaybeContextualArg<any>
   ): Promise<Identity> {
     const { log, ctx } = (await this.logCtx(args, "reenroll", true)).for(
-      this.reenrollAndRevoke
+      this.updateIdentity
     );
 
     try {
@@ -417,16 +417,12 @@ export class FabricIdentityService extends ClientBasedService<
 
       // Update attributes in the CA registry (admin operation). This changes the "source of truth".
       const identityService = this.client.newIdentityService();
-      const caIdentityUpdateRequest: IIdentityRequest = {
-        enrollmentID: enrollmentId,
-        affiliation: "", // kept as-is to preserve current behavior
-        attrs: attr,
-      };
-      await identityService.update(
-        enrollmentId,
-        caIdentityUpdateRequest,
-        this.user
-      ); // as IServiceResponse & { result: IIdentityRequest };
+      // const caIdentityUpdateRequest: IIdentityRequest = {
+      //   enrollmentID: enrollmentId,
+      //   affiliation: "", // kept as-is to preserve current behavior
+      //   attrs: attr,
+      // };
+      await identityService.update(enrollmentId, identityRequest, this.user); // as IServiceResponse & { result: IIdentityRequest };
 
       // Reenroll as the user. Request must be signed using the existing certificate.
       const reenrollUser = User.createUser(
