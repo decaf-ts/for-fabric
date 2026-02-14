@@ -413,7 +413,7 @@ export class FabricIdentityService extends ClientBasedService<
     );
 
     try {
-      log.debug(`Re-enrolling ${enrollmentId}`);
+      log.info(`Renewing identity for ${enrollmentId}`);
 
       // Update attributes in the CA registry (admin operation). This changes the "source of truth".
       const identityService = this.client.newIdentityService();
@@ -434,7 +434,6 @@ export class FabricIdentityService extends ClientBasedService<
       );
       reenrollUser.setCryptoSuite(this.user.getCryptoSuite());
 
-      // If you want attributes included in the *new* cert, pass AttributeRequests here (not KeyValue attrs).
       const enrollment = await this.client.reenroll(reenrollUser, []);
 
       const renewedIdentity = FabricIdentityService.identityFromEnrollment(
@@ -444,9 +443,11 @@ export class FabricIdentityService extends ClientBasedService<
       );
 
       // Revoke the previous certificate only, so the old cert becomes invalid.
+      log.debug(`Revoking previous certificates for ${enrollmentId}`);
       const { aki, serial } = getAkiAndSerialFromCert(identity.certificate);
       await this.revoke(enrollmentId, { aki, serial }, args);
 
+      log.debug(`Renew identity successful for ${enrollmentId}`);
       return renewedIdentity;
     } catch (e: any) {
       throw this.parseError(e);
