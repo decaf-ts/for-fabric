@@ -1,5 +1,5 @@
 import { Context } from "@decaf-ts/core";
-import { FabricContractFlags, SegregatedWriteEntry } from "./types";
+import { FabricContractFlags } from "./types";
 import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
 
 /**
@@ -88,7 +88,8 @@ export class FabricContractContext extends Context<FabricContractFlags> {
     fullySegregated: boolean,
     collections: string[]
   ): void {
-    const map = this.getFromChildren("sequenceSegregation") || new Map();
+    let map = this.getFromChildren("sequenceSegregation");
+    map = !map || !Object.keys(map).length ? new Map() : map;
     map.set(seqName, { fullySegregated, collections });
     this.put("sequenceSegregation", map);
   }

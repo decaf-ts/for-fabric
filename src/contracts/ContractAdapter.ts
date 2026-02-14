@@ -283,12 +283,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
 
     try {
-      // const sanitizedModel = this.normalizeForPublic(clazz, model, ctx);
       log.info(`adding entry to ${tableName} table with pk ${id}`);
-      // if (ctx.isFullySegregated) {
-      //   await this.flushSegregatedWrites(ctx, composedKey);
-      //   return sanitizedModel;
-      // }
 
       const defaults = this.getModelDefaults(clazz);
       // handle public data
@@ -363,24 +358,23 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
     let model: Record<string, any>;
+    // const fabricCtx = ctx as FabricContractContext;
     try {
-      model = await this.readState(composedKey, ctx);
+      model = ctx.isFullySegregated
+        ? {}
+        : await this.readState(composedKey, ctx);
     } catch (e: unknown) {
-      const fabricCtx = ctx as FabricContractContext;
-      if (
-        e instanceof NotFoundError &&
-        (fabricCtx.isFullySegregated ||
-          fabricCtx.getReadCollections().length ||
-          !!ctx.getOrUndefined("segregated") ||
-          !!ctx.getOrUndefined("mirror"))
-      ) {
-        model = {} as Record<string, any>;
-      } else {
-        throw this.parseError(e as Error);
-      }
+      throw this.parseError(e as Error);
     }
-    model = await this.mergeSegregatedReads(ctx, composedKey, model);
 
+    const collections = ctx.getReadCollections();
+    if (collections && collections.length) {
+      for (const col of collections)
+        Object.assign(
+          model,
+          await this.forPrivate(col).readState(composedKey, ctx)
+        );
+    }
     return model;
   }
 
@@ -401,23 +395,68 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
     const { ctx, log } = this.logCtx(args, this.update);
+
     this.enforceMirrorAuthorization(clazz, ctx);
+    log.info(`in ADAPTER create with args ${args}`);
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
 
     try {
-      log.verbose(`updating entry to ${tableName} table with pk ${id}`);
-      const sanitizedModel = this.normalizeForPublic(clazz, model, ctx);
-      if (ctx.isFullySegregated) {
-        await this.flushSegregatedWrites(ctx, composedKey);
-        return sanitizedModel;
+      log.info(`adding entry to ${tableName} table with pk ${id}`);
+
+      const defaults = this.getModelDefaults(clazz);
+      // handle public data
+      if (
+        Object.keys(model).filter((k) => {
+          if (k === CouchDBKeys.TABLE) return false;
+          return !(
+            defaults &&
+            k in defaults &&
+            defaults[k as keyof M] === model[k]
+          );
+        }).length
+      )
+        model = await this.putState(composedKey, model, ctx);
+
+      // handle segregated writes
+      const data = ctx.getFromChildren("segregatedData");
+      if (data) {
+        for (const collection in data) {
+          Object.assign(
+            model,
+            await this.forPrivate(collection).putState(
+              composedKey,
+              data[collection],
+              ctx
+            )
+          );
+        }
       }
-      model = await this.putState(composedKey, sanitizedModel, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
 
     return model;
+
+    //
+    // this.enforceMirrorAuthorization(clazz, ctx);
+    // const tableName = Model.tableName(clazz);
+    // const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    //
+    // try {
+    //   log.verbose(`updating entry to ${tableName} table with pk ${id}`);
+    //   const sanitizedModel = this.normalizeForPublic(clazz, model, ctx);
+    //   if (ctx.isFullySegregated) {
+    //     await this.flushSegregatedWrites(ctx, composedKey);
+    //     return sanitizedModel;
+    //   }
+    //   model = await this.putState(composedKey, sanitizedModel, ctx);
+    // } catch (e: unknown) {
+    //   throw this.parseError(e as Error);
+    // }
+    //
+    // return model;
   }
 
   /**
@@ -768,21 +807,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
     let result: any;
 
     const { log } = this.logCtx([ctx], this.readState);
-    let res: string;
-    const collection = ctx.get("segregated");
-    if (collection)
-      res = (
-        await ctx.stub.getPrivateData(collection, id.toString())
-      ).toString();
-    else res = (await ctx.stub.getState(id.toString())).toString();
+    const res: string = (await ctx.stub.getState(id.toString())).toString();
+    // const collection = ctx.get("segregated");
+    // if (collection)
+    //   res = (
+    //     await ctx.stub.getPrivateData(collection, id.toString())
+    //   ).toString();
+    // else res = (await ctx.stub.getState(id.toString())).toString();
 
-    if (!res)
-      throw new NotFoundError(
-        `Record with id ${id}${collection ? ` in ${collection} collection` : ""} not found`
-      );
-    log.silly(
-      `state retrieved from${collection ? ` ${collection} collection` : ""} under id ${id}`
-    );
+    if (!res) throw new NotFoundError(`Record with id ${id} not found`);
+    log.silly(`state retrieved under id ${id}`);
     try {
       result = FabricContractAdapter.serializer.deserialize(res.toString());
     } catch (e: unknown) {

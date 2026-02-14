@@ -371,7 +371,9 @@ export abstract class FabricCrudContract<M extends Model>
 
     log.info(`Merging transient data...`);
     model = Model.merge(model, transient, this.clazz) as M;
-    return this.repo.update(model, ...ctxArgs);
+    const updated = await this.repo.update(model, ...ctxArgs);
+    const result = new this.clazz(Model.segregate(updated).model);
+    return result;
   }
 
   /**

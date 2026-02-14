@@ -129,6 +129,24 @@ export class FabricContractRepository<M extends Model> extends Repository<
     return this.adapter.revert<M>(record || {}, this.class, id, transient, ctx);
   }
 
+  override async update(
+    model: M,
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ): Promise<M> {
+    const { ctxArgs, log, ctx } = this.logCtx(args, this.update);
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient, segregated } = this.adapter.prepare(
+      model,
+      ctx
+    );
+    log.debug(
+      `updating ${this.class.name} in table ${Model.tableName(this.class)} with id ${id}`
+    );
+    if (segregated) ctx.put("segregatedData", segregated);
+    record = await this.adapter.update(this.class, id, record, ...ctxArgs);
+    return this.adapter.revert<M>(record, this.class, id, transient, ctx);
+  }
+
   override async paginateBy(
     key: keyof M,
     order: OrderDirection,

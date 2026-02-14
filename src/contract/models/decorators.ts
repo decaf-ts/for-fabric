@@ -9,21 +9,17 @@ import {
 } from "@decaf-ts/db-decorators";
 import { Audit } from "./Audit";
 import { Repository } from "@decaf-ts/core";
-import { FabricContractContext } from "../../contracts/index";
+import { FabricContractContext } from "../../contracts/ContractContext";
+import { CollectionResolver } from "../../shared/decorators";
 
-export async function createAuditHandler<
-  M extends Model,
-  R extends Repository<M, any>,
->(
-  this: R,
-  context: FabricContractContext,
-  data: AuditMetadata,
-  key: keyof M,
-  model: M
-): Promise<void> {
-  const repo = Repository.forModel(Audit);
-
-  const collections = Model.collectionsFor(Audit);
+export async function rebuildForMatchingCollection<M extends Model>(
+  model: M,
+  context: any,
+  collections: {
+    privateCols: (string | CollectionResolver)[];
+    sharedCols: (string | CollectionResolver)[];
+  }
+) {
   const mapToCollections =
     collections && (collections.privateCols || collections.sharedCols);
   let cols: string[] | undefined = undefined;
@@ -40,11 +36,31 @@ export async function createAuditHandler<
     ];
 
     cols.forEach((col) => {
-      model = Object.assign(model, context.get("segregatedData")[col]);
+      const segData = context.get("segregatedData");
+      Object.assign(model, (segData as any)[col]);
     });
   }
+  return model;
+}
+
+export async function createAuditHandler<
+  M extends Model,
+  R extends Repository<M, any>,
+>(
+  this: R,
+  context: FabricContractContext,
+  data: AuditMetadata,
+  key: keyof M,
+  model: M
+): Promise<void> {
+  const repo = Repository.forModel(Audit);
+
+  const collections = Model.collectionsFor(Audit);
+
+  model = await rebuildForMatchingCollection(model, context, collections);
+
   if (!context.identity || !context.identity.getID)
-    throw new InternalError(`Lost context apparently. no getId in identity`);
+    throw new InternalError(`Lost context apparently for audit`);
 
   const toCreate = new Audit({
     userGroup: context.identity.getID(),
@@ -72,6 +88,15 @@ export async function updateAuditHandler<
   model: M,
   oldModel: M
 ): Promise<void> {
+  const repo = Repository.forModel(Audit);
+
+  const collections = Model.collectionsFor(Audit);
+
+  model = await rebuildForMatchingCollection(model, context, collections);
+
+  if (!context.identity || !context.identity.getID)
+    throw new InternalError(`Lost context apparently for audit`);
+
   const toCreate = new Audit({
     userGroup: context.identity.getID(),
     userId: context.identity.getID(),
@@ -81,7 +106,6 @@ export async function updateAuditHandler<
     diffs: model.compare(oldModel),
   });
 
-  const repo = Repository.forModel(Audit);
   const audit = await repo.override(this._overrides).create(toCreate, context);
   context.logger.info(
     `Audit log for ${OperationKeys.UPDATE} of ${Model.tableName(this.class)} created: ${JSON.stringify(audit, undefined, 2)}`
