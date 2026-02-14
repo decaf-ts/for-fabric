@@ -12,7 +12,6 @@ import {
   SerializedPage,
   Paginator,
   DirectionLimitOffset,
-  ContextOf,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -22,6 +21,7 @@ import {
   BulkCrudOperationKeys,
   InternalError,
   OperationKeys,
+  PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
 import { Constructor } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "./ContractAdapter";
@@ -122,11 +122,46 @@ export class FabricContractRepository<M extends Model> extends Repository<
     // eslint-disable-next-line prefer-const
     let { record, id, transient, segregated } = this.adapter.prepare(
       model,
+      model[this.pk] as any,
       ctx
     );
     if (segregated) ctx.put("segregatedData", segregated);
     record = await this.adapter.create(this.class, id, record, ...ctxArgs);
     return this.adapter.revert<M>(record || {}, this.class, id, transient, ctx);
+  }
+
+  override async createAll(
+    models: M[],
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<M[]> {
+    if (!models.length) return models;
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.createAll);
+    log.debug(
+      `Creating ${models.length} new ${this.class.name} in table ${Model.tableName(this.class)}`
+    );
+
+    const prepared = models.map((m) => this.adapter.prepare(m, ctx));
+    const ids = prepared.map((p) => p.id);
+    let records = prepared.map((p) => p.record);
+    const segregated = prepared.map((p) => p.segregated);
+    if (segregated.find((s) => !!s)) {
+      ctx.put(
+        "segregatedData",
+        segregated.reduce((acc, s, i) => {
+          acc[ids[i]] = s;
+          return acc;
+        }, {} as any)
+      );
+    }
+    records = await this.adapter.createAll(
+      this.class,
+      ids as PrimaryKeyType[],
+      records,
+      ...ctxArgs
+    );
+    return records.map((r, i) =>
+      this.adapter.revert(r, this.class, ids[i], prepared[i].transient, ctx)
+    );
   }
 
   override async update(

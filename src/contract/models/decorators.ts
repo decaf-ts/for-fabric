@@ -35,9 +35,11 @@ export async function rebuildForMatchingCollection<M extends Model>(
       ),
     ];
 
+    const pk = Model.pk(model);
+
     cols.forEach((col) => {
       const segData = context.get("segregatedData");
-      Object.assign(model, (segData as any)[col]);
+      Object.assign(model, (segData as any)[col][model[pk]]);
     });
   }
   return model;

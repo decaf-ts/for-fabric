@@ -28,6 +28,7 @@ import { Constructor } from "@decaf-ts/decoration";
 import { FabricContractContext } from "../ContractContext";
 import {
   BulkCrudOperationKeys,
+  InternalError,
   OperationKeys,
   PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
@@ -556,19 +557,33 @@ export abstract class FabricCrudContract<M extends Model>
    * @return {Promise<M[]>} Promise resolving to the created models
    */
   async createAll(
-    ctx: Ctx | FabricContractContext,
+    context: Ctx | FabricContractContext,
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    const { log, ctxArgs } = (
-      await this.logCtx([...args, ctx], BulkCrudOperationKeys.CREATE_ALL, true)
+    const { log, ctxArgs, ctx } = (
+      await this.logCtx(
+        [...args, context],
+        BulkCrudOperationKeys.CREATE_ALL,
+        true
+      )
     ).for(this.createAll);
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
         .map((m) => this.deserialize(m))
         .map((m) => new this.clazz(m)) as any;
 
+    const transient = this.getTransientData(ctx);
+
+    log.info(`Merging transient data...`);
+    models = (models as M[]).map((m, i) => {
+      if (!transient || !transient[i])
+        throw new InternalError(`No transient data found for position ${i}`);
+      return Model.merge(m, transient[i], this.clazz) as M;
+    });
+
     log.info(`adding ${models.length} entries to the table`);
+
     return this.repo.createAll(models as unknown as M[], ...ctxArgs);
   }
 

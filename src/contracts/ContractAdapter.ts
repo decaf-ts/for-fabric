@@ -307,7 +307,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
             model,
             await this.forPrivate(collection).putState(
               composedKey,
-              data[collection],
+              data[collection][id as any],
               ctx
             )
           );
@@ -320,23 +320,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
-  private normalizeForPublic<M extends Model>(
-    clazz: Constructor<M>,
-    model: Record<string, any>,
-    ctx: FabricContractContext
-  ): Record<string, any> {
-    if (
-      model &&
-      typeof model === "object" &&
-      Object.prototype.hasOwnProperty.call(model, CouchDBKeys.TABLE)
-    ) {
-      return model;
-    }
-    const instance = Model.isModel(model)
-      ? (model as unknown as M)
-      : (Model.build(model, clazz.name) as M);
-    const prepared = this.prepare(instance, ctx);
-    return prepared.record;
+  override async createAll<M extends Model>(
+    tableName: Constructor<M>,
+    id: PrimaryKeyType[],
+    model: Record<string, any>[],
+    ...args: ContextualArgs<FabricContractContext>
+  ): Promise<Record<string, any>[]> {
+    if (id.length !== model.length)
+      throw new InternalError("Ids and models must have the same length");
+    const { log, ctxArgs } = this.logCtx(args, this.createAll);
+    const tableLabel = Model.tableName(tableName);
+    log.debug(`Creating ${id.length} entries ${tableLabel} table`);
+    return Promise.all(
+      id.map((i, count) => this.create(tableName, i, model[count], ...ctxArgs))
+    );
   }
 
   /**
@@ -427,7 +424,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
             model,
             await this.forPrivate(collection).putState(
               composedKey,
-              data[collection],
+              data[collection][id as any],
               ctx
             )
           );
@@ -712,121 +709,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
-  private async flushSegregatedWrites(
-    ctx: FabricContractContext,
-    compositeKey: string
-  ): Promise<void> {
-    const writeCollections = ctx.getWriteCollections();
-    if (!writeCollections.length) return;
-
-    const writes = (ctx as any)._segregateWrite as
-      | Record<string, string[]>
-      | undefined;
-    if (!writes) return;
-    for (const collection of writeCollections) {
-      const entries = writes[collection];
-      if (!entries || !entries.length) continue;
-      const record = this.buildSegregatedRecord(entries, collection);
-      if (!record || !Object.keys(record).length) continue;
-
-      const cacheKey = `segregatedRecord:${collection}:${compositeKey}`;
-      ctx.cache.put(cacheKey, record);
-
-      const privateCtx = ctx.override({
-        segregated: collection,
-      });
-      await this.putState(compositeKey, record, privateCtx);
-    }
-    ctx.cache.remove("segregateWrite");
-  }
-
-  private buildSegregatedRecord(
-    entries: string[],
-    collection: string
-  ): Record<string, any> | undefined {
-    if (!entries || !entries.length) return undefined;
-    const firstModel = entries.find((entry) => !!entry);
-    if (!firstModel) return undefined;
-    const clazz = firstModel.constructor as Constructor<any>;
-    const pkProp = Model.pk(clazz) as string;
-    const keys = new Set<string>();
-    entries.forEach((entry) => keys.add(entry as string));
-    const metadataFields = this.getFieldsForCollection(
-      firstModel as any,
-      collection
-    );
-    metadataFields.forEach((key) => keys.add(key));
-    if (pkProp) keys.add(pkProp);
-
-    const record: Record<string, any> = {};
-    // keys.forEach((key) => {
-    //   const value = entries
-    //     .map((entry) => entry.model[key as keyof typeof entry.model])
-    //     .find((val) => typeof val !== "undefined");
-    //   if (typeof value === "undefined") return;
-    //   const mappedProp = Model.columnName(clazz, key as any);
-    //   if (this.isReserved(mappedProp))
-    //     throw new InternalError(`Property name ${mappedProp} is reserved`);
-    //   record[mappedProp] =
-    //     value instanceof Date ? new Date(value as Date) : value;
-    // });
-
-    return record;
-  }
-
-  private async mergeSegregatedReads(
-    ctx: FabricContractContext,
-    id: string,
-    model: Record<string, any>
-  ): Promise<Record<string, any>> {
-    // Use getReadCollections which reads from the private _segregateRead property
-    const reads = ctx.getReadCollections();
-    if (!reads?.length) return model;
-    for (const collection of reads) {
-      const skipFlagKey = `${MIRROR_SKIP_FLAG_PREFIX}${collection}`;
-      if (ctx.getOrUndefined(skipFlagKey as any)) continue;
-      const privateRecord = await this.readPrivateRecord(ctx, collection, id);
-      if (!privateRecord) continue;
-      Object.entries(privateRecord).forEach(([key, value]) => {
-        if (typeof value === "undefined") return;
-        model[key] = value;
-      });
-    }
-    return model;
-  }
-
-  private async readPrivateRecord(
-    ctx: FabricContractContext,
-    collection: string,
-    id: string
-  ): Promise<Record<string, any> | undefined> {
-    const data = await ctx.stub.getPrivateData(collection, id);
-    if (!data) return undefined;
-    const text = data.toString();
-    if (!text) return undefined;
-    try {
-      return FabricContractAdapter.serializer.deserialize(text);
-    } catch {
-      return undefined;
-    }
-  }
-
-  private async deleteSegregatedCollections(
-    ctx: FabricContractContext,
-    id: string
-  ): Promise<void> {
-    // Use getReadCollections which reads from the private _segregateRead property
-    const reads = ctx.getReadCollections();
-    if (!reads?.length) return;
-    for (const collection of reads) {
-      try {
-        await ctx.stub.deletePrivateData(collection, id);
-      } catch {
-        // ignore missing private data
-      }
-    }
-  }
-
   protected async readState(id: string, ctx: FabricContractContext) {
     let result: any;
 
@@ -940,22 +822,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
       );
 
     return res;
-  }
-
-  protected mergeModels(results: Record<string, any>[]): Record<string, any> {
-    const extract = (model: Record<string, any>) =>
-      Object.entries(model).reduce((accum: Record<string, any>, [key, val]) => {
-        if (typeof val !== "undefined") accum[key] = val;
-        return accum;
-      }, {});
-
-    let finalModel: Record<string, any> = results.pop() as Record<string, any>;
-
-    for (const res of results) {
-      finalModel = Object.assign({}, extract(finalModel), extract(res));
-    }
-
-    return finalModel;
   }
 
   /**
@@ -1191,22 +1057,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return new FabricStatement(this as any);
   }
 
-  override async createAll<M extends Model>(
-    tableName: Constructor<M>,
-    id: PrimaryKeyType[],
-    model: Record<string, any>[],
-    ...args: ContextualArgs<FabricContractContext>
-  ): Promise<Record<string, any>[]> {
-    if (id.length !== model.length)
-      throw new InternalError("Ids and models must have the same length");
-    const { log, ctxArgs } = this.logCtx(args, this.createAll);
-    const tableLabel = Model.tableName(tableName);
-    log.debug(`Creating ${id.length} entries ${tableLabel} table`);
-    return Promise.all(
-      id.map((i, count) => this.create(tableName, i, model[count], ...ctxArgs))
-    );
-  }
-
   override async updateAll<M extends Model>(
     tableName: Constructor<M>,
     id: PrimaryKeyType[],
@@ -1239,7 +1089,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const split: SegregatedModel<M> = Model.segregate(model);
     const tableName = Model.tableName(model.constructor as any);
     const pk = Model.pk(model.constructor as any);
-
+    const id = model[pk as keyof M];
     //
     // const collection = ctx.getOrUndefined("segregated") as string | undefined;
     // const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
@@ -1300,7 +1150,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const segregatedWrites: Record<string, any> = {};
     if (segregatedWriteKeys) {
       for (const collection in segregatedWriteKeys) {
-        segregatedWrites[collection] = mapToRecord(
+        segregatedWrites[collection] = segregatedWrites[collection] || {};
+        segregatedWrites[collection][id as any] = mapToRecord(
           ctx.getOrUndefined("forceSegregateWrite")
             ? split.model
             : (split.transient as any),
