@@ -476,26 +476,50 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     this.enforceMirrorAuthorization(clazz, ctx);
     const tableName = Model.tableName(clazz);
-    const pkProp = Model.pk(clazz);
-    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+
+    const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
     let model: Record<string, any>;
-    let shouldDeletePublicState = false;
+    // const fabricCtx = ctx as FabricContractContext;
     try {
-      const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-      if (!isMirror) {
-        model = await this.read(clazz, id, ...ctxArgs);
-        shouldDeletePublicState = this.hasPublicState(model, clazz);
-      } else {
-        model = { [pkProp as string]: id } as Record<string, any>;
-      }
-      log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
-      if (shouldDeletePublicState) {
-        await this.deleteState(composedKey, ctx);
-      }
-      await this.deleteSegregatedCollections(ctx, composedKey);
+      model = ctx.isFullySegregated
+        ? {}
+        : await this.readState(composedKey, ctx);
+      if (!ctx.isFullySegregated) await this.deleteState(composedKey, ctx);
     } catch (e: unknown) {
       throw this.parseError(e as Error);
     }
+
+    const collections = ctx.getReadCollections();
+    if (collections && collections.length) {
+      for (const col of collections) {
+        Object.assign(
+          model,
+          await this.forPrivate(col).readState(composedKey, ctx)
+        );
+        await this.forPrivate(col).deleteState(composedKey, ctx);
+      }
+    }
+
+    // const pkProp = Model.pk(clazz);
+    // const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+    // let model: Record<string, any>;
+    // let shouldDeletePublicState = false;
+    // try {
+    //   const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    //   if (!isMirror) {
+    //     model = await this.read(clazz, id, ...ctxArgs);
+    //     shouldDeletePublicState = this.hasPublicState(model, clazz);
+    //   } else {
+    //     model = { [pkProp as string]: id } as Record<string, any>;
+    //   }
+    //   log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
+    //   if (shouldDeletePublicState) {
+    //     await this.deleteState(composedKey, ctx);
+    //   }
+    //   await this.deleteSegregatedCollections(ctx, composedKey);
+    // } catch (e: unknown) {
+    //   throw this.parseError(e as Error);
+    // }
 
     return model;
   }

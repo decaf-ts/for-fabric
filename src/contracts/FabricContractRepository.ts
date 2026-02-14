@@ -131,7 +131,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
 
   override async update(
     model: M,
-    ...args: MaybeContextualArg<ContextOf<A>>
+    ...args: MaybeContextualArg<FabricContractContext>
   ): Promise<M> {
     const { ctxArgs, log, ctx } = this.logCtx(args, this.update);
     // eslint-disable-next-line prefer-const

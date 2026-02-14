@@ -106,7 +106,7 @@ describe("OtherProductShared contract version flow with relations", () => {
 
   let updated: OtherProductShared;
 
-  it("updates the shared product", async () => {
+  it("updates the shared data", async () => {
     const updatedModel = new OtherProductShared({
       ...created,
       inventedName: "updated-name",
@@ -145,12 +145,13 @@ describe("OtherProductShared contract version flow with relations", () => {
     expect(read.equals(updated)).toBe(true);
   });
 
-  it.skip("deletes the shared product", async () => {
+  it("deletes the shared data", async () => {
     const deleted = Model.deserialize(
       await contract.delete(ctx as any, created.productCode)
     ) as OtherProductShared;
 
-    expect(deleted.hasErrors()).toBeDefined();
+    stub.commit();
+    expect(deleted.hasErrors()).toBeUndefined();
 
     const k = stub.createCompositeKey("other_product_shared", [productCode]);
     await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
