@@ -260,48 +260,10 @@ describe("OtherProductShared contract version flow with relations", () => {
     let updated: Product[];
 
     it("Updates in Bulk", async () => {
-      const repo: FabricClientRepository<Product> = Repository.forModel<
-        Product,
-        FabricClientRepository<Product>
-      >(Product);
       const toUpdate = bulk.map((c, i) => {
-        return new Product({
+        return new OtherProductShared({
           productCode: c.productCode,
           inventedName: "inventedName_" + i,
-        });
-      });
-      const models = new Array(10).fill(0).map(() => {
-        const id = generateGtin();
-        return new OtherProductShared({
-          productCode: id,
-          inventedName: "test_name",
-          nameMedicinalProduct: "123456789",
-          strengths: [
-            {
-              productCode: id,
-              strength: "200mg",
-              substance: "Ibuprofen",
-            },
-            {
-              productCode: id,
-              strength: "400mg",
-              substance: "Ibuprofen",
-            },
-          ],
-          markets: [
-            {
-              productCode: id,
-              marketId: "BR",
-              nationalCode: "BR",
-              mahName: "ProPharma BR",
-            },
-            {
-              productCode: id,
-              marketId: "US",
-              nationalCode: "US",
-              mahName: "ProPharma US",
-            },
-          ],
         });
       });
 
@@ -314,9 +276,9 @@ describe("OtherProductShared contract version flow with relations", () => {
 
       let count = 0;
       const newBulk: OtherProductShared[] = [];
-      for (const b of bulk) {
+      for (const b of toUpdate) {
         expect(b.hasErrors()).toBeDefined();
-        const productCode = models[count++].productCode;
+        const productCode = toUpdate[count++].productCode;
         const k = stub.createCompositeKey("other_product_shared", [
           productCode,
         ]);
@@ -366,41 +328,28 @@ describe("OtherProductShared contract version flow with relations", () => {
       // ).toEqual(true);
     });
 
-    it.skip("Deletes in Bulk", async () => {
-      const repo: FabricClientRepository<Product> = Repository.forModel<
-        Product,
-        FabricClientRepository<Product>
-      >(Product);
-      const ids = bulk.map((c) => c[pk]);
-      const deleted = await repo.deleteAll(ids as any[]);
-      expect(deleted).toBeDefined();
-      expect(Array.isArray(deleted)).toEqual(true);
-      expect(deleted.every((el) => el instanceof Product)).toEqual(true);
-      expect(deleted.every((el) => !el.hasErrors())).toEqual(true);
-      expect(deleted.every((el, i) => el.equals(updated[i]))).toEqual(true);
-      //
-      // const strengthRepo = Repository.forModel(ProductStrength);
-      //
-      // const marketRepo = Repository.forModel(Market);
-      //
-      // for (const p of deleted) {
-      //   await expect(repo.read(p[Model.pk(Clazz) as any])).rejects.toThrowError(
-      //     NotFoundError
-      //   );
-      //   await expect(strengthRepo.read(p.strengths[0].id)).rejects.toThrowError(
-      //     NotFoundError
-      //   );
-      //   await expect(strengthRepo.read(p.strengths[1].id)).rejects.toThrowError(
-      //     NotFoundError
-      //   );
-      //
-      //   await expect(
-      //     marketRepo.read(p.markets[0] as any)
-      //   ).resolves.toBeInstanceOf(Market);
-      //   await expect(
-      //     marketRepo.read(p.markets[1] as any)
-      //   ).resolves.toBeInstanceOf(Market);
-      // }
+    it("Deletes in Bulk", async () => {
+      const pk = Model.pk(OtherProductShared);
+      const ids = bulk.map((c) => c[pk]) as number[];
+
+      const deleted: OtherProductShared[] = JSON.parse(
+        await contract.deleteAll(ctx as any, JSON.stringify(ids))
+      ).map((r: any) => Model.deserialize(r));
+
+      stub.commit();
+
+      let count = 0;
+      for (const b of deleted) {
+        expect(b.hasErrors()).toBeDefined();
+        const productCode = deleted[count++].productCode;
+        const k = stub.createCompositeKey("other_product_shared", [
+          productCode,
+        ]);
+        await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
+        await expect(
+          stub.getPrivateData("decaf-namespaceAeon", k)
+        ).rejects.toThrow(NotFoundError);
+      }
     });
   });
 });

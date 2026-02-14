@@ -414,7 +414,9 @@ export abstract class FabricCrudContract<M extends Model>
       await this.logCtx([...args, ctx], BulkCrudOperationKeys.DELETE_ALL, true)
     ).for(this.deleteAll);
     if (typeof keys === "string") keys = JSON.parse(keys) as string[];
-    return this.repo.deleteAll(keys, ...ctxArgs);
+    const deleted = await this.repo.deleteAll(keys, ...ctxArgs);
+    const result = deleted.map((c) => new this.clazz(Model.segregate(c).model));
+    return result;
   }
 
   /**
@@ -486,6 +488,7 @@ export abstract class FabricCrudContract<M extends Model>
    * @summary Provides a simplified way to query the database with common query parameters.
    * @param {Condition<M>} condition - The condition to filter records.
    * @param orderBy - The field to order results by.
+   * @param {OrderDirection} [order=OrderDirection.ASC] - The sort direction.
    * @param {OrderDirection} [order=OrderDirection.ASC] - The sort direction.
    * @param {number} [limit] - Optional maximum number of results to return.
    * @param {number} [skip] - Optional number of results to skip.
