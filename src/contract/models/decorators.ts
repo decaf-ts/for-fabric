@@ -58,8 +58,8 @@ export async function createAuditHandler<
   const repo = Repository.forModel(Audit);
 
   const collections = Model.collectionsFor(Audit);
-
-  model = await rebuildForMatchingCollection(model, context, collections);
+  //
+  // model = await rebuildForMatchingCollection(model, context, collections);
 
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apparently for audit`);
@@ -93,8 +93,8 @@ export async function updateAuditHandler<
   const repo = Repository.forModel(Audit);
 
   const collections = Model.collectionsFor(Audit);
-
-  model = await rebuildForMatchingCollection(model, context, collections);
+  //
+  // model = await rebuildForMatchingCollection(model, context, collections);
 
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apparently for audit`);

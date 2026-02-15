@@ -435,25 +435,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
 
     return model;
-
-    //
-    // this.enforceMirrorAuthorization(clazz, ctx);
-    // const tableName = Model.tableName(clazz);
-    // const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    //
-    // try {
-    //   log.verbose(`updating entry to ${tableName} table with pk ${id}`);
-    //   const sanitizedModel = this.normalizeForPublic(clazz, model, ctx);
-    //   if (ctx.isFullySegregated) {
-    //     await this.flushSegregatedWrites(ctx, composedKey);
-    //     return sanitizedModel;
-    //   }
-    //   model = await this.putState(composedKey, sanitizedModel, ctx);
-    // } catch (e: unknown) {
-    //   throw this.parseError(e as Error);
-    // }
-    //
-    // return model;
   }
 
   /**
@@ -496,28 +477,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
         await this.forPrivate(col).deleteState(composedKey, ctx);
       }
     }
-
-    // const pkProp = Model.pk(clazz);
-    // const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
-    // let model: Record<string, any>;
-    // let shouldDeletePublicState = false;
-    // try {
-    //   const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    //   if (!isMirror) {
-    //     model = await this.read(clazz, id, ...ctxArgs);
-    //     shouldDeletePublicState = this.hasPublicState(model, clazz);
-    //   } else {
-    //     model = { [pkProp as string]: id } as Record<string, any>;
-    //   }
-    //   log.verbose(`deleting entry with pk ${id} from ${tableName} table`);
-    //   if (shouldDeletePublicState) {
-    //     await this.deleteState(composedKey, ctx);
-    //   }
-    //   await this.deleteSegregatedCollections(ctx, composedKey);
-    // } catch (e: unknown) {
-    //   throw this.parseError(e as Error);
-    // }
-
     return model;
   }
 
@@ -720,13 +679,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const { log } = this.logCtx([ctx], this.readState);
     const res: string = (await ctx.stub.getState(id.toString())).toString();
-    // const collection = ctx.get("segregated");
-    // if (collection)
-    //   res = (
-    //     await ctx.stub.getPrivateData(collection, id.toString())
-    //   ).toString();
-    // else res = (await ctx.stub.getState(id.toString())).toString();
-
     if (!res) throw new NotFoundError(`Record with id ${id} not found`);
     log.silly(`state retrieved under id ${id}`);
     try {
@@ -748,28 +700,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
       JSON.stringify(rawInput)
     );
     return res;
-  }
-
-  private createRowsIterator(
-    rows: Array<{ key: string; value: Buffer }>
-  ): Iterators.StateQueryIterator {
-    let index = 0;
-    return {
-      // @ts-expect-error typeing of iterator?
-      async next() {
-        if (index < rows.length) {
-          const row = rows[index++];
-          return {
-            value: { key: row.key, value: row.value },
-            done: false,
-          };
-        }
-        return { done: true };
-      },
-      async close() {
-        // noop
-      },
-    };
   }
 
   protected async queryResultPaginated(
@@ -1098,18 +1028,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     //   entries = Object.keys(model)
     //     .map((key) => [key, (model as any)[key]] as [string, any])
     //     .filter(([, val]) => typeof val !== "undefined");
-    // } else if (collection) {
-    //   // SEGREGATED mode: keep only properties decorated for this collection + pk
-    //   const collectionFields = this.getFieldsForCollection(model, collection);
-    //   entries = [...new Set([pk as string, ...collectionFields])]
-    //     .map((key) => [key, (model as any)[key]] as [string, any])
-    //     .filter(([, val]) => typeof val !== "undefined");
-    // } else {
-    //   // NORMAL mode: strip transient (current behavior)
-    //   const split = Model.segregate(model);
-    //   entries = Object.entries(split.model).filter(
-    //     ([, val]) => typeof val !== "undefined"
-    //   );
     // }
 
     const mapToRecord = function (
