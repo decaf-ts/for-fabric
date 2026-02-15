@@ -230,6 +230,22 @@ export class FabricContractRepository<M extends Model> extends Repository<
     );
   }
 
+  override async listBy(
+    key: keyof M,
+    order: OrderDirection,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ) {
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.LIST_BY, true)
+    ).for(this.listBy);
+    log.verbose(
+      `listing ${Model.tableName(this.class)} by ${key as string} ${order}`
+    );
+    return this.select()
+      .orderBy([key, order])
+      .execute(...ctxArgs);
+  }
+
   override async paginateBy(
     key: keyof M,
     order: OrderDirection,

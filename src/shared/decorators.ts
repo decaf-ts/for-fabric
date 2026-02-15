@@ -51,7 +51,7 @@ const MIRROR_SKIP_FLAG_PREFIX = "mirror:skip:";
  * @param identity - The identity value which can be a string MSP ID or ClientIdentity object
  * @returns The MSP ID as a string, or undefined if not available
  */
-function extractMspId(
+export function extractMspId(
   identity: string | ClientIdentity | undefined
 ): string | undefined {
   if (!identity) return undefined;
@@ -505,6 +505,28 @@ export type SegregatedDataMetadata = {
  */
 export const SEGREGATED_COLLECTION_EXTRACTION_PRIORITY = 35;
 
+export function applySegregationFlags<M extends Model>(
+  clazz: M,
+  collections: string[],
+  ctx: any
+) {
+  // Register collections early using readFrom - this allows sequence code
+  // to know which collections to replicate to during pk generation
+  if (collections.length > 0) {
+    (ctx as FabricContractContext).readFrom(collections);
+  }
+
+  // Check if model is fully segregated (all non-pk properties are private/shared/transient).
+  // Use Model.segregate() which is the canonical way to determine what's transient,
+  // rather than reading DBKeys.TRANSIENT metadata which may not accumulate correctly
+  // when class-level @privateData applies decorators iteratively.
+  if (!ctx.isFullySegregated) {
+    const segregated = Model.segregate(clazz);
+    const publicData = segregated.public || {};
+    if (!Object.keys(publicData).length) ctx.markFullySegregated();
+  }
+}
+
 /**
  * @description Early handler to extract and register collections in context
  * @summary Runs with priority < 40 to extract collection names before pk generation (priority 60).
@@ -548,30 +570,14 @@ export async function extractSegregatedCollections<M extends Model>(
       collections.push(collection);
     }
   }
-
-  // Register collections early using readFrom - this allows sequence code
-  // to know which collections to replicate to during pk generation
-  if (collections.length > 0) {
-    (context as FabricContractContext).readFrom(collections);
-  }
-
-  // Check if model is fully segregated (all non-pk properties are private/shared/transient).
-  // Use Model.segregate() which is the canonical way to determine what's transient,
-  // rather than reading DBKeys.TRANSIENT metadata which may not accumulate correctly
-  // when class-level @privateData applies decorators iteratively.
-  const fabricCtx = context as FabricContractContext;
-  if (!fabricCtx.isFullySegregated) {
-    const segregated = Model.segregate(model);
-    const publicData = segregated.public || {};
-    if (!Object.keys(publicData).length) fabricCtx.markFullySegregated();
-  }
+  applySegregationFlags(model, collections, context);
 
   // Store segregation metadata on the adapter (persists across context chains).
   // The Sequence creates its own context via logCtx, losing context-stored flags.
   const seqName = Model.sequenceName(model, "pk");
-  fabricCtx.setSequenceSegregation(
+  (context as any).setSequenceSegregation(
     seqName,
-    fabricCtx.isFullySegregated,
+    (context as any).isFullySegregated,
     collections
   );
 }

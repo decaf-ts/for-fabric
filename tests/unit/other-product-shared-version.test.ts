@@ -9,7 +9,12 @@ import { ProductStrength } from "../../src/contract/models/ProductStrength";
 import { Market } from "../../src/contract/models/Market";
 import { generateGtin } from "../../src/contract/models/gtin";
 import { Product } from "../../src/contract/models/Product";
-import { OrderDirection, PersistenceKeys, Repository } from "@decaf-ts/core";
+import {
+  OrderDirection,
+  Paginator,
+  PersistenceKeys,
+  Repository,
+} from "@decaf-ts/core";
 import { FabricClientRepository } from "../../src/index";
 
 describe("OtherProductShared contract version flow with relations", () => {
@@ -292,40 +297,40 @@ describe("OtherProductShared contract version flow with relations", () => {
       bulk = newBulk;
     });
 
-    it.skip("lists", async () => {
-      const repo: FabricClientRepository<Product> = Repository.forModel<
-        Product,
-        FabricClientRepository<Product>
-      >(Product);
-
-      const list = await repo.listBy("inventedName", OrderDirection.ASC);
-      expect(list).toBeDefined();
-      // expect(list.every((el) => el instanceof Product)).toEqual(true);
+    it("lists via statement", async () => {
+      const listed = JSON.parse(
+        await contract.statement(
+          ctx as any,
+          "listBy",
+          JSON.stringify(["inventedName", "asc"])
+        )
+      );
+      expect(listed).toBeDefined();
+      expect(listed.length).toEqual(bulk.length);
+      // expect(listed.every((el) => el instanceof Product)).toEqual(true);
+      // expect(listed.every((el, i) => el.equals(bulk[i])).toEqual(true);
     });
 
-    it.skip("Paginates", async () => {
-      const repo: FabricClientRepository<Product> = Repository.forModel<
-        Product,
-        FabricClientRepository<Product>
-      >(Product);
-      const paginator = await repo.select().paginate(5);
-      expect(paginator).toBeDefined();
-      expect(paginator["_bookmark"]).toBeUndefined();
-      const page1 = await paginator.page(1);
-      expect(paginator.count).toBeGreaterThan(9);
-      expect(page1).toBeDefined();
-      expect(paginator["_bookmark"]).toBeDefined();
-      // expect(
-      //   page1.every((el, i) => el.equals([...updated].reverse()[i]))
-      // ).toEqual(true);
+    it("paginates via paginateBy", async () => {
+      const page = await contract.paginateBy(
+        ctx,
+        "inventedName",
+        "desc",
+        JSON.stringify({ offset: 1, limit: 3 })
+      );
+      expect(page).toBeDefined();
 
-      const page2 = await paginator.next();
-      // expect(paginator.count).toBeGreaterThan(9);
-      expect(page2).toBeDefined();
-      expect(paginator["_bookmark"]).toBeDefined();
-      // expect(
-      //   page2.every((el, i) => el.equals([...updated].reverse()[i + 5]))
-      // ).toEqual(true);
+      const parsedPage = Paginator.deserialize(page);
+      expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
+    });
+
+    it("paginates via statement", async () => {
+      const page = await contract.statement(
+        ctx,
+        "paginateBy",
+        JSON.stringify(["inventedName", "desc", { offset: 1, limit: 3 }])
+      );
+      expect(page).toBeDefined();
     });
 
     it("Deletes in Bulk", async () => {

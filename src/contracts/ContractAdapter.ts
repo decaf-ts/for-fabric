@@ -780,7 +780,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     bookmark?: string | number,
     ...args: any[]
   ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
-    const { ctx } = this.logCtx(args, this.readState);
+    const { ctx } = this.logCtx(
+      args.length ? args : [bookmark],
+      this.readState
+    );
     let res: StateQueryResponse<Iterators.StateQueryIterator>;
     const collection = ctx.get("segregated");
     if (collection) {
@@ -998,11 +1001,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
     docsOnly: D = true as D,
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<RawResult<R, D>> {
-    const { log, ctx } = this.logCtx(args, this.raw);
+    const { log, ctx, ctxArgs } = this.logCtx(args, this.raw);
 
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
-    const resp = { docs: [], bookmark: undefined as string | undefined };
+    let resp = { docs: [], bookmark: undefined as string | undefined };
     if (limit || skip) {
       delete rawInput["limit"];
       delete rawInput["skip"];
@@ -1016,7 +1019,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
           limit || Number.MAX_VALUE,
           (skip as any)?.toString(),
           rawInput["bookmark"],
-          ctx
+          ...[ctx as FabricContractContext]
         )) as StateQueryResponse<Iterators.StateQueryIterator>;
       resp.bookmark = response.metadata.bookmark;
       iterator = response.iterator;
@@ -1034,6 +1037,24 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.debug(
       `returning ${Array.isArray(resp.docs) ? resp.docs.length : 1} results`
     );
+
+    const collections = ctx.getReadCollections();
+
+    const segregated: any[] = [];
+    if (collections && collections.length) {
+      for (const collection of collections) {
+        segregated.push(
+          await this.forPrivate(collection).raw(rawInput, docsOnly, ...ctxArgs)
+        );
+      }
+      // choose the response with the most results
+      resp = segregated.reduce((acc, curr) => {
+        if (!acc) return curr;
+        if (curr.docs && curr.docs.length >= acc?.docs.length) return curr;
+        return acc;
+      }, resp);
+    }
+
     if (docsOnly) return resp.docs as any;
     return resp as any;
   }
