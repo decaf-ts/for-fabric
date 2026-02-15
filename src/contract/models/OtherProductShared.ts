@@ -22,8 +22,8 @@ import {
   sharedData,
 } from "../../shared/index";
 import { version } from "@decaf-ts/db-decorators";
-import { ProductStrength } from "./ProductStrength";
-import { Market } from "./Market";
+import { OtherProductStrength } from "./OtherProductStrength";
+import { OtherMarket } from "./OtherMarket";
 
 @sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
@@ -77,18 +77,18 @@ export class OtherProductShared extends BaseIdentifiedModel {
   counter?: number;
 
   @oneToMany(
-    () => ProductStrength,
+    () => OtherProductStrength,
     { update: Cascade.CASCADE, delete: Cascade.CASCADE },
     false
   )
-  strengths!: ProductStrength[];
+  strengths!: OtherProductStrength[];
 
   @oneToMany(
-    () => Market,
+    () => OtherMarket,
     { update: Cascade.CASCADE, delete: Cascade.CASCADE },
     false
   )
-  markets!: Market[];
+  markets!: OtherMarket[];
 
   @column()
   @ownedBy()

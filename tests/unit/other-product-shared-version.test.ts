@@ -8,14 +8,7 @@ import { OtherProductShared } from "../../src/contract/models/OtherProductShared
 import { ProductStrength } from "../../src/contract/models/ProductStrength";
 import { Market } from "../../src/contract/models/Market";
 import { generateGtin } from "../../src/contract/models/gtin";
-import { Product } from "../../src/contract/models/Product";
-import {
-  OrderDirection,
-  Paginator,
-  PersistenceKeys,
-  Repository,
-} from "@decaf-ts/core";
-import { FabricClientRepository } from "../../src/index";
+import { Paginator } from "@decaf-ts/core";
 
 describe("OtherProductShared contract version flow with relations", () => {
   let ctx: ReturnType<typeof getMockCtx>;
@@ -261,8 +254,6 @@ describe("OtherProductShared contract version flow with relations", () => {
 
       bulk = read;
     });
-
-    let updated: Product[];
 
     it("Updates in Bulk", async () => {
       const toUpdate = bulk.map((c, i) => {

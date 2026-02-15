@@ -54,11 +54,12 @@ function getFieldValue(doc: any, field: string) {
 
 function applyOperator(operator: string, value: any, comparison: any) {
   if (value === undefined) return false;
+  const isNullale = comparison === null || comparison === undefined;
   switch (operator) {
     case "$gt":
-      return value > comparison;
+      return isNullale || value > comparison;
     case "$gte":
-      return value >= comparison;
+      return isNullale || value >= comparison;
     case "$lt":
       return value < comparison;
     case "$lte":

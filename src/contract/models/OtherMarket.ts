@@ -17,12 +17,12 @@ import {
   sharedData,
 } from "../../shared/index";
 
-// @sharedData(NamespaceCollection("decaf-namespace"))
+@sharedData(NamespaceCollection("decaf-namespace"))
 @description("Links a product to a specific market.")
 @uses(FabricFlavour)
 @table(TableNames.Market)
 @model()
-export class Market extends BaseIdentifiedModel {
+export class OtherMarket extends BaseIdentifiedModel {
   @pk({ type: String, generated: false })
   // @mirror("mirror-collection", "org-a")
   @composed(["productCode", "marketId"], ":", true)
@@ -66,7 +66,7 @@ export class Market extends BaseIdentifiedModel {
   )
   mahAddress?: string;
 
-  constructor(model?: ModelArg<Market>) {
+  constructor(model?: ModelArg<OtherMarket>) {
     super(model);
   }
 }

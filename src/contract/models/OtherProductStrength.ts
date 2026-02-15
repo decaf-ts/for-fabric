@@ -1,14 +1,6 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
-import {
-  column,
-  ContextualArgs,
-  index,
-  OrderDirection,
-  pk,
-  table,
-  uuid,
-} from "@decaf-ts/core";
+import { column, index, OrderDirection, pk, table, uuid } from "@decaf-ts/core";
 import { TableNames } from "./constants";
 import { description, uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
@@ -22,7 +14,7 @@ import {
 import { composed, InternalError } from "@decaf-ts/db-decorators";
 import { gtin } from "./gtin";
 
-function strengthSeed(m: ProductStrength) {
+function strengthSeed(m: OtherProductStrength) {
   try {
     return `${m.productCode}${m.strength}${m.substance ? m.substance : ""}`;
   } catch (e: unknown) {
@@ -30,12 +22,12 @@ function strengthSeed(m: ProductStrength) {
   }
 }
 
-// @sharedData(NamespaceCollection("decaf-namespace"))
+@sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
 @table(TableNames.ProductStrength)
 @model()
 @description("Represents the product’s strength and composition details.")
-export class ProductStrength extends BaseIdentifiedModel {
+export class OtherProductStrength extends BaseIdentifiedModel {
   @pk()
   // @mirror("mirror-collection", "org-a")
   @composed(["productCode", "uuid"], ":")
@@ -72,7 +64,7 @@ export class ProductStrength extends BaseIdentifiedModel {
   @description("Legal entity name responsible for the product.")
   legalEntityName?: string;
 
-  constructor(model?: ModelArg<ProductStrength>) {
+  constructor(model?: ModelArg<OtherProductStrength>) {
     super(model);
   }
 }

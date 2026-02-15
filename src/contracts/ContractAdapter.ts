@@ -576,13 +576,19 @@ export class FabricContractAdapter extends CouchDBAdapter<
               }
               case "queryResult": {
                 const [stub, rawInput] = argsList;
-                return stub.getPrivateDataQueryResult(collection, rawInput);
+                return stub.getPrivateDataQueryResult(
+                  collection,
+                  JSON.stringify(rawInput)
+                );
               }
               case "queryResultPaginated": {
                 const [stub, rawInput, limit, skip] = argsList;
                 const iterator = await (
                   stub as ChaincodeStub
-                ).getPrivateDataQueryResult(collection, rawInput);
+                ).getPrivateDataQueryResult(
+                  collection,
+                  JSON.stringify(rawInput)
+                );
                 const results: any[] = [];
                 let count = 0;
                 let reachedBookmark = skip ? false : true;
@@ -738,15 +744,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<Iterators.StateQueryIterator> {
     const { ctx } = this.logCtx(args, this.queryResult);
-    let res: Iterators.StateQueryIterator;
-    const collection = ctx.get("segregated");
-    if (collection)
-      res = await ctx.stub.getPrivateDataQueryResult(
-        collection,
-        JSON.stringify(rawInput)
-      );
-    else res = await stub.getQueryResult(JSON.stringify(rawInput));
-
+    const res: Iterators.StateQueryIterator = await stub.getQueryResult(
+      JSON.stringify(rawInput)
+    );
     return res;
   }
 
@@ -784,41 +784,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
       args.length ? args : [bookmark],
       this.readState
     );
-    let res: StateQueryResponse<Iterators.StateQueryIterator>;
-    const collection = ctx.get("segregated");
-    if (collection) {
-      const clonedInput = JSON.parse(JSON.stringify(rawInput));
-      clonedInput.selector = clonedInput.selector || {};
-      if (bookmark) clonedInput.selector._id = { $gt: bookmark.toString() };
-      const limitValue =
-        typeof limit === "number" && limit > 0 ? limit : Number.MAX_VALUE;
-      const iterator = await stub.getPrivateDataQueryResult(
-        collection,
-        JSON.stringify(clonedInput)
-      );
-      const rows: Array<{ key: string; value: Buffer }> = [];
-      let lastKey = "";
-      while (rows.length < limitValue) {
-        const resRow = await iterator.next();
-        if (resRow.done) break;
-        if (resRow.value && resRow.value.value) {
-          rows.push({
-            key: resRow.value.key,
-            value: resRow.value.value as Buffer,
-          });
-          lastKey = resRow.value.key;
-        }
-      }
-      await iterator.close();
-      res = {
-        iterator: this.createRowsIterator(rows),
-        metadata: {
-          fetchedRecordsCount: rows.length,
-          bookmark: rows.length ? lastKey : "",
-        },
-      };
-    } else
-      res = await stub.getQueryResultWithPagination(
+    const res: StateQueryResponse<Iterators.StateQueryIterator> =
+      await stub.getQueryResultWithPagination(
         JSON.stringify(rawInput),
         limit,
         bookmark?.toString()
@@ -1003,6 +970,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ): Promise<RawResult<R, D>> {
     const { log, ctx, ctxArgs } = this.logCtx(args, this.raw);
 
+    const enableSegregates = !args.length || args[0] !== true;
+
     const { skip, limit } = rawInput;
     let iterator: Iterators.StateQueryIterator;
     let resp = { docs: [], bookmark: undefined as string | undefined };
@@ -1038,13 +1007,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
       `returning ${Array.isArray(resp.docs) ? resp.docs.length : 1} results`
     );
 
-    const collections = ctx.getReadCollections();
+    const collections = enableSegregates ? ctx.getReadCollections() : undefined;
 
     const segregated: any[] = [];
     if (collections && collections.length) {
       for (const collection of collections) {
         segregated.push(
-          await this.forPrivate(collection).raw(rawInput, docsOnly, ...ctxArgs)
+          await this.forPrivate(collection).raw(
+            rawInput,
+            false,
+            true,
+            ...ctxArgs
+          )
         );
       }
       // choose the response with the most results
@@ -1055,7 +1029,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
       }, resp);
     }
 
-    if (docsOnly) return resp.docs as any;
+    if (docsOnly) {
+      return resp.docs as any;
+    }
     return resp as any;
   }
 
