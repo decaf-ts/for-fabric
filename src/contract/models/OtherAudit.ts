@@ -32,7 +32,7 @@ import {
 } from "../../shared/index";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function uuidSeed(m: Audit, ...args: ContextualArgs<any>) {
+function uuidSeed(m: OtherAudit, ...args: ContextualArgs<any>) {
   try {
     return `${m.model}${m.action}${m.userId}${m.transaction}${JSON.stringify(m.diffs)}`;
   } catch (e: unknown) {
@@ -47,10 +47,10 @@ function uuidSeed(m: Audit, ...args: ContextualArgs<any>) {
   OperationKeys.DELETE,
 ])
 @uses(FabricFlavour)
-// @sharedData(NamespaceCollection("decaf-namespace"))
+@sharedData(NamespaceCollection("decaf-namespace"))
 @table("audit")
 @model()
-export class Audit extends BaseModel {
+export class OtherAudit extends BaseModel {
   @pk()
   @uuid(uuidSeed)
   // @mirror("mirror-collection", "main-org", (mspId: string) => mspId === "main-org")
@@ -100,7 +100,7 @@ export class Audit extends BaseModel {
   @description("the diffs for the action.")
   diffs!: Record<string, any>;
 
-  constructor(model?: ModelArg<Audit>) {
+  constructor(model?: ModelArg<OtherAudit>) {
     super(model);
   }
 }

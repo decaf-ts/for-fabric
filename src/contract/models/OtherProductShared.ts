@@ -13,7 +13,7 @@ import {
 import { uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { gtin } from "./gtin";
-import { audit } from "./decorators";
+import { audit } from "./decorators-private";
 import {
   FabricFlavour,
   mirror,
