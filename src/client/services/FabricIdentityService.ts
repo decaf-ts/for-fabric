@@ -417,11 +417,12 @@ export class FabricIdentityService extends ClientBasedService<
 
       // Update attributes in the CA registry (admin operation). This changes the "source of truth".
       const identityService = this.client.newIdentityService();
-      // const caIdentityUpdateRequest: IIdentityRequest = {
-      //   enrollmentID: enrollmentId,
-      //   affiliation: "", // kept as-is to preserve current behavior
-      //   attrs: attr,
-      // };
+
+      const caUserIdentity = (await identityService.getOne(
+        enrollmentId,
+        this.user
+      )) as { result: { attrs?: IKeyValueAttribute[] } };
+
       await identityService.update(enrollmentId, identityRequest, this.user); // as IServiceResponse & { result: IIdentityRequest };
 
       // Reenroll as the user. Request must be signed using the existing certificate.
@@ -434,7 +435,17 @@ export class FabricIdentityService extends ClientBasedService<
       );
       reenrollUser.setCryptoSuite(this.user.getCryptoSuite());
 
-      const enrollment = await this.client.reenroll(reenrollUser, []);
+      const enrollmentAttrs: IAttributeRequest[] = (
+        caUserIdentity.result.attrs || []
+      ).map(({ name }) => ({
+        name,
+        optional: false,
+      }));
+
+      const enrollment = await this.client.reenroll(
+        reenrollUser,
+        enrollmentAttrs
+      );
 
       const renewedIdentity = FabricIdentityService.identityFromEnrollment(
         enrollment,
