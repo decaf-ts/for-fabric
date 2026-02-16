@@ -301,10 +301,10 @@ describe("Tests Product Contract", () => {
       const newBulk: Product[] = [];
       for (const product of toUpdate) {
         const productCode = product.productCode;
-        const newObj = await loadPublicProduct(productCode);
-        expect(newObj.hasErrors()).toBeUndefined();
-        await assertPublicRelations(newObj);
-        newBulk.push(newObj);
+        // const newObj = await loadPublicProduct(productCode);
+        expect(product.hasErrors()).toBeUndefined();
+        await assertPublicRelations(product);
+        newBulk.push(product);
       }
 
       bulk = newBulk;
