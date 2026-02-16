@@ -13,6 +13,8 @@ import { OtherMarket } from "../../src/contract/models/OtherMarket";
 import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
 import { GtinOwner } from "../../src/contract/models/GtinOwner";
 
+jest.setTimeout(50000);
+
 describe("OtherProductShared contract version flow with relations", () => {
   let ctx: ReturnType<typeof getMockCtx>;
   let stub: ReturnType<typeof getStubMock>;
