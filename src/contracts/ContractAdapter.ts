@@ -473,7 +473,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     id: PrimaryKeyType,
     ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
-    const { ctx, log, ctxArgs } = this.logCtx(args, this.delete);
+    const { ctx } = this.logCtx(args, this.delete);
 
     this.enforceMirrorAuthorization(clazz, ctx);
     const tableName = Model.tableName(clazz);
@@ -493,14 +493,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
       } catch (e: unknown) {
         throw this.parseError(e as Error);
       }
-      } else {
-        try {
-          const fullySeg = ctx.isFullySegregated;
-          model = fullySeg ? {} : await this.readState(composedKey, ctx);
-          if (!fullySeg) await this.deleteState(composedKey, ctx);
-        } catch (e: unknown) {
-          throw this.parseError(e as Error);
-        }
+    } else {
+      try {
+        const fullySeg = ctx.isFullySegregated;
+        model = fullySeg ? {} : await this.readState(composedKey, ctx);
+        if (!fullySeg) await this.deleteState(composedKey, ctx);
+      } catch (e: unknown) {
+        throw this.parseError(e as Error);
+      }
 
       const collections = ctx.getReadCollections();
       if (collections && collections.length) {
@@ -640,7 +640,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     arrayIterator as unknown as Iterators.StateQueryIterator,
                   metadata: {
                     fetchedRecordsCount: results.length,
-                    bookmark: count >= limit ? (lastKey || "") : "",
+                    bookmark: count >= limit ? lastKey || "" : "",
                   },
                 };
               }

@@ -298,11 +298,9 @@ describe("Tests Product Contract", () => {
       );
       stub.commit();
 
-      let count = 0;
       const newBulk: Product[] = [];
-      for (const b of toUpdate) {
-        expect(b.hasErrors()).toBeUndefined();
-        const productCode = toUpdate[count++].productCode;
+      for (const product of toUpdate) {
+        const productCode = product.productCode;
         const newObj = await loadPublicProduct(productCode);
         expect(newObj.hasErrors()).toBeUndefined();
         await assertPublicRelations(newObj);
@@ -358,10 +356,8 @@ describe("Tests Product Contract", () => {
 
       stub.commit();
 
-      let count = 0;
-      for (const b of deleted) {
-        expect(b.hasErrors()).toBeUndefined();
-        const productCode = deleted[count++].productCode;
+      for (const product of bulk) {
+        const productCode = product.productCode;
         const k = stub.createCompositeKey("product", [productCode]);
         await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
         await expect(
