@@ -254,10 +254,10 @@ describe("e2e Repository test", () => {
       const marketRepo = Repository.forModel(Market);
       await expect(
         marketRepo.read(deleted.markets[0] as any)
-      ).resolves.toBeInstanceOf(Market);
+      ).rejects.toThrowError(NotFoundError);
       await expect(
         marketRepo.read(deleted.markets[1] as any)
-      ).resolves.toBeInstanceOf(Market);
+      ).rejects.toThrowError(NotFoundError);
     });
   });
 
