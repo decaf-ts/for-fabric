@@ -1,5 +1,4 @@
 import {
-  ConflictError,
   InternalError,
   NotFoundError,
   OperationKeys,
@@ -12,7 +11,7 @@ import {
   SequenceModel,
   SequenceOptions,
   Serial,
-  UUID,
+  UnsupportedError,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import type { FabricContractAdapter } from "./ContractAdapter";
@@ -209,44 +208,22 @@ export class FabricContractSequence extends Sequence {
     // Check if model is fully segregated — sequence goes ONLY to private collections.
     // We check the adapter's stored metadata because the Sequence creates its own
     // context via logCtx, losing flags set by extractSegregatedCollections.
-    const adapterMeta = (
-      this.adapter as unknown as FabricContractAdapter
-    ).getSequenceSegregation(name);
+    const adapterMeta = (ctx as FabricContractContext).getSequenceSegregation(
+      name
+    );
     const isFullySegregated =
       adapterMeta !== undefined &&
       adapterMeta.fullySegregated &&
       adapterMeta.collections.length > 0;
 
+    let next: any;
     if (typeName === "uuid") {
-      while (true) {
-        const next = await UUID.instance.generate(currentValue as string);
-        try {
-          if (isFullySegregated) {
-            const seqModel = new SequenceModel({ id: name, current: next });
-            await this.writeSequenceToCollections(
-              ctx,
-              seqModel,
-              adapterMeta!.collections
-            );
-            log.debug(
-              `Sequence uuid increment (private-only) ${name} current=${currentValue as any} next=${next as any}`
-            );
-            ctx.cache.put(name as string, next);
-            return next;
-          }
-          const result = await performUpsert(next);
-          log.debug(
-            `Sequence uuid increment ${name} current=${currentValue as any} next=${next as any}`
-          );
-          return result.current as string | number | bigint;
-        } catch (e: unknown) {
-          if (e instanceof ConflictError) continue;
-          throw e;
-        }
-      }
+      throw new UnsupportedError(
+        `uuid pk generation is only supported using @uuid and a deterministic seed`
+      );
+    } else {
+      next = await incrementSerial(currentValue);
     }
-
-    const next = await incrementSerial(currentValue);
 
     if (isFullySegregated) {
       const seqModel = new SequenceModel({ id: name, current: next });
@@ -320,9 +297,9 @@ export class FabricContractSequence extends Sequence {
   ): Promise<void> {
     // Use adapter metadata instead of ctx.getReadCollections() because the Sequence
     // creates its own context via logCtx, losing collections set by extractSegregatedCollections.
-    const adapterMeta = (
-      this.adapter as unknown as FabricContractAdapter
-    ).getSequenceSegregation(String(seq.id));
+    const adapterMeta = (ctx as FabricContractContext).getSequenceSegregation(
+      String(seq.id)
+    );
 
     if (!adapterMeta || !adapterMeta.collections.length) {
       return;

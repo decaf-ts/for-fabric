@@ -417,4 +417,373 @@ describe("FabricClientAdapter", () => {
 
     expect((result as any).token).toBe("auto-query");
   });
+
+  describe("CRUD single operations", () => {
+    it("create calls submitTransaction with serialized model", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+      const serialized = {
+        [ModelKeys.ANCHOR]: "ERC20Wallet",
+        id: "w-1",
+        token: "TK",
+        balance: 100,
+      };
+      const submitSpy = jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(JSON.stringify(serialized))
+        );
+
+      const result = await adapter.create(
+        ERC20Wallet,
+        "w-1",
+        serialized,
+        {},
+        ctx
+      );
+
+      expect(submitSpy).toHaveBeenCalledWith(
+        expect.any(Context),
+        OperationKeys.CREATE,
+        expect.any(Array),
+        {},
+        undefined,
+        "ERC20Wallet"
+      );
+      expect(result.id).toBe("w-1");
+    });
+
+    it("read calls evaluateTransaction", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+      const serialized = {
+        [ModelKeys.ANCHOR]: "ERC20Wallet",
+        id: "w-2",
+        token: "TK",
+        balance: 50,
+      };
+      jest
+        .spyOn(adapter as any, "evaluateTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(JSON.stringify(serialized))
+        );
+
+      const result = await adapter.read(ERC20Wallet, "w-2", ctx);
+
+      expect(result.id).toBe("w-2");
+      expect(result.token).toBe("TK");
+    });
+
+    it("update calls submitTransaction with serialized model", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+      const serialized = {
+        [ModelKeys.ANCHOR]: "ERC20Wallet",
+        id: "w-3",
+        token: "TK",
+        balance: 200,
+      };
+      const submitSpy = jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(JSON.stringify(serialized))
+        );
+
+      const result = await adapter.update(
+        ERC20Wallet,
+        "w-3",
+        serialized,
+        {},
+        ctx
+      );
+
+      expect(submitSpy).toHaveBeenCalledWith(
+        expect.any(Context),
+        OperationKeys.UPDATE,
+        expect.any(Array),
+        {},
+        undefined,
+        "ERC20Wallet"
+      );
+      expect(result.id).toBe("w-3");
+    });
+
+    it("delete calls submitTransaction with id", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+      const serialized = {
+        [ModelKeys.ANCHOR]: "ERC20Wallet",
+        id: "w-4",
+        token: "TK",
+        balance: 0,
+      };
+      const submitSpy = jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(JSON.stringify(serialized))
+        );
+
+      const result = await adapter.delete(ERC20Wallet, "w-4", ctx);
+
+      expect(submitSpy).toHaveBeenCalledWith(
+        expect.any(Context),
+        OperationKeys.DELETE,
+        ["w-4"],
+        undefined,
+        undefined,
+        "ERC20Wallet"
+      );
+      expect(result.id).toBe("w-4");
+    });
+  });
+
+  describe("Bulk operations", () => {
+    it("readAll calls evaluateTransaction with serialized ids", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+      const records = [
+        { id: "w-1", token: "TK", balance: 10 },
+        { id: "w-2", token: "TK", balance: 20 },
+      ];
+      const evalSpy = jest
+        .spyOn(adapter as any, "evaluateTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(JSON.stringify(records.map((r) => JSON.stringify(r))))
+        );
+
+      const result = await adapter.readAll(
+        ERC20Wallet,
+        ["w-1", "w-2"],
+        ctx
+      );
+
+      expect(evalSpy).toHaveBeenCalled();
+      expect(result).toHaveLength(2);
+    });
+
+    it("updateAll calls submitTransaction with serialized models", async () => {
+      const adapter = newAdapter();
+      (adapter as any).serializer = {
+        serialize: jest.fn((m: any) => JSON.stringify(m)),
+      };
+      const ctx = createContext();
+      const records = [
+        { id: "w-1", token: "TK", balance: 100 },
+        { id: "w-2", token: "TK", balance: 200 },
+      ];
+      const submitSpy = jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(
+            JSON.stringify(records.map((r) => JSON.stringify(r)))
+          )
+        );
+
+      const result = await adapter.updateAll(
+        ERC20Wallet,
+        ["w-1", "w-2"],
+        records.map((r) => new ERC20Wallet(r)),
+        {},
+        ctx
+      );
+
+      expect(submitSpy).toHaveBeenCalled();
+      expect(result).toHaveLength(2);
+    });
+
+    it("deleteAll calls submitTransaction with serialized ids", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+      const records = [
+        { id: "w-1", token: "TK", balance: 0 },
+        { id: "w-2", token: "TK", balance: 0 },
+      ];
+      const submitSpy = jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(
+            JSON.stringify(records.map((r) => JSON.stringify(r)))
+          )
+        );
+
+      const result = await adapter.deleteAll(
+        ERC20Wallet,
+        ["w-1", "w-2"],
+        ctx
+      );
+
+      expect(submitSpy).toHaveBeenCalled();
+      expect(result).toHaveLength(2);
+    });
+
+    it("rejects mismatched ids and models on updateAll", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+
+      await expect(
+        adapter.updateAll(ERC20Wallet, ["w-1"], [], ctx)
+      ).rejects.toThrow(InternalError);
+    });
+  });
+
+  describe("Legacy endorsement flow", () => {
+    it("does NOT use legacy gateway when only mirror flag is set (no allowGatewayOverride)", async () => {
+      const adapter = newAdapter();
+      const txnSpy = jest
+        .spyOn(adapter as any, "transaction")
+        .mockResolvedValue(new TextEncoder().encode("default"));
+      const legacySpy = jest.spyOn(
+        adapter as any,
+        "submitLegacyWithExplicitEndorsers"
+      );
+      const ctx = createContext();
+      ctx.accumulate({ mirror: true }); // mirror only, no allowGatewayOverride
+
+      await adapter.submitTransaction(ctx, "create");
+
+      expect(txnSpy).toHaveBeenCalled();
+      expect(legacySpy).not.toHaveBeenCalled();
+    });
+
+    it("does NOT use legacy gateway when only legacy is set without allowGatewayOverride", async () => {
+      const adapter = newAdapter();
+      const txnSpy = jest
+        .spyOn(adapter as any, "transaction")
+        .mockResolvedValue(new TextEncoder().encode("default"));
+      const legacySpy = jest.spyOn(
+        adapter as any,
+        "submitLegacyWithExplicitEndorsers"
+      );
+      const ctx = createContext();
+      ctx.accumulate({ legacy: true }); // legacy only, no allowGatewayOverride
+
+      await adapter.submitTransaction(ctx, "create");
+
+      expect(txnSpy).toHaveBeenCalled();
+      expect(legacySpy).not.toHaveBeenCalled();
+    });
+
+    it("uses legacy gateway when both legacy AND allowGatewayOverride are set", async () => {
+      const adapter = newAdapter();
+      const legacySpy = jest
+        .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
+        .mockResolvedValue(new TextEncoder().encode("legacy"));
+      const ctx = createContext();
+      ctx.accumulate({ legacy: true, allowGatewayOverride: true });
+
+      await adapter.submitTransaction(ctx, "create", ["data"]);
+
+      expect(legacySpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("stringifies non-string args for legacy flow", async () => {
+      const adapter = newAdapter();
+      const legacySpy = jest
+        .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
+        .mockResolvedValue(new TextEncoder().encode("ok"));
+      const ctx = createContext();
+      ctx.accumulate({ legacy: true, allowGatewayOverride: true });
+
+      await adapter.submitTransaction(ctx, "create", [
+        { foo: "bar" },
+        42,
+        "already-string",
+      ]);
+
+      const calledArgs = legacySpy.mock.calls[0][2]; // args parameter
+      expect(calledArgs).toEqual([
+        JSON.stringify({ foo: "bar" }),
+        JSON.stringify(42),
+        "already-string",
+      ]);
+    });
+
+    it("converts transient data to Buffer for legacy flow", async () => {
+      const adapter = newAdapter();
+      const legacySpy = jest
+        .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
+        .mockResolvedValue(new TextEncoder().encode("ok"));
+      const ctx = createContext();
+      ctx.accumulate({ legacy: true, allowGatewayOverride: true });
+
+      await adapter.submitTransaction(ctx, "create", [], {
+        secret: "value",
+      });
+
+      const calledTransient = legacySpy.mock.calls[0][3]; // transientMap
+      expect(calledTransient).toBeDefined();
+      expect(Buffer.isBuffer(calledTransient.secret)).toBe(true);
+      expect(calledTransient.secret.toString()).toBe(
+        JSON.stringify("value")
+      );
+    });
+
+    it("passes peer config from adapter config", async () => {
+      const adapter = newAdapter();
+      const legacySpy = jest
+        .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
+        .mockResolvedValue(new TextEncoder().encode("ok"));
+      const ctx = createContext();
+      ctx.accumulate({ legacy: true, allowGatewayOverride: true });
+
+      await adapter.submitTransaction(ctx, "create");
+
+      const calledPeerConfigs = legacySpy.mock.calls[0][4];
+      expect(calledPeerConfigs).toEqual([
+        {
+          peerEndpoint: config.peerEndpoint,
+          tlsCert: config.tlsCert,
+          peerHostAlias: config.peerHostAlias,
+        },
+      ]);
+    });
+  });
+
+  describe("Query operations", () => {
+    it("raw returns parsed documents when docsOnly is true", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+      const docs = [
+        { id: "q-1", token: "TK", balance: 10 },
+        { id: "q-2", token: "TK", balance: 20 },
+      ];
+      jest
+        .spyOn(adapter as any, "evaluateTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(JSON.stringify(docs))
+        );
+
+      const result = await adapter.raw(
+        { selector: { token: "TK" } },
+        true,
+        ERC20Wallet,
+        ctx
+      );
+
+      expect(result).toEqual(docs);
+    });
+
+    it("raw returns full response when docsOnly is false", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+      const response = {
+        docs: [{ id: "q-1", token: "TK" }],
+        bookmark: "page-2",
+      };
+      jest
+        .spyOn(adapter as any, "evaluateTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(JSON.stringify(response))
+        );
+
+      const result = await adapter.raw(
+        { selector: { token: "TK" } },
+        false,
+        ERC20Wallet,
+        ctx
+      );
+
+      expect(result).toEqual(response);
+    });
+  });
 });

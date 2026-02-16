@@ -5,14 +5,12 @@ import {
   afterDelete,
   afterUpdate,
   InternalError,
-  onCreate,
   OperationKeys,
 } from "@decaf-ts/db-decorators";
-import { Audit } from "./Audit";
-import { Repo, Repository, UnsupportedError } from "@decaf-ts/core";
+import { OtherAudit } from "./OtherAudit";
+import { Repository } from "@decaf-ts/core";
 import { FabricContractContext } from "../../contracts/ContractContext";
 import { CollectionResolver } from "../../shared/decorators";
-import { GtinOwner } from "./GtinOwner";
 
 export async function rebuildForMatchingCollection<M extends Model>(
   model: M,
@@ -57,16 +55,16 @@ export async function createAuditHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  const repo = Repository.forModel(Audit);
+  const repo = Repository.forModel(OtherAudit);
 
-  const collections = Model.collectionsFor(Audit);
-  //
-  // model = await rebuildForMatchingCollection(model, context, collections);
+  const collections = Model.collectionsFor(OtherAudit);
+
+  model = await rebuildForMatchingCollection(model, context, collections);
 
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apparently for audit`);
 
-  const toCreate = new Audit({
+  const toCreate = new OtherAudit({
     userGroup: context.identity.getID(),
     userId: context.identity.getID(),
     model: Model.tableName(data.class),
@@ -92,16 +90,16 @@ export async function updateAuditHandler<
   model: M,
   oldModel: M
 ): Promise<void> {
-  const repo = Repository.forModel(Audit);
+  const repo = Repository.forModel(OtherAudit);
 
-  const collections = Model.collectionsFor(Audit);
-  //
-  // model = await rebuildForMatchingCollection(model, context, collections);
+  const collections = Model.collectionsFor(OtherAudit);
+
+  model = await rebuildForMatchingCollection(model, context, collections);
 
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apparently for audit`);
 
-  const toCreate = new Audit({
+  const toCreate = new OtherAudit({
     userGroup: context.identity.getID(),
     userId: context.identity.getID(),
     model: Model.tableName(data.class),
@@ -129,7 +127,7 @@ export async function deleteAuditHandler<
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apprently. no getId in identity`);
 
-  const toCreate = new Audit({
+  const toCreate = new OtherAudit({
     userGroup: context.identity.getID(),
     userId: context.identity.getID(),
     model: Model.tableName(data.class),
@@ -138,7 +136,7 @@ export async function deleteAuditHandler<
     diffs: model.compare(new this.class()),
   });
 
-  const repo = Repository.forModel(Audit);
+  const repo = Repository.forModel(OtherAudit);
   const audit = await repo.override(this._overrides).create(toCreate, context);
   context.logger.info(
     `Audit log for ${OperationKeys.DELETE} of ${Model.tableName(this.class)} created: ${JSON.stringify(audit, undefined, 2)}`
@@ -159,69 +157,4 @@ export function audit(model: Constructor<Model<boolean>>) {
     afterDelete(deleteAuditHandler as any, meta),
     metadata("audit", true)
   );
-}
-
-export async function createAssignGtinOwnerHandler<
-  M extends Model,
-  R extends Repo<M>,
-  V,
->(
-  this: R,
-  context: FabricContractContext,
-  data: V,
-  key: keyof M,
-  model: { productCode: string }
-): Promise<void> {
-  if (!model.productCode)
-    throw new UnsupportedError(`Gtin owner can only be assigned to products`);
-  const repo = Repository.forModel(GtinOwner);
-  const toCreate = new GtinOwner({
-    productCode: model.productCode,
-  });
-  const owner = await repo.create(toCreate, publicContext(context));
-  context.logger.info(
-    `GTIN owner assigned for product ${model.productCode}: ${owner.ownedBy}`
-  );
-}
-
-export async function deleteAssignGtinOwnerHandler<
-  M extends Model,
-  R extends Repo<M>,
-  V,
->(
-  this: R,
-  context: FabricContractContext,
-  data: V,
-  key: keyof M,
-  model: { productCode: string }
-): Promise<void> {
-  if (!model.productCode)
-    throw new UnsupportedError(`Gtin owner can only be assigned to products`);
-  const repo = Repository.forModel(GtinOwner);
-  const owner = await repo.delete(model.productCode, publicContext(context));
-  context.logger.info(
-    `GTIN owner assigned for product ${model.productCode}: ${owner.ownedBy}`
-  );
-}
-
-export function assignProductOwner() {
-  return apply(
-    onCreate(createAssignGtinOwnerHandler as any, {}),
-    afterDelete(deleteAssignGtinOwnerHandler as any, {})
-  );
-}
-
-function publicContext(ctx: FabricContractContext) {
-  const cleanCtx = new FabricContractContext();
-  cleanCtx.accumulate({
-    stub: ctx.stub,
-    identity: ctx.identity,
-    logger: ctx.get("logger"),
-    fullySegregated: false,
-  });
-  cleanCtx.put("segregated", undefined);
-  cleanCtx.put("segregatedData", undefined);
-  cleanCtx.put("segregateRead", undefined);
-  cleanCtx.put("segregateWrite", undefined);
-  return cleanCtx;
 }

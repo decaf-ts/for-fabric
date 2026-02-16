@@ -12,6 +12,8 @@ import {
   SerializedPage,
   Paginator,
   DirectionLimitOffset,
+  MethodOrOperation,
+  ContextualizedArgs,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -21,9 +23,11 @@ import {
   BulkCrudOperationKeys,
   InternalError,
   OperationKeys,
+  PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
 import { Constructor } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "./ContractAdapter";
+import { FabricContractFlags } from "./types";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -99,6 +103,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
     allowRawStatements: true,
     forcePrepareSimpleQueries: false,
     forcePrepareComplexQueries: false,
+    rebuildWithTransient: false,
   });
 
   constructor(
@@ -107,6 +112,135 @@ export class FabricContractRepository<M extends Model> extends Repository<
     protected trackedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
   ) {
     super(adapter, clazz);
+  }
+
+  override async create(
+    model: M,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<M> {
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.create);
+    log.debug(
+      `Creating new ${this.class.name} in table ${Model.tableName(this.class)}`
+    );
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient, segregated } = this.adapter.prepare(
+      model,
+      model[this.pk] as any,
+      ctx
+    );
+    if (segregated) ctx.put("segregatedData", segregated);
+    record = await this.adapter.create(this.class, id, record, ...ctxArgs);
+    return this.adapter.revert<M>(record || {}, this.class, id, transient, ctx);
+  }
+
+  override async createAll(
+    models: M[],
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<M[]> {
+    if (!models.length) return models;
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.createAll);
+    log.debug(
+      `Creating ${models.length} new ${this.class.name} in table ${Model.tableName(this.class)}`
+    );
+
+    const prepared = models.map((m) => this.adapter.prepare(m, ctx));
+    const ids = prepared.map((p) => p.id);
+    let records = prepared.map((p) => p.record);
+    const segregated = prepared.reduce(
+      (acc, p) => {
+        const cols = Object.keys(p.segregated || {});
+        cols.forEach((c) => {
+          acc[c] = acc[c] || {};
+          acc[c] = { ...acc[c], ...(p.segregated || {})[c] };
+        });
+        return acc;
+      },
+      {} as Record<string, any>
+    );
+    if (Object.keys(segregated).length) {
+      ctx.put("segregatedData", segregated);
+    }
+    records = await this.adapter.createAll(
+      this.class,
+      ids as PrimaryKeyType[],
+      records,
+      ...ctxArgs
+    );
+    return records.map((r, i) =>
+      this.adapter.revert(r, this.class, ids[i], prepared[i].transient, ctx)
+    );
+  }
+
+  override async update(
+    model: M,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<M> {
+    const { ctxArgs, log, ctx } = this.logCtx(args, this.update);
+    // eslint-disable-next-line prefer-const
+    let { record, id, transient, segregated } = this.adapter.prepare(
+      model,
+      ctx
+    );
+    log.debug(
+      `updating ${this.class.name} in table ${Model.tableName(this.class)} with id ${id}`
+    );
+    if (segregated) ctx.put("segregatedData", segregated);
+    record = await this.adapter.update(this.class, id, record, ...ctxArgs);
+    return this.adapter.revert<M>(record, this.class, id, transient, ctx);
+  }
+
+  override async updateAll(
+    models: M[],
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<M[]> {
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.updateAll);
+    log.verbose(
+      `Updating ${models.length} new ${this.class.name} in table ${Model.tableName(this.class)}`
+    );
+
+    const prepared = models.map((m) => this.adapter.prepare(m, ctx));
+    const ids = prepared.map((p) => p.id);
+    const records = prepared.map((p) => p.record);
+    const segregated = prepared.reduce(
+      (acc, p) => {
+        const cols = Object.keys(p.segregated || {});
+        cols.forEach((c) => {
+          acc[c] = acc[c] || {};
+          acc[c] = { ...acc[c], ...(p.segregated || {})[c] };
+        });
+        return acc;
+      },
+      {} as Record<string, any>
+    );
+    if (Object.keys(segregated).length) {
+      ctx.put("segregatedData", segregated);
+    }
+
+    const updated = await this.adapter.updateAll(
+      this.class,
+      ids,
+      records,
+      ...ctxArgs
+    );
+    return updated.map((u, i) =>
+      this.adapter.revert(u, this.class, ids[i], prepared[i].transient, ctx)
+    );
+  }
+
+  override async listBy(
+    key: keyof M,
+    order: OrderDirection,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ) {
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.LIST_BY, true)
+    ).for(this.listBy);
+    log.verbose(
+      `listing ${Model.tableName(this.class)} by ${key as string} ${order}`
+    );
+    return this.select()
+      .orderBy([key, order])
+      .execute(...ctxArgs);
   }
 
   override async paginateBy(
@@ -218,5 +352,151 @@ export class FabricContractRepository<M extends Model> extends Repository<
   ): Promise<void> {
     if (!this.trackedEvents || this.trackedEvents.indexOf(event) !== -1)
       return await super.updateObservers(table, event, id, ...args);
+  }
+
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD
+  ): ContextualizedArgs<
+    FabricContractContext,
+    ARGS,
+    METHOD extends string ? true : false
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: false
+  ): ContextualizedArgs<
+    FabricContractContext,
+    ARGS,
+    METHOD extends string ? true : false
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: true
+  ): Promise<
+    ContextualizedArgs<
+      FabricContractContext,
+      ARGS,
+      METHOD extends string ? true : false
+    >
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: true,
+    overrides?: Partial<FabricContractFlags>
+  ): Promise<
+    ContextualizedArgs<
+      FabricContractContext,
+      ARGS,
+      METHOD extends string ? true : false
+    >
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: false,
+    overrides?: Partial<FabricContractFlags>
+  ): ContextualizedArgs<
+    FabricContractContext,
+    ARGS,
+    METHOD extends string ? true : false
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate?: boolean,
+    overrides?: Partial<FabricContractFlags>
+  ):
+    | ContextualizedArgs<
+        FabricContractContext,
+        ARGS,
+        METHOD extends string ? true : false
+      >
+    | Promise<
+        ContextualizedArgs<
+          FabricContractContext,
+          ARGS,
+          METHOD extends string ? true : false
+        >
+      > {
+    const result = super.logCtx(args, operation, allowCreate as any, overrides);
+    return this.cleanContextualizedArgs(result);
+  }
+
+  private cleanContextualizedArgs<
+    ARGS extends any[],
+    METHOD extends MethodOrOperation,
+  >(
+    args:
+      | ContextualizedArgs<
+          FabricContractContext,
+          ARGS,
+          METHOD extends string ? true : false
+        >
+      | Promise<
+          ContextualizedArgs<
+            FabricContractContext,
+            ARGS,
+            METHOD extends string ? true : false
+          >
+        >
+  ):
+    | ContextualizedArgs<
+        FabricContractContext,
+        ARGS,
+        METHOD extends string ? true : false
+      >
+    | Promise<
+        ContextualizedArgs<
+          FabricContractContext,
+          ARGS,
+          METHOD extends string ? true : false
+        >
+      > {
+    if (args instanceof Promise) {
+      return args.then((ctxArgs) => this.applyCleanContext(ctxArgs));
+    }
+    return this.applyCleanContext(args);
+  }
+
+  private applyCleanContext<
+    ARGS extends any[],
+    METHOD extends MethodOrOperation,
+  >(
+    ctxArgs: ContextualizedArgs<
+      FabricContractContext,
+      ARGS,
+      METHOD extends string ? true : false
+    >
+  ) {
+    this.cleanContext(ctxArgs.ctx);
+    return ctxArgs;
+  }
+
+  private cleanContext(ctx: FabricContractContext): FabricContractContext {
+    ctx.put("segregated", undefined);
+    ctx.put("allowGatewayOverride", undefined);
+    return ctx;
   }
 }

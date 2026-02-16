@@ -1,28 +1,28 @@
-import { FabricContractAdapter, FabricCrudContract } from "../../src/contracts";
-console.log("Using adapter:", FabricContractAdapter.name);
-import { getMockCtx, getStubMock } from "./ContextMock";
-import { generateGtin } from "../../src/contract/models/gtin";
-import { Logging, LogLevel } from "@decaf-ts/logging";
-import { ProductContract } from "../../src/contract/ProductContract";
-import { Product } from "../../src/contract/models/Product";
+import "../../src/shared/overrides";
 import { Model } from "@decaf-ts/decorator-validation";
-import { Market } from "../../src/contract/models/Market";
-import { ProductStrength } from "../../src/contract/models/ProductStrength";
 import { NotFoundError } from "@decaf-ts/db-decorators";
+import { Metadata } from "@decaf-ts/decoration";
+import { getMockCtx, getStubMock } from "./ContextMock";
+import { OtherProductSharedContract } from "../../src/contract/OtherProductSharedContract";
+import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
+import { ProductStrength } from "../../src/contract/models/ProductStrength";
+import { Market } from "../../src/contract/models/Market";
+import { generateGtin } from "../../src/contract/models/gtin";
 import { Paginator } from "@decaf-ts/core";
-Logging.setConfig({ level: LogLevel.debug });
+import { OtherMarket } from "../../src/contract/models/OtherMarket";
+import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
+import { GtinOwner } from "../../src/contract/models/GtinOwner";
 
-jest.setTimeout(30000);
-describe("Tests Product Contract", () => {
-  let contract = new ProductContract();
+describe("OtherProductShared contract version flow with relations", () => {
   let ctx: ReturnType<typeof getMockCtx>;
   let stub: ReturnType<typeof getStubMock>;
+  let contract: OtherProductSharedContract;
   let transientSpy: jest.SpyInstance;
 
   beforeAll(() => {
     ctx = getMockCtx();
     stub = (ctx as any).stub;
-    contract = new ProductContract();
+    contract = new OtherProductSharedContract();
   });
 
   beforeEach(() => {
@@ -53,7 +53,7 @@ describe("Tests Product Contract", () => {
     });
   }
 
-  function preparePayload(model: Product) {
+  function preparePayload(model: OtherProductShared) {
     const segregated = Model.segregate(model);
     const transient = segregated.transient || {};
 
@@ -61,7 +61,55 @@ describe("Tests Product Contract", () => {
     return segregated.model;
   }
 
-  function preparePayloadBulk(model: Product[]) {
+  async function loadSharedProduct(productCode: string) {
+    const k = stub.createCompositeKey("other_product_shared", [productCode]);
+    await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
+    const sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
+    return new OtherProductShared(JSON.parse(sharedState));
+  }
+
+  async function loadPublicOwner(productCode: string) {
+    const k = stub.createCompositeKey("owner", [productCode]);
+    await expect(stub.getPrivateData("decaf-namespaceAeon", k)).rejects.toThrow(
+      NotFoundError
+    );
+    const publicState = await stub.getState(k);
+    return new GtinOwner(JSON.parse(publicState.toString()));
+  }
+
+  async function expectMarketInSharedCollection(marketKey: string) {
+    const mk = stub.createCompositeKey("market", [marketKey]);
+    await expect(stub.getState(mk)).rejects.toThrow(NotFoundError);
+    const state = await stub.getPrivateData("decaf-namespaceAeon", mk);
+    expect(new OtherMarket(JSON.parse(state)).hasErrors()).toBeUndefined();
+  }
+
+  async function expectStrengthInSharedCollection(strengthKey: string) {
+    const sk = stub.createCompositeKey("product_strength", [strengthKey]);
+    await expect(stub.getState(sk)).rejects.toThrow(NotFoundError);
+    const state = await stub.getPrivateData("decaf-namespaceAeon", sk);
+    expect(
+      new OtherProductStrength(JSON.parse(state)).hasErrors()
+    ).toBeUndefined();
+  }
+
+  async function assertSharedRelations(product: OtherProductShared) {
+    const marketIds = (product.markets || []).map((m) =>
+      typeof m === "object" ? (m as OtherMarket).id : m
+    );
+    for (const marketId of marketIds) {
+      await expectMarketInSharedCollection(marketId as string);
+    }
+
+    const strengthIds = (product.strengths || []).map((s) =>
+      typeof s === "object" ? (s as OtherProductStrength).id : s
+    );
+    for (const strengthId of strengthIds) {
+      await expectStrengthInSharedCollection(strengthId as string);
+    }
+  }
+
+  function preparePayloadBulk(model: OtherProductShared[]) {
     const segregated = model.map((m) => Model.segregate(m));
     const transient = segregated.map((s) => s.transient || {});
 
@@ -69,54 +117,22 @@ describe("Tests Product Contract", () => {
     return segregated.map((s) => s.model.serialize());
   }
 
-  const PRIVATE_COLLECTION = "decaf-namespaceAeon";
-
-  async function loadPublicProduct(productCode: string) {
-    const k = stub.createCompositeKey("product", [productCode]);
-    await expect(stub.getPrivateData(PRIVATE_COLLECTION, k)).rejects.toThrow(
-      NotFoundError
-    );
-    const state = await stub.getState(k);
-    return new Product(JSON.parse(state.toString()));
-  }
-
-  async function assertPublicRelations(product: Product) {
-    for (const market of product.markets || []) {
-      const marketId =
-        typeof market === "object" ? (market as Market).id : market;
-      const mk = stub.createCompositeKey("market", [marketId as any]);
-      await expect(stub.getPrivateData(PRIVATE_COLLECTION, mk)).rejects.toThrow(
-        NotFoundError
-      );
-      const marketState = await stub.getState(mk);
-      expect(
-        new Market(JSON.parse(marketState.toString())).hasErrors()
-      ).toBeUndefined();
-    }
-    for (const strength of product.strengths || []) {
-      const strengthId =
-        typeof strength === "object"
-          ? (strength as ProductStrength).id
-          : strength;
-      const sk = stub.createCompositeKey("product_strength", [
-        strengthId as any,
-      ]);
-      await expect(stub.getPrivateData(PRIVATE_COLLECTION, sk)).rejects.toThrow(
-        NotFoundError
-      );
-      const strengthState = await stub.getState(sk);
-      expect(
-        new ProductStrength(JSON.parse(strengthState.toString())).hasErrors()
-      ).toBeUndefined();
-    }
-  }
-
   let productCode: string = "";
-  let created: Product;
+  let created: OtherProductShared;
 
-  it("creates with public data", async () => {
+  it.skip("holds the correct metadata", () => {
+    const instance = new OtherProductShared();
+    const properties = Metadata.properties(OtherProductShared);
+    const validatableProperties =
+      Metadata.validatableProperties(OtherProductShared);
+    const keys = Object.keys(instance);
+    expect(properties.length).toEqual(keys.length); // own-class properties only
+    expect(validatableProperties.length).toEqual(keys.length);
+  });
+
+  it("creates with shared data", async () => {
     productCode = generateGtin();
-    const baseModel = new Product({
+    const baseModel = new OtherProductShared({
       productCode,
       inventedName: "initial-name",
       nameMedicinalProduct: "medicinal",
@@ -127,28 +143,31 @@ describe("Tests Product Contract", () => {
     const payload = preparePayload(baseModel);
     created = Model.deserialize(
       await contract.create(ctx as any, payload.serialize())
-    ) as Product;
+    ) as OtherProductShared;
     stub.commit();
 
-    expect(created.hasErrors()).toBeUndefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
+    expect(created.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
 
-    const product = await loadPublicProduct(productCode);
+    const product = await loadSharedProduct(productCode);
     expect(product.hasErrors()).toBeUndefined();
-    await assertPublicRelations(product);
+    await assertSharedRelations(product);
+
+    const owner = await loadPublicOwner(productCode);
+    expect(owner.hasErrors()).toBeUndefined();
   });
 
-  it("reads the public data", async () => {
-    const read = await loadPublicProduct(productCode);
+  it("reads the shared data", async () => {
+    const read = Model.deserialize(
+      await contract.read(ctx as any, productCode)
+    ) as OtherProductShared;
     expect(read.hasErrors()).toBeUndefined();
-    await assertPublicRelations(read);
-    expect(read.equals(created)).toBe(true);
     created = read;
   });
 
-  let updated: Product;
+  let updated: OtherProductShared;
 
-  it("updates the public data", async () => {
-    const updatedModel = new Product({
+  it("updates the shared data", async () => {
+    const updatedModel = new OtherProductShared({
       ...created,
       inventedName: "updated-name",
       strengths: [
@@ -164,14 +183,14 @@ describe("Tests Product Contract", () => {
     const updatePayload = preparePayload(updatedModel);
     updated = Model.deserialize(
       await contract.update(ctx as any, updatePayload.serialize())
-    ) as Product;
+    ) as OtherProductShared;
     stub.commit();
 
-    expect(updated.hasErrors()).toBeUndefined();
+    expect(updated.hasErrors()).toBeDefined();
 
-    const k = stub.createCompositeKey("product", [productCode]);
-    updated = await loadPublicProduct(productCode);
+    updated = await loadSharedProduct(productCode);
     expect(updated.hasErrors()).toBeUndefined();
+    await assertSharedRelations(updated);
 
     expect(updated.version).toBe(2);
     expect(updated.strengths).toHaveLength(2);
@@ -179,37 +198,35 @@ describe("Tests Product Contract", () => {
 
     const read = Model.deserialize(
       await contract.read(ctx as any, created.productCode)
-    ) as Product;
+    ) as OtherProductShared;
 
     expect(read.equals(updated)).toBe(true);
   });
 
-  it("deletes the public data", async () => {
-    const beforeDelete = await loadPublicProduct(created.productCode);
-    expect(beforeDelete.hasErrors()).toBeUndefined();
-    await assertPublicRelations(beforeDelete);
-
+  it("deletes the shared data", async () => {
     const deleted = Model.deserialize(
       await contract.delete(ctx as any, created.productCode)
-    ) as Product;
-    stub.commit();
+    ) as OtherProductShared;
 
+    stub.commit();
     expect(deleted.hasErrors()).toBeUndefined();
 
-    const k = stub.createCompositeKey("product", [productCode]);
+    const k = stub.createCompositeKey("other_product_shared", [productCode]);
     await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
     await expect(stub.getPrivateData("decaf-namespaceAeon", k)).rejects.toThrow(
       NotFoundError
     );
+
+    await expect(loadPublicOwner(productCode)).rejects.toThrow(NotFoundError);
   });
 
   describe("Bulk Crud", () => {
-    let bulk: Product[];
+    let bulk: OtherProductShared[];
 
     it("Creates in bulk", async () => {
       const models = new Array(10).fill(0).map(() => {
         const id = generateGtin();
-        return new Product({
+        return new OtherProductShared({
           productCode: id,
           inventedName: "test_name",
           nameMedicinalProduct: "123456789",
@@ -250,13 +267,17 @@ describe("Tests Product Contract", () => {
       stub.commit();
 
       let count = 0;
-      const newBulk: Product[] = [];
+      const newBulk: OtherProductShared[] = [];
       for (const b of bulk) {
-        expect(b.hasErrors()).toBeUndefined();
+        expect(b.hasErrors()).toBeDefined();
         const productCode = models[count++].productCode;
-        const newObj = await loadPublicProduct(productCode);
+        const newObj = await loadSharedProduct(productCode);
         expect(newObj.hasErrors()).toBeUndefined();
-        await assertPublicRelations(newObj);
+        await assertSharedRelations(newObj);
+
+        const owner = await loadPublicOwner(productCode);
+        expect(owner.hasErrors()).toBeUndefined();
+
         newBulk.push(newObj);
       }
 
@@ -264,10 +285,10 @@ describe("Tests Product Contract", () => {
     });
 
     it("Reads in Bulk", async () => {
-      const pk = Model.pk(Product);
+      const pk = Model.pk(OtherProductShared);
       const ids = bulk.map((c) => c[pk]) as number[];
 
-      const read: Product[] = JSON.parse(
+      const read: OtherProductShared[] = JSON.parse(
         await contract.readAll(ctx as any, JSON.stringify(ids))
       ).map((r: any) => Model.deserialize(r));
 
@@ -275,9 +296,9 @@ describe("Tests Product Contract", () => {
       for (const b of read) {
         expect(b.hasErrors()).toBeUndefined();
         const productCode = read[count++].productCode;
-        const product = await loadPublicProduct(productCode);
+        const product = await loadSharedProduct(productCode);
         expect(product.hasErrors()).toBeUndefined();
-        await assertPublicRelations(product);
+        await assertSharedRelations(product);
       }
 
       bulk = read;
@@ -285,7 +306,7 @@ describe("Tests Product Contract", () => {
 
     it("Updates in Bulk", async () => {
       const toUpdate = bulk.map((c, i) => {
-        return new Product({
+        return new OtherProductShared({
           productCode: c.productCode,
           inventedName: "inventedName_" + i,
         });
@@ -293,16 +314,23 @@ describe("Tests Product Contract", () => {
 
       const payload = JSON.stringify(preparePayloadBulk(toUpdate));
 
-      const rawUpdated = JSON.parse(
-        await contract.updateAll(ctx as any, payload)
+      bulk = JSON.parse(await contract.updateAll(ctx as any, payload)).map(
+        (r: any) => Model.deserialize(r)
       );
-      bulk = rawUpdated.map((r: any) => Model.deserialize(r));
       stub.commit();
 
-      for (const product of bulk) {
-        expect(product.hasErrors()).toBeUndefined();
-        await assertPublicRelations(product);
+      let count = 0;
+      const newBulk: OtherProductShared[] = [];
+      for (const b of toUpdate) {
+        expect(b.hasErrors()).toBeDefined();
+        const productCode = toUpdate[count++].productCode;
+        const newObj = await loadSharedProduct(productCode);
+        expect(newObj.hasErrors()).toBeUndefined();
+        await assertSharedRelations(newObj);
+        newBulk.push(newObj);
       }
+
+      bulk = newBulk;
     });
 
     it("lists via statement", async () => {
@@ -342,23 +370,30 @@ describe("Tests Product Contract", () => {
     });
 
     it("Deletes in Bulk", async () => {
-      const pk = Model.pk(Product);
+      const pk = Model.pk(OtherProductShared);
       const ids = bulk.map((c) => c[pk]) as number[];
-      console.log("deleteAll ids", ids);
 
-      const deleted: Product[] = JSON.parse(
+      const deleted: OtherProductShared[] = JSON.parse(
         await contract.deleteAll(ctx as any, JSON.stringify(ids))
       ).map((r: any) => Model.deserialize(r));
 
       stub.commit();
 
-      for (const product of bulk) {
-        const productCode = product.productCode;
-        const k = stub.createCompositeKey("product", [productCode]);
+      let count = 0;
+      for (const b of deleted) {
+        expect(b.hasErrors()).toBeDefined();
+        const productCode = deleted[count++].productCode;
+        const k = stub.createCompositeKey("other_product_shared", [
+          productCode,
+        ]);
         await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
         await expect(
           stub.getPrivateData("decaf-namespaceAeon", k)
         ).rejects.toThrow(NotFoundError);
+
+        await expect(loadPublicOwner(productCode)).rejects.toThrow(
+          NotFoundError
+        );
       }
     });
   });

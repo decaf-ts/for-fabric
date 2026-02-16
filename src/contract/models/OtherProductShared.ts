@@ -1,11 +1,19 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
-import { column, index, OrderDirection, pk, table } from "@decaf-ts/core";
+import {
+  Cascade,
+  column,
+  index,
+  oneToMany,
+  OrderDirection,
+  pk,
+  table,
+} from "@decaf-ts/core";
 // import {BlockOperations, OperationKeys, readonly} from "@decaf-ts/db-decorators";
 import { uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { gtin } from "./gtin";
-import { audit } from "./decorators";
+import { audit } from "./decorators-private";
 import {
   FabricFlavour,
   mirror,
@@ -14,6 +22,9 @@ import {
   sharedData,
 } from "../../shared/index";
 import { version } from "@decaf-ts/db-decorators";
+import { OtherProductStrength } from "./OtherProductStrength";
+import { OtherMarket } from "./OtherMarket";
+import { assignProductOwner } from "./decorators";
 
 @sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
@@ -23,7 +34,8 @@ import { version } from "@decaf-ts/db-decorators";
 export class OtherProductShared extends BaseIdentifiedModel {
   @pk()
   @gtin()
-  @mirror("mirror-collection", "org-a")
+  @assignProductOwner()
+  // @mirror("mirror-collection", "org-a")
   @audit(OtherProductShared)
   productCode!: string;
 
@@ -65,20 +77,20 @@ export class OtherProductShared extends BaseIdentifiedModel {
 
   @version()
   counter?: number;
-  //
-  // @oneToMany(
-  //   () => ProductStrength,
-  //   { update: Cascade.CASCADE, delete: Cascade.CASCADE },
-  //   false
-  // )
-  // strengths!: ProductStrength[];
-  //
-  // @oneToMany(
-  //   () => Market,
-  //   { update: Cascade.NONE, delete: Cascade.NONE },
-  //   false
-  // )
-  // markets!: Market[];
+
+  @oneToMany(
+    () => OtherProductStrength,
+    { update: Cascade.CASCADE, delete: Cascade.CASCADE },
+    false
+  )
+  strengths!: OtherProductStrength[];
+
+  @oneToMany(
+    () => OtherMarket,
+    { update: Cascade.CASCADE, delete: Cascade.CASCADE },
+    false
+  )
+  markets!: OtherMarket[];
 
   @column()
   @ownedBy()

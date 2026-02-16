@@ -10,11 +10,15 @@ import { SegregatedPrivateDocumentContract } from "./SegregatedPrivateDocumentCo
 import { SegregatedSharedDocumentContract } from "./SegregatedSharedDocumentContract";
 import { ProductStrengthContract } from "./ProductStrengthContract";
 import { MarketContract } from "./MarketContract";
+import { OtherProductStrengthContract } from "./OtherProductStrengthContract";
+import { OtherMarketContract } from "./OtherMarketContract";
 
 export const contracts: (typeof Contract)[] = [
   ProductContract,
   ProductStrengthContract,
+  OtherProductStrengthContract,
   MarketContract,
+  OtherMarketContract,
   BatchContract,
   UserContract,
   AddressContract,

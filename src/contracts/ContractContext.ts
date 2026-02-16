@@ -2,11 +2,6 @@ import { Context } from "@decaf-ts/core";
 import { FabricContractFlags } from "./types";
 import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
 
-export type SegregatedWriteEntry = {
-  model: Record<string, any>;
-  keys: string[];
-};
-
 /**
  * @description Context class for Fabric chaincode operations
  * @summary Provides access to Fabric-specific context elements like stub, identity, and logger to be used by repositories and adapters during contract execution.
@@ -42,8 +37,8 @@ export class FabricContractContext extends Context<FabricContractFlags> {
    * @description Creates a new FabricContractContext instance
    * @summary Initializes the context with Fabric-specific flags
    */
-  constructor() {
-    super();
+  constructor(ctx?: FabricContractContext) {
+    super(ctx);
   }
 
   /**
@@ -72,23 +67,56 @@ export class FabricContractContext extends Context<FabricContractFlags> {
   get identity(): ClientIdentity {
     return this.get("identity");
   }
+  //
+  // private _segregateWrite: Record<string, SegregatedWriteEntry[]> = {};
+  // private _segregateRead: string[] = [];
+  // private _fullySegregated: boolean = false;
+  //
+  // private _sequenceSegregation: Map<
+  //   string,
+  //   { fullySegregated: boolean; collections: string[] }
+  // > = new Map();
 
-  private _segregateWrite: Record<string, SegregatedWriteEntry[]> = {};
-  private _segregateRead: string[] = [];
-  private _fullySegregated: boolean = false;
+  /**
+   * @description Stores segregation metadata per sequence name
+   * @summary Needed because the Sequence creates its own context (via logCtx),
+   * losing flags set by extractSegregatedCollections on the handler context.
+   * The adapter persists across operations, making it a reliable store.
+   */
+  setSequenceSegregation(
+    seqName: string,
+    fullySegregated: boolean,
+    collections: string[]
+  ): void {
+    let map = this.getFromChildren("sequenceSegregation");
+    map = !map || !Object.keys(map).length ? new Map() : map;
+    map.set(seqName, { fullySegregated, collections });
+    this.put("sequenceSegregation", map);
+  }
+
+  getSequenceSegregation(
+    seqName: string
+  ): { fullySegregated: boolean; collections: string[] } | undefined {
+    return this.getFromChildren("sequenceSegregation")?.get(seqName);
+  }
 
   markFullySegregated(): void {
-    this._fullySegregated = true;
+    this.put("fullySegregated", true);
   }
 
   get isFullySegregated(): boolean {
-    return this._fullySegregated;
+    return !!this.getFromChildren("fullySegregated");
   }
 
-  writeTo(col: string, entry: SegregatedWriteEntry) {
-    if (!(col in this._segregateWrite)) this._segregateWrite[col] = [];
-    this._segregateWrite[col].push(entry);
-    this.cache.put("segregateWrite", this._segregateWrite);
+  writeTo(col: string, entry: string[]) {
+    const segregateWrite = this.getFromChildren("segregateWrite") || {};
+    if (!(col in segregateWrite)) segregateWrite[col] = [];
+    segregateWrite[col].push(...entry);
+    this.put("segregateWrite", segregateWrite);
+  }
+
+  getSegregatedWrites() {
+    return this.getFromChildren("segregateWrite");
   }
 
   put(key: string, value: any) {
@@ -97,8 +125,10 @@ export class FabricContractContext extends Context<FabricContractFlags> {
 
   readFrom(cols: string | string[]) {
     cols = Array.isArray(cols) ? cols : [cols];
-    this._segregateRead = [...new Set([...this._segregateRead, ...cols])];
-    this.cache.put("segregateRead", this._segregateRead);
+    const segregateRead = [
+      ...new Set([...(this.getOrUndefined("segregateRead") || []), ...cols]),
+    ];
+    this.put("segregateRead", segregateRead);
   }
 
   /**
@@ -107,7 +137,7 @@ export class FabricContractContext extends Context<FabricContractFlags> {
    * @return {string[]} Array of collection names, empty if none registered
    */
   getWriteCollections(): string[] {
-    return Object.keys(this._segregateWrite);
+    return Object.keys(this.getOrUndefined("segregateWrite") || {});
   }
 
   /**
@@ -116,7 +146,8 @@ export class FabricContractContext extends Context<FabricContractFlags> {
    * @return {string[]} Array of collection names, empty if none registered
    */
   getReadCollections(): string[] {
-    return this._segregateRead;
+    const cols = this.getOrUndefined("segregateRead") || [];
+    return Array.isArray(cols) ? cols : [cols];
   }
 
   override toString() {
