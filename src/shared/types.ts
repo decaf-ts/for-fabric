@@ -103,5 +103,6 @@ export type SegregatedModel<M extends Model> = {
 export type FabricFlags<LOG extends Logger = Logger> = AdapterFlags<LOG> & {
   segregated?: string;
   mirror?: boolean;
+  mirrorCollection?: string;
   identity?: string | ClientIdentity;
 };

@@ -260,12 +260,12 @@ export async function createMirrorHandler<
   const fabricCtx = context as FabricContractContext;
   // Put mirror flags directly on context so adapter.prepare() and adapter.create() can see them
   fabricCtx.put("mirror" as any, true);
-  fabricCtx.put("segregated" as any, collection);
+  fabricCtx.put("mirrorCollection" as any, collection);
   try {
     const repo = this.override(
       Object.assign({}, (this as any)._overrides, {
-        segregated: collection,
         mirror: true,
+        mirrorCollection: collection,
         ignoreValidation: true,
         ignoreHandlers: true,
       } as any)
@@ -277,7 +277,7 @@ export async function createMirrorHandler<
   } finally {
     // Clean up mirror flags from context
     fabricCtx.put("mirror" as any, undefined);
-    fabricCtx.put("segregated" as any, undefined);
+    fabricCtx.put("mirrorCollection" as any, undefined);
   }
 }
 
@@ -294,12 +294,12 @@ export async function updateMirrorHandler<
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   fabricCtx.put("mirror" as any, true);
-  fabricCtx.put("segregated" as any, collection);
+  fabricCtx.put("mirrorCollection" as any, collection);
   try {
     const repo = this.override(
       Object.assign({}, (this as any)._overrides, {
-        segregated: collection,
         mirror: true,
+        mirrorCollection: collection,
         ignoreValidation: true,
         ignoreHandlers: true,
         applyUpdateValidation: false,
@@ -312,7 +312,7 @@ export async function updateMirrorHandler<
     );
   } finally {
     fabricCtx.put("mirror" as any, undefined);
-    fabricCtx.put("segregated" as any, undefined);
+    fabricCtx.put("mirrorCollection" as any, undefined);
   }
 }
 

@@ -264,13 +264,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.info(`in ADAPTER create with args ${args}`);
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
-    const segregated = isMirror
-      ? (ctx.getOrUndefined("segregated") as string | undefined)
-      : undefined;
-    const fullySegregated = ctx.isFullySegregated && !segregated;
+    const mirrorCollection = ctx.getOrUndefined(
+      "mirrorCollection"
+    ) as string | undefined;
+    const fullySegregated = ctx.isFullySegregated && !mirrorCollection;
 
-    if (!isMirror) {
+    if (!mirrorCollection) {
       let existing: any;
       try {
         existing = await this.readState(composedKey, ctx);
@@ -288,9 +287,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
 
-      if (segregated) {
-        // Mirror write: route the full model to the mirror collection via forPrivate
-        model = await this.forPrivate(segregated).putState(
+      if (mirrorCollection) {
+        model = await this.forPrivate(mirrorCollection).putState(
           composedKey,
           model,
           ctx
@@ -411,17 +409,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.info(`in ADAPTER update with args ${args}`);
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
-    const segregated = isMirror
-      ? (ctx.getOrUndefined("segregated") as string | undefined)
-      : undefined;
+    const mirrorCollection = ctx.getOrUndefined(
+      "mirrorCollection"
+    ) as string | undefined;
 
     try {
       log.info(`updating entry in ${tableName} table with pk ${id}`);
 
-      if (segregated) {
-        // Mirror/segregated write: route the full model to the private collection
-        model = await this.forPrivate(segregated).putState(
+      if (mirrorCollection) {
+        model = await this.forPrivate(mirrorCollection).putState(
           composedKey,
           model,
           ctx
@@ -482,17 +478,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(clazz);
 
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
-    const segregated = isMirror
-      ? (ctx.getOrUndefined("segregated") as string | undefined)
-      : undefined;
+    const mirrorCollection = ctx.getOrUndefined(
+      "mirrorCollection"
+    ) as string | undefined;
     let model: Record<string, any>;
 
-    if (segregated) {
-      // Mirror/segregated delete: route through forPrivate
+    if (mirrorCollection) {
       try {
-        model = await this.forPrivate(segregated).readState(composedKey, ctx);
-        await this.forPrivate(segregated).deleteState(composedKey, ctx);
+        model = await this.forPrivate(mirrorCollection).readState(
+          composedKey,
+          ctx
+        );
+        await this.forPrivate(mirrorCollection).deleteState(composedKey, ctx);
       } catch (e: unknown) {
         throw this.parseError(e as Error);
       }
