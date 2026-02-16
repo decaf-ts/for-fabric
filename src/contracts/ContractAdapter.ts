@@ -493,15 +493,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
       } catch (e: unknown) {
         throw this.parseError(e as Error);
       }
-    } else {
-      try {
-        model = ctx.isFullySegregated
-          ? {}
-          : await this.readState(composedKey, ctx);
-        if (!ctx.isFullySegregated) await this.deleteState(composedKey, ctx);
-      } catch (e: unknown) {
-        throw this.parseError(e as Error);
-      }
+      } else {
+        try {
+          const fullySeg = ctx.isFullySegregated;
+          model = fullySeg ? {} : await this.readState(composedKey, ctx);
+          if (!fullySeg) await this.deleteState(composedKey, ctx);
+        } catch (e: unknown) {
+          throw this.parseError(e as Error);
+        }
 
       const collections = ctx.getReadCollections();
       if (collections && collections.length) {

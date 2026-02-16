@@ -185,12 +185,16 @@ describe("Tests Product Contract", () => {
   });
 
   it("deletes the public data", async () => {
-    const deleted = await loadPublicProduct(created.productCode);
+    const beforeDelete = await loadPublicProduct(created.productCode);
+    expect(beforeDelete.hasErrors()).toBeUndefined();
+    await assertPublicRelations(beforeDelete);
 
+    const deleted = Model.deserialize(
+      await contract.delete(ctx as any, created.productCode)
+    ) as Product;
     stub.commit();
-    expect(deleted.hasErrors()).toBeUndefined();
 
-    await assertPublicRelations(deleted);
+    expect(deleted.hasErrors()).toBeUndefined();
 
     const k = stub.createCompositeKey("product", [productCode]);
     await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
