@@ -138,8 +138,6 @@ describe("OtherProductShared contract version flow with relations", () => {
       productCode,
       inventedName: "initial-name",
       nameMedicinalProduct: "medicinal",
-      strengths: [buildStrength(productCode, "100mg")],
-      markets: [buildMarket(productCode, "us")],
     });
 
     const payload = preparePayload(baseModel);
@@ -159,6 +157,37 @@ describe("OtherProductShared contract version flow with relations", () => {
   });
 
   it("reads the shared data", async () => {
+    const read = Model.deserialize(
+      await contract.read(ctx as any, productCode)
+    ) as OtherProductShared;
+    expect(read.hasErrors()).toBeUndefined();
+    created = read;
+  });
+
+  it("update with shared data", async () => {
+    const baseModel = new OtherProductShared({
+      ...created,
+      strengths: [buildStrength(productCode, "100mg")],
+      markets: [buildMarket(productCode, "us")],
+    });
+
+    const payload = preparePayload(baseModel);
+    created = Model.deserialize(
+      await contract.update(ctx as any, payload.serialize())
+    ) as OtherProductShared;
+    stub.commit();
+
+    expect(created.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
+
+    const product = await loadSharedProduct(productCode);
+    expect(product.hasErrors()).toBeUndefined();
+    await assertSharedRelations(product);
+
+    const owner = await loadPublicOwner(productCode);
+    expect(owner.hasErrors()).toBeUndefined();
+  });
+
+  it("reads the shared data again", async () => {
     const read = Model.deserialize(
       await contract.read(ctx as any, productCode)
     ) as OtherProductShared;
@@ -194,14 +223,15 @@ describe("OtherProductShared contract version flow with relations", () => {
     expect(updated.hasErrors()).toBeUndefined();
     await assertSharedRelations(updated);
 
-    expect(updated.version).toBe(2);
+    expect(updated.version).toBe(3);
     expect(updated.strengths).toHaveLength(2);
     expect(updated.markets).toHaveLength(2);
 
-    const read = Model.deserialize(
-      await contract.read(ctx as any, created.productCode)
-    ) as OtherProductShared;
+    const result = await contract.read(ctx as any, created.productCode);
 
+    const read = Model.deserialize(result) as OtherProductShared;
+
+    expect(read.hasErrors()).toBeUndefined();
     expect(read.equals(updated)).toBe(true);
   });
 

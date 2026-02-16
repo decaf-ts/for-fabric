@@ -81,14 +81,14 @@ export class OtherProductShared extends BaseIdentifiedModel {
   @oneToMany(
     () => OtherProductStrength,
     { update: Cascade.CASCADE, delete: Cascade.CASCADE },
-    false
+    true
   )
   strengths!: OtherProductStrength[];
 
   @oneToMany(
     () => OtherMarket,
     { update: Cascade.CASCADE, delete: Cascade.CASCADE },
-    false
+    true
   )
   markets!: OtherMarket[];
 

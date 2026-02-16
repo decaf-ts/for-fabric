@@ -72,14 +72,14 @@ export class Product extends BaseIdentifiedModel {
   @oneToMany(
     () => ProductStrength,
     { update: Cascade.CASCADE, delete: Cascade.CASCADE },
-    false
+    true
   )
   strengths!: ProductStrength[];
 
   @oneToMany(
     () => Market,
     { update: Cascade.CASCADE, delete: Cascade.CASCADE },
-    false
+    true
   )
   markets!: Market[];
 
