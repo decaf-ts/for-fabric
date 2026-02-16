@@ -274,6 +274,10 @@ describe("OtherProductShared contract version flow with relations", () => {
         const newObj = await loadSharedProduct(productCode);
         expect(newObj.hasErrors()).toBeUndefined();
         await assertSharedRelations(newObj);
+
+        const owner = await loadPublicOwner(productCode);
+        expect(owner.hasErrors()).toBeUndefined();
+
         newBulk.push(newObj);
       }
 
@@ -386,6 +390,10 @@ describe("OtherProductShared contract version flow with relations", () => {
         await expect(
           stub.getPrivateData("decaf-namespaceAeon", k)
         ).rejects.toThrow(NotFoundError);
+
+        await expect(loadPublicOwner(productCode)).rejects.toThrow(
+          NotFoundError
+        );
       }
     });
   });
