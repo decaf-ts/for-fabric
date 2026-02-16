@@ -212,7 +212,7 @@ export function assignProductOwner() {
 }
 
 function publicContext(ctx: FabricContractContext) {
-  return new FabricContractContext(ctx).accumulate({
+  return new (ctx.constructor as any)(ctx).accumulate({
     fullySegregated: false,
     segregated: undefined,
     segregatedData: undefined,
