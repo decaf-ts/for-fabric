@@ -44,7 +44,6 @@ import { FabricContractFlags } from "../contracts/types";
 import "../shared/overrides";
 import { FabricContractContext } from "../contracts/index";
 
-
 /**
  * @description Extracts the MSP ID from either a string or ClientIdentity object
  * @param identity - The identity value which can be a string MSP ID or ClientIdentity object
@@ -532,7 +531,7 @@ export function applySegregationFlags<M extends Model>(
   // Use Model.segregate() which is the canonical way to determine what's transient,
   // rather than reading DBKeys.TRANSIENT metadata which may not accumulate correctly
   // when class-level @privateData applies decorators iteratively.
-  if (!ctx.isFullySegregated) {
+  if (!ctx.isFullySegregated && collections.length) {
     const segregated = Model.segregate(clazz);
     const publicData = segregated.public || {};
     if (!Object.keys(publicData).length) ctx.markFullySegregated();
