@@ -1,36 +1,35 @@
 import "reflect-metadata";
 
-jest.mock("@decaf-ts/core", () => {
-  const actual = jest.requireActual("@decaf-ts/core");
-  return {
-    ...actual,
-    repositoryFromTypeMetadata: jest.fn(),
-    cacheModelForPopulate: jest.fn(),
-    createOrUpdate: jest.fn(),
-  };
-});
-
 import {
   oneToOneOnCreate,
   oneToOneOnUpdate,
-  oneToManyOnCreate,
+  oneToManyOnCreateUpdate,
   oneToManyOnDelete,
   populate,
-} from "../../src/contracts/FabricConstruction";
-import {
   Cascade,
-  repositoryFromTypeMetadata,
-  cacheModelForPopulate,
+  Repository,
+  pk,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
-import { Model, model } from "@decaf-ts/decorator-validation";
+import { Model, model, list } from "@decaf-ts/decorator-validation";
 import { prop } from "@decaf-ts/decoration";
+
+@model()
+class ChildModel extends Model {
+  @pk()
+  id?: string;
+
+  constructor(data?: Partial<ChildModel>) {
+    super(data);
+  }
+}
 
 @model()
 class ParentModel extends Model {
   @prop()
   child?: string | ChildModel;
 
+  @list(ChildModel)
   @prop()
   items?: Array<string | ChildModel>;
 
@@ -39,85 +38,144 @@ class ParentModel extends Model {
   }
 }
 
-@model()
-class ChildModel extends Model {
-  @prop()
-  id?: string;
-
-  constructor(data?: Partial<ChildModel>) {
-    super(data);
-  }
+function createMockRepo(overrides: Record<string, jest.Mock> = {}) {
+  const repo: any = {
+    read: jest.fn(),
+    delete: jest.fn(),
+    deleteAll: jest.fn(),
+    override: jest.fn(),
+    pk: "id",
+    class: ChildModel,
+    adapter: { alias: "test-alias" },
+    _overrides: {},
+    ...overrides,
+  };
+  repo.override.mockReturnValue(repo);
+  return repo;
 }
 
-describe("FabricConstruction relationship hooks", () => {
-  const context = new FabricContractContext();
+function createLogger() {
+  const logger: any = {
+    info: jest.fn(),
+    debug: jest.fn(),
+    verbose: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    silly: jest.fn(),
+    for: jest.fn(),
+    clear: jest.fn().mockReturnThis(),
+  };
+  logger.for.mockReturnValue(logger);
+  return logger;
+}
+
+describe("Construction relationship hooks", () => {
+  let forModelSpy: jest.SpyInstance;
 
   afterEach(() => {
-    jest.resetAllMocks();
+    forModelSpy?.mockRestore();
+    jest.restoreAllMocks();
   });
 
   it("oneToOneOnCreate loads and caches reference ids", async () => {
-    const repo = {
+    const repo = createMockRepo({
       read: jest.fn().mockResolvedValue(new ChildModel({ id: "c-1" })),
-    };
-    (cacheModelForPopulate as jest.Mock).mockResolvedValue(undefined);
-    (repositoryFromTypeMetadata as jest.Mock).mockReturnValue(repo);
+    });
+    forModelSpy = jest
+      .spyOn(Repository, "forModel")
+      .mockReturnValue(repo as any);
+
+    const context = new FabricContractContext();
+    context.accumulate({ logger: createLogger(), cacheForPopulate: {} } as any);
 
     const model = new ParentModel({ child: "c-1" });
 
     await oneToOneOnCreate.call(
-      { adapter: { alias: "alias" } },
+      { adapter: { alias: "test-alias" }, _overrides: {} },
       context,
-      { cascade: { delete: Cascade.NONE, update: Cascade.NONE } } as any,
+      {
+        cascade: { delete: Cascade.NONE, update: Cascade.NONE },
+        class: ChildModel,
+      } as any,
       "child",
       model
     );
 
     expect(repo.read).toHaveBeenCalledWith("c-1", context);
-    expect(cacheModelForPopulate).toHaveBeenCalled();
     expect(model.child).toBe("c-1");
   });
 
-  it("oneToOneOnUpdate respects cascade configuration", async () => {
+  it("oneToOneOnUpdate skips when cascade update is NONE", async () => {
+    const context = new FabricContractContext();
+    context.accumulate({ logger: createLogger() } as any);
+
     const model = new ParentModel({ child: "c-1" });
-    const repo = { read: jest.fn() };
-    (repositoryFromTypeMetadata as jest.Mock).mockReturnValue(repo);
 
     await oneToOneOnUpdate.call(
-      { adapter: { alias: "alias" } },
+      { adapter: { alias: "test-alias" }, _overrides: {} },
       context,
-      { cascade: { update: Cascade.NONE } } as any,
+      {
+        cascade: { update: Cascade.NONE },
+        class: ChildModel,
+      } as any,
       "child",
       model
     );
 
-    expect(repo.read).not.toHaveBeenCalled();
+    // Should return early without reading
+    expect(model.child).toBe("c-1");
   });
 
-  it("oneToManyOnCreate throws when items types differ", async () => {
-    const model = new ParentModel({ items: ["a", 1 as any] });
+  it("oneToManyOnCreateUpdate reads each item via repo", async () => {
+    const childA = new ChildModel({ id: "a" });
+    const childB = new ChildModel({ id: "b" });
+    const repo = createMockRepo({
+      read: jest
+        .fn()
+        .mockResolvedValueOnce(childA)
+        .mockResolvedValueOnce(childB),
+    });
+    forModelSpy = jest
+      .spyOn(Repository, "forModel")
+      .mockReturnValue(repo as any);
 
-    await expect(
-      oneToManyOnCreate.call(
-        { adapter: { alias: "alias" } },
-        context,
-        { cascade: { update: Cascade.CASCADE } } as any,
-        "items",
-        model
-      )
-    ).rejects.toThrow("Invalid operation");
+    const context = new FabricContractContext();
+    context.accumulate({ logger: createLogger(), cacheForPopulate: {} } as any);
+
+    const model = new ParentModel({ items: ["a", "b"] });
+
+    await oneToManyOnCreateUpdate.call(
+      { adapter: { alias: "test-alias" }, _overrides: {} },
+      context,
+      {
+        cascade: { update: Cascade.CASCADE },
+        class: ChildModel,
+      } as any,
+      "items",
+      model
+    );
+
+    expect(repo.read).toHaveBeenCalledTimes(2);
   });
 
   it("oneToManyOnDelete skips when cascade not enabled", async () => {
+    const context = new FabricContractContext();
+    context.accumulate({ logger: createLogger() } as any);
+
     const model = new ParentModel({ items: ["a", "b"] });
 
-    const repo = { delete: jest.fn() };
-    (repositoryFromTypeMetadata as jest.Mock).mockReturnValue(repo);
+    const repo = createMockRepo();
+    forModelSpy = jest
+      .spyOn(Repository, "forModel")
+      .mockReturnValue(repo as any);
 
     await oneToManyOnDelete.call(
-      { adapter: { alias: "alias" } },
+      { adapter: { alias: "test-alias" }, _overrides: {} },
       context,
-      { cascade: { delete: Cascade.NONE } } as any,
+      {
+        cascade: { delete: Cascade.NONE },
+        class: ChildModel,
+      } as any,
       "items",
       model
     );
@@ -125,28 +183,31 @@ describe("FabricConstruction relationship hooks", () => {
     expect(repo.delete).not.toHaveBeenCalled();
   });
 
-  it("populate retrieves related instances using cache first", async () => {
-    const repo = {
+  it("populate falls back to repo.read when cache is empty", async () => {
+    const repo = createMockRepo({
       read: jest.fn().mockResolvedValue(new ChildModel({ id: "c-1" })),
-    };
-    const getSpy = jest
-      .spyOn(context as any, "get")
-      .mockRejectedValue(new Error("missing"));
-    (repositoryFromTypeMetadata as jest.Mock).mockReturnValue(repo);
+    });
+    forModelSpy = jest
+      .spyOn(Repository, "forModel")
+      .mockReturnValue(repo as any);
+
+    const context = new FabricContractContext();
+    context.accumulate({
+      logger: createLogger(),
+      cacheForPopulate: {},
+    } as any);
 
     const model = new ParentModel({ child: "c-1" });
 
     await populate.call(
-      { adapter: { alias: "alias" } },
+      { adapter: { alias: "test-alias" }, _overrides: {} },
       context,
-      { populate: true } as any,
+      { populate: true, class: ChildModel } as any,
       "child",
       model
     );
 
-    expect(getSpy).toHaveBeenCalled();
     expect(repo.read).toHaveBeenCalledWith("c-1", context);
     expect(model.child).toBeInstanceOf(ChildModel);
-    getSpy.mockRestore();
   });
 });

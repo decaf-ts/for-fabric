@@ -60,35 +60,8 @@ class SpyAdapter extends FabricContractAdapter {
     );
   }
 
-  public async callPutState(
-    id: string,
-    record: Record<string, any>,
-    ctx: FabricContractContext
-  ) {
-    return this.putState(id, record, ctx);
-  }
-
-  public async callReadState(id: string, ctx: FabricContractContext) {
-    return this.readState(id, ctx);
-  }
-
-  public async callQueryResult(
-    stub: ChaincodeStub,
-    query: Record<string, any>,
-    ctx: FabricContractContext
-  ) {
-    return this.queryResult(stub, query, ctx);
-  }
-
-  public async callQueryResultPaginated(
-    stub: ChaincodeStub,
-    query: Record<string, any>,
-    limit: number,
-    page: number | undefined,
-    bookmark: string | undefined,
-    ctx: FabricContractContext
-  ) {
-    return this.queryResultPaginated(stub, query, limit, page, bookmark, ctx);
+  public callForPrivate(collection: string) {
+    return this.forPrivate(collection);
   }
 
   protected override logCtx(...args: any[]): any {
@@ -149,7 +122,7 @@ describe("mirror decorator handlers", () => {
     expect(createSpy).toHaveBeenCalledWith(model, context);
   });
 
-  it("marks reads to always target the mirror collection when the MSP matches", async () => {
+  it("marks reads as fully segregated and targets the mirror collection when the MSP matches", async () => {
     const context = new FabricContractContext();
     enableContextPut(context);
     const identity = {
@@ -167,7 +140,9 @@ describe("mirror decorator handlers", () => {
       model
     );
 
-    expect(context.get("segregated")).toBe("mirror-collection");
+    // Should mark as fully segregated so adapter skips public readState()
+    expect(context.isFullySegregated).toBe(true);
+    // Should register the mirror collection for reading via forPrivate()
     expect(context.getReadCollections()).toContain("mirror-collection");
   });
 
@@ -192,12 +167,14 @@ describe("mirror decorator handlers", () => {
       model
     );
 
-    expect(context.getOrUndefined("segregated")).toBeUndefined();
+    // Should NOT set fullySegregated — normal read flow applies
+    expect(context.isFullySegregated).toBe(false);
+    // Should NOT register collections — normal public read applies
     expect(context.getReadCollections()).toHaveLength(0);
   });
 });
 
-describe("FabricContractAdapter segregated access", () => {
+describe("FabricContractAdapter forPrivate routing", () => {
   let adapter: SpyAdapter;
   let ctx: FabricContractContext;
   let stub: Partial<ChaincodeStub> & ChaincodeStub;
@@ -212,6 +189,7 @@ describe("FabricContractAdapter segregated access", () => {
 
     stub = {
       putPrivateData: jest.fn().mockResolvedValue(undefined),
+      deletePrivateData: jest.fn().mockResolvedValue(undefined),
       putState: jest.fn().mockResolvedValue(undefined),
       getPrivateData: jest
         .fn()
@@ -236,10 +214,9 @@ describe("FabricContractAdapter segregated access", () => {
     ctx.accumulate({ stub, identity, logger: createLogger() } as any);
   });
 
-  it("routes putState to private data when segregated", async () => {
-    ctx.accumulate({ segregated: "mirror-collection" });
-
-    await adapter.callPutState("pk", { foo: "bar" }, ctx);
+  it("forPrivate proxy routes putState to putPrivateData", async () => {
+    const proxy = adapter.callForPrivate("mirror-collection");
+    await (proxy as any).putState("pk", { foo: "bar" }, ctx);
 
     expect(stub.putPrivateData).toHaveBeenCalledWith(
       "mirror-collection",
@@ -249,20 +226,18 @@ describe("FabricContractAdapter segregated access", () => {
     expect(stub.putState).not.toHaveBeenCalled();
   });
 
-  it("reads from private data when segregated", async () => {
-    ctx.accumulate({ segregated: "mirror-collection" });
-
-    await adapter.callReadState("pk", ctx);
+  it("forPrivate proxy routes readState to getPrivateData", async () => {
+    const proxy = adapter.callForPrivate("mirror-collection");
+    await (proxy as any).readState("pk", ctx);
 
     expect(stub.getPrivateData).toHaveBeenCalledWith("mirror-collection", "pk");
     expect(stub.getState).not.toHaveBeenCalled();
   });
 
-  it("executes queries against the mirror collection when segregated", async () => {
-    ctx.accumulate({ segregated: "mirror-collection" });
-
+  it("forPrivate proxy routes queryResult to getPrivateDataQueryResult", async () => {
+    const proxy = adapter.callForPrivate("mirror-collection");
     const query = { selector: { foo: "bar" } };
-    await adapter.callQueryResult(stub as ChaincodeStub, query, ctx);
+    await (proxy as any).queryResult(stub, query, ctx);
 
     expect(stub.getPrivateDataQueryResult).toHaveBeenCalledWith(
       "mirror-collection",
@@ -271,12 +246,11 @@ describe("FabricContractAdapter segregated access", () => {
     expect(stub.getQueryResult).not.toHaveBeenCalled();
   });
 
-  it("uses private pagination when the context is segregated", async () => {
-    ctx.accumulate({ segregated: "mirror-collection" });
-
+  it("forPrivate proxy routes queryResultPaginated to getPrivateDataQueryResult", async () => {
+    const proxy = adapter.callForPrivate("mirror-collection");
     const query = { selector: { foo: "bar" } };
-    await adapter.callQueryResultPaginated(
-      stub as ChaincodeStub,
+    await (proxy as any).queryResultPaginated(
+      stub,
       query,
       5,
       undefined,
@@ -286,5 +260,15 @@ describe("FabricContractAdapter segregated access", () => {
 
     expect(stub.getPrivateDataQueryResult).toHaveBeenCalled();
     expect(stub.getQueryResultWithPagination).not.toHaveBeenCalled();
+  });
+
+  it("forPrivate proxy routes deleteState to deletePrivateData", async () => {
+    const proxy = adapter.callForPrivate("mirror-collection");
+    await (proxy as any).deleteState("pk", ctx);
+
+    expect(stub.deletePrivateData).toHaveBeenCalledWith(
+      "mirror-collection",
+      "pk"
+    );
   });
 });

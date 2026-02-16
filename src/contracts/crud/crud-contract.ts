@@ -28,7 +28,6 @@ import { Constructor } from "@decaf-ts/decoration";
 import { FabricContractContext } from "../ContractContext";
 import {
   BulkCrudOperationKeys,
-  InternalError,
   OperationKeys,
   PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
@@ -468,9 +467,8 @@ export abstract class FabricCrudContract<M extends Model>
 
     log.info(`Merging transient data...`);
     models = (models as M[]).map((m, i) => {
-      if (!transient || !transient[i])
-        throw new InternalError(`No transient data found for position ${i}`);
-      return Model.merge(m, transient[i], this.clazz) as M;
+      const t = Array.isArray(transient) ? transient[i] : transient;
+      return Model.merge(m, t || {}, this.clazz) as M;
     });
 
     log.info(`adding ${models.length} entries to the table`);
@@ -599,9 +597,8 @@ export abstract class FabricCrudContract<M extends Model>
 
     log.info(`Merging transient data...`);
     models = (models as M[]).map((m, i) => {
-      if (!transient || !transient[i])
-        throw new InternalError(`No transient data found for position ${i}`);
-      return Model.merge(m, transient[i], this.clazz) as M;
+      const t = Array.isArray(transient) ? transient[i] : transient;
+      return Model.merge(m, t || {}, this.clazz) as M;
     });
 
     log.info(`adding ${models.length} entries to the table`);

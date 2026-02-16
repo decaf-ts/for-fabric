@@ -44,7 +44,6 @@ import { FabricContractFlags } from "../contracts/types";
 import "../shared/overrides";
 import { FabricContractContext } from "../contracts/index";
 
-const MIRROR_SKIP_FLAG_PREFIX = "mirror:skip:";
 
 /**
  * @description Extracts the MSP ID from either a string or ClientIdentity object
@@ -259,18 +258,28 @@ export async function createMirrorHandler<
   model: M
 ): Promise<void> {
   const collection = await evalMirrorMetadata(model, data.resolver, context);
-  const repo = this.override(
-    Object.assign({}, (this as any)._overrides, {
-      segregated: collection,
-      mirror: true,
-      ignoreValidation: true,
-      ignoreHandlers: true,
-    } as any)
-  );
-  const mirror = await repo.create(model, context);
-  context.logger.info(
-    `Mirror for ${Model.tableName(this.class)} created with ${Model.pk(model) as string}: ${mirror[Model.pk(model)]}`
-  );
+  const fabricCtx = context as FabricContractContext;
+  // Put mirror flags directly on context so adapter.prepare() and adapter.create() can see them
+  fabricCtx.put("mirror" as any, true);
+  fabricCtx.put("segregated" as any, collection);
+  try {
+    const repo = this.override(
+      Object.assign({}, (this as any)._overrides, {
+        segregated: collection,
+        mirror: true,
+        ignoreValidation: true,
+        ignoreHandlers: true,
+      } as any)
+    );
+    const mirror = await repo.create(model, context);
+    context.logger.info(
+      `Mirror for ${Model.tableName(this.class)} created with ${Model.pk(model) as string}: ${mirror[Model.pk(model)]}`
+    );
+  } finally {
+    // Clean up mirror flags from context
+    fabricCtx.put("mirror" as any, undefined);
+    fabricCtx.put("segregated" as any, undefined);
+  }
 }
 
 export async function updateMirrorHandler<
@@ -284,20 +293,28 @@ export async function updateMirrorHandler<
   model: M
 ): Promise<void> {
   const collection = await evalMirrorMetadata(model, data.resolver, context);
-  const repo = this.override(
-    Object.assign({}, (this as any)._overrides, {
-      segregated: collection,
-      mirror: true,
-      ignoreValidation: true,
-      ignoreHandlers: true,
-      applyUpdateValidation: false,
-      mergeForUpdate: false,
-    } as any)
-  );
-  await repo.update(model, context);
-  context.logger.info(
-    `Mirror for ${Model.tableName(this.class)} updated: ${(model as any)[Model.pk(model)]}`
-  );
+  const fabricCtx = context as FabricContractContext;
+  fabricCtx.put("mirror" as any, true);
+  fabricCtx.put("segregated" as any, collection);
+  try {
+    const repo = this.override(
+      Object.assign({}, (this as any)._overrides, {
+        segregated: collection,
+        mirror: true,
+        ignoreValidation: true,
+        ignoreHandlers: true,
+        applyUpdateValidation: false,
+        mergeForUpdate: false,
+      } as any)
+    );
+    await repo.update(model, context);
+    context.logger.info(
+      `Mirror for ${Model.tableName(this.class)} updated: ${(model as any)[Model.pk(model)]}`
+    );
+  } finally {
+    fabricCtx.put("mirror" as any, undefined);
+    fabricCtx.put("segregated" as any, undefined);
+  }
 }
 
 export async function deleteMirrorHandler<
@@ -311,24 +328,32 @@ export async function deleteMirrorHandler<
   model: M
 ): Promise<void> {
   const collection = await evalMirrorMetadata(model, data.resolver, context);
-  const pkProp = Model.pk(model) as keyof M;
-  const id = model[pkProp];
-  const repo = this.override(
-    Object.assign({}, (this as any)._overrides, {
-      segregated: collection,
-      mirror: true,
-      ignoreValidation: true,
-      ignoreHandlers: true,
-    } as any)
-  );
+  const fabricCtx = context as FabricContractContext;
+  fabricCtx.put("mirror" as any, true);
+  fabricCtx.put("segregated" as any, collection);
   try {
-    await repo.delete(id as any, context);
-  } catch {
-    // May already be deleted by adapter.deleteSegregatedCollections
+    const pkProp = Model.pk(model) as keyof M;
+    const id = model[pkProp];
+    const repo = this.override(
+      Object.assign({}, (this as any)._overrides, {
+        segregated: collection,
+        mirror: true,
+        ignoreValidation: true,
+        ignoreHandlers: true,
+      } as any)
+    );
+    try {
+      await repo.delete(id as any, context);
+    } catch {
+      // May already be deleted by adapter.deleteSegregatedCollections
+    }
+    context.logger.info(
+      `Mirror for ${Model.tableName(this.class)} deleted: ${String(id)}`
+    );
+  } finally {
+    fabricCtx.put("mirror" as any, undefined);
+    fabricCtx.put("segregated" as any, undefined);
   }
-  context.logger.info(
-    `Mirror for ${Model.tableName(this.class)} deleted: ${String(id)}`
-  );
 }
 
 export async function mirrorWriteGuard<
@@ -364,37 +389,25 @@ export async function readMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  // Get the current MSP ID from the context
   const msp = extractMspId(
     context.get("identity") as string | ClientIdentity | undefined
   );
 
-  if (!msp) {
-    context.logger.debug(
-      `Mirror read: No MSP ID available, using default read behavior`
-    );
-    return;
-  }
+  if (!msp) return;
 
-  // Evaluate the mirror condition
   const collection = await evalMirrorMetadata(model, data.resolver, context);
-  const skipFlagKey = `${MIRROR_SKIP_FLAG_PREFIX}${collection}`;
   const fabricCtx = context as FabricContractContext;
   const matches = msp === data.mspId || (data.condition && data.condition(msp));
 
   if (matches) {
     context.logger.info(
-      `Mirror read: MSP ${msp} matches condition, routing ALL reads exclusively to collection ${collection}`
+      `Mirror read: MSP ${msp} matches, routing reads to mirror collection ${collection}`
     );
-
-    // Set the segregated flag in context to route ALL reads to the mirror collection
-    // This ensures no reads go to world state or other collections
-    fabricCtx.put("segregated", collection);
+    // Route reads exclusively through the mirror collection
+    fabricCtx.put("fullySegregated", true);
     fabricCtx.readFrom(collection);
-    fabricCtx.put(skipFlagKey, false);
-  } else {
-    fabricCtx.put(skipFlagKey, true);
   }
+  // When MSP does NOT match, normal read flow — all data is in public state
 }
 
 export function mirror(
@@ -426,7 +439,6 @@ export function mirror(
         Metadata.key(FabricModelKeys.FABRIC, FabricModelKeys.MIRROR),
         meta
       ),
-      privateData(collection),
       // Read handler runs early (priority 30) to set up context before any reads
       onRead(readMirrorHandler as any, meta, { priority: 30 }),
       // Write guards — reject matching MSPs before any processing
@@ -658,10 +670,6 @@ export async function segregatedDataOnRead<M extends Model>(
     typeof collectionResolver === "string"
       ? collectionResolver
       : await collectionResolver(model, msp, context);
-
-  const skipFlagKey = `${MIRROR_SKIP_FLAG_PREFIX}${collection}`;
-  const fabricCtx = context as FabricContractContext;
-  if (fabricCtx.getOrUndefined(skipFlagKey as any)) return;
 
   (context as FabricContractContext).readFrom(collection);
 }

@@ -62,7 +62,7 @@ import {
 } from "fabric-shim-api";
 import { FabricStatement } from "./FabricContractStatement";
 import { FabricContractSequence } from "./FabricContractSequence";
-import { FabricFlavour, FabricModelKeys } from "../shared/constants";
+import { FabricFlavour } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
 import {
   apply,
@@ -74,8 +74,6 @@ import {
 import { FabricContractPaginator } from "./FabricContractPaginator";
 import { MissingContextError } from "../shared/errors";
 import { SegregatedModel } from "../shared/index";
-
-const MIRROR_SKIP_FLAG_PREFIX = "mirror:skip:";
 
 export type FabricContextualizedArgs<
   ARGS extends any[] = any[],
@@ -267,6 +265,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
     const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+    const segregated = isMirror
+      ? (ctx.getOrUndefined("segregated") as string | undefined)
+      : undefined;
+
     if (!isMirror) {
       let existing: any;
       try {
@@ -285,32 +287,41 @@ export class FabricContractAdapter extends CouchDBAdapter<
     try {
       log.info(`adding entry to ${tableName} table with pk ${id}`);
 
-      const defaults = this.getModelDefaults(clazz);
-      // handle public data
-      if (
-        Object.keys(model).filter((k) => {
-          if (k === CouchDBKeys.TABLE) return false;
-          return !(
-            defaults &&
-            k in defaults &&
-            defaults[k as keyof M] === model[k]
-          );
-        }).length
-      )
-        model = await this.putState(composedKey, model, ctx);
+      if (segregated) {
+        // Mirror write: route the full model to the mirror collection via forPrivate
+        model = await this.forPrivate(segregated).putState(
+          composedKey,
+          model,
+          ctx
+        );
+      } else {
+        const defaults = this.getModelDefaults(clazz);
+        // handle public data
+        if (
+          Object.keys(model).filter((k) => {
+            if (k === CouchDBKeys.TABLE) return false;
+            return !(
+              defaults &&
+              k in defaults &&
+              defaults[k as keyof M] === model[k]
+            );
+          }).length
+        )
+          model = await this.putState(composedKey, model, ctx);
 
-      // handle segregated writes
-      const data = ctx.getFromChildren("segregatedData");
-      if (data) {
-        for (const collection in data) {
-          Object.assign(
-            model,
-            await this.forPrivate(collection).putState(
-              composedKey,
-              data[collection][id as any],
-              ctx
-            )
-          );
+        // handle segregated writes
+        const data = ctx.getFromChildren("segregatedData");
+        if (data) {
+          for (const collection in data) {
+            Object.assign(
+              model,
+              await this.forPrivate(collection).putState(
+                composedKey,
+                data[collection][id as any],
+                ctx
+              )
+            );
+          }
         }
       }
     } catch (e: unknown) {
@@ -355,7 +366,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
     let model: Record<string, any>;
-    // const fabricCtx = ctx as FabricContractContext;
+
     try {
       model = ctx.isFullySegregated
         ? {}
@@ -394,40 +405,52 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const { ctx, log } = this.logCtx(args, this.update);
 
     this.enforceMirrorAuthorization(clazz, ctx);
-    log.info(`in ADAPTER create with args ${args}`);
+    log.info(`in ADAPTER update with args ${args}`);
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
     const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+    const segregated = isMirror
+      ? (ctx.getOrUndefined("segregated") as string | undefined)
+      : undefined;
 
     try {
-      log.info(`adding entry to ${tableName} table with pk ${id}`);
+      log.info(`updating entry in ${tableName} table with pk ${id}`);
 
-      const defaults = this.getModelDefaults(clazz);
-      // handle public data
-      if (
-        Object.keys(model).filter((k) => {
-          if (k === CouchDBKeys.TABLE) return false;
-          return !(
-            defaults &&
-            k in defaults &&
-            defaults[k as keyof M] === model[k]
-          );
-        }).length
-      )
-        model = await this.putState(composedKey, model, ctx);
+      if (segregated) {
+        // Mirror/segregated write: route the full model to the private collection
+        model = await this.forPrivate(segregated).putState(
+          composedKey,
+          model,
+          ctx
+        );
+      } else {
+        const defaults = this.getModelDefaults(clazz);
+        // handle public data
+        if (
+          Object.keys(model).filter((k) => {
+            if (k === CouchDBKeys.TABLE) return false;
+            return !(
+              defaults &&
+              k in defaults &&
+              defaults[k as keyof M] === model[k]
+            );
+          }).length
+        )
+          model = await this.putState(composedKey, model, ctx);
 
-      // handle segregated writes
-      const data = ctx.getFromChildren("segregatedData");
-      if (data) {
-        for (const collection in data) {
-          Object.assign(
-            model,
-            await this.forPrivate(collection).putState(
-              composedKey,
-              data[collection][id as any],
-              ctx
-            )
-          );
+        // handle segregated writes
+        const data = ctx.getFromChildren("segregatedData");
+        if (data) {
+          for (const collection in data) {
+            Object.assign(
+              model,
+              await this.forPrivate(collection).putState(
+                composedKey,
+                data[collection][id as any],
+                ctx
+              )
+            );
+          }
         }
       }
     } catch (e: unknown) {
@@ -456,35 +479,46 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(clazz);
 
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+    const segregated = isMirror
+      ? (ctx.getOrUndefined("segregated") as string | undefined)
+      : undefined;
     let model: Record<string, any>;
-    // const fabricCtx = ctx as FabricContractContext;
-    try {
-      model = ctx.isFullySegregated
-        ? {}
-        : await this.readState(composedKey, ctx);
-      if (!ctx.isFullySegregated) await this.deleteState(composedKey, ctx);
-    } catch (e: unknown) {
-      throw this.parseError(e as Error);
-    }
 
-    const collections = ctx.getReadCollections();
-    if (collections && collections.length) {
-      for (const col of collections) {
-        Object.assign(
-          model,
-          await this.forPrivate(col).readState(composedKey, ctx)
-        );
-        await this.forPrivate(col).deleteState(composedKey, ctx);
+    if (segregated) {
+      // Mirror/segregated delete: route through forPrivate
+      try {
+        model = await this.forPrivate(segregated).readState(composedKey, ctx);
+        await this.forPrivate(segregated).deleteState(composedKey, ctx);
+      } catch (e: unknown) {
+        throw this.parseError(e as Error);
+      }
+    } else {
+      try {
+        model = ctx.isFullySegregated
+          ? {}
+          : await this.readState(composedKey, ctx);
+        if (!ctx.isFullySegregated) await this.deleteState(composedKey, ctx);
+      } catch (e: unknown) {
+        throw this.parseError(e as Error);
+      }
+
+      const collections = ctx.getReadCollections();
+      if (collections && collections.length) {
+        for (const col of collections) {
+          Object.assign(
+            model,
+            await this.forPrivate(col).readState(composedKey, ctx)
+          );
+          await this.forPrivate(col).deleteState(composedKey, ctx);
+        }
       }
     }
     return model;
   }
 
   protected async deleteState(id: string, context: FabricContractContext) {
-    const { ctx } = this.logCtx([context], this.deleteState);
-    const collection = ctx.getOrUndefined("segregated") as string | undefined;
-    if (collection) await ctx.stub.deletePrivateData(collection, id);
-    else await ctx.stub.deleteState(id);
+    await context.stub.deleteState(id);
   }
 
   forPrivate(collection: string): FabricContractAdapter {
@@ -541,7 +575,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 );
               }
               case "queryResultPaginated": {
-                const [stub, rawInput, limit, skip] = argsList;
+                const [stub, rawInput, limit, skip, bookmark] = argsList;
                 const iterator = await (
                   stub as ChaincodeStub
                 ).getPrivateDataQueryResult(
@@ -550,7 +584,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 );
                 const results: any[] = [];
                 let count = 0;
-                let reachedBookmark = skip ? false : true;
+                const skipKey = bookmark || skip;
+                let reachedBookmark = skipKey ? false : true;
                 let lastKey: string | null = null;
 
                 while (true) {
@@ -562,46 +597,53 @@ export class FabricContractAdapter extends CouchDBAdapter<
                       "utf8"
                     );
 
-                    // If we have a skip, skip until we reach it
+                    // If we have a bookmark/skip, skip until we pass it
                     if (!reachedBookmark) {
-                      if (recordKey === skip?.toString()) {
+                      if (recordKey === skipKey?.toString()) {
                         reachedBookmark = true;
                       }
                       continue;
                     }
 
                     results.push({
-                      Key: recordKey,
-                      Record: JSON.parse(recordValue),
+                      key: recordKey,
+                      value: Buffer.from(recordValue),
                     });
                     lastKey = recordKey;
                     count++;
 
                     if (count >= limit) {
                       await iterator.close();
-                      return {
-                        iterator:
-                          results as unknown as Iterators.StateQueryIterator,
-                        metadata: {
-                          fetchedRecordsCount: results.length,
-                          bookmark: lastKey,
-                        },
-                      };
+                      break;
                     }
                   }
 
                   if (res.done) {
                     await iterator.close();
-                    return {
-                      iterator:
-                        results as unknown as Iterators.StateQueryIterator,
-                      metadata: {
-                        fetchedRecordsCount: results.length,
-                        bookmark: "",
-                      },
-                    };
+                    break;
                   }
                 }
+
+                // Wrap results in an async iterator compatible with resultIterator()
+                let idx = 0;
+                const arrayIterator = {
+                  async next() {
+                    if (idx < results.length) {
+                      return { value: results[idx++], done: false };
+                    }
+                    return { value: undefined as any, done: true };
+                  },
+                  async close() {},
+                };
+
+                return {
+                  iterator:
+                    arrayIterator as unknown as Iterators.StateQueryIterator,
+                  metadata: {
+                    fetchedRecordsCount: results.length,
+                    bookmark: count >= limit ? (lastKey || "") : "",
+                  },
+                };
               }
               default:
                 throw new InternalError(
@@ -621,7 +663,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ) {
     let data: Buffer;
 
-    // const { log } = this.logCtx([ctx], this.putState);
     try {
       data = Buffer.from(
         FabricContractAdapter.serializer.serialize(model as Model, false)
@@ -631,46 +672,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
         `Failed to serialize record with id ${id}: ${e}`
       );
     }
-    //
-    // const collection = ctx.getOrUndefined("segregated") as string | undefined;
-    // if (collection) {
-    //   if (ctx.getOrUndefined("mirror")) {
-    //     const cacheKey = `segregatedRecord:${collection}:${id.toString()}`;
-    //     let existingRecord = ctx.cache.get(cacheKey) as
-    //       | Record<string, any>
-    //       | undefined;
-    //     ctx.cache.remove(cacheKey);
-    //     if (!existingRecord) {
-    //       const existing = await ctx.stub.getPrivateData(
-    //         collection,
-    //         id.toString()
-    //       );
-    //       if (existing) {
-    //         try {
-    //           existingRecord = FabricContractAdapter.serializer.deserialize(
-    //             existing.toString()
-    //           );
-    //         } catch {
-    //           existingRecord = undefined;
-    //         }
-    //       }
-    //     }
-    //     if (existingRecord) {
-    //       const merged = Object.assign({}, existingRecord, model);
-    //       data = Buffer.from(
-    //         FabricContractAdapter.serializer.serialize(merged as Model, false)
-    //       );
-    //     }
-    //   }
-    //   await ctx.stub.putPrivateData(collection, id.toString(), data);
-    // } else {
     await ctx.stub.putState(id.toString(), data);
-    //   await this.flushSegregatedWrites(ctx, id);
-    // }
 
-    // log.silly(
-    //   `state stored${collection ? ` in ${collection} collection` : ""} under id ${id}`
-    // );
     return model;
   }
 
@@ -678,7 +681,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     let result: any;
 
     const { log } = this.logCtx([ctx], this.readState);
-    const res: string = (await ctx.stub.getState(id.toString())).toString();
+    const res = (await ctx.stub.getState(id.toString())).toString();
     if (!res) throw new NotFoundError(`Record with id ${id} not found`);
     log.silly(`state retrieved under id ${id}`);
     try {
@@ -693,13 +696,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
   protected async queryResult(
     stub: ChaincodeStub,
     rawInput: any,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<Iterators.StateQueryIterator> {
-    const { ctx } = this.logCtx(args, this.queryResult);
-    const res: Iterators.StateQueryIterator = await stub.getQueryResult(
-      JSON.stringify(rawInput)
-    );
-    return res;
+    return stub.getQueryResult(JSON.stringify(rawInput));
   }
 
   protected async queryResultPaginated(
@@ -708,20 +708,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
     limit: number = 250,
     page?: number,
     bookmark?: string | number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ...args: any[]
   ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
-    const { ctx } = this.logCtx(
-      args.length ? args : [bookmark],
-      this.readState
+    return stub.getQueryResultWithPagination(
+      JSON.stringify(rawInput),
+      limit,
+      bookmark?.toString()
     );
-    const res: StateQueryResponse<Iterators.StateQueryIterator> =
-      await stub.getQueryResultWithPagination(
-        JSON.stringify(rawInput),
-        limit,
-        bookmark?.toString()
-      );
-
-    return res;
   }
 
   /**
@@ -941,10 +935,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const segregated: any[] = [];
     if (collections && collections.length) {
+      // Restore limit/skip for segregated queries (they were removed above)
+      const segregatedInput = { ...rawInput };
+      if (limit) segregatedInput.limit = limit;
+      if (skip) segregatedInput.skip = skip;
       for (const collection of collections) {
         segregated.push(
           await this.forPrivate(collection).raw(
-            rawInput,
+            segregatedInput,
             false,
             true,
             ...ctxArgs
@@ -1017,18 +1015,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(model.constructor as any);
     const pk = Model.pk(model.constructor as any);
     const id = model[pk as keyof M];
-    //
-    // const collection = ctx.getOrUndefined("segregated") as string | undefined;
-    // const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
-    //
-    // let entries: [string, any][];
-    //
-    // if (collection && isMirror) {
-    //   // MIRROR mode: keep ALL properties (full model copy)
-    //   entries = Object.keys(model)
-    //     .map((key) => [key, (model as any)[key]] as [string, any])
-    //     .filter(([, val]) => typeof val !== "undefined");
-    // }
+
+    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
 
     const mapToRecord = function (
       this: FabricContractAdapter,
@@ -1075,38 +1063,18 @@ export class FabricContractAdapter extends CouchDBAdapter<
       }
     }
 
+    // In mirror mode, the record should contain ALL model properties (full copy)
+    const record = isMirror ? mapToRecord(model) : mapToRecord(split.model);
+
     return {
-      record: mapToRecord(split.model),
+      record,
       id: (model as any)[pk] as string,
       transient:
-        split.transient && Object.keys(split.transient).length
+        !isMirror && split.transient && Object.keys(split.transient).length
           ? mapToRecord(split.transient)
           : undefined,
-      segregated: segregatedWrites,
+      segregated: isMirror ? undefined : segregatedWrites,
     };
-  }
-
-  /**
-   * @description Gets the property names that belong to a specific private/shared collection
-   * @summary Looks up per-property metadata set by @privateData/@sharedData decorators
-   * to determine which properties are decorated for the given collection name.
-   */
-  private getFieldsForCollection<M extends Model>(
-    model: M,
-    collection: string
-  ): string[] {
-    const constr = model.constructor as Constructor<M>;
-    const properties = Metadata.validatableProperties(constr);
-    if (!properties) return [];
-    return properties.filter((prop: string) => {
-      const privateKey = Metadata.key(FabricModelKeys.PRIVATE, prop);
-      const privateMeta = Metadata.get(constr, privateKey);
-      if (privateMeta?.collections?.includes(collection)) return true;
-      const sharedKey = Metadata.key(FabricModelKeys.SHARED, prop);
-      const sharedMeta = Metadata.get(constr, sharedKey);
-      if (sharedMeta?.collections?.includes(collection)) return true;
-      return false;
-    });
   }
 
   override revert<M extends Model>(
@@ -1119,6 +1087,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const { log, ctx } = this.logCtx(args, this.revert);
     const ob: Record<string, any> = {};
     const pk = Model.pk(clazz);
+    const pkProps = Model.pkProps(clazz);
+    if (pkProps?.type === Number && typeof id === "string") {
+      id = Number(id);
+    }
     ob[pk as string] = id;
     log.silly(`Rebuilding model ${clazz.name} id ${id}`);
 
@@ -1126,11 +1098,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
       const m = (
         typeof clazz === "string" ? Model.build(ob, clazz) : new clazz(ob)
       ) as M;
-      return Object.keys(r).reduce((accum: M, key) => {
-        (accum as Record<string, any>)[key] =
-          obj[Model.columnName(accum, key as any)];
-        return accum;
-      }, m);
+      return Object.keys(m)
+        .filter((k) => k !== (pk as string))
+        .reduce((accum: M, key) => {
+          (accum as Record<string, any>)[key] =
+            r[Model.columnName(accum, key as any)];
+          return accum;
+        }, m);
     }
 
     let result = mapToModel(obj);
@@ -1157,23 +1131,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     if (!operation) return true;
     const op = operation.toString().toLowerCase();
     return !TransactionOperationKeys.map((k) => k.toLowerCase()).includes(op);
-  }
-
-  private hasPublicState(
-    model: Record<string, any>,
-    clazz: Constructor<any>
-  ): boolean {
-    if (!model) return false;
-    const instance = Model.isModel(model)
-      ? (model as Model)
-      : (Model.build(model, clazz.name) as Model);
-    const split = Model.segregate(instance);
-    const pkProp = Model.pk(clazz) as string;
-    return Object.keys(split.model).some(
-      (key) =>
-        key !== pkProp &&
-        typeof (split.model as Record<string, any>)[key] !== "undefined"
-    );
   }
 
   private getContextMsp(context: FabricContractContext): string | undefined {

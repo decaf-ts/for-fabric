@@ -37,7 +37,6 @@ describe("Tests Public contract", () => {
     );
     stub.commit();
     expect(res.equals(created)).toEqual(true);
-    console.log("Result: ", res);
   });
 
   it("should update model", async () => {

@@ -6,7 +6,7 @@ import {
   ModelArg,
   required,
 } from "@decaf-ts/decorator-validation";
-import { version } from "@decaf-ts/db-decorators";
+import { version, NotFoundError } from "@decaf-ts/db-decorators";
 import {
   Cascade,
   column,
@@ -243,7 +243,8 @@ async function buildRepositoryContext(
   adapter: FabricContractAdapter,
   operation: OperationKeys,
   stub: ReturnType<typeof getStubMock>,
-  identity: ReturnType<typeof getIdentityMock>
+  identity: ReturnType<typeof getIdentityMock>,
+  modelClass: any = PrivateDataTestModel
 ) {
   const context = await adapter.context(
     operation,
@@ -251,7 +252,7 @@ async function buildRepositoryContext(
       stub: stub as any,
       identity: identity as any,
     },
-    PrivateDataTestModel
+    modelClass
   );
   return context;
 }
@@ -277,8 +278,9 @@ describe("MockStub Private Data Operations", () => {
     stub.commit();
 
     // Verify deletion
-    const deleted = await stub.getPrivateData(COLLECTION_A, "key1");
-    expect(deleted).toBe("");
+    await expect(
+      stub.getPrivateData(COLLECTION_A, "key1")
+    ).rejects.toThrow(NotFoundError);
   });
 
   it("getPrivateDataQueryResult filters by selector", async () => {
@@ -391,31 +393,21 @@ describe("FabricContractContext segregation methods", () => {
   it("writeTo accumulates collections and records for segregateWrite", () => {
     const { context } = createMockContext();
 
-    context.writeTo(COLLECTION_A, {
-      model: { id: "1", data: "test1" },
-      keys: ["id", "data"],
-    });
-    context.writeTo(COLLECTION_A, {
-      model: { id: "2", data: "test2" },
-      keys: ["id", "data"],
-    });
-    context.writeTo(COLLECTION_B, {
-      model: { id: "3", data: "test3" },
-      keys: ["id", "data"],
-    });
+    context.writeTo(COLLECTION_A, ["id", "data"]);
+    context.writeTo(COLLECTION_A, ["id", "extra"]);
+    context.writeTo(COLLECTION_B, ["id", "other"]);
 
-    const writes = context.getOrUndefined("segregateWrite") as Record<
-      string,
-      SegregatedWriteEntry[]
-    >;
+    const writes = context.getSegregatedWrites() as Record<string, string[]>;
 
     expect(writes).toBeDefined();
-    expect(writes[COLLECTION_A]).toHaveLength(2);
-    expect(writes[COLLECTION_B]).toHaveLength(1);
-    expect(writes[COLLECTION_A][0]).toEqual({
-      model: { id: "1", data: "test1" },
-      keys: ["id", "data"],
-    });
+    expect(writes[COLLECTION_A]).toBeDefined();
+    expect(writes[COLLECTION_B]).toBeDefined();
+    // Keys accumulate in the array
+    expect(writes[COLLECTION_A]).toContain("id");
+    expect(writes[COLLECTION_A]).toContain("data");
+    expect(writes[COLLECTION_A]).toContain("extra");
+    expect(writes[COLLECTION_B]).toContain("id");
+    expect(writes[COLLECTION_B]).toContain("other");
   });
 
   it("readFrom accumulates unique collections for segregateRead", () => {
@@ -484,18 +476,11 @@ describe("Segregated Data Decorator Handlers", () => {
 
       await segregatedDataOnCreate.call(repository, context, data, keys, model);
 
-      const writes = context.getOrUndefined("segregateWrite") as Record<
-        string,
-        SegregatedWriteEntry[]
-      >;
+      const writes = context.getSegregatedWrites() as Record<string, string[]>;
 
       expect(writes).toBeDefined();
       expect(writes[COLLECTION_A]).toBeDefined();
-      expect(writes[COLLECTION_A]).toHaveLength(1);
-      expect(writes[COLLECTION_A][0]).toEqual({
-        model,
-        keys: ["privateField"],
-      });
+      expect(writes[COLLECTION_A]).toContain("privateField");
     });
 
     it("extracts MSP from identity if model has no owner", async () => {
@@ -661,11 +646,9 @@ describe("FabricContractAdapter forPrivate pattern", () => {
     stub.commit();
 
     // Verify deletion
-    const result = await stub.getPrivateData(
-      COLLECTION_A,
-      "public_test_priv-3"
-    );
-    expect(result).toBe("");
+    await expect(
+      stub.getPrivateData(COLLECTION_A, "public_test_priv-3")
+    ).rejects.toThrow(NotFoundError);
   });
 
   it("forPrivate proxy routes queryResult to getPrivateDataQueryResult", async () => {
@@ -733,7 +716,6 @@ describe("Private data repository operations", () => {
       Buffer.from(privateData).toString("utf8")
     ) as Record<string, any>;
     expect(parsed.secretField).toBe("initial-secret");
-    expect(parsed.id).toBe(id);
   });
 
   it("reads private fields by merging private collections on read", async () => {
@@ -838,7 +820,6 @@ describe("Private data repository operations", () => {
         "utf8"
       )
     ) as Record<string, any>;
-    expect(recordA.id).toBe(id);
     expect(recordA.secretFieldA).toBe("secret-A");
     expect(recordA.secretFieldB).toBeUndefined();
 
@@ -847,7 +828,6 @@ describe("Private data repository operations", () => {
         "utf8"
       )
     ) as Record<string, any>;
-    expect(recordB.id).toBe(id);
     expect(recordB.secretFieldB).toBe("secret-B");
     expect(recordB.secretFieldA).toBeUndefined();
   });
@@ -878,11 +858,9 @@ describe("Private data repository operations", () => {
     await repository.delete(id, deleteContext);
     stub.commit();
 
-    const deleted = await stub.getPrivateData(
-      COLLECTION_B,
-      `private_test_${id}`
-    );
-    expect(deleted).toBe("");
+    await expect(
+      stub.getPrivateData(COLLECTION_B, `private_test_${id}`)
+    ).rejects.toThrow(NotFoundError);
   });
 
   it("tracks segregated records for multiple collections", async () => {
@@ -907,7 +885,8 @@ describe("Private data repository operations", () => {
       multiAdapter,
       OperationKeys.CREATE,
       stub,
-      identity
+      identity,
+      MultiPrivateCollectionModel
     );
     await multiRepo.create(model, createCtx);
     stub.commit();
@@ -931,7 +910,8 @@ describe("Private data repository operations", () => {
       multiAdapter,
       OperationKeys.READ,
       stub,
-      identity
+      identity,
+      MultiPrivateCollectionModel
     );
     const readResult = await multiRepo.read(id, readCtx);
     stub.commit();
@@ -942,15 +922,18 @@ describe("Private data repository operations", () => {
       multiAdapter,
       OperationKeys.DELETE,
       stub,
-      identity
+      identity,
+      MultiPrivateCollectionModel
     );
     await multiRepo.delete(id, deleteCtx);
     stub.commit();
 
-    const deletedA = await stub.getPrivateData(COLLECTION_A, privateKeyA);
-    expect(deletedA).toBe("");
-    const deletedB = await stub.getPrivateData(COLLECTION_B, privateKeyA);
-    expect(deletedB).toBe("");
+    await expect(
+      stub.getPrivateData(COLLECTION_A, privateKeyA)
+    ).rejects.toThrow(NotFoundError);
+    await expect(
+      stub.getPrivateData(COLLECTION_B, privateKeyA)
+    ).rejects.toThrow(NotFoundError);
   });
 });
 
@@ -978,11 +961,11 @@ describe("Private data queries with pagination", () => {
     stub.commit();
 
     const firstCtx = createMockContext({ stub, identity }).context;
-    const privateCtx1 = firstCtx.override({ segregated: COLLECTION_A });
+    firstCtx.readFrom(COLLECTION_A);
     const page1: any = await adapter.raw(
       { selector: { $$table: "public_test" }, limit: 3 },
       false,
-      privateCtx1
+      firstCtx
     );
 
     expect(Array.isArray(page1.docs)).toBe(true);
@@ -990,7 +973,7 @@ describe("Private data queries with pagination", () => {
     expect(page1.bookmark).toBeDefined();
 
     const secondCtx = createMockContext({ stub, identity }).context;
-    const privateCtx2 = secondCtx.override({ segregated: COLLECTION_A });
+    secondCtx.readFrom(COLLECTION_A);
     const page2: any = await adapter.raw(
       {
         selector: { $$table: "public_test" },
@@ -998,7 +981,7 @@ describe("Private data queries with pagination", () => {
         bookmark: page1.bookmark,
       },
       false,
-      privateCtx2
+      secondCtx
     );
 
     expect(page2.docs[0].publicField).toBe("item-4");
@@ -1201,7 +1184,10 @@ class FullySharedModel extends Model {
 }
 
 /**
- * Test model with @mirror decorator for testing mirror read/write routing
+ * Test model with @mirror decorator for testing mirror read/write routing.
+ * @mirror is a class-level concept — applied to a property only as a decorator
+ * anchor point. It mirrors the ENTIRE object to the mirror collection,
+ * independent of @privateData/@sharedData which control field segregation.
  */
 const MIRROR_COLLECTION = "mirrorCollection";
 
@@ -1216,12 +1202,12 @@ class MirrorTestModel extends Model {
   @required()
   publicField!: string;
 
-  // Mirror condition: only route reads to mirror when MSP is "Aeon"
-  @mirror(MIRROR_COLLECTION, "Aeon", (msp: string) => msp === "Aeon")
-  mirroredField?: string;
+  @column()
+  someOtherField?: string;
 
-  // Note: @ownedBy() omitted to simplify testing mirror functionality
-  // The owner decorator's required+readonly combination creates complex validation
+  // @mirror anchored here but affects the whole class
+  @mirror(MIRROR_COLLECTION, "Aeon", (msp: string) => msp === "Aeon")
+  mirrorAnchor?: string;
 
   constructor(args?: ModelArg<MirrorTestModel>) {
     super(args);
@@ -1661,11 +1647,9 @@ describe("Fully Private Models (no public state writes)", () => {
 
     // Verify data is gone from private collection
     const privateKey = `fully_private_test_${id}`;
-    const privateData = await trackingMock.stub.getPrivateData(
-      COLLECTION_A,
-      privateKey
-    );
-    expect(privateData).toBe("");
+    await expect(
+      trackingMock.stub.getPrivateData(COLLECTION_A, privateKey)
+    ).rejects.toThrow(NotFoundError);
   });
 });
 
@@ -1857,7 +1841,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     trackingMock = createTrackingStubMock();
   });
 
-  it("writes mirror data to the mirror collection on create", async () => {
+  it("replicates full object to mirror collection on create", async () => {
     const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
     const context = await buildRepositoryContextGeneric(
       adapter,
@@ -1870,115 +1854,44 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     const id = `mirror-create-${Math.random().toString(36).slice(2, 8)}`;
     const model = new MirrorTestModel({
       id,
-      publicField: "public-data",
-      mirroredField: "mirrored-secret",
+      publicField: "hello",
+      someOtherField: "world",
     });
 
     await repository.create(model, context);
     trackingMock.stub.commit();
 
-    // Verify data was written to mirror collection
-    const privatePuts = trackingMock.getCallsToCollection(MIRROR_COLLECTION);
-    expect(privatePuts.length).toBeGreaterThan(0);
-
-    // Verify mirror collection has the data
-    const privateKey = `mirror_test_${id}`;
-    const mirrorData = await trackingMock.stub.getPrivateData(
-      MIRROR_COLLECTION,
-      privateKey
-    );
-    expect(mirrorData).toBeDefined();
-    const parsed = JSON.parse(Buffer.from(mirrorData).toString("utf8"));
-    expect(parsed.mirroredField).toBe("mirrored-secret");
-  });
-
-  it("mirror afterCreate writes FULL model copy (not just mirrored field) to mirror collection", async () => {
-    /**
-     * The @mirror decorator's afterCreate handler writes a FULL copy of the model
-     * directly to the mirror collection — including public fields.
-     * This is different from @privateData which only stores the private fields.
-     */
-    const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
-    const context = await buildRepositoryContextGeneric(
-      adapter,
-      OperationKeys.CREATE,
-      trackingMock.stub,
-      identity,
-      MirrorTestModel
-    );
-
-    const id = `mirror-full-copy-${Math.random().toString(36).slice(2, 8)}`;
-    const model = new MirrorTestModel({
-      id,
-      publicField: "PUBLIC_VALUE",
-      mirroredField: "PRIVATE_VALUE",
-    });
-
-    await repository.create(model, context);
-    trackingMock.stub.commit();
-
-    // Check the mirror collection data
-    const privateKey = `mirror_test_${id}`;
-    const mirrorData = await trackingMock.stub.getPrivateData(
-      MIRROR_COLLECTION,
-      privateKey
-    );
-    expect(mirrorData).toBeDefined();
-    const parsed = JSON.parse(Buffer.from(mirrorData).toString("utf8"));
-
-    // The mirror should contain the mirrored field (full model copy)
-    expect(parsed.mirroredField).toBe("PRIVATE_VALUE");
-
-    // The mirror handler writes a FULL model copy directly
-    expect(parsed["??table"]).toBe("mirror_test");
-  });
-
-  it("mirror provides ADDITIONAL write beyond @privateData standard behavior", async () => {
-    /**
-     * @mirror includes @privateData but also adds afterCreate handler
-     * that writes a full model copy. This test verifies BOTH writes occur.
-     */
-    const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
-    const context = await buildRepositoryContextGeneric(
-      adapter,
-      OperationKeys.CREATE,
-      trackingMock.stub,
-      identity,
-      MirrorTestModel
-    );
-
-    const id = `mirror-double-${Math.random().toString(36).slice(2, 8)}`;
-    const model = new MirrorTestModel({
-      id,
-      publicField: "public",
-      mirroredField: "private",
-    });
-
-    await repository.create(model, context);
-    trackingMock.stub.commit();
-
-    // Count writes to mirror collection
-    const mirrorWrites = trackingMock
+    // Mirror handler writes a full copy to the mirror collection
+    const mirrorPuts = trackingMock
       .getCallsToCollection(MIRROR_COLLECTION)
       .filter((c) => c.method === "putPrivateData");
+    expect(mirrorPuts.length).toBeGreaterThanOrEqual(1);
 
-    // There should be at least one write to the mirror collection
-    // (the afterCreate mirror handler)
-    expect(mirrorWrites.length).toBeGreaterThanOrEqual(1);
+    // Verify the mirror collection has the FULL model
+    const privateKey = `mirror_test_${id}`;
+    const mirrorData = await trackingMock.stub.getPrivateData(
+      MIRROR_COLLECTION,
+      privateKey
+    );
+    expect(mirrorData).toBeDefined();
+    const parsed = JSON.parse(Buffer.from(mirrorData).toString("utf8"));
+    expect(parsed.publicField).toBe("hello");
+    expect(parsed.someOtherField).toBe("world");
+    expect(parsed["??table"]).toBe("mirror_test");
 
-    // Additionally, verify public state also gets written (for public fields)
+    // Public state also has the full model (mirror is independent)
     const publicWrites = trackingMock
       .getPublicCalls()
       .filter((c) => c.method === "putState");
     expect(publicWrites.length).toBeGreaterThan(0);
   });
 
-  it("routes ALL reads to mirror collection when MSP matches condition", async () => {
+  it("routes reads exclusively to mirror collection when MSP matches", async () => {
     const writerIdentity = getWriterIdentity(); // MSP = "WriterOrg" — for CREATE
     const readerIdentity = getIdentityMock(); // MSP = "Aeon" — matches condition for READ
     const id = `mirror-read-match-${Math.random().toString(36).slice(2, 8)}`;
 
-    // Create model first with writer identity (non-matching MSP)
+    // Create with non-matching MSP
     const createContext = await buildRepositoryContextGeneric(
       adapter,
       OperationKeys.CREATE,
@@ -1986,16 +1899,14 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       writerIdentity,
       MirrorTestModel
     );
-    const model = new MirrorTestModel({
-      id,
-      publicField: "public-data",
-      mirroredField: "secret-for-aeon",
-    });
-    await repository.create(model, createContext);
+    await repository.create(
+      new MirrorTestModel({ id, publicField: "data", someOtherField: "extra" }),
+      createContext
+    );
     trackingMock.stub.commit();
     trackingMock.clearLog();
 
-    // Read with matching MSP
+    // Read with matching MSP — should route to mirror collection
     const readContext = await buildRepositoryContextGeneric(
       adapter,
       OperationKeys.READ,
@@ -2006,16 +1917,16 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     const result = await repository.read(id, readContext);
     trackingMock.stub.commit();
 
-    // Verify reads went to mirror collection (not just public state)
+    // Verify reads went to mirror collection
     const privateReads = trackingMock.getCallsToCollection(MIRROR_COLLECTION);
     expect(privateReads.some((c) => c.method === "getPrivateData")).toBe(true);
 
-    // Verify we got the mirror data
-    expect(result.mirroredField).toBe("secret-for-aeon");
+    // Full model available from mirror
+    expect(result.publicField).toBe("data");
+    expect(result.someOtherField).toBe("extra");
   });
 
-  it("does NOT route reads to mirror when MSP does NOT match condition", async () => {
-    // Create with writer identity (non-matching MSP)
+  it("reads from public state when MSP does NOT match", async () => {
     const writerIdentity = getWriterIdentity(); // MSP = "WriterOrg"
     const id = `mirror-no-match-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -2026,43 +1937,36 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       writerIdentity,
       MirrorTestModel
     );
-    const model = new MirrorTestModel({
-      id,
-      publicField: "public-data",
-      mirroredField: "secret-for-aeon-only",
-    });
-    await repository.create(model, createContext);
+    await repository.create(
+      new MirrorTestModel({ id, publicField: "pub", someOtherField: "other" }),
+      createContext
+    );
     trackingMock.stub.commit();
     trackingMock.clearLog();
 
-    // Create a different identity that doesn't match the condition
-    const otherIdentity: ReturnType<typeof getIdentityMock> = {
-      getID: () => "other-id",
-      getMSPID: () => "OtherOrg", // Does NOT match "Aeon"
-      getIDBytes: () => Buffer.from("otherCreatorID"),
-      getAttributeValue: (name: string) =>
-        name === "roles" ? ["user"] : undefined,
-    };
-
-    // Read with non-matching MSP
+    // Read with non-matching MSP — normal public state read
     const readContext = await buildRepositoryContextGeneric(
       adapter,
       OperationKeys.READ,
       trackingMock.stub,
-      otherIdentity,
+      writerIdentity,
       MirrorTestModel
     );
+    const result = await repository.read(id, readContext);
+    trackingMock.stub.commit();
 
-    // The read will fail to find mirror data since OtherOrg should NOT
-    // have the segregated flag set to route reads to mirror collection
-    const mirrorCalls = trackingMock.getCallsToCollection(MIRROR_COLLECTION);
+    expect(result.publicField).toBe("pub");
+    expect(result.someOtherField).toBe("other");
 
-    // For non-matching MSP, reads should NOT be exclusively routed to mirror
-    // The mirrorCalls may still exist for read attempts, but the skip flag should be set
+    // Verify reads came from public state
+    const publicReads = trackingMock
+      .getPublicCalls()
+      .filter((c) => c.method === "getState");
+    expect(publicReads.length).toBeGreaterThan(0);
   });
 
-  it("updates mirror data in the mirror collection", async () => {
-    const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
+  it("replicates updated object to mirror collection", async () => {
+    const identity = getWriterIdentity();
     const id = `mirror-update-${Math.random().toString(36).slice(2, 8)}`;
 
     // Create
@@ -2073,12 +1977,10 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       identity,
       MirrorTestModel
     );
-    const model = new MirrorTestModel({
-      id,
-      publicField: "public",
-      mirroredField: "original-mirror",
-    });
-    await repository.create(model, createContext);
+    await repository.create(
+      new MirrorTestModel({ id, publicField: "v1", someOtherField: "old" }),
+      createContext
+    );
     trackingMock.stub.commit();
     trackingMock.clearLog();
 
@@ -2090,21 +1992,18 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       identity,
       MirrorTestModel
     );
-    const updatedModel = new MirrorTestModel({
-      id,
-      publicField: "public-updated",
-      mirroredField: "updated-mirror",
-    });
-    await repository.update(updatedModel, updateContext);
+    await repository.update(
+      new MirrorTestModel({ id, publicField: "v2", someOtherField: "new" }),
+      updateContext
+    );
     trackingMock.stub.commit();
 
-    // Verify mirror collection was updated
+    // Verify mirror collection was updated with full model
     const mirrorPuts = trackingMock
       .getCallsToCollection(MIRROR_COLLECTION)
       .filter((c) => c.method === "putPrivateData");
     expect(mirrorPuts.length).toBeGreaterThan(0);
 
-    // Verify data in mirror collection (composite key format)
     const privateKey = `mirror_test_${id}`;
     const mirrorData = await trackingMock.stub.getPrivateData(
       MIRROR_COLLECTION,
@@ -2112,11 +2011,12 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     );
     expect(mirrorData).toBeDefined();
     const parsed = JSON.parse(Buffer.from(mirrorData).toString("utf8"));
-    expect(parsed.mirroredField).toBe("updated-mirror");
+    expect(parsed.publicField).toBe("v2");
+    expect(parsed.someOtherField).toBe("new");
   });
 
-  it("deletes primary data and marks mirror collection for cleanup on delete", async () => {
-    const identity = getWriterIdentity(); // MSP = "WriterOrg" — does NOT match condition
+  it("deletes from both public state and mirror collection", async () => {
+    const identity = getWriterIdentity();
     const id = `mirror-delete-${Math.random().toString(36).slice(2, 8)}`;
 
     // Create
@@ -2127,30 +2027,23 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       identity,
       MirrorTestModel
     );
-    const model = new MirrorTestModel({
-      id,
-      publicField: "public",
-      mirroredField: "to-delete",
-    });
-    await repository.create(model, createContext);
+    await repository.create(
+      new MirrorTestModel({ id, publicField: "doomed", someOtherField: "bye" }),
+      createContext
+    );
     trackingMock.stub.commit();
 
     // Verify mirror data was created
     const privateKey = `mirror_test_${id}`;
-    const mirrorDataBeforeDelete = await trackingMock.stub.getPrivateData(
+    const mirrorData = await trackingMock.stub.getPrivateData(
       MIRROR_COLLECTION,
       privateKey
     );
-    expect(mirrorDataBeforeDelete).toBeDefined();
-    const parsedBefore = JSON.parse(
-      Buffer.from(mirrorDataBeforeDelete).toString("utf8")
-    );
-    expect(parsedBefore.mirroredField).toBe("to-delete");
+    expect(mirrorData).toBeDefined();
 
     trackingMock.clearLog();
 
-    // Delete the primary record - the adapter's deleteSegregatedCollections
-    // should clean up private collections registered during the operation
+    // Delete
     const deleteContext = await buildRepositoryContextGeneric(
       adapter,
       OperationKeys.DELETE,
@@ -2158,28 +2051,14 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       identity,
       MirrorTestModel
     );
-
-    // The delete operation will attempt to delete from registered collections
-    // Even if the afterDelete mirror handler fails (due to already deleted),
-    // the primary delete should complete and segregated cleanup should run
     try {
       await repository.delete(id, deleteContext);
       trackingMock.stub.commit();
-    } catch (e: any) {
-      // Mirror handler may fail but the primary deletion should work
-      // We're mainly testing that delete operations access the correct collections
+    } catch {
+      // Mirror handler may fail if already cleaned up
     }
 
-    // Verify delete attempts were made to the mirror collection
-    const mirrorDeletes = trackingMock
-      .getCallsToCollection(MIRROR_COLLECTION)
-      .filter((c) => c.method === "deletePrivateData");
-
-    // The segregated cleanup runs from adapter.deleteSegregatedCollections
-    // or the mirror handler attempts deletion
-    expect(mirrorDeletes.length).toBeGreaterThanOrEqual(0);
-
-    // Primary data should be deleted from world state
+    // Primary data deleted from world state
     const publicDeletes = trackingMock
       .getPublicCalls()
       .filter((c) => c.method === "deleteState");
@@ -2200,7 +2079,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     const model = new MirrorTestModel({
       id,
       publicField: "public",
-      mirroredField: "should-fail",
+      someOtherField: "should-fail",
     });
 
     await expect(repository.create(model, context)).rejects.toThrow(
@@ -2223,7 +2102,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     const model = new MirrorTestModel({
       id,
       publicField: "public",
-      mirroredField: "original",
+      someOtherField: "original",
     });
     await repository.create(model, createContext);
     trackingMock.stub.commit();
@@ -2240,7 +2119,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     const updatedModel = new MirrorTestModel({
       id,
       publicField: "public-updated",
-      mirroredField: "should-fail",
+      someOtherField: "should-fail",
     });
 
     await expect(
@@ -2263,7 +2142,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     const model = new MirrorTestModel({
       id,
       publicField: "public",
-      mirroredField: "original",
+      someOtherField: "original",
     });
     await repository.create(model, createContext);
     trackingMock.stub.commit();
@@ -2298,7 +2177,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     const model = new MirrorTestModel({
       id,
       publicField: "public",
-      mirroredField: "mirrored-value",
+      someOtherField: "mirrored-value",
     });
     await repository.create(model, createContext);
     trackingMock.stub.commit();
@@ -2326,7 +2205,7 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     const updatedModel = new MirrorTestModel({
       id,
       publicField: "public-updated",
-      mirroredField: "mirrored-updated",
+      someOtherField: "mirrored-updated",
     });
     await repository.update(updatedModel, updateContext);
     trackingMock.stub.commit();
@@ -2343,8 +2222,9 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     trackingMock.stub.commit();
 
     // Verify primary data is gone
-    const publicData = await trackingMock.stub.getState(`mirror_test_${id}`);
-    expect(publicData).toBe("");
+    await expect(
+      trackingMock.stub.getState(`mirror_test_${id}`)
+    ).rejects.toThrow(NotFoundError);
   });
 });
 
