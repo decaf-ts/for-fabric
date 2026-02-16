@@ -264,9 +264,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.info(`in ADAPTER create with args ${args}`);
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const mirrorCollection = ctx.getOrUndefined(
-      "mirrorCollection"
-    ) as string | undefined;
+    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
+      | string
+      | undefined;
     const fullySegregated = ctx.isFullySegregated && !mirrorCollection;
 
     if (!mirrorCollection) {
@@ -409,9 +409,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.info(`in ADAPTER update with args ${args}`);
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const mirrorCollection = ctx.getOrUndefined(
-      "mirrorCollection"
-    ) as string | undefined;
+    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
+      | string
+      | undefined;
 
     try {
       log.info(`updating entry in ${tableName} table with pk ${id}`);
@@ -478,9 +478,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(clazz);
 
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const mirrorCollection = ctx.getOrUndefined(
-      "mirrorCollection"
-    ) as string | undefined;
+    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
+      | string
+      | undefined;
     let model: Record<string, any>;
 
     if (mirrorCollection) {
@@ -747,9 +747,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
       segregated: false,
       rebuildWithTransient: false,
       fullySegregated: false,
-      // segregateWrite: false,
-      // segregateRead: false,
-      // segregatedData: false,
     };
 
     baseFlags = Object.assign(baseFlags, flags);

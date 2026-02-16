@@ -212,16 +212,11 @@ export function assignProductOwner() {
 }
 
 function publicContext(ctx: FabricContractContext) {
-  const cleanCtx = new FabricContractContext();
-  cleanCtx.accumulate({
-    stub: ctx.stub,
-    identity: ctx.identity,
-    logger: ctx.get("logger"),
+  return new FabricContractContext(ctx).accumulate({
     fullySegregated: false,
+    segregated: undefined,
+    segregatedData: undefined,
+    segregateRead: undefined,
+    segregateWrite: undefined,
   });
-  cleanCtx.put("segregated", undefined);
-  cleanCtx.put("segregatedData", undefined);
-  cleanCtx.put("segregateRead", undefined);
-  cleanCtx.put("segregateWrite", undefined);
-  return cleanCtx;
 }
