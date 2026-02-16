@@ -82,17 +82,25 @@ describe("Tests Product Contract", () => {
 
   async function assertPublicRelations(product: Product) {
     for (const market of product.markets || []) {
-      const marketId = typeof market === "object" ? (market as Market).id : market;
+      const marketId =
+        typeof market === "object" ? (market as Market).id : market;
       const mk = stub.createCompositeKey("market", [marketId as any]);
       await expect(stub.getPrivateData(PRIVATE_COLLECTION, mk)).rejects.toThrow(
         NotFoundError
       );
       const marketState = await stub.getState(mk);
-      expect(new Market(JSON.parse(marketState.toString())).hasErrors()).toBeUndefined();
+      expect(
+        new Market(JSON.parse(marketState.toString())).hasErrors()
+      ).toBeUndefined();
     }
     for (const strength of product.strengths || []) {
-      const strengthId = typeof strength === "object" ? (strength as ProductStrength).id : strength;
-      const sk = stub.createCompositeKey("product_strength", [strengthId as any]);
+      const strengthId =
+        typeof strength === "object"
+          ? (strength as ProductStrength).id
+          : strength;
+      const sk = stub.createCompositeKey("product_strength", [
+        strengthId as any,
+      ]);
       await expect(stub.getPrivateData(PRIVATE_COLLECTION, sk)).rejects.toThrow(
         NotFoundError
       );

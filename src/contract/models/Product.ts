@@ -77,7 +77,7 @@ export class Product extends BaseIdentifiedModel {
 
   @oneToMany(
     () => Market,
-    { update: Cascade.NONE, delete: Cascade.NONE },
+    { update: Cascade.CASCADE, delete: Cascade.CASCADE },
     false
   )
   markets!: Market[];
