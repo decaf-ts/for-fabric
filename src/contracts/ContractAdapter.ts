@@ -746,14 +746,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
     model: Constructor<M> | undefined,
     flags: Partial<FabricContractFlags> | FabricContractContext | Ctx | any
   ): Promise<FabricContractFlags> {
-    let baseFlags = Object.assign(
-      {
-        segregated: false,
-        rebuildWithTransient: false,
-        fullySegregated: false,
-      },
-      flags
-    );
+    let baseFlags = {
+      segregated: false,
+      rebuildWithTransient: false,
+      fullySegregated: false,
+      // segregateWrite: false,
+      // segregateRead: false,
+      // segregatedData: false,
+    };
+
+    baseFlags = Object.assign(baseFlags, flags);
     const stubFromFlags =
       (flags as FabricContractContext).stub || (flags as Ctx).stub;
     const identityFromFlags =
