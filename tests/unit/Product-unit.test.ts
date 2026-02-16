@@ -293,21 +293,16 @@ describe("Tests Product Contract", () => {
 
       const payload = JSON.stringify(preparePayloadBulk(toUpdate));
 
-      bulk = JSON.parse(await contract.updateAll(ctx as any, payload)).map(
-        (r: any) => Model.deserialize(r)
+      const rawUpdated = JSON.parse(
+        await contract.updateAll(ctx as any, payload)
       );
+      bulk = rawUpdated.map((r: any) => Model.deserialize(r));
       stub.commit();
 
-      const newBulk: Product[] = [];
-      for (const product of toUpdate) {
-        const productCode = product.productCode;
-        // const newObj = await loadPublicProduct(productCode);
+      for (const product of bulk) {
         expect(product.hasErrors()).toBeUndefined();
         await assertPublicRelations(product);
-        newBulk.push(product);
       }
-
-      bulk = newBulk;
     });
 
     it("lists via statement", async () => {
@@ -349,6 +344,7 @@ describe("Tests Product Contract", () => {
     it("Deletes in Bulk", async () => {
       const pk = Model.pk(Product);
       const ids = bulk.map((c) => c[pk]) as number[];
+      console.log("deleteAll ids", ids);
 
       const deleted: Product[] = JSON.parse(
         await contract.deleteAll(ctx as any, JSON.stringify(ids))

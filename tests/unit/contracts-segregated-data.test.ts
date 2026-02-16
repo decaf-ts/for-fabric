@@ -17,10 +17,7 @@ import {
 } from "@decaf-ts/core";
 import { uses } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
-import {
-  FabricContractContext,
-  SegregatedWriteEntry,
-} from "../../src/contracts/ContractContext";
+import { FabricContractContext } from "../../src/contracts/ContractContext";
 import { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
 import { getStubMock, getIdentityMock } from "./ContextMock";
 import { OperationKeys } from "@decaf-ts/db-decorators";
@@ -75,7 +72,7 @@ class SharedDataTestModel extends Model {
   @sharedData(COLLECTION_A)
   privateField?: string;
 
-@ownedBy()
+  @ownedBy()
   owner?: string;
 
   constructor(args?: ModelArg<SharedDataTestModel>) {
@@ -278,9 +275,9 @@ describe("MockStub Private Data Operations", () => {
     stub.commit();
 
     // Verify deletion
-    await expect(
-      stub.getPrivateData(COLLECTION_A, "key1")
-    ).rejects.toThrow(NotFoundError);
+    await expect(stub.getPrivateData(COLLECTION_A, "key1")).rejects.toThrow(
+      NotFoundError
+    );
   });
 
   it("getPrivateDataQueryResult filters by selector", async () => {
@@ -596,7 +593,7 @@ describe("FabricContractAdapter forPrivate pattern", () => {
     await privateAdapter.create(
       PublicTestModel,
       "priv-1",
-      { $$table: "public_test", publicField: "private-data" },
+      { $$table: "public_test", id: "priv-1", publicField: "private-data" },
       context
     );
     stub.commit();
@@ -615,7 +612,11 @@ describe("FabricContractAdapter forPrivate pattern", () => {
 
     // First write data to private collection
     const testData = Buffer.from(
-      JSON.stringify({ $$table: "public_test", publicField: "secret" })
+      JSON.stringify({
+        $$table: "public_test",
+        id: "public_test_priv-2",
+        publicField: "secret",
+      })
     );
     await stub.putPrivateData(COLLECTION_A, "public_test_priv-2", testData);
     stub.commit();
@@ -636,7 +637,11 @@ describe("FabricContractAdapter forPrivate pattern", () => {
 
     // First create private data
     const testData = Buffer.from(
-      JSON.stringify({ $$table: "public_test", publicField: "to-delete" })
+      JSON.stringify({
+        $$table: "public_test",
+        id: "public_test_priv-3",
+        publicField: "to-delete",
+      })
     );
     await stub.putPrivateData(COLLECTION_A, "public_test_priv-3", testData);
     stub.commit();
@@ -1761,10 +1766,7 @@ describe("Shared versioned model updates", () => {
       undefined as any,
       `versioned-test-${Math.random()}`
     );
-    repository = new FabricContractRepository(
-      adapter,
-      SharedVersionedModel
-    );
+    repository = new FabricContractRepository(adapter, SharedVersionedModel);
     trackingMock = createTrackingStubMock();
   });
 

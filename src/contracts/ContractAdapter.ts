@@ -268,6 +268,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const segregated = isMirror
       ? (ctx.getOrUndefined("segregated") as string | undefined)
       : undefined;
+    const fullySegregated = ctx.isFullySegregated && !segregated;
 
     if (!isMirror) {
       let existing: any;
@@ -296,18 +297,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
         );
       } else {
         const defaults = this.getModelDefaults(clazz);
-        // handle public data
-        if (
-          Object.keys(model).filter((k) => {
-            if (k === CouchDBKeys.TABLE) return false;
-            return !(
-              defaults &&
-              k in defaults &&
-              defaults[k as keyof M] === model[k]
-            );
-          }).length
-        )
-          model = await this.putState(composedKey, model, ctx);
+        // handle public data if not fully segregated
+        if (!fullySegregated) {
+          if (
+            Object.keys(model).filter((k) => {
+              if (k === CouchDBKeys.TABLE) return false;
+              return !(
+                defaults &&
+                k in defaults &&
+                defaults[k as keyof M] === model[k]
+              );
+            }).length
+          )
+            model = await this.putState(composedKey, model, ctx);
+        }
 
         // handle segregated writes
         const data = ctx.getFromChildren("segregatedData");
@@ -1098,7 +1101,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
       const m = (
         typeof clazz === "string" ? Model.build(ob, clazz) : new clazz(ob)
       ) as M;
-      return Object.keys(m)
+      const attributes = Model.getAttributes(clazz);
+      const keys = attributes.length ? attributes : Object.keys(m);
+      return keys
         .filter((k) => k !== (pk as string))
         .reduce((accum: M, key) => {
           (accum as Record<string, any>)[key] =

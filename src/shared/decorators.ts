@@ -532,7 +532,7 @@ export function applySegregationFlags<M extends Model>(
   // rather than reading DBKeys.TRANSIENT metadata which may not accumulate correctly
   // when class-level @privateData applies decorators iteratively.
   if (!ctx.isFullySegregated && collections.length) {
-    const segregated = Model.segregate(clazz);
+    const segregated = Model.segregate(clazz as any);
     const publicData = segregated.public || {};
     if (!Object.keys(publicData).length) ctx.markFullySegregated();
   }

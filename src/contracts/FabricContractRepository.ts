@@ -223,8 +223,8 @@ export class FabricContractRepository<M extends Model> extends Repository<
       this.adapter.revert(
         u,
         this.class,
-        records[i].id,
-        records[i].transient,
+        ids[i],
+        prepared[i].transient,
         ctx
       )
     );
