@@ -167,7 +167,7 @@ export async function createAssignGtinOwnerHandler<
   V,
 >(
   this: R,
-  context: any,
+  context: FabricContractContext,
   data: V,
   key: keyof M,
   model: { productCode: string }
@@ -178,8 +178,7 @@ export async function createAssignGtinOwnerHandler<
   const toCreate = new GtinOwner({
     productCode: model.productCode,
   });
-
-  const owner = await repo.create(toCreate, context);
+  const owner = await repo.override(this._overrides).create(toCreate, context);
   context.logger.info(
     `GTIN owner assigned for product ${model.productCode}: ${owner.ownedBy}`
   );
@@ -191,7 +190,7 @@ export async function deleteAssignGtinOwnerHandler<
   V,
 >(
   this: R,
-  context: any,
+  context: FabricContractContext,
   data: V,
   key: keyof M,
   model: { productCode: string }
@@ -199,7 +198,9 @@ export async function deleteAssignGtinOwnerHandler<
   if (!model.productCode)
     throw new UnsupportedError(`Gtin owner can only be assigned to products`);
   const repo = Repository.forModel(GtinOwner);
-  const owner = await repo.delete(model.productCode, context);
+  const owner = await repo
+    .override(this._overrides)
+    .delete(model.productCode, context);
   context.logger.info(
     `GTIN owner assigned for product ${model.productCode}: ${owner.ownedBy}`
   );

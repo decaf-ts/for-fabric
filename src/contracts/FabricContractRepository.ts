@@ -12,6 +12,8 @@ import {
   SerializedPage,
   Paginator,
   DirectionLimitOffset,
+  MethodOrOperation,
+  ContextualizedArgs,
 } from "@decaf-ts/core";
 import { FabricContractContext } from "./ContractContext";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -25,6 +27,7 @@ import {
 } from "@decaf-ts/db-decorators";
 import { Constructor } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "./ContractAdapter";
+import { FabricContractFlags } from "./types";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -220,13 +223,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
       ...ctxArgs
     );
     return updated.map((u, i) =>
-      this.adapter.revert(
-        u,
-        this.class,
-        ids[i],
-        prepared[i].transient,
-        ctx
-      )
+      this.adapter.revert(u, this.class, ids[i], prepared[i].transient, ctx)
     );
   }
 
@@ -355,5 +352,151 @@ export class FabricContractRepository<M extends Model> extends Repository<
   ): Promise<void> {
     if (!this.trackedEvents || this.trackedEvents.indexOf(event) !== -1)
       return await super.updateObservers(table, event, id, ...args);
+  }
+
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD
+  ): ContextualizedArgs<
+    FabricContractContext,
+    ARGS,
+    METHOD extends string ? true : false
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: false
+  ): ContextualizedArgs<
+    FabricContractContext,
+    ARGS,
+    METHOD extends string ? true : false
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: true
+  ): Promise<
+    ContextualizedArgs<
+      FabricContractContext,
+      ARGS,
+      METHOD extends string ? true : false
+    >
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: true,
+    overrides?: Partial<FabricContractFlags>
+  ): Promise<
+    ContextualizedArgs<
+      FabricContractContext,
+      ARGS,
+      METHOD extends string ? true : false
+    >
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate: false,
+    overrides?: Partial<FabricContractFlags>
+  ): ContextualizedArgs<
+    FabricContractContext,
+    ARGS,
+    METHOD extends string ? true : false
+  >;
+  protected override logCtx<
+    ARGS extends any[] = any[],
+    METHOD extends MethodOrOperation = MethodOrOperation,
+  >(
+    args: MaybeContextualArg<FabricContractContext, ARGS>,
+    operation: METHOD,
+    allowCreate?: boolean,
+    overrides?: Partial<FabricContractFlags>
+  ):
+    | ContextualizedArgs<
+        FabricContractContext,
+        ARGS,
+        METHOD extends string ? true : false
+      >
+    | Promise<
+        ContextualizedArgs<
+          FabricContractContext,
+          ARGS,
+          METHOD extends string ? true : false
+        >
+      > {
+    const result = super.logCtx(args, operation, allowCreate as any, overrides);
+    return this.cleanContextualizedArgs(result);
+  }
+
+  private cleanContextualizedArgs<
+    ARGS extends any[],
+    METHOD extends MethodOrOperation,
+  >(
+    args:
+      | ContextualizedArgs<
+          FabricContractContext,
+          ARGS,
+          METHOD extends string ? true : false
+        >
+      | Promise<
+          ContextualizedArgs<
+            FabricContractContext,
+            ARGS,
+            METHOD extends string ? true : false
+          >
+        >
+  ):
+    | ContextualizedArgs<
+        FabricContractContext,
+        ARGS,
+        METHOD extends string ? true : false
+      >
+    | Promise<
+        ContextualizedArgs<
+          FabricContractContext,
+          ARGS,
+          METHOD extends string ? true : false
+        >
+      > {
+    if (args instanceof Promise) {
+      return args.then((ctxArgs) => this.applyCleanContext(ctxArgs));
+    }
+    return this.applyCleanContext(args);
+  }
+
+  private applyCleanContext<
+    ARGS extends any[],
+    METHOD extends MethodOrOperation,
+  >(
+    ctxArgs: ContextualizedArgs<
+      FabricContractContext,
+      ARGS,
+      METHOD extends string ? true : false
+    >
+  ) {
+    this.cleanContext(ctxArgs.ctx);
+    return ctxArgs;
+  }
+
+  private cleanContext(ctx: FabricContractContext): FabricContractContext {
+    ctx.put("segregated", undefined);
+    ctx.put("allowGatewayOverride", undefined);
+    return ctx;
   }
 }
