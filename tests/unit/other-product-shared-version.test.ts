@@ -60,6 +60,43 @@ describe("OtherProductShared contract version flow with relations", () => {
     return segregated.model;
   }
 
+  async function loadSharedProduct(productCode: string) {
+    const k = stub.createCompositeKey("other_product_shared", [productCode]);
+    await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
+    const sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
+    return new OtherProductShared(JSON.parse(sharedState));
+  }
+
+  async function expectMarketInSharedCollection(marketKey: string) {
+    const mk = stub.createCompositeKey("market", [marketKey]);
+    await expect(stub.getState(mk)).rejects.toThrow(NotFoundError);
+    const state = await stub.getPrivateData("decaf-namespaceAeon", mk);
+    expect(new OtherMarket(JSON.parse(state)).hasErrors()).toBeUndefined();
+  }
+
+  async function expectStrengthInSharedCollection(strengthKey: string) {
+    const sk = stub.createCompositeKey("product_strength", [strengthKey]);
+    await expect(stub.getState(sk)).rejects.toThrow(NotFoundError);
+    const state = await stub.getPrivateData("decaf-namespaceAeon", sk);
+    expect(new OtherProductStrength(JSON.parse(state)).hasErrors()).toBeUndefined();
+  }
+
+  async function assertSharedRelations(product: OtherProductShared) {
+    const marketIds = (product.markets || []).map((m) =>
+      typeof m === "object" ? (m as OtherMarket).id : m
+    );
+    for (const marketId of marketIds) {
+      await expectMarketInSharedCollection(marketId as string);
+    }
+
+    const strengthIds = (product.strengths || []).map((s) =>
+      typeof s === "object" ? (s as OtherProductStrength).id : s
+    );
+    for (const strengthId of strengthIds) {
+      await expectStrengthInSharedCollection(strengthId as string);
+    }
+  }
+
   function preparePayloadBulk(model: OtherProductShared[]) {
     const segregated = model.map((m) => Model.segregate(m));
     const transient = segregated.map((s) => s.transient || {});
@@ -99,27 +136,9 @@ describe("OtherProductShared contract version flow with relations", () => {
 
     expect(created.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
 
-    let k = stub.createCompositeKey("other_product_shared", [productCode]);
-    await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-    let sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
-    const product = new OtherProductShared(JSON.parse(sharedState));
+    const product = await loadSharedProduct(productCode);
     expect(product.hasErrors()).toBeUndefined();
-
-    k = stub.createCompositeKey("market", [product.markets[0] as any]);
-    await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-    sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
-    expect(
-      new OtherMarket(JSON.parse(sharedState)).hasErrors()
-    ).toBeUndefined();
-
-    k = stub.createCompositeKey("product_strength", [
-      product.strengths[0] as any,
-    ]);
-    await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-    sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
-    expect(
-      new OtherProductStrength(JSON.parse(sharedState)).hasErrors()
-    ).toBeUndefined();
+    await assertSharedRelations(product);
   });
 
   it("reads the shared data", async () => {
@@ -154,11 +173,9 @@ describe("OtherProductShared contract version flow with relations", () => {
 
     expect(updated.hasErrors()).toBeDefined();
 
-    const k = stub.createCompositeKey("other_product_shared", [productCode]);
-    await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-    const sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
-    updated = new OtherProductShared(JSON.parse(sharedState));
+    updated = await loadSharedProduct(productCode);
     expect(updated.hasErrors()).toBeUndefined();
+    await assertSharedRelations(updated);
 
     expect(updated.version).toBe(2);
     expect(updated.strengths).toHaveLength(2);
@@ -237,13 +254,9 @@ describe("OtherProductShared contract version flow with relations", () => {
       for (const b of bulk) {
         expect(b.hasErrors()).toBeDefined();
         const productCode = models[count++].productCode;
-        const k = stub.createCompositeKey("other_product_shared", [
-          productCode,
-        ]);
-        await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-        const sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
-        const newObj = new OtherProductShared(JSON.parse(sharedState));
+        const newObj = await loadSharedProduct(productCode);
         expect(newObj.hasErrors()).toBeUndefined();
+        await assertSharedRelations(newObj);
         newBulk.push(newObj);
       }
 
@@ -262,11 +275,9 @@ describe("OtherProductShared contract version flow with relations", () => {
       for (const b of read) {
         expect(b.hasErrors()).toBeUndefined();
         const productCode = read[count++].productCode;
-        const k = stub.createCompositeKey("other_product_shared", [
-          productCode,
-        ]);
-        await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-        await stub.getPrivateData("decaf-namespaceAeon", k);
+        const product = await loadSharedProduct(productCode);
+        expect(product.hasErrors()).toBeUndefined();
+        await assertSharedRelations(product);
       }
 
       bulk = read;
@@ -292,13 +303,9 @@ describe("OtherProductShared contract version flow with relations", () => {
       for (const b of toUpdate) {
         expect(b.hasErrors()).toBeDefined();
         const productCode = toUpdate[count++].productCode;
-        const k = stub.createCompositeKey("other_product_shared", [
-          productCode,
-        ]);
-        await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-        const sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
-        const newObj = new OtherProductShared(JSON.parse(sharedState));
+        const newObj = await loadSharedProduct(productCode);
         expect(newObj.hasErrors()).toBeUndefined();
+        await assertSharedRelations(newObj);
         newBulk.push(newObj);
       }
 

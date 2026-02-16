@@ -69,6 +69,40 @@ describe("Tests Product Contract", () => {
     return segregated.map((s) => s.model.serialize());
   }
 
+  const PRIVATE_COLLECTION = "decaf-namespaceAeon";
+
+  async function loadPublicProduct(productCode: string) {
+    const k = stub.createCompositeKey("product", [productCode]);
+    await expect(stub.getPrivateData(PRIVATE_COLLECTION, k)).rejects.toThrow(
+      NotFoundError
+    );
+    const state = await stub.getState(k);
+    return new Product(JSON.parse(state.toString()));
+  }
+
+  async function assertPublicRelations(product: Product) {
+    for (const market of product.markets || []) {
+      const marketId = typeof market === "object" ? (market as Market).id : market;
+      const mk = stub.createCompositeKey("market", [marketId as any]);
+      await expect(stub.getPrivateData(PRIVATE_COLLECTION, mk)).rejects.toThrow(
+        NotFoundError
+      );
+      const marketState = await stub.getState(mk);
+      expect(new Market(JSON.parse(marketState.toString())).hasErrors()).toBeUndefined();
+    }
+    for (const strength of product.strengths || []) {
+      const strengthId = typeof strength === "object" ? (strength as ProductStrength).id : strength;
+      const sk = stub.createCompositeKey("product_strength", [strengthId as any]);
+      await expect(stub.getPrivateData(PRIVATE_COLLECTION, sk)).rejects.toThrow(
+        NotFoundError
+      );
+      const strengthState = await stub.getState(sk);
+      expect(
+        new ProductStrength(JSON.parse(strengthState.toString())).hasErrors()
+      ).toBeUndefined();
+    }
+  }
+
   let productCode: string = "";
   let created: Product;
 
@@ -90,21 +124,15 @@ describe("Tests Product Contract", () => {
 
     expect(created.hasErrors()).toBeUndefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
 
-    const k = stub.createCompositeKey("product", [productCode]);
-    await expect(stub.getPrivateData("decaf-namespaceAeon", k)).rejects.toThrow(
-      NotFoundError
-    );
-    expect(
-      new Product(JSON.parse((await stub.getState(k)).toString())).hasErrors()
-    ).toBeUndefined();
+    const product = await loadPublicProduct(productCode);
+    expect(product.hasErrors()).toBeUndefined();
+    await assertPublicRelations(product);
   });
 
   it("reads the public data", async () => {
-    const read = Model.deserialize(
-      await contract.read(ctx as any, productCode)
-    ) as Product;
-    console.log("READ RESULT", read, read?.hasErrors());
+    const read = await loadPublicProduct(productCode);
     expect(read.hasErrors()).toBeUndefined();
+    await assertPublicRelations(read);
     expect(read.equals(created)).toBe(true);
     created = read;
   });
@@ -134,11 +162,7 @@ describe("Tests Product Contract", () => {
     expect(updated.hasErrors()).toBeUndefined();
 
     const k = stub.createCompositeKey("product", [productCode]);
-    await expect(stub.getPrivateData("decaf-namespaceAeon", k)).rejects.toThrow(
-      NotFoundError
-    );
-    const publicState = await stub.getState(k);
-    updated = new Product(JSON.parse(publicState.toString()));
+    updated = await loadPublicProduct(productCode);
     expect(updated.hasErrors()).toBeUndefined();
 
     expect(updated.version).toBe(2);
@@ -153,12 +177,12 @@ describe("Tests Product Contract", () => {
   });
 
   it("deletes the public data", async () => {
-    const deleted = Model.deserialize(
-      await contract.delete(ctx as any, created.productCode)
-    ) as Product;
+    const deleted = await loadPublicProduct(created.productCode);
 
     stub.commit();
     expect(deleted.hasErrors()).toBeUndefined();
+
+    await assertPublicRelations(deleted);
 
     const k = stub.createCompositeKey("product", [productCode]);
     await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
@@ -218,13 +242,9 @@ describe("Tests Product Contract", () => {
       for (const b of bulk) {
         expect(b.hasErrors()).toBeUndefined();
         const productCode = models[count++].productCode;
-        const k = stub.createCompositeKey("product", [productCode]);
-        await expect(
-          stub.getPrivateData("decaf-namespaceAeon", k)
-        ).rejects.toThrow(NotFoundError);
-        const publicState = await stub.getState(k);
-        const newObj = new Product(JSON.parse(publicState.toString()));
+        const newObj = await loadPublicProduct(productCode);
         expect(newObj.hasErrors()).toBeUndefined();
+        await assertPublicRelations(newObj);
         newBulk.push(newObj);
       }
 
@@ -243,11 +263,9 @@ describe("Tests Product Contract", () => {
       for (const b of read) {
         expect(b.hasErrors()).toBeUndefined();
         const productCode = read[count++].productCode;
-        const k = stub.createCompositeKey("product", [productCode]);
-        await expect(
-          stub.getPrivateData("decaf-namespaceAeon", k)
-        ).rejects.toThrow(NotFoundError);
-        await stub.getState(k);
+        const product = await loadPublicProduct(productCode);
+        expect(product.hasErrors()).toBeUndefined();
+        await assertPublicRelations(product);
       }
 
       bulk = read;
@@ -273,13 +291,9 @@ describe("Tests Product Contract", () => {
       for (const b of toUpdate) {
         expect(b.hasErrors()).toBeUndefined();
         const productCode = toUpdate[count++].productCode;
-        const k = stub.createCompositeKey("product", [productCode]);
-        await expect(
-          stub.getPrivateData("decaf-namespaceAeon", k)
-        ).rejects.toThrow(NotFoundError);
-        const publicState = await stub.getState(k);
-        const newObj = new Product(JSON.parse(publicState.toString()));
+        const newObj = await loadPublicProduct(productCode);
         expect(newObj.hasErrors()).toBeUndefined();
+        await assertPublicRelations(newObj);
         newBulk.push(newObj);
       }
 
