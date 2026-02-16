@@ -37,8 +37,8 @@ export class FabricContractContext extends Context<FabricContractFlags> {
    * @description Creates a new FabricContractContext instance
    * @summary Initializes the context with Fabric-specific flags
    */
-  constructor() {
-    super();
+  constructor(ctx?: FabricContractContext) {
+    super(ctx);
   }
 
   /**
