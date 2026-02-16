@@ -5,12 +5,14 @@ import {
   afterDelete,
   afterUpdate,
   InternalError,
+  onCreate,
   OperationKeys,
 } from "@decaf-ts/db-decorators";
 import { Audit } from "./Audit";
-import { Repository } from "@decaf-ts/core";
+import { Repo, Repository, UnsupportedError } from "@decaf-ts/core";
 import { FabricContractContext } from "../../contracts/ContractContext";
 import { CollectionResolver } from "../../shared/decorators";
+import { GtinOwner } from "./GtinOwner";
 
 export async function rebuildForMatchingCollection<M extends Model>(
   model: M,
@@ -156,5 +158,56 @@ export function audit(model: Constructor<Model<boolean>>) {
     afterUpdate(updateAuditHandler as any, meta),
     afterDelete(deleteAuditHandler as any, meta),
     metadata("audit", true)
+  );
+}
+
+export async function createAssignGtinOwnerHandler<
+  M extends Model,
+  R extends Repo<M>,
+  V,
+>(
+  this: R,
+  context: any,
+  data: V,
+  key: keyof M,
+  model: { productCode: string }
+): Promise<void> {
+  if (!model.productCode)
+    throw new UnsupportedError(`Gtin owner can only be assigned to products`);
+  const repo = Repository.forModel(GtinOwner);
+  const toCreate = new GtinOwner({
+    productCode: model.productCode,
+  });
+
+  const owner = await repo.create(toCreate, context);
+  context.logger.info(
+    `GTIN owner assigned for product ${model.productCode}: ${owner.ownedBy}`
+  );
+}
+
+export async function deleteAssignGtinOwnerHandler<
+  M extends Model,
+  R extends Repo<M>,
+  V,
+>(
+  this: R,
+  context: any,
+  data: V,
+  key: keyof M,
+  model: { productCode: string }
+): Promise<void> {
+  if (!model.productCode)
+    throw new UnsupportedError(`Gtin owner can only be assigned to products`);
+  const repo = Repository.forModel(GtinOwner);
+  const owner = await repo.delete(model.productCode, context);
+  context.logger.info(
+    `GTIN owner assigned for product ${model.productCode}: ${owner.ownedBy}`
+  );
+}
+
+export function assignProductOwner() {
+  return apply(
+    onCreate(createAssignGtinOwnerHandler as any, {}),
+    afterDelete(deleteAssignGtinOwnerHandler as any, {})
   );
 }

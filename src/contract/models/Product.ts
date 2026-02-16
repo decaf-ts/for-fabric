@@ -16,7 +16,7 @@ import { Market } from "./Market";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { gtin } from "./gtin";
 
-import { audit } from "./decorators";
+import { assignProductOwner, audit } from "./decorators";
 import { FabricFlavour } from "../../shared/constants";
 
 @uses(FabricFlavour)
@@ -26,6 +26,7 @@ import { FabricFlavour } from "../../shared/constants";
 export class Product extends BaseIdentifiedModel {
   @gtin()
   @audit(Product)
+  @assignProductOwner()
   @pk()
   productCode!: string;
 

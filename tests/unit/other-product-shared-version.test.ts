@@ -11,6 +11,7 @@ import { generateGtin } from "../../src/contract/models/gtin";
 import { Paginator } from "@decaf-ts/core";
 import { OtherMarket } from "../../src/contract/models/OtherMarket";
 import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
+import { GtinOwner } from "../../src/contract/models/GtinOwner";
 
 describe("OtherProductShared contract version flow with relations", () => {
   let ctx: ReturnType<typeof getMockCtx>;
@@ -67,6 +68,15 @@ describe("OtherProductShared contract version flow with relations", () => {
     return new OtherProductShared(JSON.parse(sharedState));
   }
 
+  async function loadPublicOwner(productCode: string) {
+    const k = stub.createCompositeKey("owner", [productCode]);
+    await expect(stub.getPrivateData("decaf-namespaceAeon", k)).rejects.toThrow(
+      NotFoundError
+    );
+    const publicState = await stub.getState(k);
+    return new GtinOwner(JSON.parse(publicState.toString()));
+  }
+
   async function expectMarketInSharedCollection(marketKey: string) {
     const mk = stub.createCompositeKey("market", [marketKey]);
     await expect(stub.getState(mk)).rejects.toThrow(NotFoundError);
@@ -78,7 +88,9 @@ describe("OtherProductShared contract version flow with relations", () => {
     const sk = stub.createCompositeKey("product_strength", [strengthKey]);
     await expect(stub.getState(sk)).rejects.toThrow(NotFoundError);
     const state = await stub.getPrivateData("decaf-namespaceAeon", sk);
-    expect(new OtherProductStrength(JSON.parse(state)).hasErrors()).toBeUndefined();
+    expect(
+      new OtherProductStrength(JSON.parse(state)).hasErrors()
+    ).toBeUndefined();
   }
 
   async function assertSharedRelations(product: OtherProductShared) {
@@ -139,6 +151,9 @@ describe("OtherProductShared contract version flow with relations", () => {
     const product = await loadSharedProduct(productCode);
     expect(product.hasErrors()).toBeUndefined();
     await assertSharedRelations(product);
+
+    const owner = await loadPublicOwner(productCode);
+    expect(owner.hasErrors()).toBeUndefined();
   });
 
   it("reads the shared data", async () => {
@@ -201,6 +216,8 @@ describe("OtherProductShared contract version flow with relations", () => {
     await expect(stub.getPrivateData("decaf-namespaceAeon", k)).rejects.toThrow(
       NotFoundError
     );
+
+    await expect(loadPublicOwner(productCode)).rejects.toThrow(NotFoundError);
   });
 
   describe("Bulk Crud", () => {
