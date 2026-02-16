@@ -9,6 +9,8 @@ import { ProductStrength } from "../../src/contract/models/ProductStrength";
 import { Market } from "../../src/contract/models/Market";
 import { generateGtin } from "../../src/contract/models/gtin";
 import { Paginator } from "@decaf-ts/core";
+import { OtherMarket } from "../../src/contract/models/OtherMarket";
+import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
 
 describe("OtherProductShared contract version flow with relations", () => {
   let ctx: ReturnType<typeof getMockCtx>;
@@ -97,11 +99,26 @@ describe("OtherProductShared contract version flow with relations", () => {
 
     expect(created.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
 
-    const k = stub.createCompositeKey("other_product_shared", [productCode]);
+    let k = stub.createCompositeKey("other_product_shared", [productCode]);
     await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-    const sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
+    let sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
+    const product = new OtherProductShared(JSON.parse(sharedState));
+    expect(product.hasErrors()).toBeUndefined();
+
+    k = stub.createCompositeKey("market", [product.markets[0] as any]);
+    await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
+    sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
     expect(
-      new OtherProductShared(JSON.parse(sharedState)).hasErrors()
+      new OtherMarket(JSON.parse(sharedState)).hasErrors()
+    ).toBeUndefined();
+
+    k = stub.createCompositeKey("product_strength", [
+      product.strengths[0] as any,
+    ]);
+    await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
+    sharedState = await stub.getPrivateData("decaf-namespaceAeon", k);
+    expect(
+      new OtherProductStrength(JSON.parse(sharedState)).hasErrors()
     ).toBeUndefined();
   });
 

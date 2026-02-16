@@ -103,6 +103,7 @@ describe("Tests Product Contract", () => {
     const read = Model.deserialize(
       await contract.read(ctx as any, productCode)
     ) as Product;
+    console.log("READ RESULT", read, read?.hasErrors());
     expect(read.hasErrors()).toBeUndefined();
     expect(read.equals(created)).toBe(true);
     created = read;

@@ -30,14 +30,12 @@ function strengthSeed(m: ProductStrength) {
   }
 }
 
-// @sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
 @table(TableNames.ProductStrength)
 @model()
 @description("Represents the product’s strength and composition details.")
 export class ProductStrength extends BaseIdentifiedModel {
   @pk()
-  // @mirror("mirror-collection", "org-a")
   @composed(["productCode", "uuid"], ":")
   @description("Unique identifier of the product strength.")
   id!: string;
