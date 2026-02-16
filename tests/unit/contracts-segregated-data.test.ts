@@ -1322,33 +1322,6 @@ function createTrackingStubMock() {
   };
 }
 
-function createMockContextWithTracking({
-  stub,
-  identity = getIdentityMock(),
-}: {
-  stub: ReturnType<typeof getStubMock>;
-  identity?: ReturnType<typeof getIdentityMock>;
-}) {
-  const context = new FabricContractContext();
-  context.accumulate({
-    stub: stub as any,
-    identity: identity as any,
-    logger: {
-      for: jest.fn().mockReturnThis(),
-      clear: jest.fn().mockReturnThis(),
-      info: jest.fn(),
-      error: jest.fn(),
-      verbose: jest.fn(),
-      debug: jest.fn(),
-      silly: jest.fn(),
-      warn: jest.fn(),
-    } as any,
-    timestamp: new Date(),
-    segregated: undefined,
-  });
-  return context;
-}
-
 /**
  * Returns a non-matching MSP identity ("WriterOrg") for mirror write tests.
  * The mirror condition `(msp) => msp === "Aeon"` does NOT match this MSP,

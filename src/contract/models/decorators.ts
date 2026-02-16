@@ -178,7 +178,7 @@ export async function createAssignGtinOwnerHandler<
   const toCreate = new GtinOwner({
     productCode: model.productCode,
   });
-  const owner = await repo.override(this._overrides).create(toCreate, context);
+  const owner = await repo.create(toCreate, publicContext(context));
   context.logger.info(
     `GTIN owner assigned for product ${model.productCode}: ${owner.ownedBy}`
   );
@@ -198,9 +198,7 @@ export async function deleteAssignGtinOwnerHandler<
   if (!model.productCode)
     throw new UnsupportedError(`Gtin owner can only be assigned to products`);
   const repo = Repository.forModel(GtinOwner);
-  const owner = await repo
-    .override(this._overrides)
-    .delete(model.productCode, context);
+  const owner = await repo.delete(model.productCode, publicContext(context));
   context.logger.info(
     `GTIN owner assigned for product ${model.productCode}: ${owner.ownedBy}`
   );
@@ -211,4 +209,14 @@ export function assignProductOwner() {
     onCreate(createAssignGtinOwnerHandler as any, {}),
     afterDelete(deleteAssignGtinOwnerHandler as any, {})
   );
+}
+
+function publicContext(ctx: FabricContractContext) {
+  return ctx.override({
+    fullySegregated: false,
+    segregated: undefined,
+    segregatedData: undefined,
+    segregateRead: undefined,
+    segregateWrite: undefined,
+  }) as FabricContractContext;
 }
