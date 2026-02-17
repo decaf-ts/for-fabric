@@ -380,6 +380,11 @@ export class FabricClientAdapter extends Adapter<
       this.getEndorsingOrganizations(ctx),
       clazz.name
     );
+
+    if (this.shouldRefreshAfterWrite(ctx, hasTransient, ids[0])) {
+      return this.readAll(clazz, ids, ctx);
+    }
+
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
     } catch (e: unknown) {
@@ -461,6 +466,13 @@ export class FabricClientAdapter extends Adapter<
       this.getEndorsingOrganizations(ctx),
       clazz.name
     );
+
+    const hasTransient = transient && Object.keys(transient).length > 0;
+
+    if (this.shouldRefreshAfterWrite(ctx, hasTransient, ids[0])) {
+      return this.readAll(clazz, ids, ctx);
+    }
+
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
     } catch (e: unknown) {
