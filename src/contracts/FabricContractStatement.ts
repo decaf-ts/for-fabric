@@ -20,7 +20,11 @@ import {
 } from "@decaf-ts/core";
 import { InternalError } from "@decaf-ts/db-decorators";
 import { Constructor } from "@decaf-ts/decoration";
-import { applySegregationFlags, extractMspId } from "../shared/decorators";
+import {
+  applyMirrorFlags,
+  applySegregationFlags,
+  extractMspId,
+} from "../shared/decorators";
 
 /**
  * @description Statement wrapper for executing Mango queries within Fabric contracts
@@ -198,6 +202,7 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
     ];
 
     applySegregationFlags(new this.fromSelector(), collections, ctx);
+    await applyMirrorFlags(this.fromSelector, msp, ctx);
 
     try {
       if (this.prepared) return this.executePrepared(...(args as any));

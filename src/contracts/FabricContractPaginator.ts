@@ -9,6 +9,11 @@ import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "./ContractAdapter";
 import { CouchDBPaginator, MangoQuery } from "@decaf-ts/for-couchdb";
+import {
+  applyMirrorFlags,
+  applySegregationFlags,
+  extractMspId,
+} from "../shared/decorators";
 
 /**
  * @description Paginator for CouchDB query results
@@ -138,6 +143,20 @@ export class FabricContractPaginator<
     if (bookmark && bookmark instanceof Context) {
       bookmark = undefined;
     }
+
+    const msp = extractMspId(ctx.identity);
+    const { privateCols, sharedCols } = Model.collectionsFor(this.clazz);
+    const collections = [
+      ...new Set(
+        await Promise.all(
+          [...privateCols, ...sharedCols].map((c) =>
+            typeof c === "string" ? c : c(this.clazz, msp, ctx)
+          )
+        )
+      ),
+    ];
+    applySegregationFlags(new this.clazz(), collections, ctx);
+    await applyMirrorFlags(this.clazz, msp, ctx);
 
     this._bookmark = bookmark;
     if (this.isPreparedStatement())

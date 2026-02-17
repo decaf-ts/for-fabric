@@ -538,6 +538,27 @@ export function applySegregationFlags<M extends Model>(
   }
 }
 
+export async function applyMirrorFlags<M extends Model>(
+  clazz: Constructor<M>,
+  msp: string | undefined,
+  ctx: FabricContractContext
+) {
+  if (!msp) return;
+  const mirrorMeta = Model.mirroredAt(clazz);
+  if (!mirrorMeta) return;
+  const matches =
+    msp === mirrorMeta.mspId ||
+    (mirrorMeta.condition && mirrorMeta.condition(msp));
+  if (!matches) return;
+  const collection = await evalMirrorMetadata(
+    new clazz(),
+    mirrorMeta.resolver,
+    ctx
+  );
+  ctx.put("fullySegregated", true);
+  ctx.readFrom(collection);
+}
+
 function hasPublicProperties<M extends Model>(
   clazz: Constructor<M>
 ): boolean {
