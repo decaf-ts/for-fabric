@@ -573,10 +573,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
               }
               case "queryResult": {
                 const [stub, rawInput] = argsList;
-                return stub.getPrivateDataQueryResult(
+                const res = await stub.getPrivateDataQueryResult(
                   collection,
                   JSON.stringify(rawInput)
                 );
+                return res.iterator || res;
               }
               case "queryResultPaginated": {
                 const [stub, rawInput, limit, skip, bookmark] = argsList;
