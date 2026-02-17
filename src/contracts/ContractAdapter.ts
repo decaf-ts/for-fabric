@@ -577,48 +577,52 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 return res.iterator || res;
               }
               case "queryResultPaginated": {
-                const [stub, rawInput, limit, skip, bookmark] = argsList;
+                const [stub, rawInput, limit, , bookmark] = argsList;
+
+                // Build a query that pushes pagination into the selector
+                // so we avoid retrieving ALL records from the private collection.
+                const query = { ...rawInput };
+                delete query.limit;
+                delete query.skip;
+                delete query.bookmark;
+
+                // When a bookmark is present it is the _id of the last record
+                // from the previous page — skip past it via selector.
+                if (bookmark) {
+                  query.selector = {
+                    ...query.selector,
+                    _id: { $gt: bookmark },
+                  };
+                }
+
+                // Limit the query to the page size so CouchDB returns only
+                // the records we need.
+                query.limit = limit;
+
                 let iterator = await (
                   stub as ChaincodeStub
                 ).getPrivateDataQueryResult(
                   collection,
-                  JSON.stringify(rawInput)
+                  JSON.stringify(query)
                 );
                 iterator = (iterator as any).iterator || iterator;
+
                 const results: any[] = [];
-                let count = 0;
-                const skipKey = bookmark || skip;
-                let reachedBookmark = skipKey ? false : true;
                 let lastKey: string | null = null;
 
                 while (true) {
                   const res = await iterator.next();
 
-                  if (res.value && res.value.value.toString()) {
-                    const recordKey = res.value.key;
-                    const recordValue = (res.value.value as any).toString(
-                      "utf8"
-                    );
-
-                    // If we have a bookmark/skip, skip until we pass it
-                    if (!reachedBookmark) {
-                      if (recordKey === skipKey?.toString()) {
-                        reachedBookmark = true;
-                      }
-                      continue;
-                    }
-
+                  if (res.value && res.value.value) {
                     results.push({
-                      key: recordKey,
-                      value: Buffer.from(recordValue),
+                      key: res.value.key,
+                      value: Buffer.isBuffer(res.value.value)
+                        ? res.value.value
+                        : Buffer.from(
+                            (res.value.value as any).toString("utf8")
+                          ),
                     });
-                    lastKey = recordKey;
-                    count++;
-
-                    if (count >= limit) {
-                      await iterator.close();
-                      break;
-                    }
+                    lastKey = res.value.key;
                   }
 
                   if (res.done) {
@@ -627,7 +631,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   }
                 }
 
-                // Wrap results in an async iterator compatible with resultIterator()
+                // Wrap results in an async iterator compatible with
+                // resultIterator()
                 let idx = 0;
                 const arrayIterator = {
                   async next() {
@@ -644,7 +649,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     arrayIterator as unknown as Iterators.StateQueryIterator,
                   metadata: {
                     fetchedRecordsCount: results.length,
-                    bookmark: count >= limit ? lastKey || "" : "",
+                    bookmark:
+                      results.length >= limit ? lastKey || "" : "",
                   },
                 };
               }

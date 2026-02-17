@@ -380,7 +380,7 @@ describe("OtherProductShared contract version flow with relations", () => {
     });
 
     it("paginates via paginateBy", async () => {
-      const page = await contract.paginateBy(
+      let page = await contract.paginateBy(
         ctx,
         "inventedName",
         "desc",
@@ -388,10 +388,24 @@ describe("OtherProductShared contract version flow with relations", () => {
       );
       expect(page).toBeDefined();
 
-      const parsedPage = Paginator.deserialize(page);
+      let parsedPage = Paginator.deserialize(page);
       expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
       expect(parsedPage.data.length).toEqual(3);
       expect(parsedPage.current).toEqual(1);
+      expect(parsedPage.bookmark).toBeTruthy();
+
+      page = await contract.paginateBy(
+        ctx,
+        "inventedName",
+        "desc",
+        JSON.stringify({ offset: 2, limit: 3, bookmark: parsedPage.bookmark })
+      );
+      expect(page).toBeDefined();
+
+      parsedPage = Paginator.deserialize(page);
+      expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
+      expect(parsedPage.data.length).toEqual(3);
+      expect(parsedPage.current).toEqual(2);
       expect(parsedPage.bookmark).toBeTruthy();
     });
 

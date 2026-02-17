@@ -347,8 +347,11 @@ export function getStubMock() {
 
     async getPrivateDataQueryResult(collection: string, query: string) {
       // Queries only committed private state
-      const { selector, sort } = parseQuery(query);
-      const rows = filterRows(privateState[collection] || {}, selector, sort);
+      const { selector, sort, limit } = parseQuery(query);
+      let rows = filterRows(privateState[collection] || {}, selector, sort);
+      if (limit && limit > 0) {
+        rows = rows.slice(0, limit);
+      }
       return createIterator(rows);
     },
   };

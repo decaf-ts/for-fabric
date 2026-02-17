@@ -28,6 +28,11 @@ import {
 import { Constructor } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "./ContractAdapter";
 import { FabricContractFlags } from "./types";
+import {
+  applyMirrorFlags,
+  applySegregationFlags,
+  extractMspId,
+} from "../shared/decorators";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -263,19 +268,22 @@ export class FabricContractRepository<M extends Model> extends Repository<
       `paginating ${Model.tableName(this.class)} with page size ${limit}`
     );
 
-    const segregated = !!ctx.get("segregated");
+    const msp = extractMspId(ctx.identity);
+    const { privateCols, sharedCols } = Model.collectionsFor(this.class);
+    const collections = [
+      ...new Set(
+        await Promise.all(
+          [...privateCols, ...sharedCols].map((c) =>
+            typeof c === "string" ? c : c(this.class, msp, ctx)
+          )
+        )
+      ),
+    ];
+    applySegregationFlags(new this.class(), collections, ctx);
+    await applyMirrorFlags(this.class, msp, ctx);
 
     let paginator: Paginator<M>;
-    if (segregated && bookmark) {
-      paginator = await this.override({
-        forcePrepareComplexQueries: false,
-        forcePrepareSimpleQueries: false,
-      } as any)
-        .select()
-        .where(this.attr(Model.pk(this.class)).gt(bookmark))
-        .orderBy([key, order])
-        .paginate(limit as number, ...ctxArgs);
-    } else if (offset && bookmark) {
+    if (offset && bookmark) {
       paginator = await this.override({
         forcePrepareComplexQueries: false,
         forcePrepareSimpleQueries: false,
