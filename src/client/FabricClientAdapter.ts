@@ -493,11 +493,18 @@ export class FabricClientAdapter extends Adapter<
     ids: PrimaryKeyType[],
     ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<Record<string, any>[]> {
-    const { log, ctx } = this.logCtx(args, this.deleteAll);
+    const { log, ctx, ctxArgs } = this.logCtx(args, this.deleteAll);
     const tableName = Model.tableName(clazz);
+
+    const hasTransient = Model.isTransient(clazz);
+    let result: any;
+    if (this.shouldRefreshAfterWrite(ctx, hasTransient, ids[0])) {
+      result = await this.readAll(clazz, ids, ...ctxArgs);
+    }
+
     log.info(`deleting ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
-    const result = await this.submitTransaction(
+    const res = await this.submitTransaction(
       ctx,
       BulkCrudOperationKeys.DELETE_ALL,
       [JSON.stringify(ids)],
@@ -506,7 +513,9 @@ export class FabricClientAdapter extends Adapter<
       clazz.name
     );
     try {
-      return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
+      return hasTransient
+        ? result
+        : JSON.parse(this.decode(res)).map((r: any) => JSON.parse(r));
     } catch (e: unknown) {
       throw new SerializationError(e as Error);
     }
@@ -823,9 +832,15 @@ export class FabricClientAdapter extends Adapter<
   ): Promise<Record<string, any>> {
     const { log, ctx } = this.logCtx(args, this.delete);
     const tableName = Model.tableName(clazz);
+    const hasTransient = Model.isTransient(clazz);
+    let result: any;
+    if (this.shouldRefreshAfterWrite(ctx, hasTransient, id)) {
+      result = await this.read(clazz, id, ctx);
+    }
+
     log.verbose(`deleting entry from ${tableName} table`);
     log.debug(`pk: ${id}`);
-    const result = await this.submitTransaction(
+    const res = await this.submitTransaction(
       ctx,
       OperationKeys.DELETE,
       [id.toString()],
@@ -833,7 +848,9 @@ export class FabricClientAdapter extends Adapter<
       this.getEndorsingOrganizations(ctx),
       clazz.name
     );
-    return this.serializer.deserialize(this.decode(result));
+    return hasTransient
+      ? result
+      : this.serializer.deserialize(this.decode(res));
   }
 
   /**

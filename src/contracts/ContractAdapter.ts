@@ -10,6 +10,7 @@ import { FabricContractContext } from "./ContractContext";
 import {
   BadRequestError,
   BaseError,
+  BulkCrudOperationKeys,
   ConflictError,
   InternalError,
   NotFoundError,
@@ -17,6 +18,7 @@ import {
   onCreateUpdate,
   PrimaryKeyType,
   SerializationError,
+  ValidationError,
 } from "@decaf-ts/db-decorators";
 import {
   Context as Ctx,
@@ -52,6 +54,7 @@ import {
   FlagsOf,
   ContextOf,
   TransactionOperationKeys,
+  promiseSequence,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -1225,42 +1228,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
       return record;
     });
     return [tableName, ids, records, ctx as any];
-  }
-
-  override async createAll<M extends Model>(
-    clazz: Constructor<M>,
-    id: PrimaryKeyType[],
-    model: Record<string, any>[],
-    ...args: ContextualArgs<CONTEXT>
-  ): Promise<Record<string, any>[]> {
-    const { log, ctx } = this.logCtx(args, this.createAll);
-    if (!id || !model)
-      throw new ValidationError("Ids and models cannot be null or undefined");
-    if (id.length !== model.length)
-      throw new ValidationError("Ids and models must have the same length");
-    const tableLabel = Model.tableName(clazz);
-    log.debug(`Creating ${id.length} entries ${tableLabel} table`);
-    const breakOnSingleFailure = ctx.get("breakOnSingleFailureInBulk") ?? true;
-    const continueOnError = !breakOnSingleFailure;
-    const tasks = id.map(
-      (i, count) => () =>
-        this.create(
-          clazz,
-          i,
-          model[count],
-          ...args,
-          ctx.override({ noEmitSingle: true }) as CONTEXT
-        )
-    );
-    const rawResult = continueOnError
-      ? await promiseSequence(tasks, true)
-      : await promiseSequence(tasks);
-    return resolveBulkSequenceResult(
-      rawResult,
-      continueOnError,
-      log,
-      BulkCrudOperationKeys.CREATE_ALL
-    );
   }
 
   protected override updateAllPrefix<M extends Model>(
