@@ -7,6 +7,23 @@ import {
 } from "@decaf-ts/decorator-validation";
 
 /**
+ * @description Recursively sorts object keys without reordering arrays
+ * @param {any} obj - The value to process
+ * @return {any} A copy with sorted object keys but preserved array order
+ */
+export function sortKeysOnlyRecursive(obj: any): any {
+  if (obj === null || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(sortKeysOnlyRecursive);
+  if (obj.constructor !== Object) return obj;
+  return Object.keys(obj)
+    .sort()
+    .reduce((acc: Record<string, any>, key) => {
+      acc[key] = sortKeysOnlyRecursive(obj[key]);
+      return acc;
+    }, {});
+}
+
+/**
  * @description Deterministic JSON serializer for Fabric models
  * @summary Ensures stable, deterministic JSON output by sorting object keys recursively before stringification, which is important for Fabric endorsement and hashing. Extends JSONSerializer to plug into existing Decaf model serialization flow.
  * @template M - The Decaf Model subtype serialized by this instance
@@ -87,7 +104,6 @@ export class DeterministicSerializer<
    */
   override serialize(model: M): string {
     const stringify = require("json-stringify-deterministic");
-    const sortKeysRecursive = require("sort-keys-recursive");
-    return stringify(sortKeysRecursive(this.preSerialize(model)));
+    return stringify(sortKeysOnlyRecursive(this.preSerialize(model)));
   }
 }
