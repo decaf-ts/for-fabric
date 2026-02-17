@@ -63,6 +63,7 @@ export class FabricClientRepository<
     forcePrepareSimpleQueries: true,
     forcePrepareComplexQueries: true,
     allowGenerationOverride: false,
+    rebuildWithTransient: false,
   });
 
   constructor(adapter?: A, clazz?: Constructor<M>) {
@@ -334,7 +335,7 @@ export class FabricClientRepository<
   }
 
   async healthcheck(...args: MaybeContextualArg<ContextOf<A>>) {
-    const { log, ctxArgs } = this.logCtx(args, this.healthcheck);
+    const { ctxArgs } = this.logCtx(args, this.healthcheck);
 
     const result = await this.adapter.healthcheck(this.class, ...ctxArgs);
 
@@ -359,20 +360,6 @@ export class FabricClientRepository<
       transient,
       ...ctxArgs
     );
-    if (
-      this.shouldRefreshAfterWrite(prepared, ctx) &&
-      id !== undefined &&
-      id !== null
-    ) {
-      const refreshed = await this.adapter.read(this.class, id, ctx);
-      return this.adapter.revert<M>(
-        refreshed,
-        this.class,
-        id,
-        ctx.get("rebuildWithTransient") ? prepared.transient : undefined,
-        ctx
-      );
-    }
     return this.adapter.revert<M>(result, this.class, id, transient, ctx);
   }
 
@@ -395,20 +382,6 @@ export class FabricClientRepository<
       transient,
       ...ctxArgs
     );
-    if (
-      this.shouldRefreshAfterWrite(prepared, ctx) &&
-      id !== undefined &&
-      id !== null
-    ) {
-      const refreshed = await this.adapter.read(this.class, id, ctx);
-      return this.adapter.revert<M>(
-        refreshed,
-        this.class,
-        id,
-        ctx.get("rebuildWithTransient") ? prepared.transient : undefined,
-        ctx
-      );
-    }
     return this.adapter.revert<M>(record, this.class, id, transient, ctx);
   }
 
