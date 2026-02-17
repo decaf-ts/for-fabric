@@ -376,14 +376,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
       throw this.parseError(e as Error);
     }
 
-    const collections = ctx.getReadCollections();
-    if (collections && collections.length) {
-      for (const col of collections)
-        Object.assign(
-          model,
-          await this.forPrivate(col).readState(composedKey, ctx)
-        );
-    }
+    const readCollections = new Set<string>([
+      ...(ctx.getReadCollections() || []),
+      ...(ctx.consumeReadCollections() || []),
+    ]);
+    for (const col of readCollections)
+      Object.assign(
+        model,
+        await this.forPrivate(col).readState(composedKey, ctx)
+      );
     return model;
   }
 

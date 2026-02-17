@@ -35,14 +35,8 @@ describe("Tests product contract", () => {
       productCode: id,
       inventedName: "test_name",
       nameMedicinalProduct: "123456789",
-      strengths: [
-        buildStrength("200mg"),
-        buildStrength("400mg"),
-      ],
-      markets: [
-        buildMarket("BR"),
-        buildMarket("US"),
-      ],
+      strengths: [buildStrength("200mg"), buildStrength("400mg")],
+      markets: [buildMarket("BR"), buildMarket("US")],
     });
 
     created = Model.deserialize(
@@ -70,6 +64,9 @@ describe("Tests product contract", () => {
       await contract.read(ctx as any, created.productCode.toString())
     );
     stub.commit();
+
+    const comp = res.compare(created);
+
     expect(res.equals(created)).toEqual(true);
     console.log("Result: ", res);
   });

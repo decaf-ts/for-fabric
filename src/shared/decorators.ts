@@ -532,10 +532,34 @@ export function applySegregationFlags<M extends Model>(
   // rather than reading DBKeys.TRANSIENT metadata which may not accumulate correctly
   // when class-level @privateData applies decorators iteratively.
   if (!ctx.isFullySegregated && collections.length) {
-    const segregated = Model.segregate(clazz as any);
-    const publicData = segregated.public || {};
-    if (!Object.keys(publicData).length) ctx.markFullySegregated();
+    if (!hasPublicProperties(clazz.constructor as Constructor<M>)) {
+      ctx.markFullySegregated();
+    }
   }
+}
+
+function hasPublicProperties<M extends Model>(
+  clazz: Constructor<M>
+): boolean {
+  const attributes = Metadata.getAttributes(clazz) || [];
+  const pk = Model.pk(clazz);
+  const transientMeta = Metadata.get(clazz as any, DBKeys.TRANSIENT) || {};
+  const privateMeta = Metadata.get(
+    clazz as any,
+    Metadata.key(FabricModelKeys.PRIVATE)
+  ) || {};
+  const sharedMeta = Metadata.get(
+    clazz as any,
+    Metadata.key(FabricModelKeys.SHARED)
+  ) || {};
+
+  return attributes.some((attr) => {
+    if (attr === pk) return false;
+    if (attr in transientMeta) return false;
+    if (attr in privateMeta) return false;
+    if (attr in sharedMeta) return false;
+    return true;
+  });
 }
 
 /**

@@ -129,6 +129,19 @@ export class FabricContractContext extends Context<FabricContractFlags> {
       ...new Set([...(this.getOrUndefined("segregateRead") || []), ...cols]),
     ];
     this.put("segregateRead", segregateRead);
+
+    const readStack = this.getOrUndefined("segregateReadStack") || [];
+    this.put("segregateReadStack", [...readStack, cols]);
+  }
+
+  consumeReadCollections(): string[] {
+    const readStack = this.getOrUndefined("segregateReadStack") || [];
+    if (readStack.length) {
+      const [current, ...rest] = readStack;
+      this.put("segregateReadStack", rest);
+      return current;
+    }
+    return this.getReadCollections();
   }
 
   /**

@@ -35,7 +35,7 @@ export interface FabricContractFlags extends FabricFlags {
     { fullySegregated: boolean; collections: string[] }
   >;
   segregatedData?: Record<string, Record<string, any>>;
-
+  segregateReadStack?: any[];
   /**
    * @description Logger instance for the contract
    */

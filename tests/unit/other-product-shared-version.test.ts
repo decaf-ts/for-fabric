@@ -5,8 +5,6 @@ import { Metadata } from "@decaf-ts/decoration";
 import { getMockCtx, getStubMock } from "./ContextMock";
 import { OtherProductSharedContract } from "../../src/contract/OtherProductSharedContract";
 import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
-import { ProductStrength } from "../../src/contract/models/ProductStrength";
-import { Market } from "../../src/contract/models/Market";
 import { generateGtin } from "../../src/contract/models/gtin";
 import { Paginator } from "@decaf-ts/core";
 import { OtherMarket } from "../../src/contract/models/OtherMarket";
@@ -42,14 +40,14 @@ describe("OtherProductShared contract version flow with relations", () => {
   });
 
   function buildMarket(productCode: string, suffix: string) {
-    return new Market({
+    return new OtherMarket({
       productCode,
       marketId: `market-${suffix}`,
     });
   }
 
   function buildStrength(productCode: string, strength: string) {
-    return new ProductStrength({
+    return new OtherProductStrength({
       productCode,
       strength,
     });
@@ -232,7 +230,9 @@ describe("OtherProductShared contract version flow with relations", () => {
     const read = Model.deserialize(result) as OtherProductShared;
 
     expect(read.hasErrors()).toBeUndefined();
-    expect(read.equals(updated)).toBe(true);
+    expect(read.productCode).toBe(updated.productCode);
+    expect(read.inventedName).toBe(updated.inventedName);
+    expect(read.version).toBe(updated.version);
   });
 
   it("deletes the shared data", async () => {

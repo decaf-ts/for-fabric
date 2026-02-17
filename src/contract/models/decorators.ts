@@ -218,5 +218,6 @@ function publicContext(ctx: FabricContractContext) {
     segregatedData: undefined,
     segregateRead: undefined,
     segregateWrite: undefined,
+    segregateReadStack: undefined,
   });
 }

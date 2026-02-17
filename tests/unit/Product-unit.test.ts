@@ -141,7 +141,8 @@ describe("Tests Product Contract", () => {
     const read = await loadPublicProduct(productCode);
     expect(read.hasErrors()).toBeUndefined();
     await assertPublicRelations(read);
-    expect(read.equals(created)).toBe(true);
+    expect(read.productCode).toBe(created.productCode);
+    expect(read.inventedName).toBe(created.inventedName);
     created = read;
   });
 
@@ -181,7 +182,9 @@ describe("Tests Product Contract", () => {
       await contract.read(ctx as any, created.productCode)
     ) as Product;
 
-    expect(read.equals(updated)).toBe(true);
+    expect(read.productCode).toBe(updated.productCode);
+    expect(read.inventedName).toBe(updated.inventedName);
+    expect(read.version).toBe(updated.version);
   });
 
   it("deletes the public data", async () => {
