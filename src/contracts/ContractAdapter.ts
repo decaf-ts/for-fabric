@@ -10,7 +10,6 @@ import { FabricContractContext } from "./ContractContext";
 import {
   BadRequestError,
   BaseError,
-  BulkCrudOperationKeys,
   ConflictError,
   InternalError,
   NotFoundError,
@@ -18,7 +17,6 @@ import {
   onCreateUpdate,
   PrimaryKeyType,
   SerializationError,
-  ValidationError,
 } from "@decaf-ts/db-decorators";
 import {
   Context as Ctx,
@@ -54,7 +52,6 @@ import {
   FlagsOf,
   ContextOf,
   TransactionOperationKeys,
-  promiseSequence,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -581,12 +578,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
               }
               case "queryResultPaginated": {
                 const [stub, rawInput, limit, skip, bookmark] = argsList;
-                const iterator = await (
+                let iterator = await (
                   stub as ChaincodeStub
                 ).getPrivateDataQueryResult(
                   collection,
                   JSON.stringify(rawInput)
                 );
+                iterator = (iterator as any).iterator || iterator;
                 const results: any[] = [];
                 let count = 0;
                 const skipKey = bookmark || skip;
