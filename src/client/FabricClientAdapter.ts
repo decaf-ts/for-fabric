@@ -397,7 +397,15 @@ export class FabricClientAdapter extends Adapter<
         res[0][Model.pk(clazz) as string] || ids[0]
       )
     ) {
-      return this.readAll(clazz, ids, ctx);
+      return this.readAll(
+        clazz,
+        extractIds(
+          clazz,
+          models.map((m, i) => Model.merge(m as any, res[i])),
+          ids
+        ),
+        ctx
+      );
     }
 
     return res;
@@ -724,7 +732,11 @@ export class FabricClientAdapter extends Adapter<
     );
     const deserialized = this.serializer.deserialize(this.decode(result));
     if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, id)) {
-      return this.read(clazz, extractIds(clazz, deserialized, id), ctx);
+      return this.read(
+        clazz,
+        extractIds(clazz, Model.merge(model, deserialized), id),
+        ctx
+      );
     }
     return deserialized;
   }
@@ -834,7 +846,11 @@ export class FabricClientAdapter extends Adapter<
     );
     const deserialized = this.serializer.deserialize(this.decode(result));
     if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, id)) {
-      return this.read(clazz, extractIds(clazz, deserialized, id), ctx);
+      return this.read(
+        clazz,
+        extractIds(clazz, Model.merge(model, deserialized), id),
+        ctx
+      );
     }
     return deserialized;
   }
