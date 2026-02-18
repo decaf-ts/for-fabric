@@ -163,7 +163,7 @@ export class FabricContractPaginator<
       return await this.pagePrepared(page, ...ctxArgs);
     const statement = Object.assign({}, this.statement);
 
-    if (!this._recordCount || !this._totalPages) {
+    if ((!this._recordCount || !this._totalPages) && !this._bookmark) {
       this._totalPages = this._recordCount = 0;
       const countResults =
         (await this.adapter.raw<M[], true>(

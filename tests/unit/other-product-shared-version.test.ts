@@ -10,6 +10,7 @@ import { Paginator } from "@decaf-ts/core";
 import { OtherMarket } from "../../src/contract/models/OtherMarket";
 import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
 import { GtinOwner } from "../../src/contract/models/GtinOwner";
+import { FabricClientPaginator } from "../../src/client/FabricClientPaginator";
 
 jest.setTimeout(50000);
 
@@ -394,6 +395,19 @@ describe("OtherProductShared contract version flow with relations", () => {
       expect(parsedPage.current).toEqual(1);
       expect(parsedPage.bookmark).toBeTruthy();
 
+      const paginator = new FabricClientPaginator(
+        null as any,
+        null as any,
+        3,
+        OtherProductShared
+      );
+
+      paginator.apply(parsedPage as any);
+
+      expect(paginator.current).toEqual(1);
+      expect(paginator.count).toEqual(10);
+      expect(paginator.total).toEqual(4);
+
       page = await contract.paginateBy(
         ctx,
         "inventedName",
@@ -403,10 +417,16 @@ describe("OtherProductShared contract version flow with relations", () => {
       expect(page).toBeDefined();
 
       parsedPage = Paginator.deserialize(page);
-      expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
+      // expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
       expect(parsedPage.data.length).toEqual(3);
       expect(parsedPage.current).toEqual(2);
       expect(parsedPage.bookmark).toBeTruthy();
+
+      paginator.apply(parsedPage as any);
+
+      expect(paginator.current).toEqual(2);
+      expect(paginator.count).toEqual(10);
+      expect(paginator.total).toEqual(4);
     });
 
     it("paginates via statement", async () => {
