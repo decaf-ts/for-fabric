@@ -579,39 +579,26 @@ export class FabricContractAdapter extends CouchDBAdapter<
               case "queryResultPaginated": {
                 const [stub, rawInput, limit, , bookmark] = argsList;
 
-                // Build a query that pushes pagination into the selector
-                // so we avoid retrieving ALL records from the private collection.
+                // Fabric has no native pagination API for private data.
+                // Emulate it: query all matching records (with selector
+                // and sort preserved), locate the bookmark position in
+                // the sorted results, then slice to the page size.
                 const query = { ...rawInput };
                 delete query.limit;
                 delete query.skip;
                 delete query.bookmark;
-
-                // When a bookmark is present it is the _id of the last record
-                // from the previous page — skip past it via selector.
-                if (bookmark) {
-                  query.selector = {
-                    ...query.selector,
-                    _id: { $gt: bookmark },
-                  };
-                }
-
-                // Limit the query to the page size so CouchDB returns only
-                // the records we need.
-                query.limit = limit;
 
                 let iterator = await (
                   stub as ChaincodeStub
                 ).getPrivateDataQueryResult(collection, JSON.stringify(query));
                 iterator = (iterator as any).iterator || iterator;
 
-                const results: any[] = [];
-                let lastKey: string | null = null;
-
+                // Collect all matching records from the iterator
+                const allResults: Array<{ key: string; value: Buffer }> = [];
                 while (true) {
                   const res = await iterator.next();
-
                   if (res.value && res.value.value) {
-                    results.push({
+                    allResults.push({
                       key: res.value.key,
                       value: Buffer.isBuffer(res.value.value)
                         ? res.value.value
@@ -619,22 +606,36 @@ export class FabricContractAdapter extends CouchDBAdapter<
                             (res.value.value as any).toString("utf8")
                           ),
                     });
-                    lastKey = res.value.key;
                   }
-
                   if (res.done) {
                     await iterator.close();
                     break;
                   }
                 }
 
-                // Wrap results in an async iterator compatible with
-                // resultIterator()
+                // Find the bookmark position and slice the page
+                let startIndex = 0;
+                if (bookmark) {
+                  const found = allResults.findIndex(
+                    (r) => r.key === bookmark
+                  );
+                  startIndex = found >= 0 ? found + 1 : 0;
+                }
+                const paged = allResults.slice(
+                  startIndex,
+                  startIndex + limit
+                );
+                const lastKey =
+                  paged.length > 0
+                    ? paged[paged.length - 1].key
+                    : bookmark || "";
+
+                // Wrap the page in an async iterator for resultIterator()
                 let idx = 0;
                 const arrayIterator = {
                   async next() {
-                    if (idx < results.length) {
-                      return { value: results[idx++], done: false };
+                    if (idx < paged.length) {
+                      return { value: paged[idx++], done: false };
                     }
                     return { value: undefined as any, done: true };
                   },
@@ -645,8 +646,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   iterator:
                     arrayIterator as unknown as Iterators.StateQueryIterator,
                   metadata: {
-                    fetchedRecordsCount: results.length,
-                    bookmark: results.length >= limit ? lastKey : "",
+                    fetchedRecordsCount: paged.length,
+                    bookmark:
+                      paged.length >= limit ? lastKey : "",
                   },
                 };
               }
@@ -899,54 +901,70 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const { log, ctx, ctxArgs } = this.logCtx(args, this.raw);
 
     const enableSegregates = !args.length || args[0] !== true;
+    const fullySegregated = enableSegregates && ctx.isFullySegregated;
 
     const { skip, limit } = rawInput;
-    let iterator: Iterators.StateQueryIterator;
+    const bookmark = rawInput["bookmark"];
     let resp = { docs: [], bookmark: undefined as string | undefined };
-    if (limit || skip) {
-      delete rawInput["limit"];
-      delete rawInput["skip"];
-      log.debug(
-        `Retrieving paginated iterator: limit: ${limit}/ skip: ${skip}`
-      );
-      const response: StateQueryResponse<Iterators.StateQueryIterator> =
-        (await this.queryResultPaginated(
+
+    // Query public state only when the model is NOT fully segregated
+    if (!fullySegregated) {
+      let iterator: Iterators.StateQueryIterator;
+      if (limit || skip) {
+        delete rawInput["limit"];
+        delete rawInput["skip"];
+        log.debug(
+          `Retrieving paginated iterator: limit: ${limit}/ skip: ${skip}`
+        );
+        const response: StateQueryResponse<Iterators.StateQueryIterator> =
+          (await this.queryResultPaginated(
+            ctx.stub,
+            rawInput,
+            limit || Number.MAX_VALUE,
+            (skip as any)?.toString(),
+            bookmark,
+            ...[ctx as FabricContractContext]
+          )) as StateQueryResponse<Iterators.StateQueryIterator>;
+        resp.bookmark = response.metadata.bookmark;
+        iterator = response.iterator;
+      } else {
+        log.debug("Retrieving iterator");
+        iterator = (await this.queryResult(
           ctx.stub,
           rawInput,
-          limit || Number.MAX_VALUE,
-          (skip as any)?.toString(),
-          rawInput["bookmark"],
-          ...[ctx as FabricContractContext]
-        )) as StateQueryResponse<Iterators.StateQueryIterator>;
-      resp.bookmark = response.metadata.bookmark;
-      iterator = response.iterator;
-    } else {
-      log.debug("Retrieving iterator");
-      iterator = (await this.queryResult(
-        ctx.stub,
-        rawInput,
-        ctx
-      )) as Iterators.StateQueryIterator;
-    }
-    log.debug("Iterator acquired");
+          ctx
+        )) as Iterators.StateQueryIterator;
+      }
+      log.debug("Iterator acquired");
 
-    resp.docs = (await this.resultIterator(log, iterator)) as any;
-    log.debug(
-      `returning ${Array.isArray(resp.docs) ? resp.docs.length : 1} results`
-    );
+      resp.docs = (await this.resultIterator(log, iterator)) as any;
+      log.debug(
+        `returning ${Array.isArray(resp.docs) ? resp.docs.length : 1} results`
+      );
+    } else {
+      // For fully segregated models, strip pagination fields from rawInput
+      // so the segregated query below can re-apply them cleanly
+      if (limit || skip) {
+        delete rawInput["limit"];
+        delete rawInput["skip"];
+      }
+      log.debug("Skipping public state query (fully segregated model)");
+    }
 
     const collections = enableSegregates ? ctx.getReadCollections() : undefined;
 
-    const segregated: any[] = [];
     if (collections && collections.length) {
-      // Restore limit/skip for segregated queries (they were removed above)
+      // Build a fresh input with limit/skip/bookmark restored
       const segregatedInput = { ...rawInput };
       if (limit) segregatedInput.limit = limit;
       if (skip) segregatedInput.skip = skip;
+      if (bookmark) segregatedInput["bookmark"] = bookmark;
+
+      const segregated: any[] = [];
       for (const collection of collections) {
         segregated.push(
           await this.forPrivate(collection).raw(
-            segregatedInput,
+            { ...segregatedInput },
             false,
             true,
             ...ctxArgs

@@ -555,6 +555,11 @@ export async function applyMirrorFlags<M extends Model>(
     mirrorMeta.resolver,
     ctx
   );
+  // Mirror MSP matches — route reads exclusively through the mirror
+  // collection. Clear any previously registered collections so queries
+  // go ONLY to the mirror, not to the regular private/shared ones.
+  ctx.put("segregateRead", undefined);
+  ctx.put("segregateReadStack", undefined);
   ctx.put("fullySegregated", true);
   ctx.readFrom(collection);
 }

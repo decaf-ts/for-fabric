@@ -109,7 +109,7 @@ describe("OtherProductShared contract version flow with relations", () => {
     }
   }
 
-  function preparePayloadBulk(model: OtherProductShared[]) {
+  function preparePayloadBulk(model: (OtherProductShared | OtherBatchShared)[]) {
     const segregated = model.map((m) => Model.segregate(m));
     const transient = segregated.map((s) => s.transient || {});
 
@@ -519,6 +519,148 @@ describe("OtherProductShared contract version flow with relations", () => {
           NotFoundError
         );
       }
+    });
+  });
+
+  describe("batch Bulk Crud & query", () => {
+    let batchBulk: OtherBatchShared[];
+
+    beforeEach(() => {
+      ctx = getMockCtx();
+      Object.assign(ctx, { stub: stub });
+
+      transientSpy = jest.spyOn(
+        batchContract as any,
+        "getTransientData" as any
+      ) as jest.SpyInstance;
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it("Creates in bulk", async () => {
+      const models = new Array(10).fill(0).map((_, i) => {
+        const pc = generateGtin();
+        return new OtherBatchShared({
+          productCode: pc,
+          batchNumber: `BN${String(i).padStart(3, "0")}`,
+          expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        });
+      });
+
+      const payload = JSON.stringify(preparePayloadBulk(models));
+
+      batchBulk = JSON.parse(
+        await batchContract.createAll(ctx as any, payload)
+      ).map((r: any) => Model.deserialize(r));
+      stub.commit();
+
+      const newBulk: OtherBatchShared[] = [];
+      for (let i = 0; i < batchBulk.length; i++) {
+        expect(batchBulk[i].hasErrors()).toBeDefined();
+        const batch = await loadSharedBatch(
+          models[i].productCode,
+          models[i].batchNumber
+        );
+        expect(batch.hasErrors()).toBeUndefined();
+        newBulk.push(batch);
+      }
+
+      batchBulk = newBulk;
+    });
+
+    it("paginates via paginateBy", async () => {
+      let page = await batchContract.paginateBy(
+        ctx,
+        "batchNumber",
+        "asc",
+        JSON.stringify({ offset: 1, limit: 3 })
+      );
+      expect(page).toBeDefined();
+
+      const parsedPage = Paginator.deserialize(page);
+      expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
+      expect(parsedPage.data.length).toEqual(3);
+      expect(parsedPage.current).toEqual(1);
+      expect(parsedPage.bookmark).toBeTruthy();
+
+      const paginator = new FabricClientPaginator(
+        null as any,
+        null as any,
+        3,
+        OtherBatchShared
+      );
+
+      paginator.apply(parsedPage as any);
+
+      expect(paginator.current).toEqual(1);
+      expect(paginator.count).toEqual(10);
+      expect(paginator.total).toEqual(4);
+
+      page = await batchContract.paginateBy(
+        ctx,
+        "batchNumber",
+        "asc",
+        JSON.stringify({ offset: 2, limit: 3, bookmark: parsedPage.bookmark })
+      );
+      expect(page).toBeDefined();
+
+      const secondParsedPage = Paginator.deserialize(page);
+      expect(secondParsedPage.data.length).toEqual(3);
+      expect(secondParsedPage.current).toEqual(2);
+      expect(secondParsedPage.bookmark).toBeTruthy();
+      expect(secondParsedPage.bookmark).not.toEqual(parsedPage.bookmark);
+
+      paginator.apply(secondParsedPage as any);
+
+      expect(paginator.current).toEqual(2);
+      expect(paginator.count).toEqual(10);
+      expect(paginator.total).toEqual(4);
+    });
+
+    it("paginates via statement", async () => {
+      let page = await batchContract.statement(
+        ctx,
+        "paginateBy",
+        JSON.stringify(["batchNumber", "asc", { offset: 1, limit: 3 }])
+      );
+      expect(page).toBeDefined();
+
+      const parsedPage = Paginator.deserialize(page);
+      expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
+      expect(parsedPage.data.length).toEqual(3);
+      expect(parsedPage.current).toEqual(1);
+      expect(parsedPage.bookmark).toBeTruthy();
+
+      page = await batchContract.statement(
+        ctx,
+        "paginateBy",
+        JSON.stringify([
+          "batchNumber",
+          "asc",
+          { offset: 2, limit: 3, bookmark: parsedPage.bookmark },
+        ])
+      );
+      expect(page).toBeDefined();
+
+      const secondParsedPage = Paginator.deserialize(page);
+      expect(secondParsedPage.data.length).toEqual(3);
+      expect(secondParsedPage.current).toEqual(2);
+      expect(secondParsedPage.bookmark).toBeTruthy();
+      expect(secondParsedPage.bookmark).not.toEqual(parsedPage.bookmark);
+    });
+
+    it("lists via statement", async () => {
+      const listed = JSON.parse(
+        await batchContract.statement(
+          ctx as any,
+          "listBy",
+          JSON.stringify(["batchNumber", "asc"])
+        )
+      );
+      expect(listed).toBeDefined();
+      expect(listed.length).toEqual(batchBulk.length);
     });
   });
 
