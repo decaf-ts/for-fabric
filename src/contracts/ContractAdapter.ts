@@ -601,10 +601,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
                 let iterator = await (
                   stub as ChaincodeStub
-                ).getPrivateDataQueryResult(
-                  collection,
-                  JSON.stringify(query)
-                );
+                ).getPrivateDataQueryResult(collection, JSON.stringify(query));
                 iterator = (iterator as any).iterator || iterator;
 
                 const results: any[] = [];
@@ -649,8 +646,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     arrayIterator as unknown as Iterators.StateQueryIterator,
                   metadata: {
                     fetchedRecordsCount: results.length,
-                    bookmark:
-                      results.length >= limit ? lastKey || "" : "",
+                    bookmark: results.length >= limit ? lastKey : "",
                   },
                 };
               }
