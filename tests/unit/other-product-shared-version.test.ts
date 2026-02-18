@@ -406,8 +406,10 @@ describe("OtherProductShared contract version flow with relations", () => {
       );
       expect(listed).toBeDefined();
       expect(listed.length).toEqual(bulk.length);
-      // expect(listed.every((el) => el instanceof Product)).toEqual(true);
-      // expect(listed.every((el, i) => el.equals(bulk[i])).toEqual(true);
+      // expect(listed.every((el) => el instanceof OtherProductShared)).toEqual(
+      //   true
+      // );
+      // expect(listed.every((el, i) => el.equals(bulk[i]))).toEqual(true);
     });
 
     it("paginates via paginateBy", async () => {
@@ -550,7 +552,109 @@ describe("OtherProductShared contract version flow with relations", () => {
     });
   });
 
-  describe.skip("batch Bulk Crud & query", () => {
+  describe("batch single crud", () => {
+    beforeEach(() => {
+      ctx = getMockCtx();
+      Object.assign(ctx, { stub: stub });
+
+      transientSpy = jest.spyOn(
+        batchContract as any,
+        "getTransientData" as any
+      ) as jest.SpyInstance;
+    });
+
+    afterEach(() => {
+      jest.resetAllMocks();
+    });
+
+    let created: OtherBatchShared;
+
+    it("holds the correct metadata", () => {
+      const instance = new OtherBatchShared();
+      const properties = Metadata.properties(OtherBatchShared);
+      const validatableProperties =
+        Metadata.validatableProperties(OtherBatchShared);
+      const keys = Object.keys(instance);
+      expect(properties.length).toEqual(keys.length); // own-class properties only
+      expect(validatableProperties.length).toEqual(keys.length);
+    });
+
+    it("creates with shared data", async () => {
+      const baseModel = new OtherBatchShared({
+        productCode,
+        batchNumber: "test-batch",
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      });
+
+      const payload = preparePayload(baseModel);
+      created = Model.deserialize(
+        await batchContract.create(ctx as any, payload.serialize())
+      ) as OtherBatchShared;
+      stub.commit();
+
+      expect(created.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
+
+      const batch = await loadSharedBatch(productCode, baseModel.batchNumber);
+      expect(batch.hasErrors()).toBeUndefined();
+      created = batch;
+    });
+
+    it("reads the shared data", async () => {
+      const read = Model.deserialize(
+        await batchContract.read(ctx as any, created.id)
+      ) as OtherBatchShared;
+      expect(read.hasErrors()).toBeUndefined();
+      created = read;
+    });
+
+    let updated: OtherBatchShared;
+
+    it("update with shared data", async () => {
+      const baseModel = new OtherBatchShared({
+        ...created,
+        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      });
+
+      const payload = preparePayload(baseModel);
+      updated = Model.deserialize(
+        await batchContract.update(ctx as any, payload.serialize())
+      ) as OtherBatchShared;
+      stub.commit();
+
+      expect(updated.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
+
+      const batch = await loadSharedBatch(productCode, created.batchNumber);
+      expect(batch.hasErrors()).toBeUndefined();
+      updated = batch;
+    });
+
+    it("reads the shared data again", async () => {
+      const read = Model.deserialize(
+        await batchContract.read(ctx as any, created.id)
+      ) as OtherBatchShared;
+      expect(read.hasErrors()).toBeUndefined();
+      created = read;
+    });
+
+    it("deletes the shared data", async () => {
+      const deleted = Model.deserialize(
+        await batchContract.delete(ctx as any, created.id)
+      ) as OtherBatchShared;
+
+      stub.commit();
+      expect(deleted.hasErrors()).toBeUndefined();
+
+      const k = stub.createCompositeKey("other_product_shared", [
+        `${productCode}:${updated.id}`,
+      ]);
+      await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
+      await expect(
+        stub.getPrivateData("decaf-namespaceAeon", k)
+      ).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe("batch Bulk Crud & query", () => {
     let batchBulk: OtherBatchShared[];
 
     beforeEach(() => {
@@ -590,6 +694,35 @@ describe("OtherProductShared contract version flow with relations", () => {
         const batch = await loadSharedBatch(
           models[i].productCode,
           models[i].batchNumber
+        );
+        expect(batch.hasErrors()).toBeUndefined();
+        newBulk.push(batch);
+      }
+
+      batchBulk = newBulk;
+    });
+
+    it("updates in bulk", async () => {
+      const toUpdate = batchBulk.map((b, i) => {
+        return new OtherBatchShared({
+          ...b,
+          manufacturerName: `Manufacturer Name Update ${i}`,
+        });
+      });
+
+      const payload = JSON.stringify(preparePayloadBulk(toUpdate));
+
+      JSON.parse(await batchContract.updateAll(ctx as any, payload)).map(
+        (r: any) => Model.deserialize(r)
+      );
+      stub.commit();
+
+      const newBulk: OtherBatchShared[] = [];
+      for (let i = 0; i < batchBulk.length; i++) {
+        expect(batchBulk[i].hasErrors()).toBeUndefined();
+        const batch = await loadSharedBatch(
+          toUpdate[i].productCode,
+          toUpdate[i].batchNumber
         );
         expect(batch.hasErrors()).toBeUndefined();
         newBulk.push(batch);
@@ -689,108 +822,6 @@ describe("OtherProductShared contract version flow with relations", () => {
       );
       expect(listed).toBeDefined();
       expect(listed.length).toEqual(batchBulk.length);
-    });
-  });
-
-  describe.skip("batch single crud", () => {
-    beforeEach(() => {
-      ctx = getMockCtx();
-      Object.assign(ctx, { stub: stub });
-
-      transientSpy = jest.spyOn(
-        batchContract as any,
-        "getTransientData" as any
-      ) as jest.SpyInstance;
-    });
-
-    afterEach(() => {
-      jest.resetAllMocks();
-    });
-
-    let created: OtherBatchShared;
-
-    it("holds the correct metadata", () => {
-      const instance = new OtherBatchShared();
-      const properties = Metadata.properties(OtherBatchShared);
-      const validatableProperties =
-        Metadata.validatableProperties(OtherBatchShared);
-      const keys = Object.keys(instance);
-      expect(properties.length).toEqual(keys.length); // own-class properties only
-      expect(validatableProperties.length).toEqual(keys.length);
-    });
-
-    it("creates with shared data", async () => {
-      const baseModel = new OtherBatchShared({
-        productCode,
-        batchNumber: "test-batch",
-        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      });
-
-      const payload = preparePayload(baseModel);
-      created = Model.deserialize(
-        await batchContract.create(ctx as any, payload.serialize())
-      ) as OtherBatchShared;
-      stub.commit();
-
-      expect(created.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
-
-      const batch = await loadSharedBatch(productCode, baseModel.batchNumber);
-      expect(batch.hasErrors()).toBeUndefined();
-      created = batch;
-    });
-
-    it("reads the shared data", async () => {
-      const read = Model.deserialize(
-        await batchContract.read(ctx as any, created.id)
-      ) as OtherBatchShared;
-      expect(read.hasErrors()).toBeUndefined();
-      created = read;
-    });
-
-    let updated: OtherBatchShared;
-
-    it("update with shared data", async () => {
-      const baseModel = new OtherBatchShared({
-        ...created,
-        expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      });
-
-      const payload = preparePayload(baseModel);
-      updated = Model.deserialize(
-        await batchContract.update(ctx as any, payload.serialize())
-      ) as OtherBatchShared;
-      stub.commit();
-
-      expect(updated.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
-
-      const batch = await loadSharedBatch(productCode, created.batchNumber);
-      expect(batch.hasErrors()).toBeUndefined();
-      updated = batch;
-    });
-
-    it("reads the shared data again", async () => {
-      const read = Model.deserialize(
-        await batchContract.read(ctx as any, created.id)
-      ) as OtherBatchShared;
-      expect(read.hasErrors()).toBeUndefined();
-      created = read;
-    });
-
-    it("deletes the shared data", async () => {
-      const deleted = Model.deserialize(
-        await batchContract.delete(ctx as any, created.id)
-      ) as OtherBatchShared;
-
-      stub.commit();
-      expect(deleted.hasErrors()).toBeUndefined();
-
-      const k = stub.createCompositeKey("other_product_shared", [
-        `${productCode}:${updated.id}`,
-      ]);
-      await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
-      await expect(
-        stub.getPrivateData("decaf-namespaceAeon", k)
-      ).rejects.toThrow(NotFoundError);
     });
   });
 });
