@@ -462,7 +462,7 @@ export class FabricClientAdapter extends Adapter<
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
     const ctxArgs = [...(args as unknown as any[])];
-    let transient = ctxArgs.shift() as Record<string, any>;
+    const transient = ctxArgs.shift() as Record<string, any>;
     const { log, ctx } = this.logCtx(
       ctxArgs as ContextualArgs<Context<FabricClientFlags>>,
       this.updateAll
@@ -470,11 +470,9 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     log.info(`updating ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
-    transient =
-      transient &&
-      (Array.isArray(transient) ? transient : Object.keys(transient)).length
-        ? { [tableName]: transient }
-        : {};
+    const hasTransient = transient && Object.keys(transient).length > 0;
+    const transientPayload = hasTransient ? { [tableName]: transient } : {};
+
     const result = await this.submitTransaction(
       ctx,
       BulkCrudOperationKeys.UPDATE_ALL,
@@ -483,12 +481,10 @@ export class FabricClientAdapter extends Adapter<
           models.map((m) => this.serializer.serialize(m, clazz.name))
         ),
       ],
-      transient,
+      transientPayload as any,
       this.getEndorsingOrganizations(ctx),
       clazz.name
     );
-
-    const hasTransient = transient && Object.keys(transient).length > 0;
 
     let res: any;
     try {
