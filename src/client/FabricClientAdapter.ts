@@ -401,7 +401,9 @@ export class FabricClientAdapter extends Adapter<
         clazz,
         extractIds(
           clazz,
-          models.map((m, i) => Model.merge(m as any, res[i])),
+          models.map((m, i) =>
+            Model.merge(Object.assign({}, m as any, transient[i] || {}), res[i])
+          ),
           ids
         ),
         ctx
@@ -496,7 +498,17 @@ export class FabricClientAdapter extends Adapter<
     }
 
     if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, ids[0])) {
-      return this.readAll(clazz, extractIds(clazz, res, ids), ctx);
+      return this.readAll(
+        clazz,
+        extractIds(
+          clazz,
+          models.map((m, i) =>
+            Model.merge(Object.assign({}, m as any, transient[i] || {}), res[i])
+          ),
+          ids
+        ),
+        ctx
+      );
     }
     return res;
   }
@@ -734,7 +746,15 @@ export class FabricClientAdapter extends Adapter<
     if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, id)) {
       return this.read(
         clazz,
-        extractIds(clazz, Model.merge(model, deserialized), id),
+        extractIds(
+          clazz,
+          Model.merge(
+            Object.assign({}, model, transient || {}),
+            deserialized,
+            clazz
+          ),
+          id
+        ),
         ctx
       );
     }
@@ -848,7 +868,15 @@ export class FabricClientAdapter extends Adapter<
     if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, id)) {
       return this.read(
         clazz,
-        extractIds(clazz, Model.merge(model, deserialized), id),
+        extractIds(
+          clazz,
+          Model.merge(
+            Object.assign({}, model, transient || {}),
+            deserialized,
+            clazz
+          ),
+          id
+        ),
         ctx
       );
     }
