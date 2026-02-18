@@ -14,7 +14,6 @@ import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
 import { type FabricClientAdapter } from "./FabricClientAdapter";
-import { SegregatedModel } from "../shared/types";
 import {
   OperationKeys,
   PrimaryKeyType,
@@ -450,21 +449,6 @@ export class FabricClientRepository<
     return Promise.all(
       created.map(async (r, i) => {
         const id = ids[i];
-        if (
-          this.shouldRefreshAfterWrite(prepared[i], ctx) &&
-          id !== undefined &&
-          id !== null
-        ) {
-          const refreshed = await this.adapter.read(this.class, id, ctx);
-          return this.adapter.revert<M>(
-            refreshed,
-            this.class,
-            id,
-            ctx.get("rebuildWithTransient") ? prepared[i].transient : undefined,
-            ctx
-          );
-        }
-
         return this.adapter.revert<M>(r, this.class, id, transients[i], ctx);
       })
     );
@@ -492,20 +476,6 @@ export class FabricClientRepository<
     return Promise.all(
       updated.map(async (u, i) => {
         const id = ids[i];
-        if (
-          this.shouldRefreshAfterWrite(prepared[i], ctx) &&
-          id !== undefined &&
-          id !== null
-        ) {
-          const refreshed = await this.adapter.read(this.class, id, ctx);
-          return this.adapter.revert<M>(
-            refreshed,
-            this.class,
-            id,
-            ctx.get("rebuildWithTransient") ? prepared[i].transient : undefined,
-            ctx
-          );
-        }
         return this.adapter.revert<M>(
           u,
           this.class,
@@ -514,22 +484,6 @@ export class FabricClientRepository<
           ctx
         );
       })
-    );
-  }
-
-  private shouldRefreshAfterWrite(
-    prepared: SegregatedModel<M>,
-    ctx: ContextOf<A>
-  ): boolean {
-    const hasPrivate =
-      prepared.privates && Object.keys(prepared.privates).length > 0;
-    const hasShared =
-      prepared.shared && Object.keys(prepared.shared).length > 0;
-    return (
-      hasPrivate ||
-      hasShared ||
-      !!ctx.getOrUndefined("segregated") ||
-      !!ctx.getOrUndefined("mirror")
     );
   }
 
