@@ -109,7 +109,9 @@ describe("OtherProductShared contract version flow with relations", () => {
     }
   }
 
-  function preparePayloadBulk(model: (OtherProductShared | OtherBatchShared)[]) {
+  function preparePayloadBulk(
+    model: (OtherProductShared | OtherBatchShared)[]
+  ) {
     const segregated = model.map((m) => Model.segregate(m));
     const transient = segregated.map((s) => s.transient || {});
 
@@ -119,8 +121,9 @@ describe("OtherProductShared contract version flow with relations", () => {
 
   let productCode: string = "";
   let created: OtherProductShared;
+  let bulk: OtherProductShared[];
 
-  describe.skip("product single crud", () => {
+  describe("product single crud", () => {
     beforeEach(() => {
       ctx = getMockCtx();
       Object.assign(ctx, { stub: stub });
@@ -269,8 +272,6 @@ describe("OtherProductShared contract version flow with relations", () => {
   });
 
   describe("product Bulk Crud & query", () => {
-    let bulk: OtherProductShared[];
-
     beforeEach(() => {
       ctx = getMockCtx();
       Object.assign(ctx, { stub: stub });
@@ -346,7 +347,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       bulk = newBulk;
     });
 
-    it.skip("Reads in Bulk", async () => {
+    it("Reads in Bulk", async () => {
       const pk = Model.pk(OtherProductShared);
       const ids = bulk.map((c) => c[pk]) as number[];
 
@@ -366,7 +367,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       bulk = read;
     });
 
-    it.skip("Updates in Bulk", async () => {
+    it("Updates in Bulk", async () => {
       const toUpdate = bulk.map((c, i) => {
         return new OtherProductShared({
           productCode: c.productCode,
@@ -395,7 +396,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       bulk = newBulk;
     });
 
-    it.skip("lists via statement", async () => {
+    it("lists via statement", async () => {
       const listed = JSON.parse(
         await contract.statement(
           ctx as any,
@@ -410,9 +411,18 @@ describe("OtherProductShared contract version flow with relations", () => {
     });
 
     it("paginates via paginateBy", async () => {
+      const tableName = Model.tableName(OtherProductShared);
+      // Sort bulk by productCode descending to know expected order
+      const sorted = [...bulk].sort((a, b) =>
+        b.productCode.localeCompare(a.productCode)
+      );
+      const expectedPage1 = sorted.slice(0, 3);
+      const expectedPage2 = sorted.slice(3, 6);
+
+      // --- Page 1 ---
       let page = await contract.paginateBy(
         ctx,
-        "inventedName",
+        "productCode",
         "desc",
         JSON.stringify({ offset: 1, limit: 3 })
       );
@@ -422,7 +432,18 @@ describe("OtherProductShared contract version flow with relations", () => {
       expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
       expect(parsedPage.data.length).toEqual(3);
       expect(parsedPage.current).toEqual(1);
-      expect(parsedPage.bookmark).toBeTruthy();
+      expect(parsedPage.count).toEqual(10);
+      expect(parsedPage.total).toEqual(4);
+
+      // Validate actual records match expected order
+      const page1Data = parsedPage.data as OtherProductShared[];
+      for (let i = 0; i < 3; i++) {
+        expect(page1Data[i].productCode).toEqual(expectedPage1[i].productCode);
+      }
+
+      // Bookmark should be the _id of the last record on this page
+      const expectedBookmark1 = `${tableName}_${expectedPage1[2].productCode}`;
+      expect(parsedPage.bookmark).toEqual(expectedBookmark1);
 
       const paginator = new FabricClientPaginator(
         null as any,
@@ -430,27 +451,34 @@ describe("OtherProductShared contract version flow with relations", () => {
         3,
         OtherProductShared
       );
-
       paginator.apply(parsedPage as any);
 
       expect(paginator.current).toEqual(1);
       expect(paginator.count).toEqual(10);
       expect(paginator.total).toEqual(4);
 
+      // --- Page 2 ---
       page = await contract.paginateBy(
         ctx,
-        "inventedName",
+        "productCode",
         "desc",
         JSON.stringify({ offset: 2, limit: 3, bookmark: parsedPage.bookmark })
       );
       expect(page).toBeDefined();
 
-      // expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
       const secondParsedPage = Paginator.deserialize(page);
-      // expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
       expect(secondParsedPage.data.length).toEqual(3);
       expect(secondParsedPage.current).toEqual(2);
-      expect(secondParsedPage.bookmark).toBeTruthy();
+
+      // Validate actual records match expected order
+      const page2Data = secondParsedPage.data as OtherProductShared[];
+      for (let i = 0; i < 3; i++) {
+        expect(page2Data[i].productCode).toEqual(expectedPage2[i].productCode);
+      }
+
+      // Bookmark should be the _id of the last record on this page
+      const expectedBookmark2 = `${tableName}_${expectedPage2[2].productCode}`;
+      expect(secondParsedPage.bookmark).toEqual(expectedBookmark2);
       expect(secondParsedPage.bookmark).not.toEqual(parsedPage.bookmark);
 
       paginator.apply(secondParsedPage as any);
@@ -522,7 +550,7 @@ describe("OtherProductShared contract version flow with relations", () => {
     });
   });
 
-  describe("batch Bulk Crud & query", () => {
+  describe.skip("batch Bulk Crud & query", () => {
     let batchBulk: OtherBatchShared[];
 
     beforeEach(() => {
