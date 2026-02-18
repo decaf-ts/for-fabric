@@ -14,6 +14,7 @@ import { audit } from "./decorators";
 import { gtin } from "./gtin";
 import {
   FabricFlavour,
+  mirror,
   NamespaceCollection,
   sharedData,
 } from "../../shared/index";
@@ -27,6 +28,7 @@ import {
 export class OtherBatchShared extends BaseIdentifiedModel {
   @pk()
   @audit(OtherBatchShared)
+  // @mirror("mirror-collection", "org-a")
   @composed(["productCode", "batchNumber"], ":")
   @description("Unique identifier composed of product code and batch number.")
   id!: string;

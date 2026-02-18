@@ -7,7 +7,12 @@ import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { gtin } from "./gtin";
 
 import { audit } from "./decorators";
-import { FabricFlavour, ownedBy, privateData } from "../../shared/index";
+import {
+  FabricFlavour,
+  mirror,
+  ownedBy,
+  privateData,
+} from "../../shared/index";
 import { version } from "@decaf-ts/db-decorators";
 
 @privateData()
@@ -18,6 +23,7 @@ import { version } from "@decaf-ts/db-decorators";
 export class OtherProduct extends BaseIdentifiedModel {
   @pk()
   @gtin()
+  // @mirror("mirror-collection", "org-a")
   @audit(OtherProduct)
   productCode!: string;
 

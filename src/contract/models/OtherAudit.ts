@@ -26,6 +26,7 @@ import { BaseModel } from "./BaseModel";
 import { AuditOperations } from "./constants";
 import {
   FabricFlavour,
+  mirror,
   NamespaceCollection,
   sharedData,
   transactionId,
@@ -53,7 +54,7 @@ function uuidSeed(m: OtherAudit, ...args: ContextualArgs<any>) {
 export class OtherAudit extends BaseModel {
   @pk()
   @uuid(uuidSeed)
-  // @mirror("mirror-collection", "main-org", (mspId: string) => mspId === "main-org")
+  // @mirror("mirror-collection", "org-a")
   @description("Unique identifier of the audit record.")
   id!: string;
 

@@ -13,6 +13,7 @@ import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { gtin } from "./gtin";
 import {
   FabricFlavour,
+  mirror,
   NamespaceCollection,
   sharedData,
 } from "../../shared/index";

@@ -164,9 +164,9 @@ describe("OtherProductShared contract version flow with relations", () => {
 
       expect(created.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
 
-      const product = await loadSharedProduct(productCode);
-      expect(product.hasErrors()).toBeUndefined();
-      await assertSharedRelations(product);
+      created = await loadSharedProduct(productCode);
+      expect(created.hasErrors()).toBeUndefined();
+      await assertSharedRelations(created);
 
       const owner = await loadPublicOwner(productCode);
       expect(owner.hasErrors()).toBeUndefined();
@@ -644,8 +644,8 @@ describe("OtherProductShared contract version flow with relations", () => {
       stub.commit();
       expect(deleted.hasErrors()).toBeUndefined();
 
-      const k = stub.createCompositeKey("other_product_shared", [
-        `${productCode}:${updated.id}`,
+      const k = stub.createCompositeKey("other_batch_shared", [
+        `${productCode}:${created.id}`,
       ]);
       await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
       await expect(
@@ -822,6 +822,29 @@ describe("OtherProductShared contract version flow with relations", () => {
       );
       expect(listed).toBeDefined();
       expect(listed.length).toEqual(batchBulk.length);
+    });
+
+    it("Deletes in Bulk", async () => {
+      const pk = Model.pk(OtherBatchShared);
+      const ids = batchBulk.map((c) => c[pk]) as number[];
+
+      const deleted: OtherBatchShared[] = JSON.parse(
+        await batchContract.deleteAll(ctx as any, JSON.stringify(ids))
+      ).map((r: any) => Model.deserialize(r));
+
+      stub.commit();
+
+      let count = 0;
+      for (const b of deleted) {
+        expect(b.hasErrors()).toBeDefined();
+        const k = stub.createCompositeKey("other_batch_shared", [
+          ids[count++].toString(),
+        ]);
+        await expect(stub.getState(k)).rejects.toThrow(NotFoundError);
+        await expect(
+          stub.getPrivateData("decaf-namespaceAeon", k)
+        ).rejects.toThrow(NotFoundError);
+      }
     });
   });
 });
