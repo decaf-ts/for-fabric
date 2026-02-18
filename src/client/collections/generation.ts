@@ -1,4 +1,3 @@
-import { OrderDirection } from "@decaf-ts/core";
 import { Constructor } from "@decaf-ts/decoration";
 import { CouchDBDesignDoc } from "@decaf-ts/for-couchdb";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -6,14 +5,6 @@ import { InternalError } from "@decaf-ts/db-decorators";
 import { CollectionResolver } from "../../shared/index";
 import { writeDesignDocs } from "../indexes/generation";
 
-export type Index = {
-  index: {
-    fields: string[] | { [k: string]: OrderDirection };
-  };
-  ddoc?: string;
-  name: string;
-  type: "json";
-};
 //
 // export type FabricCollection = {
 //   name: "collectionMarbles";

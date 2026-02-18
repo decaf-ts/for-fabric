@@ -77,6 +77,7 @@ import { FabricClientFlags } from "./types";
 import { DefaultFabricClientFlags } from "./constants";
 import fs from "fs";
 import { CryptoUtils } from "./crypto";
+import { extractIds } from "./ids/id-extraction";
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -381,15 +382,25 @@ export class FabricClientAdapter extends Adapter<
       clazz.name
     );
 
-    if (this.shouldRefreshAfterWrite(ctx, hasTransient, ids[0])) {
-      return this.readAll(clazz, ids, ctx);
-    }
-
+    let res: Record<string, any>[];
     try {
-      return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
+      res = JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
     } catch (e: unknown) {
       throw new SerializationError(e as Error);
     }
+
+    if (
+      this.shouldRefreshAfterWrite(
+        clazz,
+        ctx,
+        hasTransient,
+        res[0][Model.pk(clazz) as string] || ids[0]
+      )
+    ) {
+      return this.readAll(clazz, ids, ctx);
+    }
+
+    return res;
   }
 
   /**
@@ -469,15 +480,17 @@ export class FabricClientAdapter extends Adapter<
 
     const hasTransient = transient && Object.keys(transient).length > 0;
 
-    if (this.shouldRefreshAfterWrite(ctx, hasTransient, ids[0])) {
-      return this.readAll(clazz, ids, ctx);
-    }
-
+    let res: any;
     try {
-      return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
+      res = JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
     } catch (e: unknown) {
       throw new SerializationError(e as Error);
     }
+
+    if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, ids[0])) {
+      return this.readAll(clazz, extractIds(clazz, res, ids), ctx);
+    }
+    return res;
   }
 
   /**
@@ -498,7 +511,7 @@ export class FabricClientAdapter extends Adapter<
 
     const hasTransient = Model.isTransient(clazz);
     let result: any;
-    if (this.shouldRefreshAfterWrite(ctx, hasTransient, ids[0])) {
+    if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, ids[0])) {
       result = await this.readAll(clazz, ids, ...ctxArgs);
     }
 
@@ -639,15 +652,25 @@ export class FabricClientAdapter extends Adapter<
     return undefined;
   }
 
-  private shouldRefreshAfterWrite(
+  private shouldRefreshAfterWrite<M extends Model>(
+    clazz: Constructor<M>,
     ctx: Context<FabricClientFlags>,
     hasTransient: boolean,
     id?: PrimaryKeyType
   ): boolean {
     if (!hasTransient) return false;
-    if (id === undefined || id === null) return false;
-    if (ctx.getOrUndefined("mirror")) return false;
-    return true;
+    const pk = Model.pk(clazz);
+    const composed = Model.composed(clazz, pk);
+    const generated = Model.generated(clazz, pk);
+    const hasId = id !== undefined && id !== null;
+    if (!hasId && composed) return true;
+    if (!hasId && generated) {
+      ctx.logger.warn(
+        `Cannot refresh record with private generated primary key`
+      );
+      return false;
+    }
+    return hasId;
   }
 
   private getEndorsingOrganizations(
@@ -700,8 +723,8 @@ export class FabricClientAdapter extends Adapter<
       clazz.name
     );
     const deserialized = this.serializer.deserialize(this.decode(result));
-    if (this.shouldRefreshAfterWrite(ctx, hasTransient, id)) {
-      return this.read(clazz, id, ctx);
+    if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, id)) {
+      return this.read(clazz, extractIds(clazz, deserialized, id), ctx);
     }
     return deserialized;
   }
@@ -810,8 +833,8 @@ export class FabricClientAdapter extends Adapter<
       clazz.name
     );
     const deserialized = this.serializer.deserialize(this.decode(result));
-    if (this.shouldRefreshAfterWrite(ctx, hasTransient, id)) {
-      return this.read(clazz, id, ctx);
+    if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, id)) {
+      return this.read(clazz, extractIds(clazz, deserialized, id), ctx);
     }
     return deserialized;
   }
@@ -834,7 +857,7 @@ export class FabricClientAdapter extends Adapter<
     const tableName = Model.tableName(clazz);
     const hasTransient = Model.isTransient(clazz);
     let result: any;
-    if (this.shouldRefreshAfterWrite(ctx, hasTransient, id)) {
+    if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, id)) {
       result = await this.read(clazz, id, ctx);
     }
 
