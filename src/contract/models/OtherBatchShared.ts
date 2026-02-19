@@ -28,7 +28,7 @@ import {
 export class OtherBatchShared extends BaseIdentifiedModel {
   @pk()
   @audit(OtherBatchShared)
-  // @mirror("mirror-collection", "org-a")
+  @mirror("mirror-collection", "org-b")
   @composed(["productCode", "batchNumber"], ":")
   @description("Unique identifier composed of product code and batch number.")
   id!: string;

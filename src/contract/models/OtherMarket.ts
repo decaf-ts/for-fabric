@@ -25,7 +25,7 @@ import {
 @model()
 export class OtherMarket extends BaseIdentifiedModel {
   @pk({ type: String, generated: false })
-  // @mirror("mirror-collection", "org-a")
+  @mirror("mirror-collection", "org-b")
   @composed(["productCode", "marketId"], ":", true)
   @description("Unique identifier composed of product code and market ID.")
   id!: string;

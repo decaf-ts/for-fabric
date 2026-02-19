@@ -29,7 +29,7 @@ function strengthSeed(m: OtherProductStrength) {
 @description("Represents the product’s strength and composition details.")
 export class OtherProductStrength extends BaseIdentifiedModel {
   @pk()
-  // @mirror("mirror-collection", "org-a")
+  @mirror("mirror-collection", "org-b")
   @composed(["productCode", "uuid"], ":")
   @description("Unique identifier of the product strength.")
   id!: string;

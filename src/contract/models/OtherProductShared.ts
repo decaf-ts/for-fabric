@@ -35,7 +35,7 @@ export class OtherProductShared extends BaseIdentifiedModel {
   @pk()
   @gtin()
   @assignProductOwner()
-  // @mirror("mirror-collection", "org-a")
+  @mirror("mirror-collection", "org-b")
   @audit(OtherProductShared)
   productCode!: string;
 
