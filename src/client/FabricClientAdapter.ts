@@ -91,6 +91,7 @@ type LegacyPeerTarget = {
   mspId: string;
   peerEndpoint: string;
   peerHostAlias?: string;
+  tlsCert?: string | Buffer;
 };
 
 type LegacyPeerWithName = LegacyPeerTarget & { name: string };
@@ -1214,14 +1215,49 @@ export class FabricClientAdapter extends Adapter<
     return map;
   }
 
-  private buildLegacyPeerConfigs(): LegacyPeerTarget[] {
-    return [
+  private buildLegacyPeerConfigs(
+    ctx: Context<FabricClientFlags>
+  ): LegacyPeerTarget[] {
+    const peers: LegacyPeerTarget[] = [
       {
         mspId: this.config.mspId,
         peerEndpoint: this.config.peerEndpoint,
         peerHostAlias: this.config.peerHostAlias,
+        tlsCert: this.config.tlsCert,
       },
     ];
+
+    const endorsers =
+      this.getEndorsingOrganizations(ctx)?.filter(
+        (org): org is string => Boolean(org)
+      ) || [];
+    const extras = endorsers.filter((org) => org !== this.config.mspId);
+    if (!extras.length) return peers;
+
+    const map = this.config.mspMap;
+    for (const msp of extras) {
+      const candidates = map?.[msp];
+      if (!candidates?.length) {
+        throw new UnsupportedError(
+          `No peer mapping available for MSP ${msp}. Provide it via config.mspMap`
+        );
+      }
+      const choice =
+        candidates[Math.floor(Math.random() * candidates.length)];
+      if (!choice.endpoint) {
+        throw new UnsupportedError(
+          `Invalid peer mapping for MSP ${msp}: missing endpoint`
+        );
+      }
+      peers.push({
+        mspId: msp,
+        peerEndpoint: choice.endpoint,
+        peerHostAlias: choice.alias,
+        tlsCert: choice.tlsCert || this.config.tlsCert,
+      });
+    }
+
+    return peers;
   }
 
   private async submitLegacyWithExplicitEndorsers(
@@ -1234,7 +1270,6 @@ export class FabricClientAdapter extends Adapter<
   ): Promise<Uint8Array> {
     const log = this.log.for(this.submitLegacyWithExplicitEndorsers);
     const peers = this.normalizeLegacyPeers(peerConfigs);
-    const tlsPem = await this.readPemInput(this.config.tlsCert);
     const identityMaterial = await this.resolveLegacyIdentityMaterial();
     const wallet = await Wallets.newInMemoryWallet();
     const identityLabel = `${this.config.mspId}-legacy`;
@@ -1247,7 +1282,7 @@ export class FabricClientAdapter extends Adapter<
       type: "X.509",
     } as Identity);
 
-    const connectionProfile = this.buildLegacyConnectionProfile(peers, tlsPem);
+    const connectionProfile = await this.buildLegacyConnectionProfile(peers);
     const gateway = new LegacyGateway();
 
     try {
@@ -1332,14 +1367,14 @@ export class FabricClientAdapter extends Adapter<
     return { certificate, privateKey };
   }
 
-  private buildLegacyConnectionProfile(
-    peers: LegacyPeerWithName[],
-    tlsPem: string
-  ) {
+  private async buildLegacyConnectionProfile(peers: LegacyPeerWithName[]) {
     const peerEntries: Record<string, any> = {};
     const channelPeers: Record<string, any> = {};
     const orgs: Record<string, any> = {};
-    peers.forEach((peer) => {
+    for (const peer of peers) {
+      const tlsPem = await this.readPemInput(
+        peer.tlsCert || this.config.tlsCert
+      );
       const hostname =
         peer.peerHostAlias || this.extractHost(peer.peerEndpoint);
       peerEntries[peer.name] = {
@@ -1361,7 +1396,7 @@ export class FabricClientAdapter extends Adapter<
         peers: [],
       };
       orgs[peer.mspId].peers.push(peer.name);
-    });
+    }
 
     return {
       name: "legacy-manual",
@@ -1442,7 +1477,7 @@ export class FabricClientAdapter extends Adapter<
     if (this.shouldUseLegacyGateway(ctx)) {
       const legacyArgs = this.prepareLegacyArgs(args);
       const transientMap = this.buildLegacyTransient(transientData);
-      const peerConfigs = this.buildLegacyPeerConfigs();
+      const peerConfigs = this.buildLegacyPeerConfigs(ctx);
       return this.submitLegacyWithExplicitEndorsers(
         ctx,
         api,

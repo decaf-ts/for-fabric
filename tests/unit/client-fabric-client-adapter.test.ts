@@ -1,6 +1,10 @@
 import "reflect-metadata";
 
-import { InternalError, OperationKeys } from "@decaf-ts/db-decorators";
+import {
+  InternalError,
+  OperationKeys,
+  UnsupportedError,
+} from "@decaf-ts/db-decorators";
 import { Context, PreparedStatementKeys } from "@decaf-ts/core";
 import { ModelKeys } from "@decaf-ts/decorator-validation";
 import { ERC20Wallet } from "../../src/contracts/erc20/models";
@@ -81,12 +85,27 @@ const mockKeyPem =
 const mockCertPem =
   "-----BEGIN CERTIFICATE-----\nMIIC0jCCAbqgAwIBAgIJAJEd\n-----END CERTIFICATE-----";
 
+const MIRROR_MSP = "MirrorMSP";
+
 const config: PeerConfig = {
   cryptoPath: "/tmp",
   keyCertOrDirectoryPath: mockKeyPem,
   certCertOrDirectoryPath: mockCertPem,
   tlsCert: mockCertPem,
   allowGatewayOverride: false,
+  mspMap: {
+    [MIRROR_MSP]: [
+      {
+        endpoint: "mirror-peer-1:8051",
+        alias: "peer0.mirror.example.com",
+        tlsCert: mockCertPem,
+      },
+      {
+        endpoint: "mirror-peer-2:9051",
+        alias: "peer1.mirror.example.com",
+      },
+    ],
+  },
   peerEndpoint: "localhost:7051",
   peerHostAlias: "peer0.org1.example.com",
   chaincodeName: "erc20",
@@ -283,7 +302,12 @@ describe("FabricClientAdapter", () => {
     expect(method).toBe("create");
     expect(args).toEqual([JSON.stringify(payload)]);
     expect(transientMap.private.toString()).toBe(JSON.stringify("secret"));
-    expect(peerConfigs[0].peerEndpoint).toBe(config.peerEndpoint);
+    expect(peerConfigs[0]).toMatchObject({
+      mspId: config.mspId,
+      peerEndpoint: config.peerEndpoint,
+      peerHostAlias: config.peerHostAlias,
+      tlsCert: config.tlsCert,
+    });
     legacySpy.mockRestore();
   });
 
@@ -299,6 +323,48 @@ describe("FabricClientAdapter", () => {
 
     expect(txnSpy).toHaveBeenCalled();
     txnSpy.mockRestore();
+  });
+
+  it("adds mapped peers for additional endorsers when submitting legacy transactions", async () => {
+    const adapter = newAdapter({ allowGatewayOverride: true });
+    const legacySpy = jest
+      .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
+      .mockResolvedValue(new TextEncoder().encode("legacy"));
+    const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.75);
+    const ctx = createContext();
+    ctx.accumulate({
+      legacy: true,
+      endorsingOrgs: [config.mspId, MIRROR_MSP],
+    });
+
+    await adapter.submitTransaction(ctx, "create");
+
+    const peerConfigs = legacySpy.mock.calls[0][4];
+    expect(peerConfigs).toHaveLength(2);
+    expect(peerConfigs[1]).toMatchObject({
+      mspId: MIRROR_MSP,
+      peerEndpoint: "mirror-peer-2:9051",
+      peerHostAlias: "peer1.mirror.example.com",
+      tlsCert: config.tlsCert,
+    });
+    randomSpy.mockRestore();
+    legacySpy.mockRestore();
+  });
+
+  it("throws when required MSP is missing from mspMap", async () => {
+    const adapter = newAdapter({
+      allowGatewayOverride: true,
+      mspMap: {},
+    });
+    const ctx = createContext();
+    ctx.accumulate({
+      legacy: true,
+      endorsingOrgs: [config.mspId, "UnknownMSP"],
+    });
+
+    await expect(adapter.submitTransaction(ctx, "create")).rejects.toThrow(
+      UnsupportedError
+    );
   });
 
   it("refreshes model after create when transient data exist", async () => {
@@ -790,17 +856,18 @@ describe("FabricClientAdapter", () => {
       const ctx = createContext();
       ctx.accumulate({ legacy: true });
 
-      await adapter.submitTransaction(ctx, "create");
+    await adapter.submitTransaction(ctx, "create");
 
-      const calledPeerConfigs = legacySpy.mock.calls[0][4];
-      expect(calledPeerConfigs).toEqual([
-        {
-          mspId: config.mspId,
-          peerEndpoint: config.peerEndpoint,
-          peerHostAlias: config.peerHostAlias,
-        },
-      ]);
-    });
+    const calledPeerConfigs = legacySpy.mock.calls[0][4];
+    expect(calledPeerConfigs).toEqual([
+      {
+        mspId: config.mspId,
+        peerEndpoint: config.peerEndpoint,
+        peerHostAlias: config.peerHostAlias,
+        tlsCert: config.tlsCert,
+      },
+    ]);
+  });
 
     it("builds a manual connection profile using provided peers", async () => {
       const adapter = newAdapter({ allowGatewayOverride: true });
@@ -816,6 +883,29 @@ describe("FabricClientAdapter", () => {
       const peerName = Object.keys(profile.peers || {})[0];
       expect(peerName).toContain(config.mspId);
       expect(profile.channels[config.channel]).toBeDefined();
+    });
+
+    it("builds connection profile including mapped mirror peers", async () => {
+      const adapter = newAdapter({ allowGatewayOverride: true });
+      const ctx = createContext();
+      const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0);
+      ctx.accumulate({
+        legacy: true,
+        endorsingOrgs: [config.mspId, MIRROR_MSP],
+      });
+
+      await adapter.submitTransaction(ctx, "create", ["payload"]);
+
+      const [profile] =
+        legacyGatewayConnectMock.mock.calls[
+          legacyGatewayConnectMock.mock.calls.length - 1
+        ];
+      expect(Object.keys(profile.peers || {})).toHaveLength(2);
+      const tlsValues = Object.values(profile.peers || {}).map(
+        (entry: any) => entry.tlsCACerts.pem
+      );
+      expect(tlsValues).toContain(mockCertPem);
+      randomSpy.mockRestore();
     });
   });
 
