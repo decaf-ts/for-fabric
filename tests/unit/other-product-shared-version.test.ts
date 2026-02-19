@@ -6,7 +6,7 @@ import { getMockCtx, getStubMock } from "./ContextMock";
 import { OtherProductSharedContract } from "../../src/contract/OtherProductSharedContract";
 import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
 import { generateGtin } from "../../src/contract/models/gtin";
-import { Paginator } from "@decaf-ts/core";
+import { AuthorizationError, Paginator } from "@decaf-ts/core";
 import { OtherMarket } from "../../src/contract/models/OtherMarket";
 import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
 import { GtinOwner } from "../../src/contract/models/GtinOwner";
@@ -119,6 +119,38 @@ describe("OtherProductShared contract version flow with relations", () => {
     return segregated.map((s) => s.model.serialize());
   }
 
+  async function expectInMirrorCollection(tableName: string, id: string) {
+    const k = stub.createCompositeKey(tableName, [id]);
+    const data = await stub.getPrivateData("mirror-collection", k);
+    const parsed = JSON.parse(Buffer.from(data).toString("utf8"));
+    expect(parsed).toBeDefined();
+    return parsed;
+  }
+
+  async function assertMirrorCopies(product: OtherProductShared) {
+    const mirror = await expectInMirrorCollection(
+      "other_product_shared",
+      product.productCode
+    );
+    expect(mirror.productCode).toBe(product.productCode);
+     expect(mirror.inventedName).toBe(product.inventedName);
+     expect(mirror.nameMedicinalProduct).toBe(product.nameMedicinalProduct);
+
+    const marketIds = (product.markets || []).map((m) =>
+      typeof m === "object" ? (m as OtherMarket).id : m
+    );
+    for (const marketId of marketIds) {
+      await expectInMirrorCollection("market", marketId as string);
+    }
+
+    const strengthIds = (product.strengths || []).map((s) =>
+      typeof s === "object" ? (s as OtherProductStrength).id : s
+    );
+    for (const strengthId of strengthIds) {
+      await expectInMirrorCollection("product_strength", strengthId as string);
+    }
+  }
+
   let productCode: string = "";
   let created: OtherProductShared;
   let bulk: OtherProductShared[];
@@ -167,6 +199,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       created = await loadSharedProduct(productCode);
       expect(created.hasErrors()).toBeUndefined();
       await assertSharedRelations(created);
+      await assertMirrorCopies(created);
 
       const owner = await loadPublicOwner(productCode);
       expect(owner.hasErrors()).toBeUndefined();
@@ -198,6 +231,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       const product = await loadSharedProduct(productCode);
       expect(product.hasErrors()).toBeUndefined();
       await assertSharedRelations(product);
+      await assertMirrorCopies(product);
 
       const owner = await loadPublicOwner(productCode);
       expect(owner.hasErrors()).toBeUndefined();
@@ -209,6 +243,39 @@ describe("OtherProductShared contract version flow with relations", () => {
       ) as OtherProductShared;
       expect(read.hasErrors()).toBeUndefined();
       created = read;
+    });
+
+    it("non-mirror reads ignore mirror collection mutations", async () => {
+      const key = stub.createCompositeKey("other_product_shared", [
+        productCode,
+      ]);
+      const originalMirror = JSON.parse(
+        Buffer.from(
+          await stub.getPrivateData("mirror-collection", key)
+        ).toString("utf8")
+      );
+      const mutated = {
+        ...originalMirror,
+        inventedName: "MIRROR_ONLY_VALUE",
+      };
+      await stub.putPrivateData(
+        "mirror-collection",
+        key,
+        Buffer.from(JSON.stringify(mutated))
+      );
+
+      const read = Model.deserialize(
+        await contract.read(ctx as any, productCode)
+      ) as OtherProductShared;
+      expect(read.hasErrors()).toBeUndefined();
+      expect(read.inventedName).toBe(created.inventedName);
+      expect(read.inventedName).not.toBe("MIRROR_ONLY_VALUE");
+
+      await stub.putPrivateData(
+        "mirror-collection",
+        key,
+        Buffer.from(JSON.stringify(originalMirror))
+      );
     });
 
     let updated: OtherProductShared;
@@ -238,6 +305,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       updated = await loadSharedProduct(productCode);
       expect(updated.hasErrors()).toBeUndefined();
       await assertSharedRelations(updated);
+      await assertMirrorCopies(updated);
 
       expect(updated.version).toBe(3);
       expect(updated.strengths).toHaveLength(2);
@@ -337,6 +405,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         const newObj = await loadSharedProduct(productCode);
         expect(newObj.hasErrors()).toBeUndefined();
         await assertSharedRelations(newObj);
+        await assertMirrorCopies(newObj);
 
         const owner = await loadPublicOwner(productCode);
         expect(owner.hasErrors()).toBeUndefined();
@@ -596,6 +665,7 @@ describe("OtherProductShared contract version flow with relations", () => {
 
       const batch = await loadSharedBatch(productCode, baseModel.batchNumber);
       expect(batch.hasErrors()).toBeUndefined();
+      await expectInMirrorCollection("other_batch_shared", batch.id);
       created = batch;
     });
 
@@ -696,6 +766,7 @@ describe("OtherProductShared contract version flow with relations", () => {
           models[i].batchNumber
         );
         expect(batch.hasErrors()).toBeUndefined();
+        await expectInMirrorCollection("other_batch_shared", batch.id);
         newBulk.push(batch);
       }
 
@@ -845,6 +916,349 @@ describe("OtherProductShared contract version flow with relations", () => {
           stub.getPrivateData("decaf-namespaceAeon", k)
         ).rejects.toThrow(NotFoundError);
       }
+    });
+  });
+
+  describe("mirror behavior with org-b identity", () => {
+    let mirrorProducts: OtherProductShared[];
+    let mirrorBatches: OtherBatchShared[];
+
+    function getOrgBCtx() {
+      const baseCtx = getMockCtx();
+      const orgBStub = Object.create(stub);
+      orgBStub.getCreator = async () => ({
+        idBytes: Buffer.from("creatorID-org-b"),
+        mspid: "org-b",
+      });
+      orgBStub.getMspID = () => "org-b";
+      return Object.assign(baseCtx, {
+        stub: orgBStub,
+        clientIdentity: {
+          getID: () => "id-org-b",
+          getMSPID: () => "org-b",
+          getIDBytes: () => Buffer.from("creatorID-org-b"),
+          getAttributeValue: (name: string) =>
+            name === "roles" ? ["admin"] : undefined,
+        },
+      });
+    }
+
+    describe("product mirror", () => {
+      it("creates products with Aeon and verifies mirror copies", async () => {
+        ctx = getMockCtx();
+        Object.assign(ctx, { stub });
+        transientSpy = jest.spyOn(
+          contract as any,
+          "getTransientData" as any
+        ) as jest.SpyInstance;
+
+        const models = new Array(5).fill(0).map(() => {
+          const id = generateGtin();
+          return new OtherProductShared({
+            productCode: id,
+            inventedName: "mirror_test",
+            nameMedicinalProduct: "test",
+          });
+        });
+
+        const payload = JSON.stringify(preparePayloadBulk(models));
+        JSON.parse(await contract.createAll(ctx as any, payload)).map(
+          (r: any) => Model.deserialize(r)
+        );
+        stub.commit();
+
+        const loaded: OtherProductShared[] = [];
+        for (const m of models) {
+          const product = await loadSharedProduct(m.productCode);
+          expect(product.hasErrors()).toBeUndefined();
+          await assertMirrorCopies(product);
+          loaded.push(product);
+        }
+        mirrorProducts = loaded;
+
+        jest.restoreAllMocks();
+      });
+
+      it("modifies mirror data to prove read exclusivity", async () => {
+        const pk = mirrorProducts[0].productCode;
+        const key = stub.createCompositeKey("other_product_shared", [pk]);
+        const mirrorData = JSON.parse(
+          Buffer.from(
+            await stub.getPrivateData("mirror-collection", key)
+          ).toString("utf8")
+        );
+        mirrorData.inventedName = "FROM_MIRROR";
+        await stub.putPrivateData(
+          "mirror-collection",
+          key,
+          Buffer.from(JSON.stringify(mirrorData))
+        );
+        stub.commit();
+
+        // Verify shared collection still has original value
+        const sharedData = JSON.parse(
+          Buffer.from(
+            await stub.getPrivateData("decaf-namespaceAeon", key)
+          ).toString("utf8")
+        );
+        expect(sharedData.inventedName).toBe("mirror_test");
+      });
+
+      it("rejects product create from org-b", async () => {
+        const orgBCtx = getOrgBCtx();
+        transientSpy = jest.spyOn(
+          contract as any,
+          "getTransientData" as any
+        ) as jest.SpyInstance;
+
+        const model = new OtherProductShared({
+          productCode: generateGtin(),
+          inventedName: "org-b-product",
+          nameMedicinalProduct: "test",
+        });
+        const payload = preparePayload(model);
+
+        await expect(
+          contract.create(orgBCtx as any, payload.serialize())
+        ).rejects.toThrow(AuthorizationError);
+
+        jest.restoreAllMocks();
+      });
+
+      it("rejects product update from org-b", async () => {
+        const orgBCtx = getOrgBCtx();
+        transientSpy = jest.spyOn(
+          contract as any,
+          "getTransientData" as any
+        ) as jest.SpyInstance;
+
+        const model = new OtherProductShared({
+          ...mirrorProducts[0],
+          inventedName: "org-b-update",
+        });
+        const payload = preparePayload(model);
+
+        await expect(
+          contract.update(orgBCtx as any, payload.serialize())
+        ).rejects.toThrow(AuthorizationError);
+
+        jest.restoreAllMocks();
+      });
+
+      it("reads product EXCLUSIVELY from mirror collection", async () => {
+        const orgBCtx = getOrgBCtx();
+
+        const result = await contract.read(
+          orgBCtx as any,
+          mirrorProducts[0].productCode
+        );
+        const read = Model.deserialize(result) as OtherProductShared;
+        expect(read.hasErrors()).toBeUndefined();
+        expect(read.productCode).toBe(mirrorProducts[0].productCode);
+        expect(read.inventedName).toBe("FROM_MIRROR");
+      });
+
+      it("lists products EXCLUSIVELY from mirror collection", async () => {
+        const orgBCtx = getOrgBCtx();
+
+        const listed = JSON.parse(
+          await contract.statement(
+            orgBCtx as any,
+            "listBy",
+            JSON.stringify(["inventedName", "asc"])
+          )
+        );
+        expect(listed).toBeDefined();
+        expect(listed.length).toEqual(mirrorProducts.length);
+        expect(
+          listed.some((p: any) => p.inventedName === "FROM_MIRROR")
+        ).toBe(true);
+      });
+
+      it("paginates products EXCLUSIVELY from mirror collection", async () => {
+        const orgBCtx = getOrgBCtx();
+
+        const page = await contract.paginateBy(
+          orgBCtx,
+          "inventedName",
+          "asc",
+          JSON.stringify({ offset: 1, limit: 3 })
+        );
+        expect(page).toBeDefined();
+
+        const parsedPage = Paginator.deserialize(page);
+        expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
+        expect(parsedPage.data.length).toEqual(3);
+        expect(parsedPage.count).toEqual(mirrorProducts.length);
+      });
+    });
+
+    describe("batch mirror", () => {
+      it("creates batches with Aeon and verifies mirror copies", async () => {
+        ctx = getMockCtx();
+        Object.assign(ctx, { stub });
+        transientSpy = jest.spyOn(
+          batchContract as any,
+          "getTransientData" as any
+        ) as jest.SpyInstance;
+
+        const models = new Array(5).fill(0).map((_, i) => {
+          const pc = generateGtin();
+          return new OtherBatchShared({
+            productCode: pc,
+            batchNumber: `MB${String(i).padStart(3, "0")}`,
+            expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          });
+        });
+
+        const payload = JSON.stringify(preparePayloadBulk(models));
+        JSON.parse(await batchContract.createAll(ctx as any, payload)).map(
+          (r: any) => Model.deserialize(r)
+        );
+        stub.commit();
+
+        const loaded: OtherBatchShared[] = [];
+        for (const m of models) {
+          const batch = await loadSharedBatch(m.productCode, m.batchNumber);
+          expect(batch.hasErrors()).toBeUndefined();
+          await expectInMirrorCollection("other_batch_shared", batch.id);
+          loaded.push(batch);
+        }
+        mirrorBatches = loaded;
+
+        jest.restoreAllMocks();
+      });
+
+      it("modifies mirror data to prove read exclusivity", async () => {
+        // Dump mirror data to understand structure
+        const batchId = mirrorBatches[0].id;
+        const key = stub.createCompositeKey("other_batch_shared", [batchId]);
+        const debugData = JSON.parse(
+          Buffer.from(
+            await stub.getPrivateData("mirror-collection", key)
+          ).toString("utf8")
+        );
+        console.log("BATCH MIRROR DATA:", JSON.stringify(debugData, null, 2));
+        const mirrorData = JSON.parse(
+          Buffer.from(
+            await stub.getPrivateData("mirror-collection", key)
+          ).toString("utf8")
+        );
+        mirrorData.manufacturerName = "FROM_MIRROR_BATCH";
+        await stub.putPrivateData(
+          "mirror-collection",
+          key,
+          Buffer.from(JSON.stringify(mirrorData))
+        );
+        stub.commit();
+      });
+
+      it("rejects batch create from org-b", async () => {
+        const orgBCtx = getOrgBCtx();
+        transientSpy = jest.spyOn(
+          batchContract as any,
+          "getTransientData" as any
+        ) as jest.SpyInstance;
+
+        const model = new OtherBatchShared({
+          productCode: generateGtin(),
+          batchNumber: "OB000",
+          expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        });
+        const payload = preparePayload(model);
+
+        await expect(
+          batchContract.create(orgBCtx as any, payload.serialize())
+        ).rejects.toThrow(AuthorizationError);
+
+        jest.restoreAllMocks();
+      });
+
+      it("rejects batch update from org-b", async () => {
+        const orgBCtx = getOrgBCtx();
+        transientSpy = jest.spyOn(
+          batchContract as any,
+          "getTransientData" as any
+        ) as jest.SpyInstance;
+
+        const model = new OtherBatchShared({
+          ...mirrorBatches[0],
+          manufacturerName: "org-b-update",
+        });
+        const payload = preparePayload(model);
+
+        await expect(
+          batchContract.update(orgBCtx as any, payload.serialize())
+        ).rejects.toThrow(AuthorizationError);
+
+        jest.restoreAllMocks();
+      });
+
+      it("reads batch EXCLUSIVELY from mirror collection", async () => {
+        // Diagnostic: check mirroredAt and mirror data
+        const mirrorMeta = (Model as any).mirroredAt(OtherBatchShared);
+        expect(mirrorMeta).toBeDefined();
+        expect(mirrorMeta.mspId).toBe("org-b");
+
+        const batchKey = stub.createCompositeKey("other_batch_shared", [
+          mirrorBatches[0].id,
+        ]);
+        const rawMirrorData = JSON.parse(
+          Buffer.from(
+            await stub.getPrivateData("mirror-collection", batchKey)
+          ).toString("utf8")
+        );
+        // Verify mirror copy has required fields
+        expect(rawMirrorData.productCode).toBeDefined();
+        expect(rawMirrorData.expiryDate).toBeDefined();
+
+        const orgBCtx = getOrgBCtx();
+
+        const result = await batchContract.read(
+          orgBCtx as any,
+          mirrorBatches[0].id
+        );
+        const read = Model.deserialize(result) as OtherBatchShared;
+        expect(read.hasErrors()).toBeUndefined();
+        expect(read.id).toBe(mirrorBatches[0].id);
+        expect(read.manufacturerName).toBe("FROM_MIRROR_BATCH");
+      });
+
+      it("lists batches EXCLUSIVELY from mirror collection", async () => {
+        const orgBCtx = getOrgBCtx();
+
+        const listed = JSON.parse(
+          await batchContract.statement(
+            orgBCtx as any,
+            "listBy",
+            JSON.stringify(["batchNumber", "asc"])
+          )
+        );
+        expect(listed).toBeDefined();
+        expect(listed.length).toEqual(mirrorBatches.length);
+        expect(
+          listed.some(
+            (b: any) => b.manufacturerName === "FROM_MIRROR_BATCH"
+          )
+        ).toBe(true);
+      });
+
+      it("paginates batches EXCLUSIVELY from mirror collection", async () => {
+        const orgBCtx = getOrgBCtx();
+
+        const page = await batchContract.paginateBy(
+          orgBCtx,
+          "batchNumber",
+          "asc",
+          JSON.stringify({ offset: 1, limit: 3 })
+        );
+        expect(page).toBeDefined();
+
+        const parsedPage = Paginator.deserialize(page);
+        expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
+        expect(parsedPage.data.length).toEqual(3);
+        expect(parsedPage.count).toEqual(mirrorBatches.length);
+      });
     });
   });
 });

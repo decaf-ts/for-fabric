@@ -23,7 +23,14 @@ import {
   type Signer,
   GatewayError,
 } from "@hyperledger/fabric-gateway";
-import { getIdentity, getSigner } from "./fabric-fs";
+import { Gateway as LegacyGateway, Wallets } from "fabric-network";
+import type { Endorser } from "fabric-common";
+import {
+  getIdentity,
+  getSigner,
+  getFirstDirFileNameContent,
+  readFile as readFsFile,
+} from "./fabric-fs";
 import {
   BaseError,
   InternalError,
@@ -78,6 +85,15 @@ import { DefaultFabricClientFlags } from "./constants";
 import fs from "fs";
 import { CryptoUtils } from "./crypto";
 import { extractIds } from "./ids/id-extraction";
+import { Identity } from "../shared/index";
+
+type LegacyPeerTarget = {
+  mspId: string;
+  peerEndpoint: string;
+  peerHostAlias?: string;
+};
+
+type LegacyPeerWithName = LegacyPeerTarget & { name: string };
 
 /**
  * @description Adapter for interacting with Hyperledger Fabric networks
@@ -367,6 +383,8 @@ export class FabricClientAdapter extends Adapter<
     log.info(`adding ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const hasTransient = transient && Object.keys(transient).length > 0;
+    const needsFullPayload =
+      hasTransient || this.shouldForceGatewayHydration(ctx);
     const transientPayload = hasTransient ? { [tableName]: transient } : {};
 
     const result = await this.submitTransaction(
@@ -393,7 +411,7 @@ export class FabricClientAdapter extends Adapter<
       this.shouldRefreshAfterWrite(
         clazz,
         ctx,
-        hasTransient,
+        needsFullPayload,
         res[0][Model.pk(clazz) as string] || ids[0]
       )
     ) {
@@ -471,6 +489,8 @@ export class FabricClientAdapter extends Adapter<
     log.info(`updating ${ids.length} entries to ${tableName} table`);
     log.verbose(`pks: ${ids}`);
     const hasTransient = transient && Object.keys(transient).length > 0;
+    const needsFullPayload =
+      hasTransient || this.shouldForceGatewayHydration(ctx);
     const transientPayload = hasTransient ? { [tableName]: transient } : {};
 
     const result = await this.submitTransaction(
@@ -493,7 +513,7 @@ export class FabricClientAdapter extends Adapter<
       throw new SerializationError(e as Error);
     }
 
-    if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, ids[0])) {
+    if (this.shouldRefreshAfterWrite(clazz, ctx, needsFullPayload, ids[0])) {
       return this.readAll(
         clazz,
         extractIds(
@@ -525,9 +545,16 @@ export class FabricClientAdapter extends Adapter<
     const { log, ctx, ctxArgs } = this.logCtx(args, this.deleteAll);
     const tableName = Model.tableName(clazz);
 
-    const hasTransient = Model.isTransient(clazz);
+    const needsFullPayload =
+      Model.isTransient(clazz) || this.shouldForceGatewayHydration(ctx);
     let result: any;
-    if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, ids[0])) {
+    const shouldHydrate = this.shouldRefreshAfterWrite(
+      clazz,
+      ctx,
+      needsFullPayload,
+      ids[0]
+    );
+    if (shouldHydrate) {
       result = await this.readAll(clazz, ids, ...ctxArgs);
     }
 
@@ -542,7 +569,7 @@ export class FabricClientAdapter extends Adapter<
       clazz.name
     );
     try {
-      return hasTransient
+      return shouldHydrate
         ? result
         : JSON.parse(this.decode(res)).map((r: any) => JSON.parse(r));
     } catch (e: unknown) {
@@ -702,6 +729,13 @@ export class FabricClientAdapter extends Adapter<
     );
   }
 
+  private shouldForceGatewayHydration(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ctx: Context<FabricClientFlags>
+  ): boolean {
+    return !!this.config.allowGatewayOverride;
+  }
+
   /**
    * @description Creates a single record
    * @summary Submits a transaction to create a record in the Fabric ledger
@@ -729,6 +763,8 @@ export class FabricClientAdapter extends Adapter<
     log.verbose(`adding entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const hasTransient = transient && Object.keys(transient).length > 0;
+    const needsFullPayload =
+      hasTransient || this.shouldForceGatewayHydration(ctx);
     const transientPayload = hasTransient ? { [tableName]: transient } : {};
     const result = await this.submitTransaction(
       ctx,
@@ -739,7 +775,7 @@ export class FabricClientAdapter extends Adapter<
       clazz.name
     );
     const deserialized = this.serializer.deserialize(this.decode(result));
-    if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, id)) {
+    if (this.shouldRefreshAfterWrite(clazz, ctx, needsFullPayload, id)) {
       return this.read(
         clazz,
         extractIds(
@@ -851,6 +887,8 @@ export class FabricClientAdapter extends Adapter<
     log.verbose(`updating entry to ${tableName} table`);
     log.debug(`pk: ${id}`);
     const hasTransient = transient && Object.keys(transient).length > 0;
+    const needsFullPayload =
+      hasTransient || this.shouldForceGatewayHydration(ctx);
     const transientPayload = hasTransient ? { [tableName]: transient } : {};
     const result = await this.submitTransaction(
       ctx,
@@ -861,7 +899,7 @@ export class FabricClientAdapter extends Adapter<
       clazz.name
     );
     const deserialized = this.serializer.deserialize(this.decode(result));
-    if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, id)) {
+    if (this.shouldRefreshAfterWrite(clazz, ctx, needsFullPayload, id)) {
       return this.read(
         clazz,
         extractIds(
@@ -895,9 +933,16 @@ export class FabricClientAdapter extends Adapter<
   ): Promise<Record<string, any>> {
     const { log, ctx } = this.logCtx(args, this.delete);
     const tableName = Model.tableName(clazz);
-    const hasTransient = Model.isTransient(clazz);
+    const needsFullPayload =
+      Model.isTransient(clazz) || this.shouldForceGatewayHydration(ctx);
     let result: any;
-    if (this.shouldRefreshAfterWrite(clazz, ctx, hasTransient, id)) {
+    const shouldHydrate = this.shouldRefreshAfterWrite(
+      clazz,
+      ctx,
+      needsFullPayload,
+      id
+    );
+    if (shouldHydrate) {
       result = await this.read(clazz, id, ctx);
     }
 
@@ -911,7 +956,7 @@ export class FabricClientAdapter extends Adapter<
       this.getEndorsingOrganizations(ctx),
       clazz.name
     );
-    return hasTransient
+    return shouldHydrate
       ? result
       : this.serializer.deserialize(this.decode(res));
   }
@@ -1147,10 +1192,7 @@ export class FabricClientAdapter extends Adapter<
   }
 
   private shouldUseLegacyGateway(ctx: Context<FabricClientFlags>): boolean {
-    return (
-      !!ctx.getOrUndefined("legacy") &&
-      !!ctx.getOrUndefined("allowGatewayOverride")
-    );
+    return !!ctx.getOrUndefined("legacy") && !!this.config.allowGatewayOverride;
   }
 
   private prepareLegacyArgs(args?: any[]): string[] {
@@ -1172,15 +1214,11 @@ export class FabricClientAdapter extends Adapter<
     return map;
   }
 
-  private buildLegacyPeerConfigs(): {
-    peerEndpoint: string;
-    tlsCert: string | Buffer;
-    peerHostAlias?: string;
-  }[] {
+  private buildLegacyPeerConfigs(): LegacyPeerTarget[] {
     return [
       {
+        mspId: this.config.mspId,
         peerEndpoint: this.config.peerEndpoint,
-        tlsCert: this.config.tlsCert,
         peerHostAlias: this.config.peerHostAlias,
       },
     ];
@@ -1191,52 +1229,186 @@ export class FabricClientAdapter extends Adapter<
     fcn: string,
     args: string[],
     transientMap: Record<string, Buffer> | undefined,
-    peerConfigs: {
-      peerEndpoint: string;
-      tlsCert: string | Buffer;
-      peerHostAlias?: string;
-    }[],
+    peerConfigs: LegacyPeerTarget[],
     className?: string
   ): Promise<Uint8Array> {
     const log = this.log.for(this.submitLegacyWithExplicitEndorsers);
-    const gateway = await this.Gateway(ctx);
+    const peers = this.normalizeLegacyPeers(peerConfigs);
+    const tlsPem = await this.readPemInput(this.config.tlsCert);
+    const identityMaterial = await this.resolveLegacyIdentityMaterial();
+    const wallet = await Wallets.newInMemoryWallet();
+    const identityLabel = `${this.config.mspId}-legacy`;
+    await wallet.put(identityLabel, {
+      credentials: {
+        certificate: identityMaterial.certificate,
+        privateKey: identityMaterial.privateKey,
+      },
+      mspId: this.config.mspId,
+      type: "X.509",
+    } as Identity);
+
+    const connectionProfile = this.buildLegacyConnectionProfile(peers, tlsPem);
+    const gateway = new LegacyGateway();
+
     try {
-      const contract = FabricClientAdapter.getContract(
-        gateway,
-        this.config,
+      await gateway.connect(connectionProfile, {
+        identity: identityLabel,
+        wallet,
+        discovery: {
+          enabled: true,
+          asLocalhost: this.shouldTreatPeersAsLocalhost(peers),
+        },
+        tlsInfo: {
+          certificate: identityMaterial.certificate,
+          key: identityMaterial.privateKey,
+        },
+      });
+
+      const network = await gateway.getNetwork(this.config.channel);
+      const contract = network.getContract(
+        this.config.chaincodeName,
         this.getContractName(className)
       );
-      log.verbose(
-        `Legacy submitting ${this.getContractName(className) || this.config.contractName}.${fcn}`
-      );
-      log.debug(`Explicit peers: ${peerConfigs.map((p) => p.peerEndpoint)}`);
-      const endorsers = new Set<string>();
-      if (this.config.mspId) endorsers.add(this.config.mspId);
-      const ctxOrgs = this.getEndorsingOrganizations(ctx) || [];
-      ctxOrgs.forEach((org) => endorsers.add(org));
+      const transaction = contract.createTransaction(fcn);
 
-      const proposalOptions: ProposalOptions = {
-        arguments: args,
-        transientData: transientMap,
-        endorsingOrganizations:
-          endorsers.size > 0 ? Array.from(endorsers) : undefined,
-      };
-
-      const proposal = contract.newProposal(fcn, proposalOptions);
-      const transaction = await proposal.endorse();
-      const submission = await transaction.submit();
-      const status = await submission.getStatus();
-      if (!status.successful) {
-        throw new Error(
-          `Legacy endorsement failed for ${transaction.getTransactionId()}: ${status.code}`
-        );
+      if (transientMap) {
+        transaction.setTransient(transientMap);
       }
-      return transaction.getResult();
+
+      const endorsers = peers
+        .map((peer) => network.getChannel().getEndorser(peer.name))
+        .filter((endorser): endorser is Endorser => Boolean(endorser));
+      if (endorsers.length) {
+        transaction.setEndorsingPeers(endorsers);
+      }
+
+      log.verbose(
+        `Legacy submitting ${this.getContractName(className) || this.config.contractName}.${fcn} via peers ${peers.map((p) => p.peerEndpoint).join(", ")}`
+      );
+
+      const result = await transaction.submit(...args);
+      return Uint8Array.from(result);
     } catch (e: any) {
       throw this.parseError(e);
     } finally {
-      gateway.close();
+      gateway.disconnect();
     }
+  }
+
+  private normalizeLegacyPeers(
+    peers: LegacyPeerTarget[]
+  ): LegacyPeerWithName[] {
+    const deduped = new Map<string, LegacyPeerWithName>();
+    const addPeer = (peer: LegacyPeerTarget) => {
+      const key = `${peer.peerEndpoint}|${peer.peerHostAlias || ""}`;
+      if (deduped.has(key)) return;
+      const name = `peer-${peer.mspId}-${deduped.size}`;
+      deduped.set(key, {
+        ...peer,
+        name,
+      });
+    };
+
+    peers.forEach(addPeer);
+    addPeer({
+      mspId: this.config.mspId,
+      peerEndpoint: this.config.peerEndpoint,
+      peerHostAlias: this.config.peerHostAlias,
+    });
+
+    return Array.from(deduped.values());
+  }
+
+  private async resolveLegacyIdentityMaterial(): Promise<{
+    certificate: string;
+    privateKey: string;
+  }> {
+    const certificate = await this.readPemInput(
+      this.config.certCertOrDirectoryPath
+    );
+    const privateKey = await this.readPemInput(
+      this.config.keyCertOrDirectoryPath
+    );
+    return { certificate, privateKey };
+  }
+
+  private buildLegacyConnectionProfile(
+    peers: LegacyPeerWithName[],
+    tlsPem: string
+  ) {
+    const peerEntries: Record<string, any> = {};
+    const channelPeers: Record<string, any> = {};
+    const orgs: Record<string, any> = {};
+    peers.forEach((peer) => {
+      const hostname =
+        peer.peerHostAlias || this.extractHost(peer.peerEndpoint);
+      peerEntries[peer.name] = {
+        url: this.ensureGrpcUrl(peer.peerEndpoint),
+        tlsCACerts: { pem: tlsPem },
+        grpcOptions: {
+          "ssl-target-name-override": hostname,
+          hostnameOverride: hostname,
+        },
+      };
+      channelPeers[peer.name] = {
+        endorsingPeer: true,
+        chaincodeQuery: true,
+        ledgerQuery: true,
+        eventSource: true,
+      };
+      orgs[peer.mspId] = orgs[peer.mspId] || {
+        mspid: peer.mspId,
+        peers: [],
+      };
+      orgs[peer.mspId].peers.push(peer.name);
+    });
+
+    return {
+      name: "legacy-manual",
+      version: "1.0.0",
+      client: {
+        organization: this.config.mspId,
+      },
+      organizations: orgs,
+      peers: peerEntries,
+      orderers: {},
+      channels: {
+        [this.config.channel]: {
+          peers: channelPeers,
+        },
+      },
+    };
+  }
+
+  private shouldTreatPeersAsLocalhost(peers: LegacyPeerWithName[]): boolean {
+    return peers.every((peer) => this.isLocalEndpoint(peer.peerEndpoint));
+  }
+
+  private isLocalEndpoint(endpoint: string): boolean {
+    const host = this.extractHost(endpoint).toLowerCase();
+    return host === "localhost" || host === "127.0.0.1";
+  }
+
+  private extractHost(endpoint: string): string {
+    const sanitized = endpoint.replace(/^grpcs?:\/\//, "");
+    return sanitized.split(":")[0];
+  }
+
+  private ensureGrpcUrl(endpoint: string): string {
+    if (/^grpcs?:\/\//i.test(endpoint)) return endpoint;
+    return `grpcs://${endpoint}`;
+  }
+
+  private async readPemInput(source?: string | Buffer): Promise<string> {
+    if (!source) throw new InternalError("Missing certificate or key material");
+    if (Buffer.isBuffer(source)) return source.toString("utf8");
+    const trimmed = source.trim();
+    if (/-----BEGIN [A-Z ]+-----/.test(trimmed)) return trimmed;
+    const stats = await fs.promises.stat(source).catch(() => undefined);
+    if (stats?.isDirectory()) {
+      return await getFirstDirFileNameContent(source);
+    }
+    return (await readFsFile(source)).toString();
   }
 
   /**

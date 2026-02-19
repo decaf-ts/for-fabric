@@ -171,37 +171,54 @@ export async function extractCollections<M extends Model>(
 
   const privates = mspIds
     .map((mspId) =>
-      (privateCols as string[])
-        .filter((p) => {
-          if (!mirrorMeta) return true;
-          const mirroCol =
-            typeof mirrorMeta.resolver === "string"
-              ? mirrorMeta.resolver
-              : mirrorMeta.resolver(m, mspId);
-          return (
-            mirroCol === p &&
-            (mirrorMeta.condition ? mirrorMeta.condition(mspId) : true)
-          );
-        })
-        .map((p) => {
-          const {
-            requiredPeerCount,
-            maxPeerCount,
-            blockToLive,
-            memberOnlyRead,
-          } = privateDefaults;
-          return privateCollectionFor(
-            mspId,
-            p,
-            requiredPeerCount,
-            maxPeerCount,
-            blockToLive,
-            memberOnlyRead,
-            false
-          );
-        })
+      (privateCols as string[]).map((p) => {
+        const {
+          requiredPeerCount,
+          maxPeerCount,
+          blockToLive,
+          memberOnlyRead,
+        } = privateDefaults;
+        return privateCollectionFor(
+          mspId,
+          p,
+          requiredPeerCount,
+          maxPeerCount,
+          blockToLive,
+          memberOnlyRead,
+          false
+        );
+      })
     )
     .flat();
+
+  if (mirrorMeta && mirrorMeta.mspId) {
+    const resolved =
+      typeof mirrorMeta.resolver === "string"
+        ? mirrorMeta.resolver
+        : mirrorMeta.resolver(m, mirrorMeta.mspId);
+    if (
+      resolved &&
+      !privates.some((p) => p.name === resolved && p.policy.includes(mirrorMeta.mspId))
+    ) {
+      const {
+        requiredPeerCount,
+        maxPeerCount,
+        blockToLive,
+        memberOnlyRead,
+      } = privateDefaults;
+      privates.push(
+        privateCollectionFor(
+          mirrorMeta.mspId,
+          resolved,
+          requiredPeerCount,
+          maxPeerCount,
+          blockToLive,
+          memberOnlyRead,
+          false
+        )
+      );
+    }
+  }
 
   const shared = (sharedCols as string[]).map((p) => {
     const {

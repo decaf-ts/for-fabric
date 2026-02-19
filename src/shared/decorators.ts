@@ -7,9 +7,6 @@ import {
   ContextOf,
 } from "@decaf-ts/core";
 import {
-  afterCreate,
-  afterDelete,
-  afterUpdate,
   generated,
   InternalError,
   NotFoundError,
@@ -246,6 +243,7 @@ export async function evalMirrorMetadata<M extends Model>(
   return collection;
 }
 
+
 export async function createMirrorHandler<
   M extends Model,
   R extends Repository<M, any>,
@@ -258,6 +256,7 @@ export async function createMirrorHandler<
 ): Promise<void> {
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
+  const sourceModel = model;
   // Put mirror flags directly on context so adapter.prepare() and adapter.create() can see them
   fabricCtx.put("mirror" as any, true);
   fabricCtx.put("mirrorCollection" as any, collection);
@@ -270,7 +269,7 @@ export async function createMirrorHandler<
         ignoreHandlers: true,
       } as any)
     );
-    const mirror = await repo.create(model, context);
+    const mirror = await repo.create(sourceModel, context);
     context.logger.info(
       `Mirror for ${Model.tableName(this.class)} created with ${Model.pk(model) as string}: ${mirror[Model.pk(model)]}`
     );
@@ -293,6 +292,7 @@ export async function updateMirrorHandler<
 ): Promise<void> {
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
+  const sourceModel = model;
   fabricCtx.put("mirror" as any, true);
   fabricCtx.put("mirrorCollection" as any, collection);
   try {
@@ -306,7 +306,7 @@ export async function updateMirrorHandler<
         mergeForUpdate: false,
       } as any)
     );
-    await repo.update(model, context);
+    await repo.update(sourceModel, context);
     context.logger.info(
       `Mirror for ${Model.tableName(this.class)} updated: ${(model as any)[Model.pk(model)]}`
     );
@@ -329,6 +329,7 @@ export async function deleteMirrorHandler<
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   fabricCtx.put("mirror" as any, true);
+  fabricCtx.put("mirrorCollection" as any, collection);
   fabricCtx.put("segregated" as any, collection);
   try {
     const pkProp = Model.pk(model) as keyof M;
@@ -351,6 +352,7 @@ export async function deleteMirrorHandler<
     );
   } finally {
     fabricCtx.put("mirror" as any, undefined);
+    fabricCtx.put("mirrorCollection" as any, undefined);
     fabricCtx.put("segregated" as any, undefined);
   }
 }
@@ -403,6 +405,8 @@ export async function readMirrorHandler<
       `Mirror read: MSP ${msp} matches, routing reads to mirror collection ${collection}`
     );
     // Route reads exclusively through the mirror collection
+    fabricCtx.put("mirror" as any, true);
+    fabricCtx.put("mirrorCollection" as any, collection);
     fabricCtx.put("fullySegregated", true);
     fabricCtx.readFrom(collection);
   }
@@ -444,10 +448,10 @@ export function mirror(
       onCreate(mirrorWriteGuard as any, meta, { priority: 20 }),
       onUpdate(mirrorWriteGuard as any, meta, { priority: 20 }),
       onDelete(mirrorWriteGuard as any, meta, { priority: 20 }),
-      // Mirror sync handlers — write full model AFTER operation completes
-      afterCreate(createMirrorHandler as any, meta, { priority: 95 }),
-      afterUpdate(updateMirrorHandler as any, meta, { priority: 95 }),
-      afterDelete(deleteMirrorHandler as any, meta, { priority: 95 })
+      // Mirror sync handlers — write full model after other handlers (priority 100)
+      onCreate(createMirrorHandler as any, meta, { priority: 100 }),
+      onUpdate(updateMirrorHandler as any, meta, { priority: 100 }),
+      onDelete(deleteMirrorHandler as any, meta, { priority: 100 })
     );
   }
 
@@ -561,6 +565,8 @@ export async function applyMirrorFlags<M extends Model>(
   ctx.put("segregateRead", undefined);
   ctx.put("segregateReadStack", undefined);
   ctx.put("fullySegregated", true);
+  ctx.put("mirror" as any, true);
+  ctx.put("mirrorCollection" as any, collection);
   ctx.readFrom(collection);
 }
 

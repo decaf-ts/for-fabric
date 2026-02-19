@@ -10,9 +10,9 @@ import { uses } from "@decaf-ts/decoration";
 import { FabricFlavour } from "../../src/shared/constants";
 import { generateModelDesignDocs } from "../../src/client/indexes";
 import { view } from "@decaf-ts/core";
-import fs from "fs";
-import os from "os";
-import path from "path";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 
 describe("collection extraction", () => {
   it("extracts collections", async () => {
@@ -87,7 +87,9 @@ describe("collection extraction", () => {
     }
 
     const docs = generateModelDesignDocs(CollectionViewModel);
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fabric-collections-"));
+    const tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "fabric-collections-")
+    );
     const collectionName = "MyCollection";
     writeCollectionDesignDocs(docs, tmpDir, collectionName);
 

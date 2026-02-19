@@ -366,6 +366,24 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(clazz);
 
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
+      | string
+      | undefined;
+    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+    if (isMirror && mirrorCollection) {
+      try {
+        return await this.forPrivate(mirrorCollection).readState(
+          composedKey,
+          ctx
+        );
+      } catch (e: unknown) {
+        throw this.parseError(e as Error);
+      } finally {
+        ctx.put("mirror" as any, undefined);
+        ctx.put("mirrorCollection" as any, undefined);
+      }
+    }
+
     let model: Record<string, any>;
 
     try {

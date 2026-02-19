@@ -13,6 +13,12 @@ export type HSMOptions = {
   keyIdHex?: string;
 };
 
+export type MspDetails = {
+  endpoint: string;
+  tlsCert?: string | Buffer;
+  alias?: string;
+};
+
 /**
  * @description Configuration for connecting to a Hyperledger Fabric peer
  * @summary Contains all the necessary parameters to establish a connection to a Fabric peer and interact with chaincode
@@ -39,6 +45,8 @@ export type PeerConfig = {
   keyCertOrDirectoryPath: string | Buffer;
   certCertOrDirectoryPath: string | Buffer;
   tlsCert: string | Buffer;
+  allowGatewayOverride?: boolean;
+  mspMap?: Record<string, MspDetails[]>;
   peerEndpoint: string;
   peerHostAlias: string;
   caEndpoint?: string;

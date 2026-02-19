@@ -10,6 +10,7 @@ import {
 } from "fabric-contract-api";
 import { Model, Serializer } from "@decaf-ts/decorator-validation";
 import {
+  AuthorizationError,
   Condition,
   DirectionLimitOffset,
   MaybeContextualArg,
@@ -32,6 +33,7 @@ import {
   PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
 import { MissingContextError } from "../../shared/index";
+import { extractMspId } from "../../shared/decorators";
 import { PACKAGE_NAME, VERSION } from "../../version";
 
 FabricObject()(Date);
@@ -284,6 +286,7 @@ export abstract class FabricCrudContract<M extends Model>
     const { log, ctxArgs, ctx } = (
       await this.logCtx([...args, context], OperationKeys.CREATE, true)
     ).for(this.create);
+    this.ensureMirrorWritePermissions(ctx);
     log.info(`CONTRACT CREATE, ${ctxArgs}`);
 
     if (typeof model === "string") model = this.deserialize<M>(model) as M;
@@ -363,6 +366,7 @@ export abstract class FabricCrudContract<M extends Model>
     const { log, ctxArgs, ctx } = (
       await this.logCtx([...args, context], OperationKeys.UPDATE, true)
     ).for(this.update);
+    this.ensureMirrorWritePermissions(ctx);
     if (typeof model === "string") model = this.deserialize<M>(model) as M;
 
     log.info(`Updating model: ${JSON.stringify(model)}`);
@@ -389,9 +393,10 @@ export abstract class FabricCrudContract<M extends Model>
     key: PrimaryKeyType | string,
     ...args: any[]
   ): Promise<M | string> {
-    const { log, ctxArgs } = (
+    const { log, ctxArgs, ctx: fabricCtx } = (
       await this.logCtx([...args, ctx], OperationKeys.DELETE, true)
     ).for(this.delete);
+    this.ensureMirrorWritePermissions(fabricCtx);
     log.info(`deleting entry with pk ${key} `);
     return this.repo.delete(String(key), ...ctxArgs);
   }
@@ -409,9 +414,10 @@ export abstract class FabricCrudContract<M extends Model>
     keys: PrimaryKeyType[] | string,
     ...args: any[]
   ): Promise<M[] | string> {
-    const { ctxArgs } = (
+    const { ctxArgs, ctx: fabricCtx } = (
       await this.logCtx([...args, ctx], BulkCrudOperationKeys.DELETE_ALL, true)
     ).for(this.deleteAll);
+    this.ensureMirrorWritePermissions(fabricCtx);
     if (typeof keys === "string") keys = JSON.parse(keys) as string[];
     const deleted = await this.repo.deleteAll(keys, ...ctxArgs);
     const result = deleted.map((c) => new this.clazz(Model.segregate(c).model));
@@ -458,6 +464,7 @@ export abstract class FabricCrudContract<M extends Model>
         true
       )
     ).for(this.updateAll);
+    this.ensureMirrorWritePermissions(ctx);
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
         .map((m) => this.deserialize(m))
@@ -588,6 +595,7 @@ export abstract class FabricCrudContract<M extends Model>
         true
       )
     ).for(this.createAll);
+    this.ensureMirrorWritePermissions(ctx);
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
         .map((m) => this.deserialize(m))
@@ -609,6 +617,24 @@ export abstract class FabricCrudContract<M extends Model>
     );
     const result = created.map((c) => new this.clazz(Model.segregate(c).model));
     return result;
+  }
+
+  protected ensureMirrorWritePermissions(
+    ctx: FabricContractContext
+  ): void {
+    if (!ctx) return;
+    const mirrorMeta = Model.mirroredAt(this.clazz);
+    if (!mirrorMeta) return;
+    const msp = extractMspId(ctx.identity);
+    if (
+      msp &&
+      (msp === mirrorMeta.mspId ||
+        (mirrorMeta.condition && mirrorMeta.condition(msp)))
+    ) {
+      throw new AuthorizationError(
+        `Organization ${msp} is not authorized to modify mirrored data`
+      );
+    }
   }
 
   protected logCtx<

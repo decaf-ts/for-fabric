@@ -26,11 +26,67 @@ jest.mock("@grpc/grpc-js", () => {
   };
 });
 
+jest.mock("fabric-network", () => {
+  const legacyTransactionMock = {
+    submit: jest.fn().mockResolvedValue(Buffer.from("legacy")),
+    setTransient: jest.fn().mockReturnThis(),
+    setEndorsingPeers: jest.fn().mockReturnThis(),
+  };
+  const legacyContractMock = {
+    createTransaction: jest.fn(() => legacyTransactionMock),
+  };
+  const legacyNetworkMock = {
+    getContract: jest.fn(() => legacyContractMock),
+    getChannel: jest.fn(() => ({
+      getEndorser: jest.fn(() => ({})),
+    })),
+  };
+  const legacyGatewayConnectMock = jest.fn();
+  const legacyGatewayDisconnectMock = jest.fn();
+
+  const Gateway = jest.fn().mockImplementation(() => ({
+    connect: legacyGatewayConnectMock,
+    getNetwork: jest.fn(() => legacyNetworkMock),
+    disconnect: legacyGatewayDisconnectMock,
+  }));
+
+  return {
+    Gateway,
+    Wallets: {
+      newInMemoryWallet: jest.fn().mockResolvedValue({
+        put: jest.fn(),
+      }),
+    },
+    __mocks: {
+      transaction: legacyTransactionMock,
+      contract: legacyContractMock,
+      network: legacyNetworkMock,
+      gatewayConnect: legacyGatewayConnectMock,
+      gatewayDisconnect: legacyGatewayDisconnectMock,
+    },
+  };
+});
+
+const fabricNetworkMocks = jest.requireMock("fabric-network") as any;
+const {
+  transaction: legacyTransactionMock,
+  contract: legacyContractMock,
+  network: legacyNetworkMock,
+  gatewayConnect: legacyGatewayConnectMock,
+  gatewayDisconnect: legacyGatewayDisconnectMock,
+} = fabricNetworkMocks.__mocks;
+
+const mockKeyPem =
+  "-----BEGIN PRIVATE KEY-----\nMIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJeAgEAAoGBAMock\n-----END PRIVATE KEY-----";
+const mockCertPem =
+  "-----BEGIN CERTIFICATE-----\nMIIC0jCCAbqgAwIBAgIJAJEd\n-----END CERTIFICATE-----";
+
 const config: PeerConfig = {
   cryptoPath: "/tmp",
-  keyCertOrDirectoryPath: "/tmp/keystore",
-  certCertOrDirectoryPath: "/tmp/signcerts",
-  tlsCert: "tls-cert",
+  keyCertOrDirectoryPath: mockKeyPem,
+  certCertOrDirectoryPath: mockCertPem,
+  tlsCert: mockCertPem,
+  allowGatewayOverride: false,
   peerEndpoint: "localhost:7051",
   peerHostAlias: "peer0.org1.example.com",
   chaincodeName: "erc20",
@@ -64,11 +120,19 @@ const attachLoggerSpies = (adapter: FabricClientAdapter) => {
 describe("FabricClientAdapter", () => {
   afterEach(() => {
     jest.restoreAllMocks();
+    legacyGatewayConnectMock.mockReset();
+    legacyGatewayDisconnectMock.mockReset();
+    legacyContractMock.createTransaction.mockClear();
+    legacyNetworkMock.getContract.mockClear();
+    legacyNetworkMock.getChannel.mockClear();
+    legacyTransactionMock.submit.mockClear();
+    legacyTransactionMock.setTransient.mockClear();
+    legacyTransactionMock.setEndorsingPeers.mockClear();
   });
 
-  const newAdapter = () => {
+  const newAdapter = (overrides: Partial<PeerConfig> = {}) => {
     const adapter = new FabricClientAdapter(
-      config,
+      Object.assign({}, config, overrides),
       `adapter-${Math.random().toString(36).slice(2)}`
     );
     attachLoggerSpies(adapter);
@@ -193,13 +257,13 @@ describe("FabricClientAdapter", () => {
   });
 
   it("submits through legacy flow when mirror flags are set", async () => {
-    const adapter = newAdapter();
+    const adapter = newAdapter({ allowGatewayOverride: true });
     const legacyResult = new TextEncoder().encode("legacy");
     const legacySpy = jest
       .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
       .mockResolvedValue(legacyResult);
     const ctx = createContext();
-    ctx.accumulate({ legacy: true, allowGatewayOverride: true });
+    ctx.accumulate({ legacy: true });
 
     const payload = { foo: "bar" };
     const transient = { private: "secret" };
@@ -224,12 +288,12 @@ describe("FabricClientAdapter", () => {
   });
 
   it("uses default transaction when legacy override is disabled", async () => {
-    const adapter = newAdapter();
+    const adapter = newAdapter({ allowGatewayOverride: false });
     const txnSpy = jest
       .spyOn(adapter as any, "transaction")
       .mockResolvedValue(new TextEncoder().encode("submit"));
     const ctx = createContext();
-    ctx.accumulate({ legacy: true, allowGatewayOverride: false });
+    ctx.accumulate({ legacy: true });
 
     await adapter.submitTransaction(ctx, "create");
 
@@ -664,12 +728,12 @@ describe("FabricClientAdapter", () => {
     });
 
     it("uses legacy gateway when both legacy AND allowGatewayOverride are set", async () => {
-      const adapter = newAdapter();
+      const adapter = newAdapter({ allowGatewayOverride: true });
       const legacySpy = jest
         .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
         .mockResolvedValue(new TextEncoder().encode("legacy"));
       const ctx = createContext();
-      ctx.accumulate({ legacy: true, allowGatewayOverride: true });
+      ctx.accumulate({ legacy: true });
 
       await adapter.submitTransaction(ctx, "create", ["data"]);
 
@@ -677,12 +741,12 @@ describe("FabricClientAdapter", () => {
     });
 
     it("stringifies non-string args for legacy flow", async () => {
-      const adapter = newAdapter();
+      const adapter = newAdapter({ allowGatewayOverride: true });
       const legacySpy = jest
         .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
         .mockResolvedValue(new TextEncoder().encode("ok"));
       const ctx = createContext();
-      ctx.accumulate({ legacy: true, allowGatewayOverride: true });
+      ctx.accumulate({ legacy: true });
 
       await adapter.submitTransaction(ctx, "create", [
         { foo: "bar" },
@@ -699,12 +763,12 @@ describe("FabricClientAdapter", () => {
     });
 
     it("converts transient data to Buffer for legacy flow", async () => {
-      const adapter = newAdapter();
+      const adapter = newAdapter({ allowGatewayOverride: true });
       const legacySpy = jest
         .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
         .mockResolvedValue(new TextEncoder().encode("ok"));
       const ctx = createContext();
-      ctx.accumulate({ legacy: true, allowGatewayOverride: true });
+      ctx.accumulate({ legacy: true });
 
       await adapter.submitTransaction(ctx, "create", [], {
         secret: "value",
@@ -719,23 +783,212 @@ describe("FabricClientAdapter", () => {
     });
 
     it("passes peer config from adapter config", async () => {
-      const adapter = newAdapter();
+      const adapter = newAdapter({ allowGatewayOverride: true });
       const legacySpy = jest
         .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
         .mockResolvedValue(new TextEncoder().encode("ok"));
       const ctx = createContext();
-      ctx.accumulate({ legacy: true, allowGatewayOverride: true });
+      ctx.accumulate({ legacy: true });
 
       await adapter.submitTransaction(ctx, "create");
 
       const calledPeerConfigs = legacySpy.mock.calls[0][4];
       expect(calledPeerConfigs).toEqual([
         {
+          mspId: config.mspId,
           peerEndpoint: config.peerEndpoint,
-          tlsCert: config.tlsCert,
           peerHostAlias: config.peerHostAlias,
         },
       ]);
+    });
+
+    it("builds a manual connection profile using provided peers", async () => {
+      const adapter = newAdapter({ allowGatewayOverride: true });
+      const ctx = createContext();
+      ctx.accumulate({ legacy: true });
+
+      await adapter.submitTransaction(ctx, "create", ["payload"]);
+
+      expect(legacyGatewayConnectMock).toHaveBeenCalledTimes(1);
+      const [profile] = legacyGatewayConnectMock.mock.calls[0];
+      expect(profile).toBeDefined();
+      expect(Object.keys(profile.peers || {})).toHaveLength(1);
+      const peerName = Object.keys(profile.peers || {})[0];
+      expect(peerName).toContain(config.mspId);
+      expect(profile.channels[config.channel]).toBeDefined();
+    });
+  });
+
+  describe("allowGatewayOverride hydration", () => {
+    const buildSerializer = () => ({
+      serialize: jest.fn((payload: any) => JSON.stringify(payload)),
+      deserialize: jest.fn((val: any) =>
+        JSON.parse(
+          typeof val === "string" ? val : new TextDecoder().decode(val)
+        )
+      ),
+    });
+
+    it("forces create to refresh after write even without transient data", async () => {
+      const adapter = newAdapter({ allowGatewayOverride: true });
+      (adapter as any).serializer = buildSerializer();
+      const ctx = createContext();
+      jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(
+            JSON.stringify({ id: "wallet-1", token: "TK", balance: 5 })
+          )
+        );
+      const readSpy = jest
+        .spyOn(adapter, "read")
+        .mockResolvedValue(
+          { id: "wallet-1", token: "TK", balance: 25 } as any
+        );
+      const refreshSpy = jest.spyOn(
+        adapter as any,
+        "shouldRefreshAfterWrite"
+      );
+
+      const result = await adapter.create(
+        ERC20Wallet,
+        "wallet-1",
+        new ERC20Wallet({ id: "wallet-1", token: "TK", balance: 5 }),
+        {},
+        ctx
+      );
+
+      expect(refreshSpy).toHaveBeenCalledWith(
+        ERC20Wallet,
+        ctx,
+        true,
+        "wallet-1"
+      );
+      expect(readSpy).toHaveBeenCalledWith(ERC20Wallet, "wallet-1", ctx);
+      expect(result).toEqual({
+        id: "wallet-1",
+        token: "TK",
+        balance: 25,
+      });
+    });
+
+    it("forces createAll to refresh after write even without transient data", async () => {
+      const adapter = newAdapter({ allowGatewayOverride: true });
+      (adapter as any).serializer = buildSerializer();
+      const ctx = createContext();
+      jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(
+            JSON.stringify([
+              JSON.stringify({ id: "wallet-1", token: "TK", balance: 5 }),
+              JSON.stringify({ id: "wallet-2", token: "TK", balance: 15 }),
+            ])
+          )
+        );
+      const readAllSpy = jest
+        .spyOn(adapter, "readAll")
+        .mockResolvedValue([
+          { id: "wallet-1", token: "TK", balance: 50 },
+          { id: "wallet-2", token: "TK", balance: 75 },
+        ] as any);
+      const refreshSpy = jest.spyOn(
+        adapter as any,
+        "shouldRefreshAfterWrite"
+      );
+
+      const result = await adapter.createAll(
+        ERC20Wallet,
+        ["wallet-1", "wallet-2"],
+        [
+          new ERC20Wallet({ id: "wallet-1", token: "TK", balance: 5 }),
+          new ERC20Wallet({ id: "wallet-2", token: "TK", balance: 15 }),
+        ],
+        {},
+        ctx
+      );
+
+      expect(refreshSpy).toHaveBeenCalledWith(
+        ERC20Wallet,
+        ctx,
+        true,
+        "wallet-1"
+      );
+      expect(readAllSpy).toHaveBeenCalledTimes(1);
+      expect(result).toEqual([
+        { id: "wallet-1", token: "TK", balance: 50 },
+        { id: "wallet-2", token: "TK", balance: 75 },
+      ]);
+    });
+
+    it("forces delete to read before submitting when allowGatewayOverride is true", async () => {
+      const adapter = newAdapter({ allowGatewayOverride: true });
+      (adapter as any).serializer = buildSerializer();
+      const ctx = createContext();
+      jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(new TextEncoder().encode("{}"));
+      const readSpy = jest
+        .spyOn(adapter, "read")
+        .mockResolvedValue(
+          { id: "wallet-1", token: "TK", balance: 5 } as any
+        );
+      const refreshSpy = jest.spyOn(
+        adapter as any,
+        "shouldRefreshAfterWrite"
+      );
+
+      const result = await adapter.delete(ERC20Wallet, "wallet-1", ctx);
+
+      expect(refreshSpy).toHaveBeenCalledWith(
+        ERC20Wallet,
+        ctx,
+        true,
+        "wallet-1"
+      );
+      expect(readSpy).toHaveBeenCalledWith(ERC20Wallet, "wallet-1", ctx);
+      expect(result).toEqual({ id: "wallet-1", token: "TK", balance: 5 });
+    });
+
+    it("forces deleteAll to read before submitting when allowGatewayOverride is true", async () => {
+      const adapter = newAdapter({ allowGatewayOverride: true });
+      (adapter as any).serializer = buildSerializer();
+      const ctx = createContext();
+      jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(
+          new TextEncoder().encode(
+            JSON.stringify([JSON.stringify({ id: "wallet-1" })])
+          )
+        );
+      const readAllSpy = jest
+        .spyOn(adapter, "readAll")
+        .mockResolvedValue([
+          { id: "wallet-1", token: "TK", balance: 90 },
+        ] as any);
+      const refreshSpy = jest.spyOn(
+        adapter as any,
+        "shouldRefreshAfterWrite"
+      );
+
+      const result = await adapter.deleteAll(
+        ERC20Wallet,
+        ["wallet-1"],
+        ctx
+      );
+
+      expect(refreshSpy).toHaveBeenCalledWith(
+        ERC20Wallet,
+        ctx,
+        true,
+        "wallet-1"
+      );
+      expect(readAllSpy).toHaveBeenCalledWith(
+        ERC20Wallet,
+        ["wallet-1"],
+        ctx
+      );
+      expect(result).toEqual([{ id: "wallet-1", token: "TK", balance: 90 }]);
     });
   });
 
