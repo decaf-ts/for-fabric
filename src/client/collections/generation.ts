@@ -86,7 +86,7 @@ export function privateCollectionFor(
   memberOnlyRead: boolean = true,
   memberOnlyWrite: boolean = true
 ): PrivateCollection {
-  return collectionFor(
+  const c = collectionFor(
     collectionName,
     `OR('${mspId}.member')`,
     requiredPeerCount,
@@ -95,6 +95,11 @@ export function privateCollectionFor(
     memberOnlyRead,
     memberOnlyWrite
   );
+
+  c.endorsementPolicy = {
+    signaturePolicy: `OR(${mspId}.peer)`,
+  };
+  return c;
 }
 
 export function sharedCollectionFor(
@@ -172,12 +177,8 @@ export async function extractCollections<M extends Model>(
   const privates = mspIds
     .map((mspId) =>
       (privateCols as string[]).map((p) => {
-        const {
-          requiredPeerCount,
-          maxPeerCount,
-          blockToLive,
-          memberOnlyRead,
-        } = privateDefaults;
+        const { requiredPeerCount, maxPeerCount, blockToLive, memberOnlyRead } =
+          privateDefaults;
         return privateCollectionFor(
           mspId,
           p,
@@ -198,14 +199,12 @@ export async function extractCollections<M extends Model>(
         : mirrorMeta.resolver(m, mirrorMeta.mspId);
     if (
       resolved &&
-      !privates.some((p) => p.name === resolved && p.policy.includes(mirrorMeta.mspId))
+      !privates.some(
+        (p) => p.name === resolved && p.policy.includes(mirrorMeta.mspId)
+      )
     ) {
-      const {
-        requiredPeerCount,
-        maxPeerCount,
-        blockToLive,
-        memberOnlyRead,
-      } = privateDefaults;
+      const { requiredPeerCount, maxPeerCount, blockToLive, memberOnlyRead } =
+        privateDefaults;
       privates.push(
         privateCollectionFor(
           mirrorMeta.mspId,
