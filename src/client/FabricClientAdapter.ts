@@ -12,7 +12,11 @@ import {
   type Serializer,
 } from "@decaf-ts/decorator-validation";
 import { debug, final, Logging } from "@decaf-ts/logging";
-import { type PeerConfig, type SegregatedModel } from "../shared/types";
+import {
+  type PeerConfig,
+  type SegregatedModel,
+  type MspDetails,
+} from "../shared/types";
 import {
   connect,
   type ConnectOptions,
@@ -1215,6 +1219,31 @@ export class FabricClientAdapter extends Adapter<
     return map;
   }
 
+  private resolveLegacyMspCount(): number {
+    const configured = this.config.legacyMspCount ?? 1;
+    const parsed = Number(configured);
+    if (!Number.isFinite(parsed) || parsed < 1) return 1;
+    return Math.floor(parsed);
+  }
+
+  private pickLegacyCandidates(
+    candidates: MspDetails[],
+    limit: number
+  ): MspDetails[] {
+    if (!candidates.length || limit <= 0) return [];
+    const available = [...candidates];
+    const target = Math.min(limit, available.length);
+    const picked: MspDetails[] = [];
+    while (picked.length < target && available.length) {
+      const idx = Math.floor(Math.random() * available.length);
+      const [selection] = available.splice(idx, 1);
+      if (selection) {
+        picked.push(selection);
+      }
+    }
+    return picked;
+  }
+
   private buildLegacyPeerConfigs(
     ctx: Context<FabricClientFlags>
   ): LegacyPeerTarget[] {
@@ -1228,13 +1257,14 @@ export class FabricClientAdapter extends Adapter<
     ];
 
     const endorsers =
-      this.getEndorsingOrganizations(ctx)?.filter(
-        (org): org is string => Boolean(org)
+      this.getEndorsingOrganizations(ctx)?.filter((org): org is string =>
+        Boolean(org)
       ) || [];
     const extras = endorsers.filter((org) => org !== this.config.mspId);
     if (!extras.length) return peers;
 
     const map = this.config.mspMap;
+    const legacyCount = this.resolveLegacyMspCount();
     for (const msp of extras) {
       const candidates = map?.[msp];
       if (!candidates?.length) {
@@ -1242,19 +1272,25 @@ export class FabricClientAdapter extends Adapter<
           `No peer mapping available for MSP ${msp}. Provide it via config.mspMap`
         );
       }
-      const choice =
-        candidates[Math.floor(Math.random() * candidates.length)];
-      if (!choice.endpoint) {
+      const selections = this.pickLegacyCandidates(candidates, legacyCount);
+      if (!selections.length) {
         throw new UnsupportedError(
-          `Invalid peer mapping for MSP ${msp}: missing endpoint`
+          `No valid peer mapping available for MSP ${msp}. Provide it via config.mspMap`
         );
       }
-      peers.push({
-        mspId: msp,
-        peerEndpoint: choice.endpoint,
-        peerHostAlias: choice.alias,
-        tlsCert: choice.tlsCert || this.config.tlsCert,
-      });
+      for (const choice of selections) {
+        if (!choice.endpoint) {
+          throw new UnsupportedError(
+            `Invalid peer mapping for MSP ${msp}: missing endpoint`
+          );
+        }
+        peers.push({
+          mspId: msp,
+          peerEndpoint: choice.endpoint,
+          peerHostAlias: choice.alias,
+          tlsCert: choice.tlsCert || this.config.tlsCert,
+        });
+      }
     }
 
     return peers;

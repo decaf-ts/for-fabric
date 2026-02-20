@@ -47,6 +47,7 @@ export type PeerConfig = {
   tlsCert: string | Buffer;
   allowGatewayOverride?: boolean;
   mspMap?: Record<string, MspDetails[]>;
+  legacyMspCount?: number;
   peerEndpoint: string;
   peerHostAlias: string;
   caEndpoint?: string;

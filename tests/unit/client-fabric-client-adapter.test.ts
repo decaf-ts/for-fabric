@@ -351,6 +351,35 @@ describe("FabricClientAdapter", () => {
     legacySpy.mockRestore();
   });
 
+  it("selects up to legacyMspCount peers per MSP when provided", async () => {
+    const adapter = newAdapter({
+      allowGatewayOverride: true,
+      legacyMspCount: 2,
+    });
+    const legacySpy = jest
+      .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
+      .mockResolvedValue(new TextEncoder().encode("legacy"));
+    const randomSpy = jest
+      .spyOn(Math, "random")
+      .mockReturnValue(0.1); // deterministic selection order
+    const ctx = createContext();
+    ctx.accumulate({
+      legacy: true,
+      endorsingOrgs: [config.mspId, MIRROR_MSP],
+    });
+
+    await adapter.submitTransaction(ctx, "create");
+
+    const peerConfigs = legacySpy.mock.calls[0][4];
+    const extraPeers = peerConfigs.filter(
+      (peer) => peer.mspId === MIRROR_MSP
+    );
+    expect(extraPeers).toHaveLength(2);
+
+    randomSpy.mockRestore();
+    legacySpy.mockRestore();
+  });
+
   it("throws when required MSP is missing from mspMap", async () => {
     const adapter = newAdapter({
       allowGatewayOverride: true,
