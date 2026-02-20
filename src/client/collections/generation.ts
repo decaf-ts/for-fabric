@@ -97,7 +97,7 @@ export function privateCollectionFor(
   );
 
   c.endorsementPolicy = {
-    signaturePolicy: `OR(${mspId}.peer)`,
+    signaturePolicy: `OR('${mspId}'.peer)`,
   };
   return c;
 }
