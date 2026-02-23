@@ -1,9 +1,10 @@
-import { Config } from "@jest/types";
+const path = require("path");
+// import { Config } from "@jest/types";
 
-const config: Config.InitialOptions = {
+const config = {
   verbose: true,
   rootDir: __dirname,
-  transform: { "^.+\\.ts?$": "ts-jest" },
+  transform: { "^.+\\.ts$": "ts-jest" },
   testEnvironment: "node",
   testRegex: "/tests/.*\\.(test|spec)\\.(ts|tsx)$",
   watchman: false,
@@ -19,4 +20,4 @@ const config: Config.InitialOptions = {
   reporters: ["default"],
 };
 
-export default config;
+module.exports = config;

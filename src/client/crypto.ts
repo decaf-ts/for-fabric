@@ -260,7 +260,7 @@ export class CryptoUtils {
         hash: "SHA-256",
       },
       key,
-      data
+      data as any
     )) as ArrayBuffer;
 
     return Array.from(new Uint8Array(buff))
@@ -285,8 +285,8 @@ export class CryptoUtils {
         hash: "SHA-256",
       },
       key,
-      signature,
-      data
+      signature as any,
+      data as any
     );
   }
 

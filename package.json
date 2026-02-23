@@ -40,11 +40,11 @@
     "build": "npx build-scripts --dev && sed -i -e '1i#!/usr/bin/env node\\' lib/bin/*.cjs",
     "build:prod": "npx build-scripts --prod",
     "test": "jest --runInBand --coverage --detectOpenHandles",
-    "test:unit": "jest --testPathPattern=\"/tests/unit\" --passWithNoTests --detectOpenHandles",
-    "test:integration": "jest --testPathPattern=\"/tests/(integration)\" --passWithNoTests --detectOpenHandles",
-    "test:all": "jest --testPathPattern=\"/tests/unit\" --passWithNoTests --detectOpenHandles --runInBand",
+    "test:unit": "jest --testPathPatterns=\"/tests/unit\" --passWithNoTests --detectOpenHandles",
+    "test:integration": "jest --testPathPatterns=\"/tests/(integration)\" --passWithNoTests --detectOpenHandles",
+    "test:all": "jest --testPathPatterns=\"/tests/unit\" --passWithNoTests --detectOpenHandles --runInBand",
     "test:circular": "dpdm -T --no-warning --no-tree ./src/index.ts",
-    "coverage": "rimraf ./workdocs/reports/data/*.json && npm run test:unit -- --coverage --config=./workdocs/reports/jest.coverage.config.ts",
+    "coverage": "rimraf ./workdocs/reports/data/*.json && npm run test:unit -- --coverage --config=./workdocs/reports/jest.coverage.config.cjs",
     "lint": "eslint .",
     "lint-fix": "eslint --fix .",
     "prepare-pr": "npm run lint-fix && npm run build:prod && npm run coverage && npm run docs",
@@ -109,8 +109,8 @@
   "devDependencies": {
     "@decaf-ts/cli": "latest",
     "@decaf-ts/fabric-weaver": "latest",
-    "@decaf-ts/ui-decorators": "^0.6.15",
-    "@decaf-ts/utils": "latest"
+    "@decaf-ts/utils": "latest",
+    "@types/jest": "^30.0.0"
   },
   "dependencies": {
     "@decaf-ts/core": "latest",
@@ -121,6 +121,7 @@
     "@decaf-ts/injectable-decorators": "latest",
     "@decaf-ts/logging": "latest",
     "@decaf-ts/transactional-decorators": "latest",
+    "@decaf-ts/ui-decorators": "latest",
     "@peculiar/x509": "^1.14.2",
     "json-stringify-deterministic": "^1.0.12",
     "sort-keys-recursive": "^2.1.10"
@@ -133,8 +134,7 @@
     "fabric-common": "^2.2.20",
     "fabric-contract-api": "^2.5.8",
     "fabric-network": "^2.2.20",
-    "fabric-shim": "^2.5.8",
-    "rollup-plugin-ts": "^3.4.5"
+    "fabric-shim": "^2.5.8"
   },
   "overrides": {
     "fabric-common": {
@@ -142,7 +142,9 @@
     },
     "fabric-ca-client": {
       "jsrsasign": "^11.1.0"
-    }
+    },
+    "minimatch": "^10.2.2",
+    "test-exclude": "7.0.1"
   },
   "optionalDependencies": {
     "pkcs11js": "^2.1.6"

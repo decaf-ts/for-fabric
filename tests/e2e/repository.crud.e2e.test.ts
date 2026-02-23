@@ -239,25 +239,25 @@ describe("e2e Repository test", () => {
 
       expect(deleted).toBeDefined();
       expect(deleted.productCode).toEqual(created.productCode); // same model
-      await expect(
-        repo.read(created.productCode as string)
-      ).rejects.toThrowError(NotFoundError);
+      await expect(repo.read(created.productCode as string)).rejects.toThrow(
+        NotFoundError
+      );
 
       const strengthRepo = Repository.forModel(ProductStrength);
       await expect(
         strengthRepo.read(deleted.strengths[0] as unknown as string)
-      ).rejects.toThrowError(NotFoundError);
+      ).rejects.toThrow(NotFoundError);
       await expect(
         strengthRepo.read(deleted.strengths[1] as unknown as string)
-      ).rejects.toThrowError(NotFoundError);
+      ).rejects.toThrow(NotFoundError);
 
       const marketRepo = Repository.forModel(Market);
-      await expect(
-        marketRepo.read(deleted.markets[0] as any)
-      ).rejects.toThrowError(NotFoundError);
-      await expect(
-        marketRepo.read(deleted.markets[1] as any)
-      ).rejects.toThrowError(NotFoundError);
+      await expect(marketRepo.read(deleted.markets[0] as any)).rejects.toThrow(
+        NotFoundError
+      );
+      await expect(marketRepo.read(deleted.markets[1] as any)).rejects.toThrow(
+        NotFoundError
+      );
     });
   });
 
@@ -453,13 +453,13 @@ describe("e2e Repository test", () => {
       // const marketRepo = Repository.forModel(Market);
       //
       // for (const p of deleted) {
-      //   await expect(repo.read(p[Model.pk(Clazz) as any])).rejects.toThrowError(
+      //   await expect(repo.read(p[Model.pk(Clazz) as any])).rejects.toThrow(
       //     NotFoundError
       //   );
-      //   await expect(strengthRepo.read(p.strengths[0].id)).rejects.toThrowError(
+      //   await expect(strengthRepo.read(p.strengths[0].id)).rejects.toThrow(
       //     NotFoundError
       //   );
-      //   await expect(strengthRepo.read(p.strengths[1].id)).rejects.toThrowError(
+      //   await expect(strengthRepo.read(p.strengths[1].id)).rejects.toThrow(
       //     NotFoundError
       //   );
       //

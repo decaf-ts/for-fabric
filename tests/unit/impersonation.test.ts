@@ -109,7 +109,7 @@ describe("impersonation test", () => {
 
       await expect(
         repo.override(override as any).create(model)
-      ).rejects.toThrowError();
+      ).rejects.toThrow();
 
       expect(transactionMock).toHaveBeenCalled();
       expect(transactionMock).toHaveBeenCalledWith(
@@ -122,7 +122,7 @@ describe("impersonation test", () => {
 
       const service = new ModelService(Product);
 
-      await expect(service.for(override).update(model)).rejects.toThrowError();
+      await expect(service.for(override).update(model)).rejects.toThrow();
 
       expect(transactionMock).toHaveBeenCalled();
       expect(transactionMock).toHaveBeenCalledWith(

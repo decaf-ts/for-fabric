@@ -144,7 +144,7 @@ describe("e2e Repository test", () => {
 
       expect(deleted).toBeDefined();
       expect(deleted.id).toEqual(created.id); // same model
-      await expect(repo.read(created.id as string)).rejects.toThrowError(
+      await expect(repo.read(created.id as string)).rejects.toThrow(
         NotFoundError
       );
       expect(mock).toHaveBeenCalledWith(
@@ -254,7 +254,7 @@ describe("e2e Repository test", () => {
       expect(deleted.every((el) => !el.hasErrors())).toEqual(true);
       expect(deleted.every((el, i) => el.equals(updated[i]))).toEqual(true);
       for (const k in deleted.map((c) => c[pk])) {
-        await expect(repo.read(k)).rejects.toThrowError(NotFoundError);
+        await expect(repo.read(k)).rejects.toThrow(NotFoundError);
       }
       expect(mock).toHaveBeenCalledWith(
         Batch,

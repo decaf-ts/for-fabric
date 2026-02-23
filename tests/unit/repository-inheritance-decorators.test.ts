@@ -86,7 +86,7 @@ describe("Inheritance and attribute generation", () => {
     expect(deleted.productCode).toEqual(created.productCode); // same model
     await expect(
       contract.read(ctx, created.productCode as string)
-    ).rejects.toThrowError(NotFoundError);
+    ).rejects.toThrow(NotFoundError);
     stub.commit();
   });
 });
