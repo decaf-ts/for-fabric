@@ -39,7 +39,7 @@ import { FabricFlags } from "./types";
 import { toPascalCase } from "@decaf-ts/logging";
 import { FabricContractFlags } from "../contracts/types";
 import "../shared/overrides";
-import { FabricContractContext } from "../contracts/index";
+import { type FabricContractContext } from "../contracts/ContractContext";
 
 /**
  * @description Extracts the MSP ID from either a string or ClientIdentity object
@@ -242,7 +242,6 @@ export async function evalMirrorMetadata<M extends Model>(
     );
   return collection;
 }
-
 
 export async function createMirrorHandler<
   M extends Model,
@@ -570,20 +569,14 @@ export async function applyMirrorFlags<M extends Model>(
   ctx.readFrom(collection);
 }
 
-function hasPublicProperties<M extends Model>(
-  clazz: Constructor<M>
-): boolean {
+function hasPublicProperties<M extends Model>(clazz: Constructor<M>): boolean {
   const attributes = Metadata.getAttributes(clazz) || [];
   const pk = Model.pk(clazz);
   const transientMeta = Metadata.get(clazz as any, DBKeys.TRANSIENT) || {};
-  const privateMeta = Metadata.get(
-    clazz as any,
-    Metadata.key(FabricModelKeys.PRIVATE)
-  ) || {};
-  const sharedMeta = Metadata.get(
-    clazz as any,
-    Metadata.key(FabricModelKeys.SHARED)
-  ) || {};
+  const privateMeta =
+    Metadata.get(clazz as any, Metadata.key(FabricModelKeys.PRIVATE)) || {};
+  const sharedMeta =
+    Metadata.get(clazz as any, Metadata.key(FabricModelKeys.SHARED)) || {};
 
   return attributes.some((attr) => {
     if (attr === pk) return false;
