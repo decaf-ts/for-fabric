@@ -11,7 +11,7 @@ import {
   NamespaceCollection,
   sharedData,
 } from "../../shared/index";
-import { composed, InternalError } from "@decaf-ts/db-decorators";
+import { composed, InternalError, version } from "@decaf-ts/db-decorators";
 import { gtin } from "./gtin";
 import { historyDec } from "./history-dec";
 
@@ -65,6 +65,9 @@ export class OtherProductStrength extends BaseIdentifiedModel {
   @column()
   @description("Legal entity name responsible for the product.")
   legalEntityName?: string;
+
+  @version()
+  counter?: number;
 
   constructor(model?: ModelArg<OtherProductStrength>) {
     super(model);

@@ -7,7 +7,7 @@ import {
 } from "@decaf-ts/decorator-validation";
 import { TableNames } from "./constants";
 import { column, index, OrderDirection, pk, table } from "@decaf-ts/core";
-import { composed } from "@decaf-ts/db-decorators";
+import { composed, version } from "@decaf-ts/db-decorators";
 import { description, uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 import { gtin } from "./gtin";
@@ -68,6 +68,9 @@ export class OtherMarket extends BaseIdentifiedModel {
     "Address of the Marketing Authorization Holder or responsible legal entity."
   )
   mahAddress?: string;
+
+  @version()
+  counter?: number;
 
   constructor(model?: ModelArg<OtherMarket>) {
     super(model);

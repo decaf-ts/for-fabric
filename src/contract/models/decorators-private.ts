@@ -3,7 +3,7 @@ import { metadata, apply, Constructor } from "@decaf-ts/decoration";
 import {
   afterCreate,
   afterDelete,
-  afterUpdate,
+  onUpdate,
   InternalError,
   OperationKeys,
 } from "@decaf-ts/db-decorators";
@@ -11,6 +11,7 @@ import { OtherAudit } from "./OtherAudit";
 import { Repository } from "@decaf-ts/core";
 import { FabricContractContext } from "../../contracts/ContractContext";
 import { CollectionResolver } from "../../shared/decorators";
+import { populateRelations } from "./decorators";
 
 export async function rebuildForMatchingCollection<M extends Model>(
   model: M,
@@ -38,8 +39,15 @@ export async function rebuildForMatchingCollection<M extends Model>(
     const pk = Model.pk(model);
 
     cols.forEach((col) => {
-      const segData = context.get("segregatedData");
-      Object.assign(model, (segData as any)[col][model[pk]]);
+      let segData: any;
+      try {
+        segData = context.get("segregatedData");
+      } catch {
+        return; // segregatedData not present in this context (e.g. cascade child)
+      }
+      if (!segData || !segData[col] || !((model[pk] as any) in segData[col]))
+        return;
+      Object.assign(model, segData[col][model[pk]]);
     });
   }
   return model;
@@ -57,12 +65,10 @@ export async function createAuditHandler<
 ): Promise<void> {
   const repo = Repository.forModel(OtherAudit);
 
-  const collections = Model.collectionsFor(OtherAudit);
-
-  model = await rebuildForMatchingCollection(model, context, collections);
-
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apparently for audit`);
+
+  model = await populateRelations(model, context, this._overrides);
 
   const toCreate = new OtherAudit({
     userGroup: context.identity.getID(),
@@ -79,6 +85,39 @@ export async function createAuditHandler<
   );
 }
 
+/**
+ * Returns a shallow-cloned copy of the model where each relation array item
+ * is normalised to its string ID. This ensures that `{ id: "x" }` and `"x"`
+ * compare as equal so that unchanged relations produce no diff.
+ */
+function normalizeRelationsForAudit<M extends Model>(model: M): M {
+  const copy = Object.assign(
+    Object.create(Object.getPrototypeOf(model)),
+    model
+  ) as M;
+  const relProps = Model.relations(model) as string[];
+  if (!relProps || !relProps.length) return copy;
+  for (const propKey of relProps) {
+    const value = (copy as any)[propKey];
+    if (Array.isArray(value)) {
+      (copy as any)[propKey] = value.map((item: any) => {
+        if (item == null) return item;
+        if (typeof item === "string" || typeof item === "number")
+          return String(item);
+        if (item.id != null) return String(item.id);
+        return item; // new object without id — keep as-is
+      });
+    } else if (value != null) {
+      if (typeof value === "string" || typeof value === "number") {
+        (copy as any)[propKey] = String(value);
+      } else if ((value as any).id != null) {
+        (copy as any)[propKey] = String((value as any).id);
+      }
+    }
+  }
+  return copy;
+}
+
 export async function updateAuditHandler<
   M extends Model,
   R extends Repository<M, any>,
@@ -92,12 +131,15 @@ export async function updateAuditHandler<
 ): Promise<void> {
   const repo = Repository.forModel(OtherAudit);
 
-  const collections = Model.collectionsFor(OtherAudit);
-
-  model = await rebuildForMatchingCollection(model, context, collections);
-
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apparently for audit`);
+
+  // At onUpdate time `model` still has all private fields (not yet stripped by
+  // adapter.revert). Normalise relation arrays to ID strings on both sides so
+  // that { id: "x" } and "x" compare as equal and unchanged relations produce
+  // no spurious diff.
+  const normalizedModel = normalizeRelationsForAudit(model);
+  const normalizedOldModel = normalizeRelationsForAudit(oldModel);
 
   const toCreate = new OtherAudit({
     userGroup: context.identity.getID(),
@@ -105,7 +147,7 @@ export async function updateAuditHandler<
     model: Model.tableName(data.class),
     transaction: context.stub.getTxID(),
     action: OperationKeys.UPDATE,
-    diffs: model.compare(oldModel),
+    diffs: normalizedModel.compare(normalizedOldModel),
   });
 
   const audit = await repo.override(this._overrides).create(toCreate, context);
@@ -126,6 +168,8 @@ export async function deleteAuditHandler<
 ): Promise<void> {
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apprently. no getId in identity`);
+
+  model = await populateRelations(model, context, this._overrides);
 
   const toCreate = new OtherAudit({
     userGroup: context.identity.getID(),
@@ -153,7 +197,7 @@ export function audit(model: Constructor<Model<boolean>>) {
   };
   return apply(
     afterCreate(createAuditHandler as any, meta),
-    afterUpdate(updateAuditHandler as any, meta),
+    onUpdate(updateAuditHandler as any, meta),
     afterDelete(deleteAuditHandler as any, meta),
     metadata("audit", true)
   );

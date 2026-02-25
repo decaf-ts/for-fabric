@@ -1,5 +1,4 @@
 import {
-  JSONSerializer,
   Model,
   model,
   type ModelArg,
@@ -11,10 +10,14 @@ import {
   composed,
   OperationKeys,
   readonly,
-  serialize,
 } from "@decaf-ts/db-decorators";
 import { description, uses } from "@decaf-ts/decoration";
-import { FabricFlavour, NamespaceCollection, sharedData } from "../../shared";
+import {
+  FabricFlavour,
+  mirror,
+  NamespaceCollection,
+  sharedData,
+} from "../../shared";
 
 @description("Logs user activity for auditing purposes.")
 @uses(FabricFlavour)
@@ -28,6 +31,7 @@ import { FabricFlavour, NamespaceCollection, sharedData } from "../../shared";
 @model()
 export class History extends Model {
   @pk()
+  @mirror("ptp-history-mirror", "PharmaledgerassocMSP")
   @composed(["table", "key", "version"], ":")
   @description("Unique identifier of the history record.")
   id!: string;
@@ -56,7 +60,6 @@ export class History extends Model {
   @column()
   @required()
   @readonly()
-  @serialize(JSONSerializer)
   @description("the object to keep history of")
   record?: Record<string, any>;
 

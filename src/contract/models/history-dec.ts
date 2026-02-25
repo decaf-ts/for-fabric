@@ -1,15 +1,38 @@
 import { Model } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
-import { apply, metadata } from "@decaf-ts/decoration";
+import { apply, Constructor, Metadata, metadata } from "@decaf-ts/decoration";
 import {
   afterDelete,
+  DBKeys,
   InternalError,
   onUpdate,
   PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
-import { rebuildForMatchingCollection } from "./decorators";
+import { populateRelations } from "./decorators";
 import { type FabricContractContext } from "../../contracts/index";
 import { History } from "./History";
+
+/**
+ * Correctly extracts the version number from a model by inspecting
+ * the property decorated with `@version()`.
+ *
+ * `Model.versionProp()` has a bug where it returns `Object.keys(meta)[0]`
+ * (the first metadata key overall) instead of the actual version property name.
+ * This helper uses `Metadata.get()` correctly to find the `DBKeys.VERSION`
+ * entry and then reads the first property name from it.
+ *
+ * @returns the version number (>= 1), or undefined if none found.
+ */
+function getVersionOf(model: Model): number | undefined {
+  const meta = Metadata.get(model.constructor as Constructor<Model>);
+  if (!meta) return undefined;
+  const versionMeta = (meta as Record<string, any>)[DBKeys.VERSION];
+  if (!versionMeta || typeof versionMeta !== "object") return undefined;
+  const versionProp = Object.keys(versionMeta)[0];
+  if (!versionProp) return undefined;
+  const value = (model as any)[versionProp];
+  return typeof value === "number" && value >= 1 ? value : undefined;
+}
 
 export async function updateHistoryHandler<
   M extends Model,
@@ -22,23 +45,25 @@ export async function updateHistoryHandler<
   model: M,
   oldModel: M
 ): Promise<void> {
-  const repo = Repository.forModel(History).override(this._overrides);
-
-  const collections = Model.collectionsFor(oldModel);
-
-  model = await rebuildForMatchingCollection(oldModel, context, collections);
-
   if (!context.identity || !context.identity.getID)
-    throw new InternalError(`Lost context apparently for audit`);
+    throw new InternalError(`Lost context apparently for history`);
 
   const table = Model.tableName(oldModel);
-  const pk: PrimaryKeyType = Model.pk(model, true) as any;
-  const version = Model.versionOf(oldModel);
+  const pk: PrimaryKeyType = Model.pk(oldModel, true) as any;
+  const version = getVersionOf(oldModel);
+  if (version === undefined) return; // model has no @version field — skip history
+
+  // Populate relations on a non-mutating copy of oldModel, then convert to a
+  // plain object so no model-anchor (__model) keys appear in the stored JSON.
+  const populated = await populateRelations(oldModel, context, this._overrides);
+  const record: Record<string, any> = JSON.parse(JSON.stringify(populated));
+
+  const repo = Repository.forModel(History).override(this._overrides);
   const toCreate = new History({
     table,
     key: pk,
     version,
-    record: model,
+    record,
   });
 
   await repo.create(toCreate, context);
@@ -57,23 +82,25 @@ export async function deleteHistoryHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  const repo = Repository.forModel(History).override(this._overrides);
-
-  const collections = Model.collectionsFor(model);
-
-  model = await rebuildForMatchingCollection(model, context, collections);
-
   if (!context.identity || !context.identity.getID)
-    throw new InternalError(`Lost context apparently for audit`);
+    throw new InternalError(`Lost context apparently for history`);
 
   const table = Model.tableName(model);
   const pk: PrimaryKeyType = Model.pk(model, true) as any;
-  const version = Model.versionOf(model);
+  const version = getVersionOf(model);
+  if (version === undefined) return; // model has no @version field — skip history
+
+  // Populate relations on a non-mutating copy of model, then convert to a
+  // plain object so no model-anchor (__model) keys appear in the stored JSON.
+  const populated = await populateRelations(model, context, this._overrides);
+  const record: Record<string, any> = JSON.parse(JSON.stringify(populated));
+
+  const repo = Repository.forModel(History).override(this._overrides);
   const toCreate = new History({
     table,
     key: pk,
     version,
-    record: model,
+    record,
   });
 
   await repo.create(toCreate, context);
