@@ -17,6 +17,7 @@ import {
   NamespaceCollection,
   sharedData,
 } from "../../shared/index";
+import { historyDec } from "./history-dec";
 
 @sharedData(NamespaceCollection("decaf-namespace"))
 @description("Links a product to a specific market.")
@@ -25,6 +26,7 @@ import {
 @model()
 export class OtherMarket extends BaseIdentifiedModel {
   @pk({ type: String, generated: false })
+  @historyDec()
   @mirror("mirror-collection", "org-b")
   @composed(["productCode", "marketId"], ":", true)
   @description("Unique identifier composed of product code and market ID.")

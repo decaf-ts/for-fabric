@@ -13,6 +13,7 @@ import {
 } from "../../shared/index";
 import { composed, InternalError } from "@decaf-ts/db-decorators";
 import { gtin } from "./gtin";
+import { historyDec } from "./history-dec";
 
 function strengthSeed(m: OtherProductStrength) {
   try {
@@ -29,6 +30,7 @@ function strengthSeed(m: OtherProductStrength) {
 @description("Represents the product’s strength and composition details.")
 export class OtherProductStrength extends BaseIdentifiedModel {
   @pk()
+  @historyDec()
   @mirror("mirror-collection", "org-b")
   @composed(["productCode", "uuid"], ":")
   @description("Unique identifier of the product strength.")

@@ -18,6 +18,7 @@ import {
   NamespaceCollection,
   sharedData,
 } from "../../shared/index";
+import { historyDec } from "./history-dec";
 
 @sharedData(NamespaceCollection("decaf-namespace"))
 @description("Represents a product batch")
@@ -27,6 +28,7 @@ import {
 @model()
 export class OtherBatchShared extends BaseIdentifiedModel {
   @pk()
+  @historyDec()
   @audit(OtherBatchShared)
   @mirror("mirror-collection", "org-b")
   @composed(["productCode", "batchNumber"], ":")

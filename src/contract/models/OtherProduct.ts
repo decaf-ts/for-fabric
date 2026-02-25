@@ -14,6 +14,7 @@ import {
   privateData,
 } from "../../shared/index";
 import { version } from "@decaf-ts/db-decorators";
+import { historyDec } from "./history-dec";
 
 @privateData()
 @uses(FabricFlavour)
@@ -23,6 +24,7 @@ import { version } from "@decaf-ts/db-decorators";
 export class OtherProduct extends BaseIdentifiedModel {
   @pk()
   @gtin()
+  @historyDec()
   @mirror("mirror-collection", "org-b")
   @audit(OtherProduct)
   productCode!: string;

@@ -25,6 +25,7 @@ import { version } from "@decaf-ts/db-decorators";
 import { OtherProductStrength } from "./OtherProductStrength";
 import { OtherMarket } from "./OtherMarket";
 import { assignProductOwner } from "./decorators";
+import { historyDec } from "./history-dec";
 
 @sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
@@ -34,6 +35,7 @@ import { assignProductOwner } from "./decorators";
 export class OtherProductShared extends BaseIdentifiedModel {
   @pk()
   @gtin()
+  @historyDec()
   @assignProductOwner()
   @mirror("mirror-collection", "org-b")
   @audit(OtherProductShared)
