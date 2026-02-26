@@ -1256,10 +1256,12 @@ export class FabricClientAdapter extends Adapter<
       },
     ];
 
+    let endorsingOrgs = this.getEndorsingOrganizations(ctx) || [];
+    endorsingOrgs = Array.isArray(endorsingOrgs)
+      ? endorsingOrgs
+      : [endorsingOrgs];
     const endorsers =
-      this.getEndorsingOrganizations(ctx)?.filter((org): org is string =>
-        Boolean(org)
-      ) || [];
+      endorsingOrgs.filter((org): org is string => Boolean(org)) || [];
     const extras = endorsers.filter((org) => org !== this.config.mspId);
     if (!extras.length) return peers;
 
