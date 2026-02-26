@@ -613,7 +613,8 @@ export class FabricClientAdapter extends Adapter<
     if (mirrorMeta) {
       const mirrorMsp = mirrorMeta.mspId;
       if (!mirrorMsp) throw new InternalError(`No mirror MSP could be found`);
-      const msps = this.getEndorsingOrganizations(ctx) || [];
+      let msps = this.getEndorsingOrganizations(ctx) || [];
+      msps = Array.isArray(msps) ? msps : [msps];
       const merged = [...new Set([...msps, mirrorMsp])];
       ctx.accumulate({
         endorsingOrgs: merged,
