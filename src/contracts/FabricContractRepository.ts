@@ -114,7 +114,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
   constructor(
     adapter?: FabricContractAdapter,
     clazz?: Constructor<M>,
-    protected trackedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
+    protected omittedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
   ) {
     super(adapter, clazz);
   }
@@ -358,7 +358,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
     id: EventIds,
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<void> {
-    if (!this.trackedEvents || this.trackedEvents.indexOf(event) !== -1)
+    if (!this.omittedEvents || !this.omittedEvents.includes(event))
       return await super.updateObservers(table, event, id, ...args);
   }
 

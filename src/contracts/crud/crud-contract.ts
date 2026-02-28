@@ -10,13 +10,18 @@ import {
 } from "fabric-contract-api";
 import { Model, Serializer } from "@decaf-ts/decorator-validation";
 import {
+  AllOperationKeys,
   AuthorizationError,
   Condition,
+  ContextualArgs,
   DirectionLimitOffset,
+  EventIds,
   MaybeContextualArg,
   MethodOrOperation,
+  Observer,
   OrderDirection,
   PersistenceKeys,
+  PersistenceObserver,
   PreparedStatementKeys,
   Repository,
   SerializedPage,
@@ -87,7 +92,7 @@ FabricObject()(Date);
  */
 export abstract class FabricCrudContract<M extends Model>
   extends Contract
-  implements Checkable
+  implements Checkable, PersistenceObserver<FabricContractContext>
 {
   /**
    * @description Shared adapter instance for all contract instances
@@ -112,8 +117,18 @@ export abstract class FabricCrudContract<M extends Model>
   ) {
     super(name);
     this.repo = Repository.forModel(clazz);
+    this.repo.observe(this);
+  }
 
-    // prefixMethod(this);
+  async refresh(
+    table: Constructor<M> | string,
+    event: AllOperationKeys,
+    id: EventIds,
+    ...args: ContextualArgs<FabricContractContext>
+  ): Promise<void> {
+    const { log } = this.logCtx(args, this.refresh);
+    log.verbose(`Pushing ${event} event on table ${table}, id(s) ${id}`);
+    // do nothing. all we needed was an observer to kickstart the process
   }
 
   async listBy(
@@ -393,9 +408,13 @@ export abstract class FabricCrudContract<M extends Model>
     key: PrimaryKeyType | string,
     ...args: any[]
   ): Promise<M | string> {
-    const { log, ctxArgs, ctx: fabricCtx } = (
-      await this.logCtx([...args, ctx], OperationKeys.DELETE, true)
-    ).for(this.delete);
+    const {
+      log,
+      ctxArgs,
+      ctx: fabricCtx,
+    } = (await this.logCtx([...args, ctx], OperationKeys.DELETE, true)).for(
+      this.delete
+    );
     this.ensureMirrorWritePermissions(fabricCtx);
     log.info(`deleting entry with pk ${key} `);
     return this.repo.delete(String(key), ...ctxArgs);
@@ -619,9 +638,7 @@ export abstract class FabricCrudContract<M extends Model>
     return result;
   }
 
-  protected ensureMirrorWritePermissions(
-    ctx: FabricContractContext
-  ): void {
+  protected ensureMirrorWritePermissions(ctx: FabricContractContext): void {
     if (!ctx) return;
     const mirrorMeta = Model.mirroredAt(this.clazz);
     if (!mirrorMeta) return;
