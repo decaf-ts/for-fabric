@@ -3,7 +3,6 @@ import { ModelKeys } from "@decaf-ts/decorator-validation";
 import { InternalError, NotFoundError } from "@decaf-ts/db-decorators";
 import { ClientIdentity } from "fabric-shim-api";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
-import { FabricContractContext } from "../../src/contracts/ContractContext";
 import { Contract } from "fabric-contract-api";
 
 function parseQuery(query: string) {

@@ -55,6 +55,7 @@ import {
   ContextOf,
   TransactionOperationKeys,
   EventIds,
+  Dispatch,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -77,6 +78,7 @@ import {
 import { FabricContractPaginator } from "./FabricContractPaginator";
 import { MissingContextError } from "../shared/errors";
 import { SegregatedModel } from "../shared/index";
+import { FabricContractDispatch } from "./FabricContractDispatch";
 
 export type FabricContextualizedArgs<
   ARGS extends any[] = any[],
@@ -218,6 +220,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
   override async Sequence(options: SequenceOptions): Promise<Sequence> {
     return new FabricContractSequence(options, this as any);
+  }
+
+  protected override Dispatch(): Dispatch<FabricContractAdapter> {
+    return new FabricContractDispatch();
   }
 
   /**
@@ -1360,7 +1366,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       throw new InternalError(
         "ObserverHandler not initialized. Did you register any observables?"
       );
-    const { log, ctx, ctxArgs } = this.logCtx(args, this.updateObservers);
+    const { ctx, ctxArgs } = this.logCtx(args, this.updateObservers);
     if (ctx.isFullySegregated) return;
     if (ctx.getOrUndefined("noEmit")) return;
     if (!ctx.stub) return;

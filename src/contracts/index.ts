@@ -10,6 +10,7 @@ export * from "./crud";
 export * from "./erc20";
 export * from "./ContractAdapter";
 export * from "./ContractContext";
+export * from "./FabricContractDispatch";
 export * from "./FabricContractPaginator";
 export * from "./FabricContractRepository";
 export * from "./FabricContractRepositoryObservableHandler";
