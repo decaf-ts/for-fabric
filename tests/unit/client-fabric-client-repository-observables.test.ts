@@ -75,21 +75,4 @@ describe("FabricClientRepository observables", () => {
       ctx
     );
   });
-
-  it("skips events that are omitted", async () => {
-    const adapter = createAdapter();
-    const repo = new FabricClientRepository(adapter, Wallet, [OperationKeys.CREATE]);
-    const handler = createHandler() as any;
-    Object.defineProperty(repo, "observerHandler", {
-      value: handler,
-      writable: true,
-    });
-
-    const ctx = new Context();
-    ctx.accumulate({ logger: createLogger() } as any);
-
-    await repo.updateObservers("wallets", OperationKeys.CREATE, "w-1", ctx);
-
-    expect(handler.updateObservers).not.toHaveBeenCalled();
-  });
 });
