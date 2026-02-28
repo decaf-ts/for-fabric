@@ -10,11 +10,13 @@ import { FabricContractContext } from "./ContractContext";
 import {
   BadRequestError,
   BaseError,
+  BulkCrudOperationKeys,
   ConflictError,
   InternalError,
   NotFoundError,
   onCreate,
   onCreateUpdate,
+  OperationKeys,
   PrimaryKeyType,
   SerializationError,
 } from "@decaf-ts/db-decorators";
@@ -52,6 +54,7 @@ import {
   FlagsOf,
   ContextOf,
   TransactionOperationKeys,
+  EventIds,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -634,15 +637,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 // Find the bookmark position and slice the page
                 let startIndex = 0;
                 if (bookmark) {
-                  const found = allResults.findIndex(
-                    (r) => r.key === bookmark
-                  );
+                  const found = allResults.findIndex((r) => r.key === bookmark);
                   startIndex = found >= 0 ? found + 1 : 0;
                 }
-                const paged = allResults.slice(
-                  startIndex,
-                  startIndex + limit
-                );
+                const paged = allResults.slice(startIndex, startIndex + limit);
                 const lastKey =
                   paged.length > 0
                     ? paged[paged.length - 1].key
@@ -665,8 +663,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     arrayIterator as unknown as Iterators.StateQueryIterator,
                   metadata: {
                     fetchedRecordsCount: paged.length,
-                    bookmark:
-                      paged.length >= limit ? lastKey : "",
+                    bookmark: paged.length >= limit ? lastKey : "",
                   },
                 };
               }
@@ -1346,13 +1343,33 @@ export class FabricContractAdapter extends CouchDBAdapter<
       .then((res) => {
         if (!(res.ctx instanceof FabricContractContext))
           throw new InternalError(`Invalid context binding`);
-        if (!res.ctx.stub) throw new InternalError(`Missing Stub`);
-        if (!res.ctx.identity) throw new InternalError(`Missing Identity`);
         return Object.assign(res, {
           stub: res.ctx.stub,
           identity: res.ctx.identity,
         });
       }) as any;
+  }
+
+  override async updateObservers(
+    table: Constructor<any> | string,
+    event: OperationKeys | BulkCrudOperationKeys | string,
+    id: EventIds,
+    ...args: ContextualArgs<FabricContractContext>
+  ): Promise<void> {
+    if (!this.observerHandler)
+      throw new InternalError(
+        "ObserverHandler not initialized. Did you register any observables?"
+      );
+    const { log, ctx, ctxArgs } = this.logCtx(args, this.updateObservers);
+    if (ctx.isFullySegregated) return;
+    if (ctx.getOrUndefined("noEmit")) return;
+    if (!ctx.stub) return;
+    const isBulk = Array.isArray(id);
+    const emitSingle = !ctx.getOrUndefined("noEmitSingle");
+    const emitBulk = !ctx.getOrUndefined("noEmitBulk");
+    if ((isBulk && emitBulk) || (!isBulk && emitSingle)) {
+      await this.observerHandler.updateObservers(table, event, id, ...ctxArgs);
+    }
   }
 
   static override parseError<E extends BaseError>(err: Error | string): E {

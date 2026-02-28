@@ -36,6 +36,7 @@ import {
   BulkCrudOperationKeys,
   OperationKeys,
   PrimaryKeyType,
+  InternalError,
 } from "@decaf-ts/db-decorators";
 import { MissingContextError } from "../../shared/index";
 import { extractMspId } from "../../shared/decorators";
@@ -92,7 +93,17 @@ FabricObject()(Date);
  */
 export abstract class FabricCrudContract<M extends Model>
   extends Contract
-  implements Checkable, PersistenceObserver<FabricContractContext>
+  implements
+    Checkable,
+    PersistenceObserver<FabricContractContext>,
+    Observer<
+      [
+        table: Constructor<M> | string,
+        event: AllOperationKeys,
+        id: EventIds,
+        ...args: ContextualArgs<FabricContractContext>,
+      ]
+    >
 {
   /**
    * @description Shared adapter instance for all contract instances
@@ -117,7 +128,18 @@ export abstract class FabricCrudContract<M extends Model>
   ) {
     super(name);
     this.repo = Repository.forModel(clazz);
-    this.repo.observe(this);
+    try {
+      this.repo.observe(this);
+    } catch (err: unknown) {
+      if (
+        err instanceof InternalError &&
+        err.message.includes("Observer already registered")
+      ) {
+        // already registered observer; ignore duplicate registration (during tests)
+      } else {
+        throw err;
+      }
+    }
   }
 
   async refresh(

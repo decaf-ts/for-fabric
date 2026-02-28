@@ -9,6 +9,7 @@ import {
   Paginator,
   FlagsOf,
   ObserverHandler,
+  EventIds,
 } from "@decaf-ts/core";
 import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -16,6 +17,7 @@ import { Constructor } from "@decaf-ts/decoration";
 import { type FabricClientAdapter } from "./FabricClientAdapter";
 import {
   OperationKeys,
+  BulkCrudOperationKeys,
   PrimaryKeyType,
   ValidationError,
   reduceErrorsToPrint,
@@ -65,7 +67,11 @@ export class FabricClientRepository<
     rebuildWithTransient: false,
   });
 
-  constructor(adapter?: A, clazz?: Constructor<M>) {
+  constructor(
+    adapter?: A,
+    clazz?: Constructor<M>,
+    protected omittedEvents?: (OperationKeys | BulkCrudOperationKeys | string)[]
+  ) {
     super(adapter, clazz);
   }
 
@@ -77,6 +83,17 @@ export class FabricClientRepository<
 
   protected override ObserverHandler(): ObserverHandler {
     return super.ObserverHandler();
+  }
+
+  override async updateObservers(
+    table: Constructor<M> | string,
+    event: OperationKeys | BulkCrudOperationKeys | string,
+    id: EventIds,
+    ...args: ContextualArgs<ContextOf<A>>
+  ): Promise<void> {
+    if (!this.omittedEvents || !this.omittedEvents.includes(event)) {
+      await super.updateObservers(table, event, id, ...args);
+    }
   }
 
   override async paginateBy(

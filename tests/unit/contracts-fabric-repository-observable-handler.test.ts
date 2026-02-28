@@ -82,4 +82,62 @@ describe("FabricContractRepositoryObservableHandler", () => {
       Buffer.from(JSON.stringify({ hello: "world" }))
     );
   });
+
+  it("includes public result when observeFullResult is set", async () => {
+    const handler = new FabricContractRepositoryObservableHandler();
+    const stub = { setEvent: jest.fn() };
+    const ctx = new FabricContractContext();
+    const logger = {
+      for: jest.fn().mockReturnThis(),
+      clear: jest.fn().mockReturnThis(),
+      info: jest.fn(),
+      error: jest.fn(),
+      verbose: jest.fn(),
+      debug: jest.fn(),
+    };
+    ctx.accumulate({ stub, logger } as any);
+
+    const payload = { name: "result" };
+    ctx.put("observeFullResult", true);
+
+    await handler.updateObservers(
+      "assets",
+      OperationKeys.CREATE,
+      "id-1",
+      "owner1",
+      payload,
+      ctx
+    );
+
+    expect(stub.setEvent).toHaveBeenCalledWith(
+      "assets.CREATE",
+      Buffer.from(JSON.stringify({ id: "id-1", result: payload }))
+    );
+  });
+
+  it("skips events when context is fully segregated", async () => {
+    const handler = new FabricContractRepositoryObservableHandler();
+    const stub = { setEvent: jest.fn() };
+    const ctx = new FabricContractContext();
+    const logger = {
+      for: jest.fn().mockReturnThis(),
+      clear: jest.fn().mockReturnThis(),
+      info: jest.fn(),
+      error: jest.fn(),
+      verbose: jest.fn(),
+      debug: jest.fn(),
+    };
+    ctx.accumulate({ stub, logger } as any);
+    ctx.markFullySegregated();
+
+    await handler.updateObservers(
+      "assets",
+      OperationKeys.CREATE,
+      "id-1",
+      "owner1",
+      ctx
+    );
+
+    expect(stub.setEvent).not.toHaveBeenCalled();
+  });
 });

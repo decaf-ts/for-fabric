@@ -57,11 +57,11 @@ describe("FabricContractRepository", () => {
     expect(handler).toBeInstanceOf(FabricContractRepositoryObservableHandler);
   });
 
-  it("delegates updateObservers when event tracked", async () => {
+  it("delegates updateObservers when event is not omitted", async () => {
     const repo = new FabricContractRepository<RepoTestModel>(
       createAdapter(),
       RepoTestModel,
-      [OperationKeys.CREATE]
+      [OperationKeys.DELETE]
     );
     const superSpy = jest
       .spyOn(Repository.prototype, "updateObservers")
@@ -83,11 +83,11 @@ describe("FabricContractRepository", () => {
     );
   });
 
-  it("skips updateObservers when event not tracked", async () => {
+  it("skips updateObservers when event is omitted", async () => {
     const repo = new FabricContractRepository<RepoTestModel>(
       createAdapter(),
       RepoTestModel,
-      [OperationKeys.DELETE]
+      [OperationKeys.CREATE]
     );
     const superSpy = jest
       .spyOn(Repository.prototype, "updateObservers")

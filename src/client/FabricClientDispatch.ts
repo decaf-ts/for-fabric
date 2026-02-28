@@ -106,7 +106,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    * @param {Uint8Array} jsonBytes - The binary payload from the chaincode event
    * @return {{ id: string }} The parsed payload containing the record ID
    */
-  private parsePayload(jsonBytes: Uint8Array): { id: string } {
+  private parsePayload(jsonBytes: Uint8Array): { id: string; result?: any } {
     const json = this.decoder.decode(jsonBytes);
     return JSON.parse(json);
   }
@@ -210,17 +210,20 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
       for await (const evt of this.listeningStack) {
         const { table, event, owner } = parseEventName(evt.eventName);
         if (owner && owner !== this.adapter.config?.mspId) continue;
-        const payload: { id: string } = this.parsePayload(evt.payload);
+        const payload: { id: string; result?: any } = this.parsePayload(
+          evt.payload
+        );
         try {
           const targetModel = table
             ? Model.get(table)
             : Model.get(this.models[0].name);
           const modelRef = targetModel ?? (table || this.models[0]?.name);
+          const observerArgs = payload.result ? [payload.result, ctx] : [ctx];
           await this.updateObservers(
             modelRef as Constructor | string,
             event,
             payload.id as string,
-            ctx
+            ...(observerArgs as ContextualArgs<any>)
           );
         } catch (e: unknown) {
           log.error(

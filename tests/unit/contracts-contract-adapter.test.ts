@@ -11,6 +11,7 @@ import type { FabricContractRepository } from "../../src/contracts/FabricContrac
 import type { FabricContractSequence } from "../../src/contracts/FabricContractSequence";
 import type { SequenceOptions } from "@decaf-ts/core";
 import { UnsupportedError } from "@decaf-ts/core";
+import { OperationKeys } from "@decaf-ts/db-decorators";
 import type { Logger } from "@decaf-ts/logging";
 import { prop } from "@decaf-ts/decoration";
 import { ClientIdentity } from "fabric-shim-api";
@@ -143,5 +144,101 @@ describe("contracts/ContractAdapter helpers", () => {
     const descriptor = Object.getOwnPropertyDescriptor(model, "id");
     expect(descriptor?.writable).toBe(false);
     expect(sequenceMock.next).toHaveBeenCalledWith(context);
+  });
+
+  describe("FabricContractAdapter observables", () => {
+    const createAdapter = () =>
+      new FabricContractAdapter(undefined as any, `adapter-${Math.random()}`);
+
+    const createContext = () => {
+      const ctx = new FabricContractContext();
+      ctx.accumulate({
+        stub: {
+          getDateTimestamp: () => new Date(),
+          getTxID: () => "tx",
+          getChannelId: () => "channel",
+          setEvent: jest.fn(),
+        },
+        identity: {
+          getID: () => "user",
+          getMSPID: () => "Org1MSP",
+          getAttributeValue: () => "value",
+          getIDBytes: () => Buffer.from("id"),
+        },
+        logger: {
+          for: jest.fn().mockReturnThis(),
+          clear: jest.fn().mockReturnThis(),
+          info: jest.fn(),
+          error: jest.fn(),
+          verbose: jest.fn(),
+          debug: jest.fn(),
+        },
+      } as any);
+      return ctx;
+    };
+
+    it("notifies observers when no skip flags are set", async () => {
+      const adapter = createAdapter();
+      const handler = { updateObservers: jest.fn() };
+      Object.defineProperty(adapter, "observerHandler", {
+        value: handler,
+        writable: true,
+      });
+
+      const ctx = createContext();
+      await adapter.updateObservers(
+        "table",
+        OperationKeys.CREATE,
+        "id-1",
+        ctx
+      );
+
+      expect(handler.updateObservers).toHaveBeenCalledWith(
+        "table",
+        OperationKeys.CREATE,
+        "id-1",
+        ctx
+      );
+    });
+
+    it("skips notifications when context marks fully segregated", async () => {
+      const adapter = createAdapter();
+      const handler = { updateObservers: jest.fn() };
+      Object.defineProperty(adapter, "observerHandler", {
+        value: handler,
+        writable: true,
+      });
+      const ctx = createContext();
+      ctx.markFullySegregated();
+
+      await adapter.updateObservers(
+        "table",
+        OperationKeys.CREATE,
+        "id-1",
+        ctx
+      );
+
+      expect(handler.updateObservers).not.toHaveBeenCalled();
+    });
+
+    it("respects noEmitSingle flag", async () => {
+      const adapter = createAdapter();
+      const handler = { updateObservers: jest.fn() };
+      Object.defineProperty(adapter, "observerHandler", {
+        value: handler,
+        writable: true,
+      });
+      const ctx = createContext();
+      ctx.put("noEmitSingle", true);
+
+      await adapter.updateObservers(
+        "table",
+        OperationKeys.CREATE,
+        "id-1",
+        ctx
+      );
+
+      expect(handler.updateObservers).not.toHaveBeenCalled();
+    });
   });
 });

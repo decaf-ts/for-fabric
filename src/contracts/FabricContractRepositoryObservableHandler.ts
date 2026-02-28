@@ -92,13 +92,19 @@ export class FabricContractRepositoryObservableHandler extends ObserverHandler {
       false,
       ...args
     );
+    if (ctx.isFullySegregated) return;
+    if (!ctx.stub) return;
     const { stub } = ctx;
     const [owner, payload] = args;
     const table = typeof clazz === "string" ? clazz : clazz.name;
     if (this.supportedEvents.indexOf(event) !== -1) {
       log.debug(`Emitting ${event} event`);
       const eventName = generateFabricEventName(table, event, owner);
-      stub.setEvent(eventName, Buffer.from(JSON.stringify({ id: id })));
+      const eventData: Record<string, unknown> = { id: id };
+      if (ctx.getOrUndefined("observeFullResult") && payload) {
+        eventData.result = payload;
+      }
+      stub.setEvent(eventName, Buffer.from(JSON.stringify(eventData)));
     } else {
       stub.setEvent(event, Buffer.from(JSON.stringify(payload)));
     }
