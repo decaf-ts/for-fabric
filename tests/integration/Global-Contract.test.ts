@@ -5,7 +5,7 @@ import * as path from "path";
 import { CAConfig, PeerConfig } from "../../src/shared/types";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
-import { FabricEnrollmentService } from "../../src/shared";
+import { FabricEnrollmentService } from "../../src/client";
 import { User } from "../../src/contract/User";
 import { Product } from "../../src/contract/Product";
 import { NotFoundError } from "@decaf-ts/db-decorators";

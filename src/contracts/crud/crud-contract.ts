@@ -110,11 +110,30 @@ export abstract class FabricCrudContract<M extends Model>
    */
   protected static adapter: FabricContractAdapter = new FabricContractAdapter();
 
-  protected readonly repo: FabricContractRepository<M>;
-
   protected static readonly serializer = new DeterministicSerializer();
 
   protected initialized: boolean = false;
+
+  private _repo?: FabricContractRepository<M>;
+
+  protected get repo() {
+    if (!this._repo) {
+      this._repo = Repository.forModel(this.clazz);
+      try {
+        this.repo.observe(this);
+      } catch (err: unknown) {
+        if (
+          err instanceof InternalError &&
+          err.message.includes("Observer already registered")
+        ) {
+          // already registered observer; ignore duplicate registration (during tests)
+        } else {
+          throw err;
+        }
+      }
+    }
+    return this._repo;
+  }
 
   /**
    * @description Creates a new FabricCrudContract instance
@@ -127,19 +146,6 @@ export abstract class FabricCrudContract<M extends Model>
     protected readonly clazz: Constructor<M>
   ) {
     super(name);
-    this.repo = Repository.forModel(clazz);
-    try {
-      this.repo.observe(this);
-    } catch (err: unknown) {
-      if (
-        err instanceof InternalError &&
-        err.message.includes("Observer already registered")
-      ) {
-        // already registered observer; ignore duplicate registration (during tests)
-      } else {
-        throw err;
-      }
-    }
   }
 
   async refresh(
