@@ -272,6 +272,92 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
       this.adapter.config.chaincodeName
     );
     this.handleEvents(ctx);
+
+    // fallback for fully segregated models (the adapter doesnt sent events if so)
+
+    (
+      [
+        OperationKeys.CREATE,
+        OperationKeys.UPDATE,
+        OperationKeys.DELETE,
+        BulkCrudOperationKeys.CREATE_ALL,
+        BulkCrudOperationKeys.UPDATE_ALL,
+        BulkCrudOperationKeys.DELETE_ALL,
+      ] as (keyof Adapter<any, any, any, any>)[]
+    ).forEach((toWrap) => {
+      if (!this.adapter)
+        throw new InternalError(
+          `No adapter provided for the fallback of fully segregated models`
+        );
+      if (!this.adapter[toWrap])
+        throw new InternalError(
+          `Method ${toWrap} not found in ${this.adapter.alias} adapter to bind Observables Dispatch`
+        );
+
+      let descriptor = Object.getOwnPropertyDescriptor(this.adapter, toWrap);
+      let proto: any = this.adapter;
+      while (!descriptor && proto !== Object.prototype) {
+        proto = Object.getPrototypeOf(proto);
+        descriptor = Object.getOwnPropertyDescriptor(proto, toWrap);
+      }
+
+      if (!descriptor || !descriptor.writable) {
+        this.log.error(
+          `Could not find method ${toWrap} to bind Observables Dispatch`
+        );
+        return;
+      }
+      function bulkToSingle(method: string) {
+        switch (method) {
+          case BulkCrudOperationKeys.CREATE_ALL:
+            return OperationKeys.CREATE;
+          case BulkCrudOperationKeys.UPDATE_ALL:
+            return OperationKeys.UPDATE;
+          case BulkCrudOperationKeys.DELETE_ALL:
+            return OperationKeys.DELETE;
+          default:
+            return method;
+        }
+      }
+
+      // @ts-expect-error because there are read only properties
+      this.adapter[toWrap] = new Proxy(this.adapter[toWrap], {
+        apply: async (
+          target: any,
+          thisArg: FabricClientAdapter,
+          argArray: any[]
+        ) => {
+          // Run the original method unchanged so transient data is preserved
+          const result = await target.apply(thisArg, argArray);
+
+          const clazz: Constructor<any> = argArray[0];
+          // Fully-public models emit a chaincode event on the contract side;
+          // skip the local fallback to avoid double-notification.
+          if (!Model.isTransient(clazz)) return result;
+
+          // Context is always the last element of argArray
+          const { log, ctxArgs, ctx } = thisArg["logCtx"](
+            argArray.slice(argArray.length - 1),
+            target
+          );
+          const ids = argArray[1];
+          const resultArgs: any[] = [clazz, bulkToSingle(toWrap), ids];
+
+          if (ctx.getOrUndefined("observeFullResult")) {
+            resultArgs.push(result);
+          }
+          this.updateObservers(
+            ...(resultArgs as Parameters<typeof this.updateObservers>),
+            ...ctxArgs
+          ).catch((e: unknown) =>
+            log.error(
+              `Failed to dispatch observer refresh for ${toWrap} on ${clazz.name || clazz} for ${ids}: ${e}`
+            )
+          );
+          return result;
+        },
+      });
+    });
   }
 }
 
