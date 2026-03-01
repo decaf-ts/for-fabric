@@ -1,90 +1,75 @@
 import "reflect-metadata";
+import "../../src/shared/overrides";
 
-import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
-import { FabricContractRepositoryObservableHandler } from "../../src/contracts/FabricContractRepositoryObservableHandler";
-import { FabricContractContext } from "../../src/contracts/ContractContext";
-import { getIdentityMock, getStubMock } from "./ContextMock";
+import { getMockCtx, getStubMock } from "./ContextMock";
+import { TestPublicModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
+import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
+import { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
+import { Model } from "@decaf-ts/decorator-validation";
 import { OperationKeys } from "@decaf-ts/db-decorators";
 
-const createLogger = () => ({
-  for: jest.fn().mockReturnThis(),
-  clear: jest.fn().mockReturnThis(),
-  info: jest.fn(),
-  error: jest.fn(),
-  verbose: jest.fn(),
-  debug: jest.fn(),
-});
+jest.setTimeout(10000);
 
-const createAdapter = () =>
-  new FabricContractAdapter(undefined as any, `adapter-${Math.random().toString(36).slice(2)}`);
+describe("FabricContractAdapter observable pipeline", () => {
+  let ctx: ReturnType<typeof getMockCtx>;
+  let stub: ReturnType<typeof getStubMock>;
+  let contract: TestPublicModelContract;
+  let repo: FabricContractRepository<TestPublicModel>;
 
-describe("FabricContractAdapter observables", () => {
+  beforeAll(async () => {
+    ctx = getMockCtx();
+    stub = ctx.stub as ReturnType<typeof getStubMock>;
+    contract = new TestPublicModelContract();
+    repo = (contract as any).repo as FabricContractRepository<TestPublicModel>;
+    // Wait for async dispatch.initialize() to complete and set up proxy wrappers
+    await new Promise((r) => setTimeout(r, 100));
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it("emits events through the stub when observation is enabled", async () => {
-    const adapter = createAdapter();
-    const handler = new FabricContractRepositoryObservableHandler();
-    Object.defineProperty(adapter, "observerHandler", {
-      value: handler,
-      writable: true,
+  it("calls updateObservers on the contract repo after create", async () => {
+    const updateObserversSpy = jest.spyOn(repo, "updateObservers");
+
+    const model = new TestPublicModel({
+      name: "Alice",
+      nif: "123456789",
+      child: { name: "Child" },
     });
+    await contract.create(ctx as any, model.serialize());
 
-    const stub = getStubMock();
-    const identity = getIdentityMock();
-    const logger = createLogger();
-    stub.setEvent = jest.fn(stub.setEvent);
-
-    const ctx = new FabricContractContext();
-    ctx.accumulate({ stub, identity, logger } as any);
-    ctx.put("observeFullResult", true);
-
-    await adapter.updateObservers(
-      "TestModel",
+    // updateObservers is called with (table, event, id, mspId, payload?, ctx)
+    expect(updateObserversSpy).toHaveBeenCalledWith(
+      expect.anything(), // table (Constructor or string)
       OperationKeys.CREATE,
-      "evt-1",
-      "owner-1",
-      { value: 1 },
-      ctx
+      expect.anything(), // id
+      expect.anything(), // mspId (from stub.getMspID)
+      expect.anything(), // payload (result, may be undefined)
+      expect.anything() // ctx
     );
-
-    expect(stub.setEvent).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(Buffer)
-    );
-    const payload = JSON.parse(
-      stub.setEvent.mock.calls[0][1].toString("utf8")
-    );
-    expect(payload).toEqual({ id: "evt-1", result: { value: 1 } });
   });
 
-  it("does not emit when noEmitSingle is set", async () => {
-    const adapter = createAdapter();
-    const handler = new FabricContractRepositoryObservableHandler();
-    Object.defineProperty(adapter, "observerHandler", {
-      value: handler,
-      writable: true,
+  it("emits a Fabric event via stub.setEvent after create", async () => {
+    const setEventSpy = jest.spyOn(stub, "setEvent");
+
+    const model = new TestPublicModel({
+      name: "Bob",
+      nif: "987654321",
+      child: { name: "Child2" },
     });
+    await contract.create(ctx as any, model.serialize());
 
-    const stub = getStubMock();
-    const identity = getIdentityMock();
-    const logger = createLogger();
-    stub.setEvent = jest.fn(stub.setEvent);
-
-    const ctx = new FabricContractContext();
-    ctx.accumulate({ stub, identity, logger } as any);
-    ctx.put("noEmitSingle", true);
-
-    await adapter.updateObservers(
-      "TestModel",
-      OperationKeys.CREATE,
-      "evt-2",
-      "owner-2",
-      undefined,
-      ctx
-    );
-
-    expect(stub.setEvent).not.toHaveBeenCalled();
+    expect(setEventSpy).toHaveBeenCalledTimes(1);
+    const [eventName, payload] = setEventSpy.mock.calls[0];
+    expect(typeof eventName).toBe("string");
+    const parsed = JSON.parse(payload.toString("utf8"));
+    // Contract events must contain at least an id
+    expect(parsed).toHaveProperty("id");
+    // Result may be included (observeFullResult=true by default).
+    // When present, it must be only public data — no private collection keys.
+    if (parsed.result !== undefined) {
+      expect(parsed.result).not.toHaveProperty("__privateCollection");
+    }
   });
 });

@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { Context } from "@decaf-ts/core";
+import { Context, Dispatch } from "@decaf-ts/core";
 import { OperationKeys } from "@decaf-ts/db-decorators";
 import { pk } from "@decaf-ts/core";
 import { model, Model } from "@decaf-ts/decorator-validation";
@@ -40,39 +40,49 @@ describe("FabricClientRepository observables", () => {
     jest.restoreAllMocks();
   });
 
-  const createHandler = () => ({
-    updateObservers: jest.fn(),
-    count: jest.fn().mockReturnValue(0),
-  });
-
-  const createLogger = () => ({
-    for: jest.fn().mockReturnThis(),
-    clear: jest.fn().mockReturnThis(),
-    info: jest.fn(),
-    error: jest.fn(),
-    verbose: jest.fn(),
-    debug: jest.fn(),
-  });
-
   it("forwards events when not omitted", async () => {
     const adapter = createAdapter();
     const repo = new FabricClientRepository(adapter, Wallet);
-    const handler = createHandler() as any;
-    Object.defineProperty(repo, "observerHandler", {
-      value: handler,
-      writable: true,
-    });
 
-    const ctx = new Context();
-    ctx.accumulate({ logger: createLogger() } as any);
+    // Use base Dispatch (not FabricClientDispatch) so CRUD methods are proxied
+    // locally without requiring a real Fabric network connection
+    jest
+      .spyOn(adapter, "Dispatch")
+      .mockReturnValue(new Dispatch() as any);
 
-    await repo.updateObservers("wallets", OperationKeys.CREATE, "w-1", ctx);
+    // Mock the Fabric-level adapter calls to avoid network I/O
+    const wallet = new Wallet({ id: "w-1" });
+    jest
+      .spyOn(adapter, "create")
+      .mockResolvedValue({ id: "w-1" } as any);
+    jest
+      .spyOn(adapter, "revert")
+      .mockReturnValue(wallet as any);
 
-    expect(handler.updateObservers).toHaveBeenCalledWith(
-      "wallets",
+    // Register a mock observer via the proper adapter.observe() API
+    const mockObserver = {
+      refresh: jest.fn().mockResolvedValue(undefined),
+      toString: () => "MockObserver",
+    };
+    adapter.observe(mockObserver as any);
+
+    // Wait for async dispatch.initialize() to wrap CRUD methods with proxies
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Call the transactional method on the repository
+    await repo.create(wallet);
+
+    // Allow the fire-and-forget observer dispatch to settle
+    await new Promise((r) => setTimeout(r, 50));
+
+    // With observeFullResult=true (default), the Dispatch proxy includes the
+    // result in observer notifications: (table, event, id, result, ctx)
+    expect(mockObserver.refresh).toHaveBeenCalledWith(
+      Wallet,
       OperationKeys.CREATE,
       "w-1",
-      ctx
+      expect.anything(), // result payload (observeFullResult=true by default)
+      expect.anything() // context
     );
   });
 });

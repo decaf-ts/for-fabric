@@ -65,6 +65,13 @@ export type PeerConfig = {
   submitTimeout: number;
   commitTimeout: number;
   hsm?: HSMOptions;
+  /**
+   * When true, only chaincode events whose owner segment in the event name matches
+   * this adapter's mspId are forwarded to observers. Events with a different owner,
+   * or whose event name carries no owner segment, pass through unfiltered.
+   * Defaults to false (all events are forwarded regardless of owner).
+   */
+  mspEventOnly?: boolean;
 };
 
 /**

@@ -158,6 +158,7 @@ describe("contracts/ContractAdapter helpers", () => {
           getTxID: () => "tx",
           getChannelId: () => "channel",
           setEvent: jest.fn(),
+          getMspID: () => "Org1MSP",
         },
         identity: {
           getID: () => "user",
@@ -197,6 +198,8 @@ describe("contracts/ContractAdapter helpers", () => {
         "table",
         OperationKeys.CREATE,
         "id-1",
+        "Org1MSP", // mspId extracted from stub.getMspID()
+        undefined, // no result payload (no extra args before ctx)
         ctx
       );
     });

@@ -209,7 +209,12 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
     try {
       for await (const evt of this.listeningStack) {
         const { table, event, owner } = parseEventName(evt.eventName);
-        if (owner && owner !== this.adapter.config?.mspId) continue;
+        if (
+          this.adapter.config?.mspEventOnly &&
+          owner &&
+          owner !== this.adapter.config?.mspId
+        )
+          continue;
         const payload: { id: string; result?: any } = this.parsePayload(
           evt.payload
         );

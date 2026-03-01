@@ -1374,7 +1374,19 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const emitSingle = !ctx.getOrUndefined("noEmitSingle");
     const emitBulk = !ctx.getOrUndefined("noEmitBulk");
     if ((isBulk && emitBulk) || (!isBulk && emitSingle)) {
-      await this.observerHandler.updateObservers(table, event, id, ...ctxArgs);
+      // Pass the MSP owner from stub and the result payload (if any) in the
+      // positions the handler expects: (table, event, id, owner?, payload?, ctx)
+      const mspId = ctx.stub.getMspID ? ctx.stub.getMspID() : undefined;
+      const nonCtxArgs = ctxArgs.slice(0, -1); // everything before ctx
+      const payload = nonCtxArgs.length > 0 ? nonCtxArgs[0] : undefined;
+      await this.observerHandler.updateObservers(
+        table,
+        event,
+        id,
+        mspId,
+        payload,
+        ctx
+      );
     }
   }
 
