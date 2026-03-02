@@ -13,6 +13,8 @@ import { GtinOwner } from "../../src/contract/models/GtinOwner";
 import { FabricClientPaginator } from "../../src/client/FabricClientPaginator";
 import { OtherBatchShared } from "../../src/contract/models/OtherBatchShared";
 import { OtherBatchContract } from "../../src/contract/OtherBatchContract";
+import { AuditContract } from "../../src/contract/AuditContract";
+import { Audit } from "../../src/contract/models/Audit";
 
 jest.setTimeout(50000);
 
@@ -22,12 +24,14 @@ describe("OtherProductShared contract version flow with relations", () => {
   let contract: OtherProductSharedContract;
   let batchContract: OtherBatchContract;
   let transientSpy: jest.SpyInstance;
+  let auditContract: AuditContract;
 
   beforeAll(() => {
     ctx = getMockCtx();
     stub = (ctx as any).stub;
     contract = new OtherProductSharedContract();
     batchContract = new OtherBatchContract();
+    auditContract = new AuditContract();
   });
 
   function buildMarket(productCode: string, suffix: string) {
@@ -133,8 +137,8 @@ describe("OtherProductShared contract version flow with relations", () => {
       product.productCode
     );
     expect(mirror.productCode).toBe(product.productCode);
-     expect(mirror.inventedName).toBe(product.inventedName);
-     expect(mirror.nameMedicinalProduct).toBe(product.nameMedicinalProduct);
+    expect(mirror.inventedName).toBe(product.inventedName);
+    expect(mirror.nameMedicinalProduct).toBe(product.nameMedicinalProduct);
 
     const marketIds = (product.markets || []).map((m) =>
       typeof m === "object" ? (m as OtherMarket).id : m
@@ -1070,9 +1074,9 @@ describe("OtherProductShared contract version flow with relations", () => {
         );
         expect(listed).toBeDefined();
         expect(listed.length).toEqual(mirrorProducts.length);
-        expect(
-          listed.some((p: any) => p.inventedName === "FROM_MIRROR")
-        ).toBe(true);
+        expect(listed.some((p: any) => p.inventedName === "FROM_MIRROR")).toBe(
+          true
+        );
       });
 
       it("paginates products EXCLUSIVELY from mirror collection", async () => {
@@ -1237,9 +1241,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         expect(listed).toBeDefined();
         expect(listed.length).toEqual(mirrorBatches.length);
         expect(
-          listed.some(
-            (b: any) => b.manufacturerName === "FROM_MIRROR_BATCH"
-          )
+          listed.some((b: any) => b.manufacturerName === "FROM_MIRROR_BATCH")
         ).toBe(true);
       });
 
@@ -1258,6 +1260,43 @@ describe("OtherProductShared contract version flow with relations", () => {
         expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
         expect(parsedPage.data.length).toEqual(3);
         expect(parsedPage.count).toEqual(mirrorBatches.length);
+      });
+    });
+
+    describe("audit Bulk query and list", () => {
+      let auditBulk: Audit[];
+
+      beforeEach(() => {
+        ctx = getMockCtx();
+        Object.assign(ctx, { stub: stub });
+      });
+
+      afterEach(() => {
+        jest.restoreAllMocks();
+      });
+
+      it("lists via statement", async () => {
+        auditBulk = JSON.parse(
+          await auditContract.statement(
+            ctx as any,
+            "listBy",
+            JSON.stringify(["id", "asc"])
+          )
+        );
+        expect(auditBulk).toBeDefined();
+      });
+
+      it("Reads in Bulk", async () => {
+        const pk = Model.pk(Audit);
+        const ids = auditBulk.map((c) => c[pk]) as string[];
+
+        const read: Audit[] = JSON.parse(
+          await contract.readAll(ctx as any, JSON.stringify(ids))
+        ).map((r: any) => Model.deserialize(r));
+
+        for (const b of read) {
+          expect(b.hasErrors()).toBeUndefined();
+        }
       });
     });
   });
