@@ -14,7 +14,8 @@ import { FabricClientPaginator } from "../../src/client/FabricClientPaginator";
 import { OtherBatchShared } from "../../src/contract/models/OtherBatchShared";
 import { OtherBatchContract } from "../../src/contract/OtherBatchContract";
 import { AuditContract } from "../../src/contract/AuditContract";
-import { Audit } from "../../src/contract/models/Audit";
+import { OtherAudit } from "../../src/contract/models/OtherAudit";
+import { OtherAuditContract } from "../../src/contract/OtherAuditContract";
 
 jest.setTimeout(50000);
 
@@ -31,7 +32,7 @@ describe("OtherProductShared contract version flow with relations", () => {
     stub = (ctx as any).stub;
     contract = new OtherProductSharedContract();
     batchContract = new OtherBatchContract();
-    auditContract = new AuditContract();
+    auditContract = new OtherAuditContract();
   });
 
   function buildMarket(productCode: string, suffix: string) {
@@ -1264,7 +1265,7 @@ describe("OtherProductShared contract version flow with relations", () => {
     });
 
     describe("audit Bulk query and list", () => {
-      let auditBulk: Audit[];
+      let auditBulk: OtherAudit[];
 
       beforeEach(() => {
         ctx = getMockCtx();
@@ -1287,11 +1288,11 @@ describe("OtherProductShared contract version flow with relations", () => {
       });
 
       it("Reads in Bulk", async () => {
-        const pk = Model.pk(Audit);
+        const pk = Model.pk(OtherAudit);
         const ids = auditBulk.map((c) => c[pk]) as string[];
 
-        const read: Audit[] = JSON.parse(
-          await contract.readAll(ctx as any, JSON.stringify(ids))
+        const read: OtherAudit[] = JSON.parse(
+          await auditContract.readAll(ctx as any, JSON.stringify(ids))
         ).map((r: any) => Model.deserialize(r));
 
         for (const b of read) {
