@@ -1291,7 +1291,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         const ids = auditBulk.map((c) => c[pk]) as string[];
 
         const read: Audit[] = JSON.parse(
-          await contract.readAll(ctx as any, JSON.stringify(ids))
+          await auditContract.readAll(ctx as any, JSON.stringify(ids))
         ).map((r: any) => Model.deserialize(r));
 
         for (const b of read) {
