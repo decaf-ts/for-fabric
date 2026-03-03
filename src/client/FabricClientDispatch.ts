@@ -5,6 +5,8 @@ import {
   EventIds,
   UnsupportedError,
   Context,
+  MaybeContextualArg,
+  PersistenceKeys,
 } from "@decaf-ts/core";
 import { PeerConfig } from "../shared/types";
 import { Client } from "@grpc/grpc-js";
@@ -96,8 +98,26 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    * @summary Stops listening for chaincode events and releases resources
    * @return {Promise<void>} Promise that resolves when the connection is closed
    */
-  override async close(): Promise<void> {
-    if (this.listeningStack) this.listeningStack.close();
+  override async close(
+    ...ctxArgs: ContextualArgs<Context<FabricClientFlags>>
+  ): Promise<void> {
+    const { log, ctxArgs: loggedArgs } = (
+      await this.logCtx(ctxArgs, PersistenceKeys.SHUTDOWN, true)
+    ).for(this.close);
+    try {
+      await super.close(...loggedArgs);
+    } catch (e: unknown) {
+      log.error(`Failed to close Fabric proxies event listener`, e as Error);
+    }
+    if (this.listeningStack) {
+      try {
+        await this.listeningStack.close();
+      } catch (e: unknown) {
+        log.error(`Failed to close Fabric event listener`, e as Error);
+      } finally {
+        this.listeningStack = undefined;
+      }
+    }
   }
 
   /**
@@ -240,7 +260,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
       log.error(
         `Failed to read event for chaincode "${this.adapter.config.chaincodeName}" on channel "${this.adapter.config.channel}": ${e}`
       );
-      await this.close();
+      await this.close(ctx);
     }
   }
 
