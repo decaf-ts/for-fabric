@@ -26,6 +26,7 @@ import {
   Contract as Contrakt,
   type Signer,
   GatewayError,
+  EndorseError,
 } from "@hyperledger/fabric-gateway";
 import { Gateway as LegacyGateway, Wallets } from "fabric-network";
 import type { Endorser } from "fabric-common";
@@ -1812,6 +1813,15 @@ export class FabricClientAdapter extends Adapter<
 
     let msg = typeof err === "string" ? err : err.message;
     if (err instanceof GatewayError && err.details.length && err.code === 10) {
+      msg = `${err.details[0].message}`;
+    }
+
+    if (
+      err instanceof EndorseError &&
+      err.details.length &&
+      err.code === 10 &&
+      err.details[0].message?.includes(UnsupportedError.name)
+    ) {
       msg = `${err.details[0].message}`;
     }
 
