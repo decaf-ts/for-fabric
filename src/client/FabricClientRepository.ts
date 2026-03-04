@@ -1,25 +1,26 @@
+import type { MaybeContextualArg } from "@decaf-ts/core";
 import {
-  OrderDirection,
-  PersistenceKeys,
-  Repository,
   ContextOf,
-  PreparedStatementKeys,
-  SerializedPage,
   DirectionLimitOffset,
-  Paginator,
   FlagsOf,
   ObserverHandler,
+  OrderDirection,
+  Paginator,
+  PersistenceKeys,
+  PreparedStatementKeys,
+  Repository,
+  SerializedPage,
 } from "@decaf-ts/core";
-import type { MaybeContextualArg } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
 import { type FabricClientAdapter } from "./FabricClientAdapter";
 import {
+  BulkCrudOperationKeys,
+  enforceDBDecorators,
   OperationKeys,
   PrimaryKeyType,
-  ValidationError,
   reduceErrorsToPrint,
-  enforceDBDecorators,
+  ValidationError,
 } from "@decaf-ts/db-decorators";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 
@@ -451,6 +452,20 @@ export class FabricClientRepository<
         const id = ids[i];
         return this.adapter.revert<M>(r, this.class, id, transients[i], ctx);
       })
+    );
+  }
+
+  override async readAll(
+    keys: PrimaryKeyType[],
+    ...args: MaybeContextualArg<ContextOf<A>>
+  ) {
+    const { ctx, log, ctxArgs } = this.logCtx(args, this.readAll);
+    log.debug(
+      `reading ${keys.length} ${this.class.name} in table ${Model.tableName(this.class)}`
+    );
+    const records = await this.adapter.readAll(this.class, keys, ...ctxArgs);
+    return records.map((r, i) =>
+      this.adapter.revert(r, this.class, keys[i], {}, ctx)
     );
   }
 
