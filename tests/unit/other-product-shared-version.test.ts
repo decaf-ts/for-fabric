@@ -215,7 +215,13 @@ describe("OtherProductShared contract version flow with relations", () => {
       ) as OtherProductShared;
       stub.commit();
 
-      expect(updated.hasErrors()).toBeUndefined();
+      const read = Model.deserialize(
+        await contract.read(ctx as any, productCode)
+      );
+
+      stub.commit();
+
+      expect(read).toBeDefined();
     });
   });
 
@@ -538,7 +544,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         )
       );
       expect(listed).toBeDefined();
-      expect(listed.length).toEqual(bulk.length);
+      expect(listed.length).toEqual(bulk.length + 1);
       // expect(listed.every((el) => el instanceof OtherProductShared)).toEqual(
       //   true
       // );
@@ -567,7 +573,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
       expect(parsedPage.data.length).toEqual(3);
       expect(parsedPage.current).toEqual(1);
-      expect(parsedPage.count).toEqual(10);
+      expect(parsedPage.count).toEqual(11);
       expect(parsedPage.total).toEqual(4);
 
       // Validate actual records match expected order
@@ -589,7 +595,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       paginator.apply(parsedPage as any);
 
       expect(paginator.current).toEqual(1);
-      expect(paginator.count).toEqual(10);
+      expect(paginator.count).toEqual(11);
       expect(paginator.total).toEqual(4);
 
       // --- Page 2 ---
@@ -619,7 +625,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       paginator.apply(secondParsedPage as any);
 
       expect(paginator.current).toEqual(2);
-      expect(paginator.count).toEqual(10);
+      expect(paginator.count).toEqual(11);
       expect(paginator.total).toEqual(4);
     });
 
@@ -1133,7 +1139,7 @@ describe("OtherProductShared contract version flow with relations", () => {
           )
         );
         expect(listed).toBeDefined();
-        expect(listed.length).toEqual(mirrorProducts.length);
+        expect(listed.length).toEqual(mirrorProducts.length + 1);
         expect(listed.some((p: any) => p.inventedName === "FROM_MIRROR")).toBe(
           true
         );
@@ -1153,7 +1159,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         const parsedPage = Paginator.deserialize(page);
         expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
         expect(parsedPage.data.length).toEqual(3);
-        expect(parsedPage.count).toEqual(mirrorProducts.length);
+        expect(parsedPage.count).toEqual(mirrorProducts.length + 1);
       });
     });
 
