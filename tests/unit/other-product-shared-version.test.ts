@@ -16,6 +16,7 @@ import { OtherBatchContract } from "../../src/contract/OtherBatchContract";
 import { AuditContract } from "../../src/contract/AuditContract";
 import { OtherAudit } from "../../src/contract/models/OtherAudit";
 import { OtherAuditContract } from "../../src/contract/OtherAuditContract";
+import { OtherProductImage } from "../../src/contract/models/OtherProductImage";
 
 jest.setTimeout(50000);
 
@@ -159,6 +160,64 @@ describe("OtherProductShared contract version flow with relations", () => {
   let productCode: string = "";
   let created: OtherProductShared;
   let bulk: OtherProductShared[];
+
+  describe("Nested model create while updating parent", () => {
+    const image =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+    beforeEach(() => {
+      ctx = getMockCtx();
+      Object.assign(ctx, { stub: stub });
+
+      transientSpy = jest.spyOn(
+        contract as any,
+        "getTransientData" as any
+      ) as jest.SpyInstance;
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it("Create Image in update", async () => {
+      productCode = generateGtin();
+      const baseModel = new OtherProductShared({
+        productCode,
+        inventedName: "initial-name",
+        nameMedicinalProduct: "medicinal",
+      });
+
+      const payload = preparePayload(baseModel);
+      created = Model.deserialize(
+        await contract.create(ctx as any, payload.serialize())
+      ) as OtherProductShared;
+      stub.commit();
+
+      expect(created.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
+
+      created = await loadSharedProduct(productCode);
+      expect(created.hasErrors()).toBeUndefined();
+      await assertSharedRelations(created);
+      await assertMirrorCopies(created);
+
+      const owner = await loadPublicOwner(productCode);
+      expect(owner.hasErrors()).toBeUndefined();
+
+      created.imageData = new OtherProductImage({
+        content: image,
+        owner: owner,
+        productCode,
+      });
+
+      const updatePayload = preparePayload(created);
+
+      const updated = Model.deserialize(
+        await contract.update(ctx as any, updatePayload.serialize())
+      ) as OtherProductShared;
+      stub.commit();
+
+      expect(updated.hasErrors()).toBeUndefined();
+    });
+  });
 
   describe("product single crud", () => {
     beforeEach(() => {

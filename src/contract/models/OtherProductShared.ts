@@ -5,6 +5,7 @@ import {
   column,
   index,
   oneToMany,
+  oneToOne,
   OrderDirection,
   pk,
   table,
@@ -26,6 +27,7 @@ import { OtherProductStrength } from "./OtherProductStrength";
 import { OtherMarket } from "./OtherMarket";
 import { assignProductOwner } from "./decorators";
 import { historyDec } from "./history-dec";
+import { OtherProductImage } from "./OtherProductImage";
 
 @sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
@@ -57,6 +59,16 @@ export class OtherProductShared extends BaseIdentifiedModel {
   @column()
   @index([OrderDirection.ASC, OrderDirection.DSC])
   productRecall: boolean = false;
+
+  @oneToOne(
+    () => OtherProductImage,
+    {
+      update: Cascade.CASCADE,
+      delete: Cascade.CASCADE,
+    },
+    false
+  )
+  imageData?: string | OtherProductImage;
   //
   // @column()
   // flagEnableAdverseEventReporting?: boolean;
