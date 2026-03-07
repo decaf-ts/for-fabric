@@ -586,7 +586,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 // readState signature: (id: string, ctx: FabricContractContext)
                 const [id, ctx] = argsList;
                 const data = await ctx.stub.getPrivateData(collection, id);
-                if (!data && !data.toString().length) return "";
+                if (!data || !data.toString().length) return "";
                 try {
                   return FabricContractAdapter.serializer.deserialize(
                     data.toString("utf8")
