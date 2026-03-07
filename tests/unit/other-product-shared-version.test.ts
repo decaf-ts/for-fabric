@@ -204,7 +204,6 @@ describe("OtherProductShared contract version flow with relations", () => {
 
       created.imageData = new OtherProductImage({
         content: image,
-        owner: owner,
         productCode,
       });
 

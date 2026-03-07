@@ -12,7 +12,12 @@ import {
   PersistenceKeys,
   UnsupportedError,
 } from "@decaf-ts/core";
-import { model, Model, ModelArg, required } from "@decaf-ts/decorator-validation";
+import {
+  model,
+  Model,
+  ModelArg,
+  required,
+} from "@decaf-ts/decorator-validation";
 import { SerializedCrudContract } from "../../src/contracts/crud/serialized-crud-contract";
 import { FabricCrudContract } from "../../src/contracts/crud/crud-contract";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
@@ -369,9 +374,7 @@ describe("Complex Query Serialization - Contract Side", () => {
 
     it("pageBy results should include pagination metadata", () => {
       const pageResult = {
-        data: [
-          { id: 1, name: "John", age: 30, country: "US", active: true },
-        ],
+        data: [{ id: 1, name: "John", age: 30, country: "US", active: true }],
         bookmark: "page2bookmark",
         pageSize: 10,
         hasMore: true,
@@ -417,9 +420,10 @@ describe("Client-Contract Query Communication Flow", () => {
     };
   }
 
-  function simulateContractReceive(
-    transactionArgs: string[]
-  ): { method: string; args: any[] } {
+  function simulateContractReceive(transactionArgs: string[]): {
+    method: string;
+    args: any[];
+  } {
     // Simulates SerializedCrudContract.statement() parsing
     const [method, argsStr] = transactionArgs;
     return {
@@ -446,7 +450,9 @@ describe("Client-Contract Query Communication Flow", () => {
       expect(clientCall.transactionArgs[0]).toBe("findByName");
 
       // Contract receives
-      const contractReceive = simulateContractReceive(clientCall.transactionArgs);
+      const contractReceive = simulateContractReceive(
+        clientCall.transactionArgs
+      );
       expect(contractReceive.method).toBe("findByName");
       expect(contractReceive.args).toEqual(["John"]);
 
@@ -466,7 +472,9 @@ describe("Client-Contract Query Communication Flow", () => {
         65
       );
 
-      const contractReceive = simulateContractReceive(clientCall.transactionArgs);
+      const contractReceive = simulateContractReceive(
+        clientCall.transactionArgs
+      );
       expect(contractReceive.method).toBe("findByAgeGreaterThanAndAgeLessThan");
       expect(contractReceive.args).toEqual([18, 65]);
 
@@ -483,7 +491,9 @@ describe("Client-Contract Query Communication Flow", () => {
     it("findByCountryIn with array round-trip", () => {
       const clientCall = simulateClientCall("findByCountryIn", ["US", "UK"]);
 
-      const contractReceive = simulateContractReceive(clientCall.transactionArgs);
+      const contractReceive = simulateContractReceive(
+        clientCall.transactionArgs
+      );
       expect(contractReceive.method).toBe("findByCountryIn");
       expect(contractReceive.args).toEqual([["US", "UK"]]);
     });
@@ -493,7 +503,9 @@ describe("Client-Contract Query Communication Flow", () => {
     it("pageByName round-trip with pagination", () => {
       const clientCall = simulateClientCall("pageByName", "J", "asc", 10);
 
-      const contractReceive = simulateContractReceive(clientCall.transactionArgs);
+      const contractReceive = simulateContractReceive(
+        clientCall.transactionArgs
+      );
       expect(contractReceive.method).toBe("pageByName");
       expect(contractReceive.args).toEqual(["J", "asc", 10]);
 
@@ -521,7 +533,9 @@ describe("Client-Contract Query Communication Flow", () => {
         20
       );
 
-      const contractReceive = simulateContractReceive(clientCall.transactionArgs);
+      const contractReceive = simulateContractReceive(
+        clientCall.transactionArgs
+      );
       expect(contractReceive.method).toBe("pageByAgeGreaterThanOrderByName");
       expect(contractReceive.args).toEqual([25, "desc", 20]);
     });
@@ -531,20 +545,22 @@ describe("Client-Contract Query Communication Flow", () => {
     it("countByAge round-trip", () => {
       const clientCall = simulateClientCall("countByAge");
 
-      const contractReceive = simulateContractReceive(clientCall.transactionArgs);
+      const contractReceive = simulateContractReceive(
+        clientCall.transactionArgs
+      );
       expect(contractReceive.method).toBe("countByAge");
       expect(contractReceive.args).toEqual([]);
 
-      const clientReceive = simulateClientReceive(
-        simulateContractResponse(42)
-      );
+      const clientReceive = simulateClientReceive(simulateContractResponse(42));
       expect(clientReceive).toBe(42);
     });
 
     it("distinctByCountry round-trip", () => {
       const clientCall = simulateClientCall("distinctByCountry");
 
-      const contractReceive = simulateContractReceive(clientCall.transactionArgs);
+      const contractReceive = simulateContractReceive(
+        clientCall.transactionArgs
+      );
       expect(contractReceive.method).toBe("distinctByCountry");
 
       const clientReceive = simulateClientReceive(
@@ -556,7 +572,9 @@ describe("Client-Contract Query Communication Flow", () => {
     it("groupByCountry round-trip", () => {
       const clientCall = simulateClientCall("groupByCountry");
 
-      const contractReceive = simulateContractReceive(clientCall.transactionArgs);
+      const contractReceive = simulateContractReceive(
+        clientCall.transactionArgs
+      );
       expect(contractReceive.method).toBe("groupByCountry");
 
       const grouped = {
@@ -572,7 +590,9 @@ describe("Client-Contract Query Communication Flow", () => {
     it("findByActiveGroupByCountry round-trip", () => {
       const clientCall = simulateClientCall("findByActiveGroupByCountry", true);
 
-      const contractReceive = simulateContractReceive(clientCall.transactionArgs);
+      const contractReceive = simulateContractReceive(
+        clientCall.transactionArgs
+      );
       expect(contractReceive.method).toBe("findByActiveGroupByCountry");
       expect(contractReceive.args).toEqual([true]);
 
