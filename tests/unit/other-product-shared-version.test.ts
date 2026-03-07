@@ -98,6 +98,28 @@ describe("OtherProductShared contract version flow with relations", () => {
     ).toBeUndefined();
   }
 
+  async function expectMarketNotInSharedCollection(marketKey: string) {
+    const mk = stub.createCompositeKey("market", [marketKey]);
+    await expect(stub.getState(mk)).rejects.toThrow(NotFoundError);
+    await expect(
+      stub.getPrivateData("decaf-namespaceAeon", mk)
+    ).rejects.toThrow(NotFoundError);
+    await expect(stub.getPrivateData("mirror-collection", mk)).rejects.toThrow(
+      NotFoundError
+    );
+  }
+
+  async function expectStrengthNotInSharedCollection(strengthKey: string) {
+    const sk = stub.createCompositeKey("product_strength", [strengthKey]);
+    await expect(stub.getState(sk)).rejects.toThrow(NotFoundError);
+    await expect(
+      stub.getPrivateData("decaf-namespaceAeon", sk)
+    ).rejects.toThrow(NotFoundError);
+    await expect(stub.getPrivateData("mirror-collection", sk)).rejects.toThrow(
+      NotFoundError
+    );
+  }
+
   async function assertSharedRelations(product: OtherProductShared) {
     const marketIds = (product.markets || []).map((m) =>
       typeof m === "object" ? (m as OtherMarket).id : m
@@ -111,6 +133,22 @@ describe("OtherProductShared contract version flow with relations", () => {
     );
     for (const strengthId of strengthIds) {
       await expectStrengthInSharedCollection(strengthId as string);
+    }
+  }
+
+  async function assertNotSharedRelations(product: OtherProductShared) {
+    const marketIds = (product.markets || []).map((m) =>
+      typeof m === "object" ? (m as OtherMarket).id : m
+    );
+    for (const marketId of marketIds) {
+      await expectMarketNotInSharedCollection(marketId as string);
+    }
+
+    const strengthIds = (product.strengths || []).map((s) =>
+      typeof s === "object" ? (s as OtherProductStrength).id : s
+    );
+    for (const strengthId of strengthIds) {
+      await expectStrengthNotInSharedCollection(strengthId as string);
     }
   }
 
@@ -315,6 +353,40 @@ describe("OtherProductShared contract version flow with relations", () => {
       expect(updated.version).toBe(3);
       expect(updated.strengths).toHaveLength(2);
       expect(updated.markets).toHaveLength(2);
+
+      const result = await contract.read(ctx as any, created.productCode);
+
+      const read = Model.deserialize(result) as OtherProductShared;
+
+      expect(read.hasErrors()).toBeUndefined();
+      expect(read.productCode).toBe(updated.productCode);
+      expect(read.inventedName).toBe(updated.inventedName);
+      expect(read.version).toBe(updated.version);
+    });
+
+    it("deletes the relations", async () => {
+      const updatedModel = new OtherProductShared({
+        ...updated,
+        strengths: [],
+        markets: [],
+      });
+
+      const updatePayload = preparePayload(updatedModel);
+      updated = Model.deserialize(
+        await contract.update(ctx as any, updatePayload.serialize())
+      ) as OtherProductShared;
+      stub.commit();
+
+      expect(updated.hasErrors()).toBeDefined();
+
+      updated = await loadSharedProduct(productCode);
+      expect(updated.hasErrors()).toBeUndefined();
+      await assertNotSharedRelations(updated);
+      // await assertMirrorCopies(updated);
+
+      expect(updated.version).toBe(4);
+      expect(updated.strengths).toHaveLength(0);
+      expect(updated.markets).toHaveLength(0);
 
       const result = await contract.read(ctx as any, created.productCode);
 
