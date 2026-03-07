@@ -411,7 +411,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       });
 
       const payload = preparePayload(baseModel);
-      created = Model.deserialize(
+      let created = Model.deserialize(
         await contract.create(ctx as any, payload.serialize())
       ) as OtherProductShared;
       stub.commit();
@@ -440,6 +440,12 @@ describe("OtherProductShared contract version flow with relations", () => {
 
       const read = Model.deserialize(
         await contract.read(ctx as any, productCode)
+      );
+      await contract.delete(ctx as any, created.productCode);
+      ctx.stub.commit();
+
+      await expect(contract.read(ctx as any, productCode)).rejects.toThrow(
+        NotFoundError
       );
     });
 
@@ -1214,7 +1220,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         const parsedPage = Paginator.deserialize(page);
         expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
         expect(parsedPage.data.length).toEqual(3);
-        expect(parsedPage.count).toEqual(mirrorProducts.length + 1);
+        expect(parsedPage.count).toEqual(mirrorProducts.length);
       });
     });
 
