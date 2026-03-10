@@ -99,6 +99,28 @@ describe("OtherProductShared contract version flow with relations", () => {
     ).toBeUndefined();
   }
 
+  async function expectMarketNotInSharedCollection(marketKey: string) {
+    const mk = stub.createCompositeKey("market", [marketKey]);
+    await expect(stub.getState(mk)).rejects.toThrow(NotFoundError);
+    await expect(
+      stub.getPrivateData("decaf-namespaceAeon", mk)
+    ).rejects.toThrow(NotFoundError);
+    await expect(stub.getPrivateData("mirror-collection", mk)).rejects.toThrow(
+      NotFoundError
+    );
+  }
+
+  async function expectStrengthNotInSharedCollection(strengthKey: string) {
+    const sk = stub.createCompositeKey("product_strength", [strengthKey]);
+    await expect(stub.getState(sk)).rejects.toThrow(NotFoundError);
+    await expect(
+      stub.getPrivateData("decaf-namespaceAeon", sk)
+    ).rejects.toThrow(NotFoundError);
+    await expect(stub.getPrivateData("mirror-collection", sk)).rejects.toThrow(
+      NotFoundError
+    );
+  }
+
   async function assertSharedRelations(product: OtherProductShared) {
     const marketIds = (product.markets || []).map((m) =>
       typeof m === "object" ? (m as OtherMarket).id : m
@@ -112,6 +134,22 @@ describe("OtherProductShared contract version flow with relations", () => {
     );
     for (const strengthId of strengthIds) {
       await expectStrengthInSharedCollection(strengthId as string);
+    }
+  }
+
+  async function assertNotSharedRelations(product: OtherProductShared) {
+    const marketIds = (product.markets || []).map((m) =>
+      typeof m === "object" ? (m as OtherMarket).id : m
+    );
+    for (const marketId of marketIds) {
+      await expectMarketNotInSharedCollection(marketId as string);
+    }
+
+    const strengthIds = (product.strengths || []).map((s) =>
+      typeof s === "object" ? (s as OtherProductStrength).id : s
+    );
+    for (const strengthId of strengthIds) {
+      await expectStrengthNotInSharedCollection(strengthId as string);
     }
   }
 
@@ -160,69 +198,6 @@ describe("OtherProductShared contract version flow with relations", () => {
   let productCode: string = "";
   let created: OtherProductShared;
   let bulk: OtherProductShared[];
-
-  describe("Nested model create while updating parent", () => {
-    const image =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
-    beforeEach(() => {
-      ctx = getMockCtx();
-      Object.assign(ctx, { stub: stub });
-
-      transientSpy = jest.spyOn(
-        contract as any,
-        "getTransientData" as any
-      ) as jest.SpyInstance;
-    });
-
-    afterEach(() => {
-      jest.restoreAllMocks();
-    });
-
-    it("Create Image in update", async () => {
-      productCode = generateGtin();
-      const baseModel = new OtherProductShared({
-        productCode,
-        inventedName: "initial-name",
-        nameMedicinalProduct: "medicinal",
-      });
-
-      const payload = preparePayload(baseModel);
-      created = Model.deserialize(
-        await contract.create(ctx as any, payload.serialize())
-      ) as OtherProductShared;
-      stub.commit();
-
-      expect(created.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
-
-      created = await loadSharedProduct(productCode);
-      expect(created.hasErrors()).toBeUndefined();
-      await assertSharedRelations(created);
-      await assertMirrorCopies(created);
-
-      const owner = await loadPublicOwner(productCode);
-      expect(owner.hasErrors()).toBeUndefined();
-
-      created.imageData = new OtherProductImage({
-        content: image,
-        productCode,
-      });
-
-      const updatePayload = preparePayload(created);
-
-      const updated = Model.deserialize(
-        await contract.update(ctx as any, updatePayload.serialize())
-      ) as OtherProductShared;
-      stub.commit();
-
-      const read = Model.deserialize(
-        await contract.read(ctx as any, productCode)
-      );
-
-      stub.commit();
-
-      expect(read).toBeDefined();
-    });
-  });
 
   describe("product single crud", () => {
     beforeEach(() => {
@@ -390,6 +365,90 @@ describe("OtherProductShared contract version flow with relations", () => {
       expect(read.version).toBe(updated.version);
     });
 
+    it("deletes the relations", async () => {
+      const updatedModel = new OtherProductShared({
+        ...updated,
+        strengths: [],
+        markets: [],
+      });
+
+      const updatePayload = preparePayload(updatedModel);
+      updated = Model.deserialize(
+        await contract.update(ctx as any, updatePayload.serialize())
+      ) as OtherProductShared;
+      stub.commit();
+
+      expect(updated.hasErrors()).toBeDefined();
+
+      updated = await loadSharedProduct(productCode);
+      expect(updated.hasErrors()).toBeUndefined();
+      await assertNotSharedRelations(updated);
+      // await assertMirrorCopies(updated);
+
+      expect(updated.version).toBe(4);
+      expect(updated.strengths).toHaveLength(0);
+      expect(updated.markets).toHaveLength(0);
+
+      const result = await contract.read(ctx as any, created.productCode);
+
+      const read = Model.deserialize(result) as OtherProductShared;
+
+      expect(read.hasErrors()).toBeUndefined();
+      expect(read.productCode).toBe(updated.productCode);
+      expect(read.inventedName).toBe(updated.inventedName);
+      expect(read.version).toBe(updated.version);
+    });
+
+    it("Create Image in update", async () => {
+      const image =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+
+      productCode = generateGtin();
+      const baseModel = new OtherProductShared({
+        productCode,
+        inventedName: "initial-name",
+        nameMedicinalProduct: "medicinal",
+      });
+
+      const payload = preparePayload(baseModel);
+      let created = Model.deserialize(
+        await contract.create(ctx as any, payload.serialize())
+      ) as OtherProductShared;
+      stub.commit();
+
+      expect(created.hasErrors()).toBeDefined(); // the contract doesnt return transient data, so the model should come back completely empty, forcing a subsequent read
+
+      created = await loadSharedProduct(productCode);
+      expect(created.hasErrors()).toBeUndefined();
+      await assertSharedRelations(created);
+      await assertMirrorCopies(created);
+
+      const owner = await loadPublicOwner(productCode);
+      expect(owner.hasErrors()).toBeUndefined();
+
+      created.imageData = new OtherProductImage({
+        content: image,
+        productCode,
+      });
+
+      const updatePayload = preparePayload(created);
+
+      const updated = Model.deserialize(
+        await contract.update(ctx as any, updatePayload.serialize())
+      ) as OtherProductShared;
+      stub.commit();
+
+      const read = Model.deserialize(
+        await contract.read(ctx as any, productCode)
+      );
+      await contract.delete(ctx as any, created.productCode);
+      ctx.stub.commit();
+
+      await expect(contract.read(ctx as any, productCode)).rejects.toThrow(
+        NotFoundError
+      );
+    });
+
     it("deletes the shared data", async () => {
       const deleted = Model.deserialize(
         await contract.delete(ctx as any, created.productCode)
@@ -403,6 +462,9 @@ describe("OtherProductShared contract version flow with relations", () => {
       await expect(
         stub.getPrivateData("decaf-namespaceAeon", k)
       ).rejects.toThrow(NotFoundError);
+      await expect(stub.getPrivateData("mirror-collection", k)).rejects.toThrow(
+        NotFoundError
+      );
 
       await expect(loadPublicOwner(productCode)).rejects.toThrow(NotFoundError);
     });
@@ -543,7 +605,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         )
       );
       expect(listed).toBeDefined();
-      expect(listed.length).toEqual(bulk.length + 1);
+      expect(listed.length).toEqual(bulk.length);
       // expect(listed.every((el) => el instanceof OtherProductShared)).toEqual(
       //   true
       // );
@@ -572,7 +634,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
       expect(parsedPage.data.length).toEqual(3);
       expect(parsedPage.current).toEqual(1);
-      expect(parsedPage.count).toEqual(11);
+      expect(parsedPage.count).toEqual(10);
       expect(parsedPage.total).toEqual(4);
 
       // Validate actual records match expected order
@@ -594,7 +656,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       paginator.apply(parsedPage as any);
 
       expect(paginator.current).toEqual(1);
-      expect(paginator.count).toEqual(11);
+      expect(paginator.count).toEqual(10);
       expect(paginator.total).toEqual(4);
 
       // --- Page 2 ---
@@ -624,7 +686,7 @@ describe("OtherProductShared contract version flow with relations", () => {
       paginator.apply(secondParsedPage as any);
 
       expect(paginator.current).toEqual(2);
-      expect(paginator.count).toEqual(11);
+      expect(paginator.count).toEqual(10);
       expect(paginator.total).toEqual(4);
     });
 
@@ -1138,7 +1200,7 @@ describe("OtherProductShared contract version flow with relations", () => {
           )
         );
         expect(listed).toBeDefined();
-        expect(listed.length).toEqual(mirrorProducts.length + 1);
+        expect(listed.length).toEqual(mirrorProducts.length);
         expect(listed.some((p: any) => p.inventedName === "FROM_MIRROR")).toBe(
           true
         );
@@ -1158,7 +1220,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         const parsedPage = Paginator.deserialize(page);
         expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
         expect(parsedPage.data.length).toEqual(3);
-        expect(parsedPage.count).toEqual(mirrorProducts.length + 1);
+        expect(parsedPage.count).toEqual(mirrorProducts.length);
       });
     });
 

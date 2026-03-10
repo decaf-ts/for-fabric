@@ -16,7 +16,7 @@ import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 @sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
 // @BlockOperations([OperationKeys.DELETE])
-@table("other_product_shared")
+@table("other_product_image")
 @model()
 export class OtherProductImage extends BaseIdentifiedModel {
   @pk()
