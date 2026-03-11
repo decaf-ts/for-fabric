@@ -257,6 +257,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
     },
     ...args: MaybeContextualArg<FabricContractContext>
   ): Promise<SerializedPage<M>> {
+    const requestedPage = ref.offset || 1;
     // eslint-disable-next-line prefer-const
     let { offset, bookmark, limit } = ref;
     if (!offset && !bookmark)
@@ -302,7 +303,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
     } else {
       throw new QueryError(`PaginateBy needs a page or a bookmark`);
     }
-    const paged = await paginator.page(offset, bookmark, ...ctxArgs);
+    const paged = await paginator.page(requestedPage, bookmark, ...ctxArgs);
     return paginator.serialize(paged) as SerializedPage<M>;
   }
 
