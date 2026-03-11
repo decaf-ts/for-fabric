@@ -466,7 +466,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
       }
     };
 
-    // const tasks =
     try {
       const tasks = id.map(
         (i) => () =>
