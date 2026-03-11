@@ -57,6 +57,7 @@ import {
   EventIds,
   Dispatch,
   promiseSequence,
+  resolveBulkSequenceResult,
 } from "@decaf-ts/core";
 import { FabricContractRepository } from "./FabricContractRepository";
 import {
@@ -440,11 +441,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
       | undefined;
     const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
 
-    async function readMirror<M extends Model>(
+    const readMirror = async <M extends Model>(
       clazz: Constructor<M>,
       id: PrimaryKeyType,
       ...args: ContextualArgs<Context<FabricContractFlags>>
-    ) {
+    ) => {
+      if (!mirrorCollection)
+        throw new BadRequestError("Missing mirror collection for mirror read");
       try {
         const { ctx, log } = this.logCtx(args, readMirror);
         log.info(`in ADAPTER read with args ${args}`);
@@ -461,7 +464,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       } catch (e: unknown) {
         throw this.parseError(e as Error);
       }
-    }
+    };
 
     // const tasks =
     try {
@@ -474,12 +477,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 ...args,
                 ctx.override({ noEmitSingle: true })
               )
-            : this.read.apply(
-                clazz,
-                i,
-                ...args,
-                ctx.override({ noEmitSingle: true })
-              )
+            : this.read(clazz, i, ...args, ctx.override({ noEmitSingle: true }))
       );
 
       const rawResult = continueOnError
