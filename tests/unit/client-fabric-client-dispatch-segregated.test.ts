@@ -50,6 +50,7 @@ const createAdapterStub = (ctx: Context) => {
       chaincodeName: "testcc",
       channel: "testchannel",
       mspId: "Org1MSP",
+      syntheticEvents: false,
     },
     alias: "stub-adapter",
     logCtx: jest.fn().mockImplementation((argsArr: any[]) => {

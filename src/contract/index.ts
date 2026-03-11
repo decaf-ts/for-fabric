@@ -12,6 +12,7 @@ import { ProductStrengthContract } from "./ProductStrengthContract";
 import { MarketContract } from "./MarketContract";
 import { OtherProductStrengthContract } from "./OtherProductStrengthContract";
 import { OtherMarketContract } from "./OtherMarketContract";
+import { OtherProductImageContract } from "./OtherProductImageContract";
 import { OtherAuditContract } from "./OtherAuditContract";
 
 export const contracts: (typeof Contract)[] = [
@@ -20,6 +21,7 @@ export const contracts: (typeof Contract)[] = [
   OtherProductStrengthContract,
   MarketContract,
   OtherMarketContract,
+  OtherProductImageContract,
   BatchContract,
   UserContract,
   OtherAuditContract,

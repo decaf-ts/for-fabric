@@ -202,6 +202,33 @@ export abstract class FabricCrudContract<M extends Model>
     );
   }
 
+  async page(
+    ctx: Ctx | FabricContractContext,
+    value: string,
+    direction: string | OrderDirection = OrderDirection.ASC,
+    ref: Omit<DirectionLimitOffset, "direction"> | string = {
+      offset: 1,
+      limit: 10,
+    },
+    ...args: any[]
+  ): Promise<SerializedPage<M> | string> {
+    const { ctxArgs, log } = (
+      await this.logCtx([...args, ctx], PreparedStatementKeys.PAGE, true)
+    ).for(this.page);
+    log.info(`Paging ${Model.tableName(this.clazz)} by default query attributes`);
+    const reference =
+      typeof ref === "string"
+        ? ((JSON.parse(ref) as Omit<DirectionLimitOffset, "direction">) ||
+            ({} as Omit<DirectionLimitOffset, "direction">))
+        : ref;
+    return this.repo.page(
+      value,
+      direction as OrderDirection,
+      reference as Omit<DirectionLimitOffset, "direction">,
+      ...ctxArgs
+    );
+  }
+
   async findOneBy(
     ctx: Ctx | FabricContractContext,
     key: string | keyof M,

@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import {
+  BulkCrudOperationKeys,
   InternalError,
   OperationKeys,
   UnsupportedError,
@@ -136,6 +137,29 @@ const attachLoggerSpies = (adapter: FabricClientAdapter) => {
   });
 };
 
+const newAdapter = (overrides: Partial<PeerConfig> = {}) => {
+  const adapter = new FabricClientAdapter(
+    Object.assign({}, config, overrides),
+    `adapter-${Math.random().toString(36).slice(2)}`
+  );
+  attachLoggerSpies(adapter);
+  return adapter;
+};
+
+const createContext = () => {
+  const ctx = new Context();
+  const logger = {
+    for: jest.fn().mockReturnThis(),
+    clear: jest.fn().mockReturnThis(),
+    info: jest.fn(),
+    error: jest.fn(),
+    verbose: jest.fn(),
+    debug: jest.fn(),
+  };
+  ctx.accumulate({ logger } as any);
+  return ctx;
+};
+
 describe("FabricClientAdapter", () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -148,29 +172,6 @@ describe("FabricClientAdapter", () => {
     legacyTransactionMock.setTransient.mockClear();
     legacyTransactionMock.setEndorsingPeers.mockClear();
   });
-
-  const newAdapter = (overrides: Partial<PeerConfig> = {}) => {
-    const adapter = new FabricClientAdapter(
-      Object.assign({}, config, overrides),
-      `adapter-${Math.random().toString(36).slice(2)}`
-    );
-    attachLoggerSpies(adapter);
-    return adapter;
-  };
-
-  const createContext = () => {
-    const ctx = new Context();
-    const logger = {
-      for: jest.fn().mockReturnThis(),
-      clear: jest.fn().mockReturnThis(),
-      info: jest.fn(),
-      error: jest.fn(),
-      verbose: jest.fn(),
-      debug: jest.fn(),
-    };
-    ctx.accumulate({ logger } as any);
-    return ctx;
-  };
 
   it("decodes Uint8Array payloads", () => {
     const adapter = newAdapter();
@@ -270,7 +271,7 @@ describe("FabricClientAdapter", () => {
     const client = { close: jest.fn() } as any;
     (adapter as any)._client = client;
 
-    await adapter.close();
+    await adapter.shutdown();
 
     expect(client.close).toHaveBeenCalledTimes(1);
   });
@@ -1157,5 +1158,220 @@ describe("FabricClientAdapter", () => {
 
       expect(result).toEqual(response);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration: syntheticEvents: true — observer receives events without gateway
+// ---------------------------------------------------------------------------
+
+describe("FabricClientAdapter — syntheticEvents: true delivers events end-to-end", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  /**
+   * Creates a context that includes the observer emission flags required by
+   * Adapter.updateObservers() (noEmit / noEmitSingle / noEmitBulk).
+   * Without these the ObjectAccumulator throws on ctx.get("noEmit") and the
+   * observer chain silently fails.
+   */
+  const createObserverContext = () => {
+    const ctx = createContext();
+    ctx.accumulate({
+      noEmit: false,
+      noEmitSingle: false,
+      noEmitBulk: false,
+    } as any);
+    return ctx;
+  };
+
+  /**
+   * Registers an observer on the adapter, waits for FabricClientDispatch.initialize()
+   * to complete (it runs fire-and-forget inside observe()), then returns.
+   *
+   * A spy intercepts the protected initialize() so we can reliably await it
+   * rather than relying on timers.
+   */
+  async function attachObserver(
+    adapter: FabricClientAdapter,
+    received: Array<{ model: any; event: string; id: any }>
+  ) {
+    let resolveInit!: () => void;
+    const initDone = new Promise<void>((r) => {
+      resolveInit = r;
+    });
+
+    const origInit = FabricClientDispatch.prototype[
+      "initialize"
+    ] as (...args: any[]) => Promise<void>;
+    jest
+      .spyOn(FabricClientDispatch.prototype as any, "initialize")
+      .mockImplementation(async function (this: any, ...args: any[]) {
+        const result = await origInit.apply(this, args);
+        resolveInit();
+        return result;
+      });
+
+    adapter.observe({
+      refresh: async (model: any, event: string, id: any) => {
+        received.push({ model, event, id });
+      },
+    });
+
+    await initDone;
+  }
+
+  /** Drain pending microtasks so fire-and-forget observer calls settle. */
+  const flush = () => new Promise<void>((r) => setImmediate(r));
+
+  it("does NOT open a gateway connection during initialization", async () => {
+    const getGatewaySpy = jest
+      .spyOn(FabricClientAdapter, "getGateway")
+      .mockResolvedValue({} as any);
+
+    const adapter = newAdapter({ syntheticEvents: true });
+    (adapter as any).create = jest.fn().mockResolvedValue({});
+
+    const received: any[] = [];
+    await attachObserver(adapter, received);
+
+    expect(getGatewaySpy).not.toHaveBeenCalled();
+  });
+
+  it("fires a CREATE event for a public model", async () => {
+    const adapter = newAdapter({ syntheticEvents: true });
+    (adapter as any).create = jest.fn().mockResolvedValue({ id: "wallet-1" });
+
+    const received: Array<{ model: any; event: string; id: any }> = [];
+    await attachObserver(adapter, received);
+
+    const ctx = createObserverContext();
+    await (adapter as any).create(ERC20Wallet, "wallet-1", {}, {}, ctx);
+    await flush();
+
+    expect(received).toHaveLength(1);
+    expect(received[0].event).toBe(OperationKeys.CREATE);
+    expect(received[0].id).toBe("wallet-1");
+    expect(received[0].model).toBe(ERC20Wallet);
+  });
+
+  it("fires an UPDATE event", async () => {
+    const adapter = newAdapter({ syntheticEvents: true });
+    (adapter as any).update = jest.fn().mockResolvedValue({ id: "wallet-2" });
+
+    const received: Array<{ model: any; event: string; id: any }> = [];
+    await attachObserver(adapter, received);
+
+    const ctx = createObserverContext();
+    await (adapter as any).update(ERC20Wallet, "wallet-2", {}, {}, ctx);
+    await flush();
+
+    expect(received).toHaveLength(1);
+    expect(received[0].event).toBe(OperationKeys.UPDATE);
+    expect(received[0].id).toBe("wallet-2");
+  });
+
+  it("fires a DELETE event", async () => {
+    const adapter = newAdapter({ syntheticEvents: true });
+    (adapter as any).delete = jest.fn().mockResolvedValue({ id: "wallet-3" });
+
+    const received: Array<{ model: any; event: string; id: any }> = [];
+    await attachObserver(adapter, received);
+
+    const ctx = createObserverContext();
+    await (adapter as any).delete(ERC20Wallet, "wallet-3", ctx);
+    await flush();
+
+    expect(received).toHaveLength(1);
+    expect(received[0].event).toBe(OperationKeys.DELETE);
+    expect(received[0].id).toBe("wallet-3");
+  });
+
+  it("fires a CREATE event for createAll (bulk)", async () => {
+    const adapter = newAdapter({ syntheticEvents: true });
+    (adapter as any).createAll = jest
+      .fn()
+      .mockResolvedValue([{ id: "a" }, { id: "b" }]);
+
+    const received: Array<{ model: any; event: string; id: any }> = [];
+    await attachObserver(adapter, received);
+
+    const ctx = createObserverContext();
+    await (adapter as any).createAll(
+      ERC20Wallet,
+      ["a", "b"],
+      [{}, {}],
+      {},
+      ctx
+    );
+    await flush();
+
+    expect(received).toHaveLength(1);
+    expect(received[0].event).toBe(OperationKeys.CREATE);
+    expect(received[0].id).toEqual(["a", "b"]);
+  });
+
+  it("fires an UPDATE event for updateAll (bulk)", async () => {
+    const adapter = newAdapter({ syntheticEvents: true });
+    (adapter as any).updateAll = jest
+      .fn()
+      .mockResolvedValue([{ id: "a" }]);
+
+    const received: Array<{ model: any; event: string; id: any }> = [];
+    await attachObserver(adapter, received);
+
+    const ctx = createObserverContext();
+    await (adapter as any).updateAll(ERC20Wallet, ["a"], [{}], {}, ctx);
+    await flush();
+
+    expect(received).toHaveLength(1);
+    expect(received[0].event).toBe(OperationKeys.UPDATE);
+    expect(received[0].id).toEqual(["a"]);
+  });
+
+  it("fires a DELETE event for deleteAll (bulk)", async () => {
+    const adapter = newAdapter({ syntheticEvents: true });
+    (adapter as any).deleteAll = jest
+      .fn()
+      .mockResolvedValue([{ id: "a" }, { id: "b" }]);
+
+    const received: Array<{ model: any; event: string; id: any }> = [];
+    await attachObserver(adapter, received);
+
+    const ctx = createObserverContext();
+    await (adapter as any).deleteAll(ERC20Wallet, ["a", "b"], ctx);
+    await flush();
+
+    expect(received).toHaveLength(1);
+    expect(received[0].event).toBe(OperationKeys.DELETE);
+    expect(received[0].id).toEqual(["a", "b"]);
+  });
+
+  it("delivers events for all six CRUD methods in a single adapter instance", async () => {
+    const adapter = newAdapter({ syntheticEvents: true });
+
+    (adapter as any).create = jest.fn().mockResolvedValue({ id: "c-1" });
+    (adapter as any).update = jest.fn().mockResolvedValue({ id: "u-1" });
+    (adapter as any).delete = jest.fn().mockResolvedValue({ id: "d-1" });
+    (adapter as any).createAll = jest.fn().mockResolvedValue([{ id: "ca-1" }]);
+    (adapter as any).updateAll = jest.fn().mockResolvedValue([{ id: "ua-1" }]);
+    (adapter as any).deleteAll = jest.fn().mockResolvedValue([{ id: "da-1" }]);
+
+    const received: Array<{ event: string }> = [];
+    await attachObserver(adapter, received);
+
+    const ctx = createObserverContext();
+    await (adapter as any).create(ERC20Wallet, "c-1", {}, {}, ctx);
+    await (adapter as any).update(ERC20Wallet, "u-1", {}, {}, ctx);
+    await (adapter as any).delete(ERC20Wallet, "d-1", ctx);
+    await (adapter as any).createAll(ERC20Wallet, ["ca-1"], [{}], {}, ctx);
+    await (adapter as any).updateAll(ERC20Wallet, ["ua-1"], [{}], {}, ctx);
+    await (adapter as any).deleteAll(ERC20Wallet, ["da-1"], ctx);
+    await flush();
+
+    const events = received.map((r) => r.event);
+    expect(events).toContain(OperationKeys.CREATE);
+    expect(events).toContain(OperationKeys.UPDATE);
+    expect(events).toContain(OperationKeys.DELETE);
+    expect(events).toHaveLength(6);
   });
 });

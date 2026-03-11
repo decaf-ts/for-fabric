@@ -306,7 +306,15 @@ export function getStubMock() {
       // Reads only from committed private state
       if (collection in privateState && key in privateState[collection])
         return privateState[collection][key];
-      throw new NotFoundError(`State key ${key} not found`);
+      console.error(
+        "DEBUG getPrivateData missing",
+        collection,
+        key,
+        privateState[collection]
+          ? Object.keys(privateState[collection])
+          : "no-collection"
+      );
+      throw new NotFoundError(`State key ${key} not found in ${collection}`);
     },
     // getPrivateDataHash(collection: string, key: string): Promise<Uint8Array>;
     async putPrivateData(

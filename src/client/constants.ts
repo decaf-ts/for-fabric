@@ -10,4 +10,5 @@ export const DefaultFabricClientFlags: FabricClientFlags = Object.assign({
   allowGatewayOverride: false,
   rebuildWithTransient: true,
   encryptTransient: false,
+  syntheticEvents: true,
 }) as any;

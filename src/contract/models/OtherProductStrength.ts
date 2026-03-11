@@ -1,6 +1,14 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
-import { column, index, OrderDirection, pk, table, uuid } from "@decaf-ts/core";
+import {
+  column,
+  defaultQueryAttr,
+  index,
+  OrderDirection,
+  pk,
+  table,
+  uuid,
+} from "@decaf-ts/core";
 import { TableNames } from "./constants";
 import { description, uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
@@ -25,7 +33,7 @@ function strengthSeed(m: OtherProductStrength) {
 
 @sharedData(NamespaceCollection("decaf-namespace"))
 @uses(FabricFlavour)
-@table(TableNames.ProductStrength)
+@table("other_product_strength")
 @model()
 @description("Represents the product’s strength and composition details.")
 export class OtherProductStrength extends BaseIdentifiedModel {
@@ -47,12 +55,14 @@ export class OtherProductStrength extends BaseIdentifiedModel {
   //   false
   // )
   @gtin()
+  @defaultQueryAttr()
   @index([OrderDirection.ASC, OrderDirection.DSC])
   @description("Product code associated with this strength entry.")
   productCode!: string;
 
   @column()
   @required()
+  @defaultQueryAttr()
   @index([OrderDirection.ASC, OrderDirection.DSC])
   @description("Product concentration or dosage (e.g., 500mg, 10%).")
   strength!: string;

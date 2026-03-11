@@ -1567,11 +1567,15 @@ export class FabricClientAdapter extends Adapter<
   }
 
   /**
-   * @description Closes the connection to the Fabric network
-   * @summary Closes the gRPC client if it exists
-   * @return {Promise<void>} Promise that resolves when the client is closed
+   * @description Shuts down the connection to the Fabric network
+   * @summary Closes the active dispatch (which in turn closes any gateway
+   * event subscription) via the base class, then closes the gRPC client.
+   * Works correctly regardless of whether `syntheticEvents` is enabled.
+   * @return {Promise<void>} Promise that resolves when all connections are closed
    */
-  async close(): Promise<void> {
+  override async shutdown(...args: MaybeContextualArg<Context<FabricClientFlags>>): Promise<void> {
+    // Base class handles dispatch.close() internally.
+    await super.shutdown(...args);
     if (this.client) {
       this.log.verbose(`Closing ${this.config.mspId} gateway client`);
       this.client.close();
@@ -1791,7 +1795,7 @@ export class FabricClientAdapter extends Adapter<
    * fabricDispatch.submitTransaction('createProduct', { name: 'Product A', price: 100 });
    */
   override Dispatch(): FabricClientDispatch {
-    return new FabricClientAdapter["_baseDispatch"]();
+    return new FabricClientAdapter["_baseDispatch"](this.client);
   }
 
   /**
