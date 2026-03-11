@@ -39,6 +39,12 @@ describe("History decorator — relation population & audit comparison", () => {
     return segregated.model;
   }
 
+  function ensureCommitted() {
+    if (stub && typeof stub.commit === "function") {
+      stub.commit();
+    }
+  }
+
   /**
    * Reads a History entry from the ptp-historyAeon shared collection.
    * The history id is composed as "<table>:<pk>:<version>".
@@ -47,6 +53,7 @@ describe("History decorator — relation population & audit comparison", () => {
     productCode: string,
     version: number
   ): Promise<History> {
+    ensureCommitted();
     const historyId = `other_product_shared:${productCode}:${version}`;
     const k = stub.createCompositeKey("history", [historyId]);
     const raw = await stub.getPrivateData("ptp-historyAeon", k);
@@ -57,6 +64,7 @@ describe("History decorator — relation population & audit comparison", () => {
    * Reads OtherProductShared from the shared private collection.
    */
   async function loadProduct(productCode: string): Promise<OtherProductShared> {
+    ensureCommitted();
     const k = stub.createCompositeKey("other_product_shared", [productCode]);
     const raw = await stub.getPrivateData("decaf-namespaceAeon", k);
     return new OtherProductShared(JSON.parse(raw.toString()));
@@ -356,8 +364,10 @@ describe("History decorator — relation population & audit comparison", () => {
     });
 
     it("history entry for strength v1 exists with correct data", async () => {
+      ensureCommitted();
+      const tableName = Model.tableName(OtherProductStrength);
       // OtherProductStrength also has @historyDec() on its pk
-      const historyId = `product_strength:${strengthId}:1`;
+      const historyId = `${tableName}:${strengthId}:1`;
       const k = stub.createCompositeKey("history", [historyId]);
       const raw = await stub.getPrivateData("ptp-historyAeon", k);
       const history = new History(
@@ -365,7 +375,7 @@ describe("History decorator — relation population & audit comparison", () => {
       );
       expect(history.hasErrors()).toBeUndefined();
       expect(history.version).toBe(1);
-      expect(history.table).toBe("product_strength");
+      expect(history.table).toBe(tableName);
 
       const record = history.record as any;
       expect(record.strength).toBe("50mg");

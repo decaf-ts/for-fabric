@@ -3,6 +3,7 @@ import { model, required } from "@decaf-ts/decorator-validation";
 import {
   Cascade,
   column,
+  defaultQueryAttr,
   index,
   oneToMany,
   oneToOne,
@@ -41,15 +42,18 @@ export class OtherProductShared extends BaseIdentifiedModel {
   @assignProductOwner()
   @mirror("mirror-collection", "org-b")
   @audit(OtherProductShared)
+  @defaultQueryAttr()
   productCode!: string;
 
   @column()
   @required()
+  @defaultQueryAttr()
   @index([OrderDirection.ASC, OrderDirection.DSC])
   inventedName!: string;
 
   @column()
   @required()
+  @defaultQueryAttr()
   @index([OrderDirection.ASC, OrderDirection.DSC])
   nameMedicinalProduct!: string;
 

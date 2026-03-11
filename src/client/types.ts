@@ -17,4 +17,5 @@ export type FabricClientFlags = FabricFlags & {
   allowGatewayOverride?: boolean;
   allowManualEndorsingOrgs: boolean;
   encryptTransient?: false | string | (() => string);
+  syntheticEvents?: boolean;
 };

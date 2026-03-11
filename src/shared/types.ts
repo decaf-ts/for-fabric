@@ -72,6 +72,13 @@ export type PeerConfig = {
    * Defaults to false (all events are forwarded regardless of owner).
    */
   mspEventOnly?: boolean;
+  /**
+   * When true (default), the FabricClientDispatch uses a Proxy-based mechanism
+   * to emit events for ALL CRUD operations without a live gateway connection.
+   * When false, the dispatch opens a real chaincode-event subscription via the
+   * gateway and limits the local proxy fallback to fully-segregated models only.
+   */
+  syntheticEvents?: boolean;
 };
 
 /**

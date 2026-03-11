@@ -119,6 +119,19 @@ export class SerializedCrudContract<
   }
 
   @Transaction(false)
+  override async page(
+    ctx: Ctx,
+    value: string,
+    direction: string,
+    ref: string
+  ): Promise<string> {
+    const reference =
+      typeof ref === "string" ? JSON.parse(ref) : (ref as any);
+    const result = await super.page(ctx, value, direction, reference);
+    return JSON.stringify(result);
+  }
+
+  @Transaction(false)
   override async findOneBy(ctx: Ctx, key: string, value: string) {
     return JSON.stringify(await super.findOneBy(ctx, key, value));
   }

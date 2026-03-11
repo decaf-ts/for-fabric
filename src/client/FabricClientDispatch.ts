@@ -266,35 +266,48 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
 
   /**
    * @description Initializes the event listener
-   * @summary Sets up the connection to the Fabric network and starts listening for chaincode events
+   * @summary Sets up event dispatching for the observed adapter. When
+   * `syntheticEvents` is true (the default) no gateway connection is opened;
+   * instead every CRUD operation is wrapped with a Proxy that fires
+   * `updateObservers` for **all** models. When `syntheticEvents` is false the
+   * existing gateway-based chaincode-event subscription is established and the
+   * local Proxy fallback is limited to fully-segregated (transient) models only.
    * @return {Promise<void>} Promise that resolves when initialization is complete
    */
   protected override async initialize(): Promise<void> {
     if (!this.adapter)
       throw new InternalError(`No adapter or config observed for dispatch`);
-    const context = await this.adapter.context(
-      "dispatch",
-      {
-        correlationId: this.adapter.config.chaincodeName,
-      },
-      Model as any
-    );
-    const { ctx } = this.logCtx([context], this.initialize);
-    const gateway = await FabricClientAdapter.getGateway(
-      ctx,
-      this.adapter.config as PeerConfig,
-      this.client
-    );
-    const network = gateway.getNetwork(this.adapter.config.channel);
-    if (!this.adapter)
-      throw new InternalError(`No adapter observed for dispatch`);
-    this.listeningStack = await network.getChaincodeEvents(
-      this.adapter.config.chaincodeName
-    );
-    this.handleEvents(ctx);
 
-    // fallback for fully segregated models (the adapter doesnt sent events if so)
+    const syntheticEvents = this.adapter.config.syntheticEvents !== false;
 
+    if (!syntheticEvents) {
+      // Gateway-based chaincode-event subscription (non-synthetic path)
+      const context = await this.adapter.context(
+        "dispatch",
+        {
+          correlationId: this.adapter.config.chaincodeName,
+        },
+        Model as any
+      );
+      const { ctx } = this.logCtx([context], this.initialize);
+      const gateway = await FabricClientAdapter.getGateway(
+        ctx,
+        this.adapter.config as PeerConfig,
+        this.client
+      );
+      const network = gateway.getNetwork(this.adapter.config.channel);
+      if (!this.adapter)
+        throw new InternalError(`No adapter observed for dispatch`);
+      this.listeningStack = await network.getChaincodeEvents(
+        this.adapter.config.chaincodeName
+      );
+      this.handleEvents(ctx);
+    }
+
+    // Proxy CRUD methods.
+    // • syntheticEvents = true  → notify for ALL models (replaces gateway events entirely)
+    // • syntheticEvents = false → notify only for fully-segregated (transient) models
+    //   (the gateway subscription handles public models)
     (
       [
         OperationKeys.CREATE,
@@ -351,9 +364,10 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
           const result = await target.apply(thisArg, argArray);
 
           const clazz: Constructor<any> = argArray[0];
-          // Fully-public models emit a chaincode event on the contract side;
-          // skip the local fallback to avoid double-notification.
-          if (!Model.isTransient(clazz)) return result;
+          // When syntheticEvents is false, public models emit a chaincode event
+          // on the contract side; skip the local fallback to avoid
+          // double-notification. When syntheticEvents is true we handle all models.
+          if (!syntheticEvents && !Model.isTransient(clazz)) return result;
 
           // Context is always the last element of argArray
           const { log, ctxArgs, ctx } = thisArg["logCtx"](

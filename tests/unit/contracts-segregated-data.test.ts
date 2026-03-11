@@ -6,7 +6,12 @@ import {
   ModelArg,
   required,
 } from "@decaf-ts/decorator-validation";
-import { version, NotFoundError } from "@decaf-ts/db-decorators";
+import {
+  version,
+  NotFoundError,
+  OperationKeys,
+  BulkCrudOperationKeys,
+} from "@decaf-ts/db-decorators";
 import {
   Cascade,
   column,
@@ -20,7 +25,6 @@ import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
 import { FabricContractContext } from "../../src/contracts/ContractContext";
 import { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
 import { getStubMock, getIdentityMock } from "./ContextMock";
-import { OperationKeys } from "@decaf-ts/db-decorators";
 import { FabricFlavour } from "../../src/shared/constants";
 import {
   sharedData,
@@ -1339,7 +1343,7 @@ function getWriterIdentity(): ReturnType<typeof getIdentityMock> {
 
 async function buildRepositoryContextGeneric<M extends Model>(
   adapter: FabricContractAdapter,
-  operation: OperationKeys,
+  operation: OperationKeys | BulkCrudOperationKeys,
   stub: ReturnType<typeof getStubMock>,
   identity: ReturnType<typeof getIdentityMock>,
   modelClass: { new (...args: any[]): M }
@@ -1938,6 +1942,107 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       .getPublicCalls()
       .filter((c) => c.method === "getState");
     expect(publicReads.length).toBeGreaterThan(0);
+  });
+
+  it("routes bulk reads exclusively to mirror collection when MSP matches", async () => {
+    const writerIdentity = getWriterIdentity();
+    const readerIdentity = getIdentityMock();
+    const ids = Array.from({ length: 2 }).map(
+      (_, idx) =>
+        `mirror-bulk-match-${idx}-${Math.random().toString(36).slice(2, 8)}`
+    );
+
+    for (const id of ids) {
+      const createContext = await buildRepositoryContextGeneric(
+        adapter,
+        OperationKeys.CREATE,
+        trackingMock.stub,
+        writerIdentity,
+        MirrorTestModel
+      );
+      await repository.create(
+        new MirrorTestModel({
+          id,
+          publicField: `match-${id}`,
+          someOtherField: `mirror-read-${id}`,
+        }),
+        createContext
+      );
+      trackingMock.stub.commit();
+    }
+    trackingMock.clearLog();
+
+    const readContext = await buildRepositoryContextGeneric(
+      adapter,
+      BulkCrudOperationKeys.READ_ALL,
+      trackingMock.stub,
+      readerIdentity,
+      MirrorTestModel
+    );
+    const results = await repository.readAll(ids, readContext);
+    trackingMock.stub.commit();
+
+    expect(results.length).toBe(ids.length);
+
+    const publicReads = trackingMock
+      .getPublicCalls()
+      .filter((c) => c.method === "getState");
+    expect(publicReads.length).toBe(0);
+
+    const mirrorReads = trackingMock
+      .getCallsToCollection(MIRROR_COLLECTION)
+      .filter((c) => c.method === "getPrivateData");
+    expect(mirrorReads.length).toBeGreaterThanOrEqual(ids.length);
+  });
+
+  it("routes bulk reads to public state when MSP does NOT match mirror condition", async () => {
+    const writerIdentity = getWriterIdentity();
+    const ids = Array.from({ length: 2 }).map(
+      (_, idx) =>
+        `mirror-bulk-no-match-${idx}-${Math.random().toString(36).slice(2, 8)}`
+    );
+
+    for (const id of ids) {
+      const createContext = await buildRepositoryContextGeneric(
+        adapter,
+        OperationKeys.CREATE,
+        trackingMock.stub,
+        writerIdentity,
+        MirrorTestModel
+      );
+      await repository.create(
+        new MirrorTestModel({
+          id,
+          publicField: `nomatch-${id}`,
+          someOtherField: `mirror-read-${id}`,
+        }),
+        createContext
+      );
+      trackingMock.stub.commit();
+    }
+    trackingMock.clearLog();
+
+    const readContext = await buildRepositoryContextGeneric(
+      adapter,
+      BulkCrudOperationKeys.READ_ALL,
+      trackingMock.stub,
+      writerIdentity,
+      MirrorTestModel
+    );
+    const results = await repository.readAll(ids, readContext);
+    trackingMock.stub.commit();
+
+    expect(results.length).toBe(ids.length);
+
+    const mirrorReads = trackingMock
+      .getCallsToCollection(MIRROR_COLLECTION)
+      .filter((c) => c.method === "getPrivateData");
+    expect(mirrorReads.length).toBe(0);
+
+    const publicReads = trackingMock
+      .getPublicCalls()
+      .filter((c) => c.method === "getState");
+    expect(publicReads.length).toBeGreaterThanOrEqual(ids.length);
   });
 
   it("replicates updated object to mirror collection", async () => {

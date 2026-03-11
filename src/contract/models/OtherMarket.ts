@@ -6,7 +6,14 @@ import {
   required,
 } from "@decaf-ts/decorator-validation";
 import { TableNames } from "./constants";
-import { column, index, OrderDirection, pk, table } from "@decaf-ts/core";
+import {
+  column,
+  defaultQueryAttr,
+  index,
+  OrderDirection,
+  pk,
+  table,
+} from "@decaf-ts/core";
 import { composed, version } from "@decaf-ts/db-decorators";
 import { description, uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
@@ -22,7 +29,7 @@ import { historyDec } from "./history-dec";
 @sharedData(NamespaceCollection("decaf-namespace"))
 @description("Links a product to a specific market.")
 @uses(FabricFlavour)
-@table(TableNames.Market)
+@table("other_market")
 @model()
 export class OtherMarket extends BaseIdentifiedModel {
   @pk({ type: String, generated: false })
@@ -34,6 +41,7 @@ export class OtherMarket extends BaseIdentifiedModel {
 
   @column()
   @required()
+  @defaultQueryAttr()
   @index([OrderDirection.ASC, OrderDirection.DSC])
   @description(
     "Identifier of the market where the product is registered or sold."
@@ -43,6 +51,7 @@ export class OtherMarket extends BaseIdentifiedModel {
   @column()
   @gtin()
   @required()
+  @defaultQueryAttr()
   productCode!: string;
 
   @column()

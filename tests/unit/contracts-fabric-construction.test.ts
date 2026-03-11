@@ -83,7 +83,10 @@ describe("Construction relationship hooks", () => {
     });
     forModelSpy = jest
       .spyOn(Repository, "forModel")
-      .mockReturnValue(repo as any);
+      .mockImplementation((model: any) => {
+        repo.class = model;
+        return repo as any;
+      });
 
     const context = new FabricContractContext();
     context.accumulate({ logger: createLogger(), cacheForPopulate: {} } as any);
@@ -137,7 +140,10 @@ describe("Construction relationship hooks", () => {
     });
     forModelSpy = jest
       .spyOn(Repository, "forModel")
-      .mockReturnValue(repo as any);
+      .mockImplementation((model: any) => {
+        repo.class = model;
+        return repo as any;
+      });
 
     const context = new FabricContractContext();
     context.accumulate({ logger: createLogger(), cacheForPopulate: {} } as any);
@@ -167,7 +173,10 @@ describe("Construction relationship hooks", () => {
     const repo = createMockRepo();
     forModelSpy = jest
       .spyOn(Repository, "forModel")
-      .mockReturnValue(repo as any);
+      .mockImplementation((model: any) => {
+        repo.class = model;
+        return repo as any;
+      });
 
     await oneToManyOnDelete.call(
       { adapter: { alias: "test-alias" }, _overrides: {} },
@@ -189,7 +198,10 @@ describe("Construction relationship hooks", () => {
     });
     forModelSpy = jest
       .spyOn(Repository, "forModel")
-      .mockReturnValue(repo as any);
+      .mockImplementation((model: any) => {
+        repo.class = model;
+        return repo as any;
+      });
 
     const context = new FabricContractContext();
     context.accumulate({
