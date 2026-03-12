@@ -119,18 +119,18 @@ export abstract class FabricCrudContract<M extends Model>
   protected get repo() {
     if (!this._repo) {
       this._repo = Repository.forModel(this.clazz);
-      try {
-        this.repo.observe(this);
-      } catch (err: unknown) {
-        if (
-          err instanceof InternalError &&
-          err.message.includes("Observer already registered")
-        ) {
-          // already registered observer; ignore duplicate registration (during tests)
-        } else {
-          throw err;
-        }
-      }
+      // try {
+      //   this.repo.observe(this);
+      // } catch (err: unknown) {
+      //   if (
+      //     err instanceof InternalError &&
+      //     err.message.includes("Observer already registered")
+      //   ) {
+      //     // already registered observer; ignore duplicate registration (during tests)
+      //   } else {
+      //     throw err;
+      //   }
+      // }
     }
     return this._repo;
   }
@@ -215,11 +215,13 @@ export abstract class FabricCrudContract<M extends Model>
     const { ctxArgs, log } = (
       await this.logCtx([...args, ctx], PreparedStatementKeys.PAGE, true)
     ).for(this.page);
-    log.info(`Paging ${Model.tableName(this.clazz)} by default query attributes`);
+    log.info(
+      `Paging ${Model.tableName(this.clazz)} by default query attributes`
+    );
     const reference =
       typeof ref === "string"
-        ? ((JSON.parse(ref) as Omit<DirectionLimitOffset, "direction">) ||
-            ({} as Omit<DirectionLimitOffset, "direction">))
+        ? (JSON.parse(ref) as Omit<DirectionLimitOffset, "direction">) ||
+          ({} as Omit<DirectionLimitOffset, "direction">)
         : ref;
     return this.repo.page(
       value,

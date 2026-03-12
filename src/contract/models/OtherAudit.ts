@@ -65,7 +65,6 @@ export class OtherAudit extends BaseModel {
   @readonly()
   @index([OrderDirection.ASC, OrderDirection.DSC])
   @description("model/entity affected by the action")
-  @defaultQueryAttr()
   model!: string;
 
   @column()
@@ -74,21 +73,18 @@ export class OtherAudit extends BaseModel {
   @type(String)
   @index([OrderDirection.ASC, OrderDirection.DSC])
   @description("Type of action performed by the user.")
-  @defaultQueryAttr()
   action!: AuditOperations;
 
   @description("Id from the model recorded in the audit")
   @column()
   @index([OrderDirection.ASC, OrderDirection.DSC])
   @required()
-  @defaultQueryAttr()
   recordId!: string;
 
   @column()
   @createdBy()
   @index([OrderDirection.ASC, OrderDirection.DSC])
   @description("Identifier of the user who performed the action.")
-  @defaultQueryAttr()
   userId!: string;
 
   @column()
