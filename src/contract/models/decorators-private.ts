@@ -70,13 +70,22 @@ export async function createAuditHandler<
 
   model = await populateRelations(model, context, this._overrides);
 
+  let roles: string[] = [];
+  try {
+    roles = JSON.parse(context.identity.getAttributeValue("roles") as string);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (e: unknown) {
+    roles = ["unknown"];
+  }
+
   const toCreate = new OtherAudit({
-    userGroup: context.identity.getID(),
+    recordId: Model.pk(model, true),
+    userGroup: roles.join(", "),
     userId: context.identity.getID(),
     model: Model.tableName(data.class),
     transaction: context.stub.getTxID(),
     action: OperationKeys.CREATE,
-    diffs: new this.class().compare(model),
+    diffs: model.compare(new this.class()),
   });
 
   const audit = await repo.override(this._overrides).create(toCreate, context);
@@ -134,15 +143,19 @@ export async function updateAuditHandler<
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apparently for audit`);
 
-  // At onUpdate time `model` still has all private fields (not yet stripped by
-  // adapter.revert). Normalise relation arrays to ID strings on both sides so
-  // that { id: "x" } and "x" compare as equal and unchanged relations produce
-  // no spurious diff.
   const normalizedModel = normalizeRelationsForAudit(model);
   const normalizedOldModel = normalizeRelationsForAudit(oldModel);
+  let roles: string[] = [];
+  try {
+    roles = JSON.parse(context.identity.getAttributeValue("roles") as string);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (e: unknown) {
+    roles = ["unknown"];
+  }
 
   const toCreate = new OtherAudit({
-    userGroup: context.identity.getID(),
+    recordId: Model.pk(model, true),
+    userGroup: roles.join(", "),
     userId: context.identity.getID(),
     model: Model.tableName(data.class),
     transaction: context.stub.getTxID(),
@@ -167,17 +180,25 @@ export async function deleteAuditHandler<
   model: M
 ): Promise<void> {
   if (!context.identity || !context.identity.getID)
-    throw new InternalError(`Lost context apprently. no getId in identity`);
+    throw new InternalError(`Lost context apparently. no getId in identity`);
 
   model = await populateRelations(model, context, this._overrides);
+  let roles: string[] = [];
+  try {
+    roles = JSON.parse(context.identity.getAttributeValue("roles") as string);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (e: unknown) {
+    roles = ["unknown"];
+  }
 
   const toCreate = new OtherAudit({
-    userGroup: context.identity.getID(),
+    recordId: Model.pk(model, true),
+    userGroup: roles.join(", "),
     userId: context.identity.getID(),
     model: Model.tableName(data.class),
     transaction: context.stub.getTxID(),
     action: OperationKeys.DELETE,
-    diffs: model.compare(new this.class()),
+    diffs: new this.class().compare(model),
   });
 
   const repo = Repository.forModel(OtherAudit);

@@ -1,7 +1,14 @@
 import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { date, model, pattern, required } from "@decaf-ts/decorator-validation";
-import { column, index, OrderDirection, pk, table } from "@decaf-ts/core";
-import { BatchPattern, DatePattern, TableNames } from "./constants";
+import {
+  column,
+  defaultQueryAttr,
+  index,
+  OrderDirection,
+  pk,
+  table,
+} from "@decaf-ts/core";
+import { BatchPattern, DatePattern } from "./constants";
 import {
   BlockOperations,
   composed,
@@ -10,7 +17,7 @@ import {
 } from "@decaf-ts/db-decorators";
 import { description, uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
-import { audit } from "./decorators";
+import { audit } from "./decorators-private";
 import { gtin } from "./gtin";
 import {
   FabricFlavour,
@@ -44,6 +51,7 @@ export class OtherBatchShared extends BaseIdentifiedModel {
   // )
   @index([OrderDirection.ASC, OrderDirection.DSC])
   @description("Code of the product associated with this batch.")
+  @defaultQueryAttr()
   productCode!: string;
 
   @column()
@@ -51,6 +59,7 @@ export class OtherBatchShared extends BaseIdentifiedModel {
   @pattern(BatchPattern)
   @index([OrderDirection.ASC, OrderDirection.DSC])
   @description("Batch number assigned to the product.")
+  @defaultQueryAttr()
   batchNumber!: string;
 
   @required()

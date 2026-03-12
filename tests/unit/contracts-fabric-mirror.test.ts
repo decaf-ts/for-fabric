@@ -32,6 +32,7 @@ function createLogger() {
     warn: jest.fn(),
     error: jest.fn(),
     silly: jest.fn(),
+    for: jest.fn().mockReturnThis(),
   };
 }
 
