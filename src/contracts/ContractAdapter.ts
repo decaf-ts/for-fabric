@@ -467,22 +467,17 @@ export class FabricContractAdapter extends CouchDBAdapter<
     };
 
     try {
-      const tasks = id.map((i) => {
-        if (isMirror && mirrorCollection)
-          return readMirror(
-            clazz,
-            i,
-            ...args,
-            ctx.override({ noEmitSingle: true })
-          );
-        else
-          return this.read(
-            clazz,
-            i,
-            ...args,
-            ctx.override({ noEmitSingle: true })
-          );
-      });
+      const tasks = id.map(
+        (i) => () =>
+          isMirror && mirrorCollection
+            ? readMirror(
+                clazz,
+                i,
+                ...args,
+                ctx.override({ noEmitSingle: true })
+              )
+            : this.read(clazz, i, ...args, ctx.override({ noEmitSingle: true }))
+      );
 
       const rawResult = continueOnError
         ? await promiseSequence(tasks, true)
