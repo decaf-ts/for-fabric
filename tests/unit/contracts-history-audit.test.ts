@@ -7,7 +7,7 @@ import { generateGtin } from "../../src/contract/models/gtin";
 import { OtherMarket } from "../../src/contract/models/OtherMarket";
 import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
 import { History } from "../../src/contract/models/History";
-import { NotFoundError } from "@decaf-ts/db-decorators";
+import { InternalError, NotFoundError } from "@decaf-ts/db-decorators";
 
 jest.setTimeout(60000);
 
@@ -56,8 +56,32 @@ describe("History decorator — relation population & audit comparison", () => {
     ensureCommitted();
     const historyId = `other_product_shared:${productCode}:${version}`;
     const k = stub.createCompositeKey("history", [historyId]);
-    const raw = await stub.getPrivateData("ptp-historyAeon", k);
-    return new History(JSON.parse(Buffer.from(raw).toString("utf8")));
+    try {
+      await stub.getState(k);
+      throw new InternalError(
+        `"history can never be loaded from public data`
+      );
+    } catch (e: unknown) {
+      expect(e).toBeInstanceOf(NotFoundError);
+    }
+
+    try {
+      await stub.getPrivateData("decaf-namespaceAeon", k);
+      throw new InternalError(
+        `"history can never be loaded from namespace collections`
+      );
+    } catch (e: unknown) {
+      expect(e).toBeInstanceOf(NotFoundError);
+    }
+
+    try {
+      const raw = await stub.getPrivateData("ptp-historyAeon", k);
+      return new History(JSON.parse(Buffer.from(raw).toString("utf8")));
+    } catch (e: unknown) {
+      expect(e).toBeInstanceOf(NotFoundError);
+      const raw = await stub.getPrivateData("ptp-history-mirror", k);
+      return new History(JSON.parse(Buffer.from(raw).toString("utf8")));
+    }
   }
 
   /**

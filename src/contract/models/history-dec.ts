@@ -6,10 +6,14 @@ import {
   DBKeys,
   InternalError,
   onUpdate,
+  OperationKeys,
   PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
 import { populateRelations } from "./decorators";
-import { type FabricContractContext } from "../../contracts/index";
+import type {
+  FabricContractContext,
+  FabricContractFlags,
+} from "../../contracts/index";
 import { History } from "./History";
 
 /**
@@ -65,10 +69,22 @@ export async function updateHistoryHandler<
     version,
     record,
   });
+  const overrides = {
+    stub: context.stub,
+    identity: context.identity,
+    logger: context.logger,
+    fullySegregated: true,
+  } as Partial<FabricContractFlags>;
 
-  await repo.create(toCreate, context);
+  const historyCtx = await this.adapter.context(
+    OperationKeys.CREATE,
+    overrides,
+    History
+  );
+
+  const history = await repo.create(toCreate, historyCtx);
   context.logger.info(
-    `History for ${table}'s ${pk.toString()} version ${version} stored`
+    `History for ${table}'s ${pk.toString()} version ${version} stored with id ${history.id}`
   );
 }
 
@@ -102,10 +118,21 @@ export async function deleteHistoryHandler<
     version,
     record,
   });
+  const overrides = {
+    stub: context.stub,
+    identity: context.identity,
+    logger: context.logger,
+    fullySegregated: true,
+  } as Partial<FabricContractFlags>;
 
-  await repo.create(toCreate, context);
+  const historyCtx = await this.adapter.context(
+    OperationKeys.CREATE,
+    overrides,
+    History
+  );
+  const history = await repo.create(toCreate, historyCtx);
   context.logger.info(
-    `History for ${table}'s ${pk.toString()} version ${version} stored`
+    `History for ${table}'s ${pk.toString()} version ${version} stored with id ${history.id}`
   );
 }
 

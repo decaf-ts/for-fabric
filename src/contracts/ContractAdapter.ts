@@ -417,84 +417,84 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
-  /**
-   * @description Retrieves multiple records from the database
-   * @summary Fetches multiple records with the given IDs from the specified table
-   * @param {string} tableName - The name of the table to read from
-   * @param id - The identifiers of the records to retrieve
-   * @param {...any[]} args - Additional arguments specific to the adapter implementation
-   * @return A promise that resolves to an array of retrieved records
-   */
-  override async readAll<M extends Model>(
-    clazz: Constructor<M>,
-    id: PrimaryKeyType[],
-    ...args: ContextualArgs<Context<FabricContractFlags>>
-  ): Promise<Record<string, any>[]> {
-    const { log, ctx } = this.logCtx(args, this.readAll);
-    const tableName = Model.tableName(clazz);
-    log.debug(`Reading ${id.length} entries ${tableName} table`);
-    const breakOnSingleFailure = ctx.get("breakOnSingleFailureInBulk") ?? true;
-    const continueOnError = !breakOnSingleFailure;
-
-    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
-      | string
-      | undefined;
-    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
-
-    const readMirror = async <M extends Model>(
-      clazz: Constructor<M>,
-      id: PrimaryKeyType,
-      ...args: ContextualArgs<Context<FabricContractFlags>>
-    ) => {
-      if (!mirrorCollection)
-        throw new BadRequestError("Missing mirror collection for mirror read");
-      try {
-        const { ctx, log } = this.logCtx(args, readMirror);
-        log.info(`in ADAPTER read with args ${args}`);
-        const tableName = Model.tableName(clazz);
-
-        const composedKey = ctx.stub.createCompositeKey(tableName, [
-          String(id),
-        ]);
-
-        return await this.forPrivate(mirrorCollection).readState(
-          composedKey,
-          ctx
-        );
-      } catch (e: unknown) {
-        throw this.parseError(e as Error);
-      }
-    };
-
-    try {
-      const tasks = id.map(
-        (i) => () =>
-          isMirror && mirrorCollection
-            ? readMirror(
-                clazz,
-                i,
-                ...args,
-                ctx.override({ noEmitSingle: true })
-              )
-            : this.read(clazz, i, ...args, ctx.override({ noEmitSingle: true }))
-      );
-
-      const rawResult = continueOnError
-        ? await promiseSequence(tasks, true)
-        : await promiseSequence(tasks);
-      return resolveBulkSequenceResult(
-        rawResult,
-        continueOnError,
-        log,
-        BulkCrudOperationKeys.READ_ALL
-      );
-    } catch (e) {
-      throw this.parseError(e as Error);
-    } finally {
-      ctx.put("mirror" as any, undefined);
-      ctx.put("mirrorCollection" as any, undefined);
-    }
-  }
+  // /**
+  //  * @description Retrieves multiple records from the database
+  //  * @summary Fetches multiple records with the given IDs from the specified table
+  //  * @param {string} tableName - The name of the table to read from
+  //  * @param id - The identifiers of the records to retrieve
+  //  * @param {...any[]} args - Additional arguments specific to the adapter implementation
+  //  * @return A promise that resolves to an array of retrieved records
+  //  */
+  // override async readAll<M extends Model>(
+  //   clazz: Constructor<M>,
+  //   id: PrimaryKeyType[],
+  //   ...args: ContextualArgs<Context<FabricContractFlags>>
+  // ): Promise<Record<string, any>[]> {
+  //   const { log, ctx } = this.logCtx(args, this.readAll);
+  //   const tableName = Model.tableName(clazz);
+  //   log.debug(`Reading ${id.length} entries ${tableName} table`);
+  //   const breakOnSingleFailure = ctx.get("breakOnSingleFailureInBulk") ?? true;
+  //   const continueOnError = !breakOnSingleFailure;
+  //
+  //   const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
+  //     | string
+  //     | undefined;
+  //   const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+  //
+  //   const readMirror = async <M extends Model>(
+  //     clazz: Constructor<M>,
+  //     id: PrimaryKeyType,
+  //     ...args: ContextualArgs<Context<FabricContractFlags>>
+  //   ) => {
+  //     if (!mirrorCollection)
+  //       throw new BadRequestError("Missing mirror collection for mirror read");
+  //     try {
+  //       const { ctx, log } = this.logCtx(args, readMirror);
+  //       log.info(`in ADAPTER read with args ${args}`);
+  //       const tableName = Model.tableName(clazz);
+  //
+  //       const composedKey = ctx.stub.createCompositeKey(tableName, [
+  //         String(id),
+  //       ]);
+  //
+  //       return await this.forPrivate(mirrorCollection).readState(
+  //         composedKey,
+  //         ctx
+  //       );
+  //     } catch (e: unknown) {
+  //       throw this.parseError(e as Error);
+  //     }
+  //   };
+  //
+  //   try {
+  //     const tasks = id.map(
+  //       (i) => () =>
+  //         isMirror && mirrorCollection
+  //           ? readMirror(
+  //               clazz,
+  //               i,
+  //               ...args,
+  //               ctx.override({ noEmitSingle: true })
+  //             )
+  //           : this.read(clazz, i, ...args, ctx.override({ noEmitSingle: true }))
+  //     );
+  //
+  //     const rawResult = continueOnError
+  //       ? await promiseSequence(tasks, true)
+  //       : await promiseSequence(tasks);
+  //     return resolveBulkSequenceResult(
+  //       rawResult,
+  //       continueOnError,
+  //       log,
+  //       BulkCrudOperationKeys.READ_ALL
+  //     );
+  //   } catch (e) {
+  //     throw this.parseError(e as Error);
+  //   } finally {
+  //     ctx.put("mirror" as any, undefined);
+  //     ctx.put("mirrorCollection" as any, undefined);
+  //   }
+  // }
 
   /**
    * @description Updates a record in the state database
@@ -581,7 +581,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     id: PrimaryKeyType,
     ...args: ContextualArgs<Context<FabricContractFlags>>
   ): Promise<Record<string, any>> {
-    const { ctx } = this.logCtx(args, this.delete);
+    const { ctx, log } = this.logCtx(args, this.delete);
 
     this.enforceMirrorAuthorization(clazz, ctx);
     const tableName = Model.tableName(clazz);
@@ -607,7 +607,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
         model = ctx.isFullySegregated
           ? {}
           : await this.readState(composedKey, ctx);
-        if (!ctx.isFullySegregated) await this.deleteState(composedKey, ctx);
+        if (!ctx.isFullySegregated) {
+          log.debug(`Deleting entry ${composedKey} from public ledger`);
+          await this.deleteState(composedKey, ctx);
+        }
       } catch (e: unknown) {
         throw this.parseError(e as Error);
       }
@@ -615,9 +618,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
       const collections = ctx.getReadCollections();
       if (collections && collections.length) {
         for (const col of collections) {
+          log.debug(
+            `ensuring collection ${col} has entry for id ${composedKey} before deleting`
+          );
           Object.assign(
             model,
             await this.forPrivate(col).readState(composedKey, ctx)
+          );
+          log.debug(
+            `Deleting private collection ${col} entry for id ${composedKey}`
           );
           await this.forPrivate(col).deleteState(composedKey, ctx);
         }
@@ -648,6 +657,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
               case "putState": {
                 // putState signature: (id: string, model: Record<string, any>, ctx: FabricContractContext)
                 const [id, model, ctx] = argsList;
+                const log = ctx.logger.for(prop);
+                log.debug(
+                  `Private write to ${collection} for ${id.toString()}`
+                );
                 const data = Buffer.from(
                   FabricContractAdapter.serializer.serialize(
                     model as Model,
@@ -660,12 +673,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
               case "deleteState": {
                 // deleteState signature: (id: string, context: FabricContractContext)
                 const [id, ctx] = argsList;
+                const log = ctx.logger.for(prop);
+                log.debug(
+                  `Private delete on ${collection} for ${id.toString()}`
+                );
                 await ctx.stub.deletePrivateData(collection, id.toString());
                 return;
               }
               case "readState": {
                 // readState signature: (id: string, ctx: FabricContractContext)
                 const [id, ctx] = argsList;
+                const log = ctx.logger.for(prop);
+                log.debug(
+                  `Private read from ${collection} for ${id.toString()}`
+                );
                 const data = await ctx.stub.getPrivateData(collection, id);
                 if (!data || !data.toString().length)
                   throw new NotFoundError(`Record with id ${id} not found`);
@@ -678,23 +699,28 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 }
               }
               case "queryResult": {
+                const [stub, rawInput, ...args] = argsList;
+                const { log } = thisArg["logCtx"](args, prop);
                 try {
-                  const [stub, rawInput] = argsList;
-                  console.log("Query start");
+                  log.debug(
+                    `Querying collection ${collection} for ${JSON.stringify(rawInput)}`
+                  );
                   const res = await stub.getPrivateDataQueryResult(
                     collection,
                     JSON.stringify(rawInput)
                   );
-                  console.log("Query end");
+                  log.verbose(
+                    `iterator from collection ${collection} received`
+                  );
                   return res.iterator || res;
                 } catch (e: any) {
-                  console.log(e);
+                  log.error(e);
                   return [];
                 }
               }
               case "queryResultPaginated": {
-                const [stub, rawInput, limit, , bookmark] = argsList;
-
+                const [stub, rawInput, limit, , bookmark, ...args] = argsList;
+                const { log } = thisArg["logCtx"](args, prop);
                 // Fabric has no native pagination API for private data.
                 // Emulate it: query all matching records (with selector
                 // and sort preserved), locate the bookmark position in
@@ -703,12 +729,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 delete query.limit;
                 delete query.skip;
                 delete query.bookmark;
+                log.debug(
+                  `Querying collection ${collection} for ${JSON.stringify(query)}`
+                );
 
                 let iterator = await (
                   stub as ChaincodeStub
                 ).getPrivateDataQueryResult(collection, JSON.stringify(query));
                 iterator = (iterator as any).iterator || iterator;
 
+                log.verbose(`iterator from collection ${collection} received`);
                 // Collect all matching records from the iterator
                 const allResults: Array<{ key: string; value: Buffer }> = [];
                 while (true) {
@@ -1024,7 +1054,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
         delete rawInput["limit"];
         delete rawInput["skip"];
         log.debug(
-          `Retrieving paginated iterator: limit: ${limit}/ skip: ${skip}`
+          `Retrieving public paginated iterator: limit: ${limit}/ skip: ${skip}`
         );
         const response: StateQueryResponse<Iterators.StateQueryIterator> =
           (await this.queryResultPaginated(
@@ -1037,15 +1067,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
           )) as StateQueryResponse<Iterators.StateQueryIterator>;
         resp.bookmark = response.metadata.bookmark;
         iterator = response.iterator;
+        log.debug(`Retrieved public paging iterator`);
       } else {
-        log.debug("Retrieving iterator");
+        log.debug("Retrieving listing public iterator");
         iterator = (await this.queryResult(
           ctx.stub,
           rawInput,
           ctx
         )) as Iterators.StateQueryIterator;
       }
-      log.debug("Iterator acquired");
+      log.debug(`Retrieved public listing iterator`);
 
       resp.docs = (await this.resultIterator(log, iterator)) as any;
       log.debug(
@@ -1072,14 +1103,17 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
       const segregated: any[] = [];
       for (const collection of collections) {
-        segregated.push(
-          await this.forPrivate(collection).raw(
-            { ...segregatedInput },
-            false,
-            true,
-            ...ctxArgs
-          )
+        log.debug(`Querying from ${collection}`);
+        const fromCols = await this.forPrivate(collection).raw(
+          { ...segregatedInput },
+          false,
+          true,
+          ...ctxArgs
         );
+        log.verbose(
+          `received ${(fromCols as unknown as any[]).length} from ${collection}`
+        );
+        segregated.push(fromCols);
       }
       // choose the response with the most results
       resp = segregated.reduce((acc, curr) => {
