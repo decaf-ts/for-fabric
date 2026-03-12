@@ -467,17 +467,22 @@ export class FabricContractAdapter extends CouchDBAdapter<
     };
 
     try {
-      const tasks = id.map(
-        (i) => () =>
-          isMirror && mirrorCollection
-            ? readMirror(
-                clazz,
-                i,
-                ...args,
-                ctx.override({ noEmitSingle: true })
-              )
-            : this.read(clazz, i, ...args, ctx.override({ noEmitSingle: true }))
-      );
+      const tasks = id.map((i) => {
+        if (isMirror && mirrorCollection)
+          return readMirror(
+            clazz,
+            i,
+            ...args,
+            ctx.override({ noEmitSingle: true })
+          );
+        else
+          return this.read(
+            clazz,
+            i,
+            ...args,
+            ctx.override({ noEmitSingle: true })
+          );
+      });
 
       const rawResult = continueOnError
         ? await promiseSequence(tasks, true)
@@ -678,12 +683,19 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 }
               }
               case "queryResult": {
-                const [stub, rawInput] = argsList;
-                const res = await stub.getPrivateDataQueryResult(
-                  collection,
-                  JSON.stringify(rawInput)
-                );
-                return res.iterator || res;
+                try {
+                  const [stub, rawInput] = argsList;
+                  console.log("Query start");
+                  const res = await stub.getPrivateDataQueryResult(
+                    collection,
+                    JSON.stringify(rawInput)
+                  );
+                  console.log("Query end");
+                  return res.iterator || res;
+                } catch (e: any) {
+                  console.log(e);
+                  return [];
+                }
               }
               case "queryResultPaginated": {
                 const [stub, rawInput, limit, , bookmark] = argsList;
