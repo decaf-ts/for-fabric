@@ -60,6 +60,7 @@ export class OtherAudit extends BaseModel {
   @description("Unique identifier of the audit record.")
   id!: string;
 
+  @defaultQueryAttr()
   @column()
   @required()
   @readonly()
@@ -77,6 +78,7 @@ export class OtherAudit extends BaseModel {
 
   @description("Id from the model recorded in the audit")
   @column()
+  @defaultQueryAttr()
   @index([OrderDirection.ASC, OrderDirection.DSC])
   @required()
   recordId!: string;

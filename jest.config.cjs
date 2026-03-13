@@ -18,6 +18,7 @@ const config = {
     "!src/contract/**/*",
   ],
   reporters: ["default"],
+  setupFiles: [path.join(__dirname, "jest.setup.js")],
 };
 
 module.exports = config;

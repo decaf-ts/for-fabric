@@ -34,6 +34,7 @@ import {
   findViewMetadata,
   CouchDBViewMetadata,
   ViewResponse,
+  reconstructPrimaryKeyFromIdParts,
 } from "@decaf-ts/for-couchdb";
 import { FabricClientFlags } from "./types";
 import { toCamelCase } from "@decaf-ts/logging";
@@ -198,18 +199,27 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
     sequenceType: "Number" | "BigInt" | undefined,
     ctx: Context<FabricClientFlags>
   ) {
-    if (r[CouchDBKeys.ID]) {
+    if (typeof r === "undefined" || r === null) return r;
+    let pkValue = r[pkAttr as string];
+    if (
+      typeof pkValue === "undefined" &&
+      typeof r[CouchDBKeys.ID] === "string"
+    ) {
       const [, ...keyArgs] = r[CouchDBKeys.ID].split(CouchDBKeys.SEPARATOR);
-      const id = keyArgs.join("_");
-      return this.adapter.revert(
-        r,
+      pkValue = reconstructPrimaryKeyFromIdParts(
         this.fromSelector,
-        Sequence.parseValue(sequenceType, id),
-        undefined,
-        ctx
+        pkAttr,
+        keyArgs
       );
     }
-    return r;
+    if (typeof pkValue === "undefined") return r;
+    return this.adapter.revert(
+      r,
+      this.fromSelector,
+      Sequence.parseValue(sequenceType, pkValue),
+      undefined,
+      ctx
+    );
   }
 
   /**

@@ -1,8 +1,7 @@
 import { TLSOptions } from "fabric-ca-client";
 import { ClientIdentity } from "fabric-shim-api";
 import { Model } from "@decaf-ts/decorator-validation";
-import { AdapterFlags } from "@decaf-ts/core";
-import { Logger } from "@decaf-ts/logging";
+import { CouchDBFlags } from "@decaf-ts/for-couchdb";
 
 export type HSMOptions = {
   library: string;
@@ -123,7 +122,7 @@ export type SegregatedModel<M extends Model> = {
   shared?: Record<string, Record<keyof M, any>>;
 };
 
-export type FabricFlags<LOG extends Logger = Logger> = AdapterFlags<LOG> & {
+export type FabricFlags = CouchDBFlags & {
   segregated?: string;
   mirror?: boolean;
   mirrorCollection?: string;

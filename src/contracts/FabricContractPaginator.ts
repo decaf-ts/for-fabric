@@ -8,7 +8,12 @@ import { DBKeys } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { FabricContractAdapter } from "./ContractAdapter";
-import { CouchDBPaginator, MangoQuery } from "@decaf-ts/for-couchdb";
+import {
+  CouchDBKeys,
+  CouchDBPaginator,
+  MangoQuery,
+} from "@decaf-ts/for-couchdb";
+import { FabricContractContext } from "./ContractContext";
 import {
   applyMirrorFlags,
   applySegregationFlags,
@@ -164,18 +169,11 @@ export class FabricContractPaginator<
     const statement = Object.assign({}, this.statement);
 
     if ((!this._recordCount || !this._totalPages) && !this._bookmark) {
-      this._totalPages = this._recordCount = 0;
-      const countResults =
-        (await this.adapter.raw<M[], true>(
-          { ...statement, limit: undefined, skip: undefined },
-          true,
-          ctx
-        )) || [];
-      this._recordCount = countResults.length;
+      await this.computeCounts(statement, ctx);
       if (this._recordCount > 0) {
-        const size = statement?.limit || this.size;
-        this._totalPages = Math.ceil(this._recordCount / size);
         if (!bookmark) return await this.page(page, ...ctxArgs);
+      } else {
+        return [];
       }
     } else if (page === 1) {
       page = this.validatePage(page);
@@ -211,5 +209,116 @@ export class FabricContractPaginator<
     this._bookmark = nextBookmark;
     this._currentPage = page;
     return results;
+  }
+
+  private async computeCounts(
+    statement: MangoQuery,
+    ctx: FabricContractContext
+  ): Promise<void> {
+    const normalizedStatement: MangoQuery = Object.assign({}, statement);
+    delete (normalizedStatement as any).bookmark;
+    delete normalizedStatement.skip;
+    delete normalizedStatement.limit;
+    const nativeTotal = await this.countViaNativePlan(normalizedStatement, ctx);
+    const total =
+      typeof nativeTotal === "number"
+        ? nativeTotal
+        : await this.countViaMango(normalizedStatement, ctx);
+    this._recordCount = total;
+    const size = statement?.limit || this.size;
+    this._totalPages = total ? Math.ceil(total / size) : 0;
+  }
+
+  private async countViaNativePlan(
+    statement: MangoQuery,
+    ctx: FabricContractContext
+  ): Promise<number | undefined> {
+    const adapter = this.adapter as FabricContractAdapter;
+    const plan = adapter.nativeIndexPlan?.(statement, ctx);
+    if (!plan) return undefined;
+    const range = this.buildNativeRangeKeys(plan, ctx);
+    if (!range) return undefined;
+    if (range.exact) {
+      try {
+        const data = await ctx.stub.getState(range.startKey);
+        return data && data.length ? 1 : 0;
+      } catch {
+        return 0;
+      }
+    }
+    if (!range.endKey || typeof ctx.stub.getStateByRange !== "function") {
+      return undefined;
+    }
+    const iterator = await ctx.stub.getStateByRange(
+      range.startKey,
+      range.endKey
+    );
+    let count = 0;
+    try {
+      for (
+        let res = await iterator.next();
+        !res.done;
+        res = await iterator.next()
+      ) {
+        if (res.value) count++;
+      }
+    } finally {
+      if (typeof (iterator as any).close === "function") {
+        await iterator.close();
+      }
+    }
+    return count;
+  }
+
+  private async countViaMango(
+    statement: MangoQuery,
+    ctx: FabricContractContext
+  ): Promise<number> {
+    const countQuery: MangoQuery = Object.assign({}, statement, {
+      limit: Number.MAX_SAFE_INTEGER,
+    });
+    const countResults =
+      (await this.adapter.raw<M[], true>(countQuery, true, ctx)) || [];
+    return countResults.length;
+  }
+
+  private buildNativeRangeKeys(
+    plan: ReturnType<FabricContractAdapter["nativeIndexPlan"]>,
+    ctx: FabricContractContext
+  ):
+    | { startKey: string; endKey?: string; exact: boolean }
+    | undefined {
+    if (!plan?.startkey) return undefined;
+    const startInfo = this.parsePlanComponents(plan.startkey);
+    const startKey = ctx.stub.createCompositeKey(
+      plan.tableName,
+      startInfo.components
+    );
+    if (!plan.endkey) {
+      return { startKey, exact: true };
+    }
+    const endInfo = this.parsePlanComponents(plan.endkey);
+    if (plan.endkey === plan.startkey && !endInfo.hasHighSentinel) {
+      return { startKey, exact: true };
+    }
+    const endComponents = endInfo.hasHighSentinel
+      ? [...endInfo.components, "\ufff0"]
+      : endInfo.components;
+    const endKey = ctx.stub.createCompositeKey(plan.tableName, endComponents);
+    return { startKey, endKey, exact: false };
+  }
+
+  private parsePlanComponents(planKey?: string) {
+    if (!planKey)
+      return { components: [] as string[], hasHighSentinel: false };
+    const parts = planKey.split(CouchDBKeys.SEPARATOR);
+    parts.shift();
+    const hasHighSentinel =
+      parts.length > 0 && parts[parts.length - 1] === "\ufff0";
+    const components = hasHighSentinel ? parts.slice(0, -1) : parts;
+    return {
+      components: components.filter((part) => part.length),
+      hasHighSentinel,
+    };
   }
 }

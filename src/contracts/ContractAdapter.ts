@@ -3,6 +3,7 @@ import {
   CouchDBKeys,
   MangoQuery,
   ViewResponse,
+  decomposePrimaryKeySegments,
 } from "@decaf-ts/for-couchdb";
 import { Model, ValidationKeys } from "@decaf-ts/decorator-validation";
 import { FabricContractFlags } from "./types";
@@ -274,7 +275,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     this.enforceMirrorAuthorization(clazz, ctx);
     log.info(`in ADAPTER create with args ${args}`);
     const tableName = Model.tableName(clazz);
-    const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    const composedKey = this.buildCompositeKey(clazz, id, ctx);
     const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
       | string
       | undefined;
@@ -376,7 +377,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.info(`in ADAPTER read with args ${args}`);
     const tableName = Model.tableName(clazz);
 
-    const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    const composedKey = this.buildCompositeKey(clazz, id, ctx);
     const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
       | string
       | undefined;
@@ -517,7 +518,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     this.enforceMirrorAuthorization(clazz, ctx);
     log.info(`in ADAPTER update with args ${args}`);
     const tableName = Model.tableName(clazz);
-    const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    const composedKey = this.buildCompositeKey(clazz, id, ctx);
     const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
       | string
       | undefined;
@@ -586,7 +587,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     this.enforceMirrorAuthorization(clazz, ctx);
     const tableName = Model.tableName(clazz);
 
-    const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
+    const composedKey = this.buildCompositeKey(clazz, id, ctx);
     const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
       | string
       | undefined;
@@ -803,6 +804,39 @@ export class FabricContractAdapter extends CouchDBAdapter<
     });
   }
 
+  private getCompositeKeyAttributes<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    ctx: FabricContractContext
+  ): string[] {
+    const nativeIndexing =
+      typeof ctx.getOrUndefined === "function"
+        ? ctx.getOrUndefined("nativeIndexing")
+        : (() => {
+            try {
+              return ctx.get("nativeIndexing");
+            } catch {
+              return undefined;
+            }
+          })();
+    if (!nativeIndexing) return [String(id)];
+    const pkAttr = Model.pk(clazz) as keyof M;
+    const segments =
+      decomposePrimaryKeySegments(clazz, pkAttr, id) || undefined;
+    if (!segments || !segments.length) return [String(id)];
+    return segments;
+  }
+
+  private buildCompositeKey<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType,
+    ctx: FabricContractContext
+  ): string {
+    const tableName = Model.tableName(clazz);
+    const attributes = this.getCompositeKeyAttributes(clazz, id, ctx);
+    return ctx.stub.createCompositeKey(tableName, attributes);
+  }
+
   protected async putState(
     id: string,
     model: Record<string, any>,
@@ -865,6 +899,82 @@ export class FabricContractAdapter extends CouchDBAdapter<
     );
   }
 
+  private parsePlanComponents(planKey?: string) {
+    if (!planKey) return { components: [] as string[], hasHighSentinel: false };
+    const parts = planKey.split(CouchDBKeys.SEPARATOR);
+    parts.shift(); // drop table name
+    const hasHighSentinel =
+      parts.length > 0 && parts[parts.length - 1] === "\ufff0";
+    const components = hasHighSentinel ? parts.slice(0, -1) : parts;
+    return {
+      components: components.filter((part) => part.length),
+      hasHighSentinel,
+    };
+  }
+
+  private buildNativeRangeKeys(
+    plan: ReturnType<FabricContractAdapter["resolveNativeIndexPlan"]>,
+    ctx: FabricContractContext
+  ):
+    | { startKey: string; endKey?: string; exact: boolean }
+    | undefined {
+    if (!plan?.startkey) return undefined;
+    const tableName = plan.tableName;
+    const startInfo = this.parsePlanComponents(plan.startkey);
+    const startKey = ctx.stub.createCompositeKey(
+      tableName,
+      startInfo.components
+    );
+    if (!plan.endkey) {
+      return { startKey, exact: true };
+    }
+    const endInfo = this.parsePlanComponents(plan.endkey);
+    if (plan.endkey === plan.startkey && !endInfo.hasHighSentinel) {
+      return { startKey, exact: true };
+    }
+    const endComponents = endInfo.hasHighSentinel
+      ? [...endInfo.components, "\ufff0"]
+      : endInfo.components;
+    const endKey = ctx.stub.createCompositeKey(tableName, endComponents);
+    return { startKey, endKey, exact: false };
+  }
+
+  private async executeNativeQuery<R, D extends boolean>(
+    plan: ReturnType<FabricContractAdapter["resolveNativeIndexPlan"]>,
+    docsOnly: D,
+    ctx: FabricContractContext
+  ): Promise<RawResult<R, D> | undefined> {
+    if (!plan) return undefined;
+    const range = this.buildNativeRangeKeys(plan, ctx);
+    if (!range) return undefined;
+    const { log } = this.logCtx([ctx], this.executeNativeQuery);
+    let docs: any[] = [];
+    if (range.exact) {
+      const data = await ctx.stub.getState(range.startKey);
+      if (data && data.length) {
+        const parsed = this.parseStateValue(data);
+        if (parsed) docs.push(parsed);
+      }
+    } else if (range.endKey) {
+      const iterator = await ctx.stub.getStateByRange(
+        range.startKey,
+        range.endKey
+      );
+      docs = (await this.resultIterator(log, iterator)) as any[];
+    }
+    if (!docs.length && range.exact && !ctx.isFullySegregated) {
+      return docsOnly ? ([] as any) : ({ docs: [] } as any);
+    }
+    if (plan.descending) docs.reverse();
+    const skip = plan.skip || 0;
+    if (skip) docs = docs.slice(skip);
+    if (typeof plan.limit === "number") {
+      docs = docs.slice(0, plan.limit);
+    }
+    if (docsOnly) return docs as any;
+    return { docs } as any;
+  }
+
   /**
    * @description Decodes binary data to string
    * @summary Converts a Uint8Array to a string using UTF-8 encoding
@@ -873,6 +983,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
    */
   protected decode(buffer: Uint8Array) {
     return FabricContractAdapter.textDecoder.decode(buffer);
+  }
+
+  protected parseStateValue(data: Uint8Array) {
+    const serialized = this.decode(data);
+    if (!serialized) return undefined;
+    try {
+      return JSON.parse(serialized);
+    } catch {
+      return serialized;
+    }
   }
 
   /**
@@ -1039,6 +1159,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<RawResult<R, D>> {
     const { log, ctx, ctxArgs } = this.logCtx(args, this.raw);
+    const hasSegregatedReads =
+      ctx.isFullySegregated ||
+      !!(ctx.getReadCollections() && ctx.getReadCollections()!.length);
+    const nativePlan = hasSegregatedReads
+      ? undefined
+      : this.resolveNativeIndexPlan(rawInput, ctx);
+    if (nativePlan) {
+      const nativeResult = await this.executeNativeQuery<R, D>(
+        nativePlan,
+        docsOnly,
+        ctx
+      );
+      if (nativeResult) return nativeResult;
+    }
 
     const enableSegregates = !args.length || args[0] !== true;
     const fullySegregated = enableSegregates && ctx.isFullySegregated;

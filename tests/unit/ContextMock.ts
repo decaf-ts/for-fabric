@@ -302,6 +302,17 @@ export function getStubMock() {
       };
     },
 
+    getStateByRange: async (startKey: string, endKey?: string) => {
+      const rows = Object.keys(state)
+        .sort()
+        .filter(
+          (key) =>
+            key >= startKey && (typeof endKey === "undefined" || key < endKey)
+        )
+        .map((key) => ({ key, value: state[key] }));
+      return createIterator(rows);
+    },
+
     async getPrivateData(collection: string, key: string): Promise<any> {
       // Reads only from committed private state
       if (collection in privateState && key in privateState[collection])

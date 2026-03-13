@@ -119,18 +119,18 @@ export abstract class FabricCrudContract<M extends Model>
   protected get repo() {
     if (!this._repo) {
       this._repo = Repository.forModel(this.clazz);
-      // try {
-      //   this.repo.observe(this);
-      // } catch (err: unknown) {
-      //   if (
-      //     err instanceof InternalError &&
-      //     err.message.includes("Observer already registered")
-      //   ) {
-      //     // already registered observer; ignore duplicate registration (during tests)
-      //   } else {
-      //     throw err;
-      //   }
-      // }
+      try {
+        this._repo.observe(this);
+      } catch (err: unknown) {
+        if (
+          err instanceof InternalError &&
+          err.message.includes("Observer already registered")
+        ) {
+          // already registered observer; ignore duplicate registration (during tests)
+        } else {
+          throw err;
+        }
+      }
     }
     return this._repo;
   }
