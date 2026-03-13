@@ -167,7 +167,7 @@ export class FabricContractPaginator<
       this._totalPages = this._recordCount = 0;
       const countResults =
         (await this.adapter.raw<M[], true>(
-          { ...statement, limit: undefined, skip: undefined },
+          { ...statement, limit: Number.MIN_SAFE_INTEGER, skip: undefined },
           true,
           ctx
         )) || [];
