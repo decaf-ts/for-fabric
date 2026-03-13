@@ -23,6 +23,7 @@ import {
   ValidationError,
 } from "@decaf-ts/db-decorators";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
+import { FabricClientPaginator } from "./FabricClientPaginator";
 
 /**
  * @description Repository implementation for Fabric client operations
@@ -237,7 +238,7 @@ export class FabricClientRepository<
     return (result as any)[CouchDBKeys.TABLE] &&
       (result as any)[CouchDBKeys.TABLE] === Model.tableName(this.class)
       ? new this.class(result)
-      : Paginator.isSerializedPage(result)
+      : FabricClientPaginator.isSerializedPage(result)
         ? Object.assign(result, {
             data: result.data.map((d: any) => new this.class(d)),
           })

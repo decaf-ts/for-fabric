@@ -43,20 +43,15 @@ const stubAdapter = {
     id:
       (model as any).productCode ||
       (model as any)[Model.pk(model.constructor as Constructor<Model>)] ||
-        "generated",
+      "generated",
     record: model,
     transient: {},
     segregated: {},
   })),
   logCtx: jest.fn((args: any[], operation: any) => {
     const previous = args.findIndex((arg) => arg instanceof Context);
-    const ctx =
-      previous >= 0
-        ? (args[previous] as Context)
-        : createContext();
-    const ctxArgs = args
-      .filter((_, index) => index !== previous)
-      .concat(ctx);
+    const ctx = previous >= 0 ? (args[previous] as Context) : createContext();
+    const ctxArgs = args.filter((_, index) => index !== previous).concat(ctx);
     const response: any = {
       log: logger,
       ctx,
@@ -68,9 +63,13 @@ const stubAdapter = {
   create: jest.fn(async (_clazz: any, _id: any, record: any) => record),
   update: jest.fn(async (_clazz: any, _id: any, record: any) => record),
   delete: jest.fn(async (_clazz: any, _id: any) => ({ id: _id })),
-  createAll: jest.fn(async (_clazz: any, _ids: any[], records: any[]) => records),
+  createAll: jest.fn(
+    async (_clazz: any, _ids: any[], records: any[]) => records
+  ),
   updateAll: jest.fn(async (_clazz: any, records: any[]) => records),
-  deleteAll: jest.fn(async (_clazz: any, ids: any[]) => ids.map((id) => ({ id }))),
+  deleteAll: jest.fn(async (_clazz: any, ids: any[]) =>
+    ids.map((id) => ({ id }))
+  ),
   read: jest.fn(async (_clazz: any, id: any) => ({ productCode: id })),
   readAll: jest.fn(async (_clazz: any, ids: any[]) =>
     ids.map((id) => ({ productCode: id }))
@@ -137,12 +136,18 @@ describe("client other-product strength repository", () => {
     (stubAdapter.read as jest.Mock).mockResolvedValue(readValue);
 
     const result = await repo.read("strength-1", ctx);
-    expect(stubAdapter.read).toHaveBeenCalledWith(OtherProductStrength, "strength-1", ctx);
+    expect(stubAdapter.read).toHaveBeenCalledWith(
+      OtherProductStrength,
+      "strength-1",
+      ctx
+    );
     expect(result.productCode).toBe("strength-1");
 
-    (stubAdapter.readAll as jest.Mock).mockResolvedValue([{
-      productCode: "strength-2",
-    }]);
+    (stubAdapter.readAll as jest.Mock).mockResolvedValue([
+      {
+        productCode: "strength-2",
+      },
+    ]);
     const bulk = await repo.readAll(["strength-2"], ctx);
     expect(stubAdapter.readAll).toHaveBeenCalledWith(
       OtherProductStrength,
@@ -195,7 +200,7 @@ describe("client other-product strength repository", () => {
       { offset: 1, limit: 1 },
       ctx
     );
-    expect(Paginator.isSerializedPage(paginated)).toBe(true);
+    expect(FabricClientPaginator.isSerializedPage(paginated)).toBe(true);
     expect(paginated.data[0].productCode).toBe("strength-4");
 
     const found = await repo.find("strength", OrderDirection.ASC, ctx);
@@ -207,7 +212,7 @@ describe("client other-product strength repository", () => {
       { offset: 1, limit: 1 },
       ctx
     );
-    expect(Paginator.isSerializedPage(pageResult)).toBe(true);
+    expect(FabricClientPaginator.isSerializedPage(pageResult)).toBe(true);
     expect(pageResult.data[0].productCode).toBe("strength-6");
   });
 
@@ -225,8 +230,8 @@ describe("client other-product strength repository", () => {
       .execute(ctx);
 
     expect(result[0].productCode).toBe("select-1");
-    const selectCall =
-      (stubAdapter.evaluateTransaction as jest.Mock).mock.calls[0];
+    const selectCall = (stubAdapter.evaluateTransaction as jest.Mock).mock
+      .calls[0];
     expect(selectCall[1]).toBe(PersistenceKeys.STATEMENT);
     expect(selectCall[2][0]).toBe("select");
   });
@@ -248,7 +253,12 @@ describe("FabricClientPaginator navigation helpers", () => {
   afterEach(() => jest.restoreAllMocks());
 
   it("advances and rewinds through pages", async () => {
-    const paginator = new DummyPaginator(stubAdapter, {} as any, 1, OtherProductStrength);
+    const paginator = new DummyPaginator(
+      stubAdapter,
+      {} as any,
+      1,
+      OtherProductStrength
+    );
     const spy = jest.spyOn(paginator, "page");
 
     paginator.apply({

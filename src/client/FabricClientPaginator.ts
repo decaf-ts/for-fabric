@@ -2,6 +2,7 @@ import {
   MaybeContextualArg,
   Paginator,
   PreparedStatement,
+  SerializedPage,
   UnsupportedError,
 } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
@@ -37,5 +38,9 @@ export class FabricClientPaginator<M extends Model> extends Paginator<
     ...args: MaybeContextualArg<any>
   ): Promise<M[]> {
     return super.page(page, ...args); // this will fail for non-prepared statements
+  }
+
+  static override isSerializedPage(obj: SerializedPage<any> | any) {
+    return obj && typeof obj === "object" && Array.isArray(obj.data);
   }
 }

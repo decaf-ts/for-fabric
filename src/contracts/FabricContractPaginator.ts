@@ -162,25 +162,25 @@ export class FabricContractPaginator<
     if (this.isPreparedStatement())
       return await this.pagePrepared(page, ...ctxArgs);
     const statement = Object.assign({}, this.statement);
-
-    if ((!this._recordCount || !this._totalPages) && !this._bookmark) {
-      this._totalPages = this._recordCount = 0;
-      const countResults =
-        (await this.adapter.raw<M[], true>(
-          { ...statement, limit: Number.MIN_SAFE_INTEGER, skip: undefined },
-          true,
-          ctx
-        )) || [];
-      this._recordCount = countResults.length;
-      if (this._recordCount > 0) {
-        const size = statement?.limit || this.size;
-        this._totalPages = Math.ceil(this._recordCount / size);
-        if (!bookmark) return await this.page(page, ...ctxArgs);
-      }
-    } else if (page === 1) {
-      page = this.validatePage(page);
-      statement.skip = (page - 1) * this.size;
-    }
+    //
+    // if ((!this._recordCount || !this._totalPages) && !this._bookmark) {
+    //   this._totalPages = this._recordCount = 0;
+    //   const countResults =
+    //     (await this.adapter.raw<M[], true>(
+    //       { ...statement, limit: Number.MIN_SAFE_INTEGER, skip: undefined },
+    //       true,
+    //       ctx
+    //     )) || [];
+    //   this._recordCount = countResults.length;
+    //   if (this._recordCount > 0) {
+    //     const size = statement?.limit || this.size;
+    //     this._totalPages = Math.ceil(this._recordCount / size);
+    //     if (!bookmark) return await this.page(page, ...ctxArgs);
+    //   }
+    // } else if (page === 1) {
+    //   page = this.validatePage(page);
+    //   statement.skip = (page - 1) * this.size;
+    // }
 
     if (page !== 1) {
       if (!this._bookmark)

@@ -10,6 +10,7 @@ import { Market } from "../../src/contract/models/Market";
 import { ProductStrength } from "../../src/contract/models/ProductStrength";
 import { NotFoundError } from "@decaf-ts/db-decorators";
 import { Paginator } from "@decaf-ts/core";
+import { FabricClientPaginator } from "../../src/client/FabricClientPaginator";
 Logging.setConfig({ level: LogLevel.debug });
 
 jest.setTimeout(30000);
@@ -332,7 +333,7 @@ describe("Tests Product Contract", () => {
       expect(page).toBeDefined();
 
       const parsedPage = Paginator.deserialize(page);
-      expect(Paginator.isSerializedPage(parsedPage)).toBe(true);
+      expect(FabricClientPaginator.isSerializedPage(parsedPage)).toBe(true);
     });
 
     it("paginates via statement", async () => {

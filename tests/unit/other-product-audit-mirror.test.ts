@@ -27,7 +27,9 @@ class OtherLeafletContract extends SerializedCrudContract<OtherLeaflet> {
 
 type PayloadPreparer<T> = (model: T) => T;
 
-function createPayloadPreparer<T extends Model>(contract: any): PayloadPreparer<T> {
+function createPayloadPreparer<T extends Model>(
+  contract: any
+): PayloadPreparer<T> {
   let transient: Record<string, any> = {};
   jest
     .spyOn(contract as any, "getTransientData")
@@ -55,10 +57,16 @@ function auditMatchesIdentifier(audit: OtherAudit, identifier: string) {
     typeof rawDiffs === "string" ? JSON.parse(rawDiffs) : rawDiffs || {};
   if (audit.recordId === identifier) return true;
   if (diffs.productCode === identifier) return true;
-  if (typeof diffs.productCode === "string" && diffs.productCode.includes(identifier)) {
+  if (
+    typeof diffs.productCode === "string" &&
+    diffs.productCode.includes(identifier)
+  ) {
     return true;
   }
-  if (Array.isArray(diffs.productCode) && diffs.productCode.includes(identifier)) {
+  if (
+    Array.isArray(diffs.productCode) &&
+    diffs.productCode.includes(identifier)
+  ) {
     return true;
   }
   return JSON.stringify(diffs).includes(identifier);
@@ -178,13 +186,14 @@ describe("OtherProduct shared audit + mirror coverage", () => {
       fileContent: `<xml>${id}</xml>`,
       owner,
     });
-    const otherFiles = ["manual", "supplement"].map((suffix) =>
-      new OtherLeafletFile({
-        leafletId: id,
-        fileName: `${id}-${suffix}.pdf`,
-        fileContent: `${id}-${suffix}`,
-        owner,
-      })
+    const otherFiles = ["manual", "supplement"].map(
+      (suffix) =>
+        new OtherLeafletFile({
+          leafletId: id,
+          fileName: `${id}-${suffix}.pdf`,
+          fileContent: `${id}-${suffix}`,
+          owner,
+        })
     );
     return new OtherLeaflet({
       id,
@@ -217,29 +226,33 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     const mirrorStub = Object.create(stub);
     const collections: string[] = [];
     const originalPrivate = stub.getPrivateData.bind(stub);
-    mirrorStub.getPrivateData = jest.fn(async (collection: string, key: string) => {
-      collections.push(collection);
-      if (collection === "mirror-collection") {
-        const fallback = namespaceAuditData[key];
-        if (fallback) {
-          mirrorCollection[key] = fallback;
-          return fallback;
+    mirrorStub.getPrivateData = jest.fn(
+      async (collection: string, key: string) => {
+        collections.push(collection);
+        if (collection === "mirror-collection") {
+          const fallback = namespaceAuditData[key];
+          if (fallback) {
+            mirrorCollection[key] = fallback;
+            return fallback;
+          }
+        }
+        try {
+          return await originalPrivate(collection, key);
+        } catch (error) {
+          if (error instanceof NotFoundError) {
+            return undefined;
+          }
+          throw error;
         }
       }
-      try {
-        return await originalPrivate(collection, key);
-      } catch (error) {
-        if (error instanceof NotFoundError) {
-          return undefined;
-        }
-        throw error;
-      }
-    });
+    );
     const originalQuery = stub.getPrivateDataQueryResult.bind(stub);
-    mirrorStub.getPrivateDataQueryResult = jest.fn(async (collection: string, query: string) => {
-      collections.push(collection);
-      return originalQuery(collection, query);
-    });
+    mirrorStub.getPrivateDataQueryResult = jest.fn(
+      async (collection: string, query: string) => {
+        collections.push(collection);
+        return originalQuery(collection, query);
+      }
+    );
     mirrorStub.getCreator = async () => ({
       idBytes: Buffer.from("creator-org-b"),
       mspid: "org-b",
@@ -250,7 +263,8 @@ describe("OtherProduct shared audit + mirror coverage", () => {
       getID: () => "id-org-b",
       getMSPID: () => "org-b",
       getIDBytes: () => Buffer.from("creator-org-b"),
-      getAttributeValue: (name: string) => (name === "roles" ? ["admin"] : undefined),
+      getAttributeValue: (name: string) =>
+        name === "roles" ? ["admin"] : undefined,
     } as any;
     return { mirrorCtx, collections };
   }
@@ -273,12 +287,18 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     });
 
     const createdProduct = Model.deserialize(
-      await productContract.create(ctx as any, prepareProduct(product).serialize())
+      await productContract.create(
+        ctx as any,
+        prepareProduct(product).serialize()
+      )
     ) as OtherProductShared;
     stub.commit();
 
     await ensureAbsentInPublic("other_product_shared", productCode);
-    const namespaceProduct = await expectPrivateEntry("other_product_shared", productCode);
+    const namespaceProduct = await expectPrivateEntry(
+      "other_product_shared",
+      productCode
+    );
     const mirrorProduct = await expectPrivateEntry(
       "other_product_shared",
       productCode,
@@ -291,7 +311,11 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     const strengthIds = resolveIds(createdProduct.strengths || []);
     for (const id of strengthIds) {
       await expectPrivateEntry("other_product_strength", id);
-      await expectPrivateEntry("other_product_strength", id, "mirror-collection");
+      await expectPrivateEntry(
+        "other_product_strength",
+        id,
+        "mirror-collection"
+      );
     }
     const marketIds = resolveIds(createdProduct.markets || []);
     for (const id of marketIds) {
@@ -317,7 +341,11 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     const batchId = `${productCode}:${batchNumber}`;
     await ensureAbsentInPublic("other_batch_shared", batchId);
     await expectPrivateEntry("other_batch_shared", batchId);
-    await expectPrivateEntry("other_batch_shared", batchId, "mirror-collection");
+    await expectPrivateEntry(
+      "other_batch_shared",
+      batchId,
+      "mirror-collection"
+    );
     await expectAuditEntry(
       Model.tableName(OtherBatchShared),
       batchId,
@@ -331,7 +359,9 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     );
     stub.commit();
 
-    const leafletBatch = buildLeaflet(productCode, "pt", { batch: batchNumber });
+    const leafletBatch = buildLeaflet(productCode, "pt", {
+      batch: batchNumber,
+    });
     await leafletContract.create(
       ctx as any,
       prepareLeaflet(leafletBatch).serialize()
@@ -341,7 +371,10 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     const leafletEntries = [leafletProduct, leafletBatch];
     for (const leaflet of leafletEntries) {
       await ensureAbsentInPublic("other_leaflet", leaflet.id);
-      const namespaceLeaflet = await expectPrivateEntry("other_leaflet", leaflet.id);
+      const namespaceLeaflet = await expectPrivateEntry(
+        "other_leaflet",
+        leaflet.id
+      );
       const mirrorLeaflet = await expectPrivateEntry(
         "other_leaflet",
         leaflet.id,
@@ -353,9 +386,16 @@ describe("OtherProduct shared audit + mirror coverage", () => {
       const fileRefs = resolveIds(namespaceLeaflet.otherFilesContent || []);
       const xmlRef = namespaceLeaflet.xmlFileContent as string;
       await expectPrivateEntry("other_leaflet_file", xmlRef);
-      await expectPrivateEntry("other_leaflet_file", xmlRef, "mirror-collection");
+      await expectPrivateEntry(
+        "other_leaflet_file",
+        xmlRef,
+        "mirror-collection"
+      );
       for (const fileRef of fileRefs) {
-        const namespaceFile = await expectPrivateEntry("other_leaflet_file", fileRef);
+        const namespaceFile = await expectPrivateEntry(
+          "other_leaflet_file",
+          fileRef
+        );
         const mirrorFile = await expectPrivateEntry(
           "other_leaflet_file",
           fileRef,
@@ -400,7 +440,8 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     const baseList = await listAllAudits(ctx);
     expect(baseList.length).toBeGreaterThanOrEqual(5);
     expect(
-      baseList.filter((entry) => entry.model === Model.tableName(OtherLeaflet)).length
+      baseList.filter((entry) => entry.model === Model.tableName(OtherLeaflet))
+        .length
     ).toBeGreaterThanOrEqual(2);
     expect(
       baseList.some(
@@ -417,8 +458,13 @@ describe("OtherProduct shared audit + mirror coverage", () => {
       )
     ).toBe(true);
 
-    const auditIds = baseList.map((entry) => entry.id).filter(Boolean) as string[];
-    const privateState = ((stub as any).privateState || {}) as Record<string, Record<string, Buffer>>;
+    const auditIds = baseList
+      .map((entry) => entry.id)
+      .filter(Boolean) as string[];
+    const privateState = ((stub as any).privateState || {}) as Record<
+      string,
+      Record<string, Buffer>
+    >;
     const namespaceAuditData = privateState["decaf-namespaceAeon"] || {};
     const mirrorCollection = privateState["mirror-collection"] || {};
     privateState["mirror-collection"] = mirrorCollection;
@@ -439,10 +485,14 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     ) as any[];
     const allRead = readAllPayload.map(normalizeAudit);
     expect(allRead.map((entry) => entry.id)).toEqual(readAllIds);
-
+    //
     const findToken = productCode.slice(0, 4);
     const findResult = JSON.parse(
-      await auditContract.statement(ctx, "find", JSON.stringify([findToken, "asc"]))
+      await auditContract.statement(
+        ctx,
+        "find",
+        JSON.stringify([findToken, "asc"])
+      )
     ) as any[];
     const normalizedFind = findResult.map(normalizeAudit);
     expect(
@@ -474,8 +524,12 @@ describe("OtherProduct shared audit + mirror coverage", () => {
       namespaceAuditData
     );
 
-    const baseListPayload = JSON.stringify(baseList.map((entry) => entry.serialize()));
-    const mirrorReadAllPayload = JSON.stringify(allRead.map((entry) => entry.serialize()));
+    const baseListPayload = JSON.stringify(
+      baseList.map((entry) => entry.serialize())
+    );
+    const mirrorReadAllPayload = JSON.stringify(
+      allRead.map((entry) => entry.serialize())
+    );
     const normalizedFindPayload = JSON.stringify(
       normalizedFind.map((entry) => entry.serialize())
     );
@@ -488,27 +542,33 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     const paginateByOriginal = auditContract.paginateBy.bind(auditContract);
     const pageOriginal = auditContract.page.bind(auditContract);
 
-    jest.spyOn(auditContract, "listBy").mockImplementation(async (context, ...args) => {
-      if (context === mirrorCtx) {
-        collections.push("mirror-collection");
-        return baseListPayload;
-      }
-      return listByOriginal(context, ...args);
-    });
-    jest.spyOn(auditContract, "readAll").mockImplementation(async (context, ...args) => {
-      if (context === mirrorCtx) {
-        collections.push("mirror-collection");
-        return mirrorReadAllPayload;
-      }
-      return readAllOriginal(context, ...args);
-    });
-    jest.spyOn(auditContract, "statement").mockImplementation(async (context, ...args) => {
-      if (context === mirrorCtx) {
-        collections.push("mirror-collection");
-        return normalizedFindPayload;
-      }
-      return statementOriginal(context, ...args);
-    });
+    jest
+      .spyOn(auditContract, "listBy")
+      .mockImplementation(async (context, ...args) => {
+        if (context === mirrorCtx) {
+          collections.push("mirror-collection");
+          return baseListPayload;
+        }
+        return listByOriginal(context, ...args);
+      });
+    jest
+      .spyOn(auditContract, "readAll")
+      .mockImplementation(async (context, ...args) => {
+        if (context === mirrorCtx) {
+          collections.push("mirror-collection");
+          return mirrorReadAllPayload;
+        }
+        return readAllOriginal(context, ...args);
+      });
+    jest
+      .spyOn(auditContract, "statement")
+      .mockImplementation(async (context, ...args) => {
+        if (context === mirrorCtx) {
+          collections.push("mirror-collection");
+          return normalizedFindPayload;
+        }
+        return statementOriginal(context, ...args);
+      });
     jest
       .spyOn(auditContract, "paginateBy")
       .mockImplementation(async (context, ...args) => {
@@ -518,17 +578,22 @@ describe("OtherProduct shared audit + mirror coverage", () => {
         }
         return paginateByOriginal(context, ...args);
       });
-    jest.spyOn(auditContract, "page").mockImplementation(async (context, ...args) => {
-      if (context === mirrorCtx) {
-        collections.push("mirror-collection");
-        return pagePayload;
-      }
-      return pageOriginal(context, ...args);
-    });
+    jest
+      .spyOn(auditContract, "page")
+      .mockImplementation(async (context, ...args) => {
+        if (context === mirrorCtx) {
+          collections.push("mirror-collection");
+          return pagePayload;
+        }
+        return pageOriginal(context, ...args);
+      });
 
     const mirrorList = await listAllAudits(mirrorCtx);
     const mirrorReadAll = JSON.parse(
-      (await auditContract.readAll(mirrorCtx, JSON.stringify(readAllIds))) as string
+      (await auditContract.readAll(
+        mirrorCtx,
+        JSON.stringify(readAllIds)
+      )) as string
     ) as any[];
     const mirrorFindResult = JSON.parse(
       await auditContract.statement(
@@ -543,7 +608,9 @@ describe("OtherProduct shared audit + mirror coverage", () => {
       "asc",
       JSON.stringify({ offset: 1, limit: 3 })
     );
-    const mirrorPaginatedPage = Paginator.deserialize(mirrorPaginatedRaw as string);
+    const mirrorPaginatedPage = Paginator.deserialize(
+      mirrorPaginatedRaw as string
+    );
     const mirrorPageRaw = await auditContract.page(
       mirrorCtx,
       findToken,

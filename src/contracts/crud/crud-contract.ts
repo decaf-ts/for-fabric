@@ -36,7 +36,6 @@ import {
   BulkCrudOperationKeys,
   OperationKeys,
   PrimaryKeyType,
-  InternalError,
 } from "@decaf-ts/db-decorators";
 import { MissingContextError } from "../../shared/index";
 import { extractMspId } from "../../shared/decorators";
