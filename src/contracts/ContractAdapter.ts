@@ -417,84 +417,84 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return model;
   }
 
-  // /**
-  //  * @description Retrieves multiple records from the database
-  //  * @summary Fetches multiple records with the given IDs from the specified table
-  //  * @param {string} tableName - The name of the table to read from
-  //  * @param id - The identifiers of the records to retrieve
-  //  * @param {...any[]} args - Additional arguments specific to the adapter implementation
-  //  * @return A promise that resolves to an array of retrieved records
-  //  */
-  // override async readAll<M extends Model>(
-  //   clazz: Constructor<M>,
-  //   id: PrimaryKeyType[],
-  //   ...args: ContextualArgs<Context<FabricContractFlags>>
-  // ): Promise<Record<string, any>[]> {
-  //   const { log, ctx } = this.logCtx(args, this.readAll);
-  //   const tableName = Model.tableName(clazz);
-  //   log.debug(`Reading ${id.length} entries ${tableName} table`);
-  //   const breakOnSingleFailure = ctx.get("breakOnSingleFailureInBulk") ?? true;
-  //   const continueOnError = !breakOnSingleFailure;
-  //
-  //   const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
-  //     | string
-  //     | undefined;
-  //   const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
-  //
-  //   const readMirror = async <M extends Model>(
-  //     clazz: Constructor<M>,
-  //     id: PrimaryKeyType,
-  //     ...args: ContextualArgs<Context<FabricContractFlags>>
-  //   ) => {
-  //     if (!mirrorCollection)
-  //       throw new BadRequestError("Missing mirror collection for mirror read");
-  //     try {
-  //       const { ctx, log } = this.logCtx(args, readMirror);
-  //       log.info(`in ADAPTER read with args ${args}`);
-  //       const tableName = Model.tableName(clazz);
-  //
-  //       const composedKey = ctx.stub.createCompositeKey(tableName, [
-  //         String(id),
-  //       ]);
-  //
-  //       return await this.forPrivate(mirrorCollection).readState(
-  //         composedKey,
-  //         ctx
-  //       );
-  //     } catch (e: unknown) {
-  //       throw this.parseError(e as Error);
-  //     }
-  //   };
-  //
-  //   try {
-  //     const tasks = id.map(
-  //       (i) => () =>
-  //         isMirror && mirrorCollection
-  //           ? readMirror(
-  //               clazz,
-  //               i,
-  //               ...args,
-  //               ctx.override({ noEmitSingle: true })
-  //             )
-  //           : this.read(clazz, i, ...args, ctx.override({ noEmitSingle: true }))
-  //     );
-  //
-  //     const rawResult = continueOnError
-  //       ? await promiseSequence(tasks, true)
-  //       : await promiseSequence(tasks);
-  //     return resolveBulkSequenceResult(
-  //       rawResult,
-  //       continueOnError,
-  //       log,
-  //       BulkCrudOperationKeys.READ_ALL
-  //     );
-  //   } catch (e) {
-  //     throw this.parseError(e as Error);
-  //   } finally {
-  //     ctx.put("mirror" as any, undefined);
-  //     ctx.put("mirrorCollection" as any, undefined);
-  //   }
-  // }
+  /**
+   * @description Retrieves multiple records from the database
+   * @summary Fetches multiple records with the given IDs from the specified table
+   * @param {string} tableName - The name of the table to read from
+   * @param id - The identifiers of the records to retrieve
+   * @param {...any[]} args - Additional arguments specific to the adapter implementation
+   * @return A promise that resolves to an array of retrieved records
+   */
+  override async readAll<M extends Model>(
+    clazz: Constructor<M>,
+    id: PrimaryKeyType[],
+    ...args: ContextualArgs<Context<FabricContractFlags>>
+  ): Promise<Record<string, any>[]> {
+    const { log, ctx } = this.logCtx(args, this.readAll);
+    const tableName = Model.tableName(clazz);
+    log.debug(`Reading ${id.length} entries ${tableName} table`);
+    const breakOnSingleFailure = ctx.get("breakOnSingleFailureInBulk") ?? true;
+    const continueOnError = !breakOnSingleFailure;
+
+    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
+      | string
+      | undefined;
+    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+
+    const readMirror = async <M extends Model>(
+      clazz: Constructor<M>,
+      id: PrimaryKeyType,
+      ...args: ContextualArgs<Context<FabricContractFlags>>
+    ) => {
+      if (!mirrorCollection)
+        throw new BadRequestError("Missing mirror collection for mirror read");
+      try {
+        const { ctx, log } = this.logCtx(args, readMirror);
+        log.info(`in ADAPTER read with args ${args}`);
+        const tableName = Model.tableName(clazz);
+
+        const composedKey = ctx.stub.createCompositeKey(tableName, [
+          String(id),
+        ]);
+
+        return await this.forPrivate(mirrorCollection).readState(
+          composedKey,
+          ctx
+        );
+      } catch (e: unknown) {
+        throw this.parseError(e as Error);
+      }
+    };
+
+    try {
+      const tasks = id.map(
+        (i) => () =>
+          isMirror && mirrorCollection
+            ? readMirror(
+                clazz,
+                i,
+                ...args,
+                ctx.override({ noEmitSingle: true })
+              )
+            : this.read(clazz, i, ...args, ctx.override({ noEmitSingle: true }))
+      );
+
+      const rawResult = continueOnError
+        ? await promiseSequence(tasks, true)
+        : await promiseSequence(tasks);
+      return resolveBulkSequenceResult(
+        rawResult,
+        continueOnError,
+        log,
+        BulkCrudOperationKeys.READ_ALL
+      );
+    } catch (e) {
+      throw this.parseError(e as Error);
+    } finally {
+      ctx.put("mirror" as any, undefined);
+      ctx.put("mirrorCollection" as any, undefined);
+    }
+  }
 
   /**
    * @description Updates a record in the state database
