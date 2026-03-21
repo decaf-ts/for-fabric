@@ -5,7 +5,6 @@ import { getMockCtx, getStubMock } from "./ContextMock";
 import { TestPublicModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
 import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
 import { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
-import { Model } from "@decaf-ts/decorator-validation";
 import { OperationKeys } from "@decaf-ts/db-decorators";
 
 jest.setTimeout(10000);
@@ -21,6 +20,7 @@ describe("FabricContractAdapter observable pipeline", () => {
     stub = ctx.stub as ReturnType<typeof getStubMock>;
     contract = new TestPublicModelContract();
     repo = (contract as any).repo as FabricContractRepository<TestPublicModel>;
+    repo.observe(contract);
     // Wait for async dispatch.initialize() to complete and set up proxy wrappers
     await new Promise((r) => setTimeout(r, 100));
   });

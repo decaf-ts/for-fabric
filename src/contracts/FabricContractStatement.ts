@@ -12,6 +12,7 @@ import { Model } from "@decaf-ts/decorator-validation";
 import { FabricContractContext } from "./ContractContext";
 import { CouchDBStatement } from "@decaf-ts/for-couchdb";
 import {
+  AdapterFlags,
   Condition,
   ContextualArgs,
   MaybeContextualArg,
@@ -55,8 +56,14 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
   CouchDBAdapter<any, void, FabricContractContext>,
   R
 > {
-  constructor(adapter: CouchDBAdapter<any, void, FabricContractContext>) {
+  constructor(
+    adapter: CouchDBAdapter<any, void, FabricContractContext>,
+    overrides?: Partial<AdapterFlags>
+  ) {
     super(adapter);
+    if (overrides) {
+      this.overrides = overrides;
+    }
   }
 
   protected override async executionPrefix(
@@ -218,26 +225,19 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
         return results;
       }
       if (!this.selectSelector) {
-        const pkAttr = Model.pk(this.fromSelector);
-        const processor = function recordProcessor(
-          this: FabricStatement<M, R>,
-          r: any
-        ) {
-          const id = r[pkAttr];
-          return this.adapter.revert(
-            r,
-            this.fromSelector as Constructor<any>,
-            id,
-            undefined,
-            ctx
-          ) as any;
-        }.bind(this as any);
-
         if (this.groupBySelectors?.length) {
-          return this.revertGroupedResults(results, processor) as R;
+          const grouped = this.revertGroupedResults(
+            results,
+            (r) => this.processRecord(r, ctx)
+          ) as R;
+          return (await this.applyAfterHandlersToResult(grouped, ctx)) as R;
         }
-        if (Array.isArray(results)) return results.map(processor) as R;
-        return processor(results) as R;
+        if (Array.isArray(results)) {
+          const mapped = results.map((r) => this.processRecord(r, ctx)) as unknown as R;
+          return (await this.applyAfterHandlersToResult(mapped, ctx)) as R;
+        }
+        const single = this.processRecord(results, ctx) as unknown as R;
+        return (await this.applyAfterHandlersToResult(single, ctx)) as R;
       }
       return results;
     } catch (e: unknown) {

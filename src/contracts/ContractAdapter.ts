@@ -34,6 +34,7 @@ import {
   SequenceOptions,
   UnsupportedError,
   Adapter,
+  AdapterFlags,
   PreparedModel,
   Repository,
   QueryError,
@@ -1144,8 +1145,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     );
   }
 
-  override Statement<M extends Model>(): FabricStatement<M, any> {
-    return new FabricStatement(this as any);
+  override Statement<M extends Model>(
+    overrides?: Partial<AdapterFlags>
+  ): FabricStatement<M, any> {
+    return new FabricStatement(this as any, overrides);
   }
 
   override async updateAll<M extends Model>(

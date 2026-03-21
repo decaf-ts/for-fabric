@@ -227,22 +227,54 @@ export class FabricClientRepository<
       )
     );
 
+    let hydrated: any;
     if (Array.isArray(result)) {
-      return result.map((r: any) =>
+      hydrated = result.map((r: any) =>
         (r as any)[CouchDBKeys.TABLE] &&
         (r as any)[CouchDBKeys.TABLE] === Model.tableName(this.class)
-          ? new this.class(r)
+          ? (new this.class(r) as M)
           : r
       );
-    }
-    return (result as any)[CouchDBKeys.TABLE] &&
+    } else if (
+      (result as any)[CouchDBKeys.TABLE] &&
       (result as any)[CouchDBKeys.TABLE] === Model.tableName(this.class)
-      ? new this.class(result)
-      : FabricClientPaginator.isSerializedPage(result)
-        ? Object.assign(result, {
-            data: result.data.map((d: any) => new this.class(d)),
-          })
-        : result;
+    ) {
+      hydrated = new this.class(result) as M;
+    } else if (FabricClientPaginator.isSerializedPage(result)) {
+      hydrated = Object.assign(result, {
+        data: result.data.map((d: any) => new this.class(d) as M),
+      });
+    } else {
+      hydrated = result;
+    }
+
+    return this.applyAfterRead(hydrated, ctx);
+  }
+
+  private async applyAfterRead(
+    value: any,
+    ctx: ContextOf<A>
+  ): Promise<any> {
+    if (!ctx.getOrUndefined("afterQueryHandlers")) return value;
+    if (value instanceof Model) {
+      await enforceDBDecorators<M, Repository<M, A>, any>(
+        this,
+        ctx,
+        value as M,
+        OperationKeys.READ,
+        OperationKeys.AFTER
+      );
+      return value;
+    }
+    if (Array.isArray(value)) {
+      await Promise.all(value.map((entry) => this.applyAfterRead(entry, ctx)));
+      return value;
+    }
+    if (FabricClientPaginator.isSerializedPage(value)) {
+      await this.applyAfterRead(value.data, ctx);
+      return value;
+    }
+    return value;
   }
 
   override async countOf(

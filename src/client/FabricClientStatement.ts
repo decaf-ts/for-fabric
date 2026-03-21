@@ -192,24 +192,23 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
    * @description Processes a record from CouchDB/Fabric
    * @summary Extracts the ID from a CouchDB document and reverts it to a model instance
    */
-  protected processRecord(
-    r: any,
-    pkAttr: keyof M,
-    sequenceType: "Number" | "BigInt" | undefined,
+  protected override processRecord(
+    record: any,
     ctx: Context<FabricClientFlags>
-  ) {
-    if (r[CouchDBKeys.ID]) {
-      const [, ...keyArgs] = r[CouchDBKeys.ID].split(CouchDBKeys.SEPARATOR);
+  ): M {
+    const pkAttr = Model.pk(this.fromSelector);
+    const type = Metadata.get(
+      this.fromSelector,
+      Metadata.key(DBKeys.ID, pkAttr as string)
+    )?.type;
+
+    if (record[CouchDBKeys.ID]) {
+      const [, ...keyArgs] = record[CouchDBKeys.ID].split(CouchDBKeys.SEPARATOR);
       const id = keyArgs.join("_");
-      return this.adapter.revert(
-        r,
-        this.fromSelector,
-        Sequence.parseValue(sequenceType, id),
-        undefined,
-        ctx
-      );
+      record[pkAttr] = Sequence.parseValue(type as any, id);
     }
-    return r;
+
+    return super.processRecord(record, ctx);
   }
 
   /**
@@ -229,14 +228,13 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
       ctx
     );
 
-    const pkAttr = Model.pk(this.fromSelector);
-    const type = Metadata.get(
-      this.fromSelector,
-      Metadata.key(DBKeys.ID, pkAttr as string)
-    )?.type;
-
-    if (!this.selectSelector)
-      return results.map((r) => this.processRecord(r, pkAttr, type, ctx)) as R;
+    if (!this.selectSelector) {
+      const processed = results.map((r) => this.processRecord(r, ctx));
+      if (!ctx.getOrUndefined("afterQueryHandlers")) {
+        return processed as unknown as R;
+      }
+      return (await this.applyAfterHandlersToResult(processed, ctx)) as R;
+    }
     return results as R;
   }
 
