@@ -67,8 +67,8 @@ export class FabricClientRepository<
     rebuildWithTransient: false,
   });
 
-  constructor(adapter?: A, clazz?: Constructor<M>) {
-    super(adapter, clazz);
+  constructor(adapter?: A, clazz?: Constructor<M>, force: boolean = false) {
+    super(adapter, clazz, force);
   }
 
   override override(flags: Partial<FlagsOf<ContextOf<A>>>): this {
@@ -251,10 +251,7 @@ export class FabricClientRepository<
     return this.applyAfterRead(hydrated, ctx);
   }
 
-  private async applyAfterRead(
-    value: any,
-    ctx: ContextOf<A>
-  ): Promise<any> {
+  private async applyAfterRead(value: any, ctx: ContextOf<A>): Promise<any> {
     if (!ctx.getOrUndefined("afterQueryHandlers")) return value;
     if (value instanceof Model) {
       await enforceDBDecorators<M, Repository<M, A>, any>(
