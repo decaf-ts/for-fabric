@@ -30,99 +30,100 @@ describe("OtherLeaflet relations and mirror enforcement", () => {
     stub.commit();
   }
 
-function parseLeaflet(entry: any) {
-  return typeof entry === "string" ? JSON.parse(entry) : entry;
-}
+  function parseLeaflet(entry: any) {
+    return typeof entry === "string" ? JSON.parse(entry) : entry;
+  }
 
-function buildLeaflet(productCode: string, lang: string, epiMarket = "EU") {
-  const batchNumber = `batch-${productCode}`;
-  const leafletType = "leaflet";
-  const id = composeLeafletId({
-    productCode,
-    batchNumber,
-    leafletType,
-    lang,
-    epiMarket,
-  });
-  const xmlFile = new OtherLeafletFile({
-    fileName: `${productCode}-xml.xml`,
-    fileContent: `<xml>${productCode}</xml>`,
-    leafletId: id,
-  });
-  const otherFiles = [
-    new OtherLeafletFile({
-      fileName: `${productCode}-manual.pdf`,
-      fileContent: `${productCode}-manual`,
+  function buildLeaflet(productCode: string, lang: string, epiMarket = "EU") {
+    const batchNumber = `batch-${productCode}`;
+    const leafletType = "leaflet";
+    const id = composeLeafletId({
+      productCode,
+      batchNumber,
+      leafletType,
+      lang,
+      epiMarket,
+    });
+    const xmlFile = new OtherLeafletFile({
+      fileName: `${productCode}-xml.xml`,
+      fileContent: `<xml>${productCode}</xml>`,
       leafletId: id,
-    }),
-    new OtherLeafletFile({
-      fileName: `${productCode}-supp.pdf`,
-      fileContent: `${productCode}-supplement`,
-      leafletId: id,
-    }),
-  ];
-  return new OtherLeaflet({
-    id,
-    productCode,
-    batchNumber,
-    leafletType,
-    lang,
-    epiMarket,
-    xmlFileContent: xmlFile,
-    otherFilesContent: otherFiles,
-  });
-}
+    });
+    const otherFiles = [
+      new OtherLeafletFile({
+        fileName: `${productCode}-manual.pdf`,
+        fileContent: `${productCode}-manual`,
+        leafletId: id,
+      }),
+      new OtherLeafletFile({
+        fileName: `${productCode}-supp.pdf`,
+        fileContent: `${productCode}-supplement`,
+        leafletId: id,
+      }),
+    ];
+    return new OtherLeaflet({
+      id,
+      productCode,
+      batchNumber,
+      leafletType,
+      lang,
+      epiMarket,
+      xmlFileContent: xmlFile,
+      otherFilesContent: otherFiles,
+    });
+  }
 
-function buildLeafletWithoutOptional(
-  productCode: string,
-  lang: string,
-  options: { leafletType?: string } = {}
-) {
-  const leafletType = options.leafletType ?? "leaflet";
-  const id = composeLeafletId({
-    productCode,
-    batchNumber: undefined,
-    leafletType,
-    lang,
-    epiMarket: undefined,
-  });
-  const xmlFile = new OtherLeafletFile({
-    leafletId: id,
-    fileName: `${productCode}-xml.xml`,
-    fileContent: `<xml>${productCode}</xml>`,
-  });
-  const otherFiles = ["manual", "supplement"].map((suffix) =>
-    new OtherLeafletFile({
+  function buildLeafletWithoutOptional(
+    productCode: string,
+    lang: string,
+    options: { leafletType?: string } = {}
+  ) {
+    const leafletType = options.leafletType ?? "leaflet";
+    const id = composeLeafletId({
+      productCode,
+      batchNumber: undefined,
+      leafletType,
+      lang,
+      epiMarket: undefined,
+    });
+    const xmlFile = new OtherLeafletFile({
       leafletId: id,
-      fileName: `${productCode}-${suffix}.pdf`,
-      fileContent: `${productCode}-${suffix}`,
-    })
-  );
-  return new OtherLeaflet({
-    id,
-    productCode,
-    batchNumber: undefined,
-    leafletType,
-    lang,
-    epiMarket: undefined,
-    xmlFileContent: xmlFile,
-    otherFilesContent: otherFiles,
-  });
-}
+      fileName: `${productCode}-xml.xml`,
+      fileContent: `<xml>${productCode}</xml>`,
+    });
+    const otherFiles = ["manual", "supplement"].map(
+      (suffix) =>
+        new OtherLeafletFile({
+          leafletId: id,
+          fileName: `${productCode}-${suffix}.pdf`,
+          fileContent: `${productCode}-${suffix}`,
+        })
+    );
+    return new OtherLeaflet({
+      id,
+      productCode,
+      batchNumber: undefined,
+      leafletType,
+      lang,
+      epiMarket: undefined,
+      xmlFileContent: xmlFile,
+      otherFilesContent: otherFiles,
+    });
+  }
 
-function composeLeafletId(leaflet: {
-  productCode: string;
-  batchNumber?: string;
-  leafletType: string;
-  lang: string;
-  epiMarket?: string;
-}) {
-  const parts = [leaflet.productCode];
-  if (leaflet.batchNumber) parts.push(leaflet.batchNumber);
-  parts.push(leaflet.leafletType, leaflet.lang);
-  if (leaflet.epiMarket) parts.push(leaflet.epiMarket);
-  return parts.join(":");
-}
+  function composeLeafletId(leaflet: {
+    productCode: string;
+    batchNumber?: string;
+    leafletType: string;
+    lang: string;
+    epiMarket?: string;
+  }) {
+    const parts = [leaflet.productCode];
+    if (leaflet.batchNumber) parts.push(leaflet.batchNumber);
+    parts.push(leaflet.leafletType, leaflet.lang);
+    if (leaflet.epiMarket) parts.push(leaflet.epiMarket);
+    return parts.join(":");
+  }
 
   async function loadPrivateEntry(
     table: string,
@@ -191,10 +192,7 @@ function composeLeafletId(leaflet: {
     expect(mirrorLeaflet.productCode).toBe(leaflet.productCode);
 
     const firstFileId = fileIds[0];
-    const firstFile = await loadPrivateEntry(
-      "other_leaflet_file",
-      firstFileId
-    );
+    const firstFile = await loadPrivateEntry("other_leaflet_file", firstFileId);
     expect(firstFile.fileContent).toContain("manual");
 
     const mirrorFile = await loadPrivateEntry(
@@ -242,7 +240,8 @@ function composeLeafletId(leaflet: {
       stub.getPrivateData("mirror-collection", rootKey)
     ).rejects.toThrow(NotFoundError);
     await expect(
-      stub.getPrivateData("decaf-namespaceAeon",
+      stub.getPrivateData(
+        "decaf-namespaceAeon",
         stub.createCompositeKey("other_leaflet_file", [newIds[0]])
       )
     ).rejects.toThrow(NotFoundError);
@@ -250,7 +249,9 @@ function composeLeafletId(leaflet: {
 
   it("supports bulk CRUD operations for multiple leaflets", async () => {
     const langs = ["en", "es", "pt"];
-    const models = langs.map((lang) => buildLeaflet(generateGtin(), lang, "EU"));
+    const models = langs.map((lang) =>
+      buildLeaflet(generateGtin(), lang, "EU")
+    );
     const createdEntries = JSON.parse(
       await contract.createAll(
         ctx as any,
@@ -281,6 +282,13 @@ function composeLeafletId(leaflet: {
       });
       return new OtherLeaflet({
         ...leaflet,
+        xmlFileContent:
+          leaflet.xmlFileContent ||
+          new OtherLeafletFile({
+            fileName: `${leaflet.productCode}-xml.xml`,
+            fileContent: `<xml>${leaflet.productCode}</xml>`,
+            leafletId: id,
+          }),
         id,
         otherFilesContent: [...currentFiles, extra],
       });
@@ -301,9 +309,7 @@ function composeLeafletId(leaflet: {
       const bulkSuffix = `-bulk-${idx}.pdf`;
       const fileIds = leaflet.otherFilesContent as string[];
       expect(Array.isArray(fileIds)).toBe(true);
-      expect(
-        fileIds.some((fileId) => fileId.includes(bulkSuffix))
-      ).toBe(true);
+      expect(fileIds.some((fileId) => fileId.includes(bulkSuffix))).toBe(true);
     });
 
     await contract.deleteAll(ctx as any, JSON.stringify(keys));
@@ -356,11 +362,9 @@ function composeLeafletId(leaflet: {
 
   it("supports optional batchNumber/epiMarket and custom leafletType flows", async () => {
     const customType = "prescribingInfo";
-    const singleLeaflet = buildLeafletWithoutOptional(
-      generateGtin(),
-      "en",
-      { leafletType: customType }
-    );
+    const singleLeaflet = buildLeafletWithoutOptional(generateGtin(), "en", {
+      leafletType: customType,
+    });
     const singleLeafletId = composeLeafletId(singleLeaflet);
     const createdSingle = parseLeaflet(
       await contract.create(ctx as any, singleLeaflet.serialize())
@@ -486,7 +490,9 @@ function composeLeafletId(leaflet: {
     await contract.deleteAll(ctx as any, JSON.stringify(bulkIds));
     ensureCommitted();
     for (const id of bulkIds) {
-      await expect(contract.read(ctx as any, id)).rejects.toThrow(NotFoundError);
+      await expect(contract.read(ctx as any, id)).rejects.toThrow(
+        NotFoundError
+      );
     }
   });
 
@@ -517,7 +523,9 @@ function composeLeafletId(leaflet: {
       expect(read.lang).toBe("fr");
 
       const mirrorRead = JSON.parse(
-        Buffer.from(await stub.getPrivateData("mirror-collection", key)).toString("utf8")
+        Buffer.from(
+          await stub.getPrivateData("mirror-collection", key)
+        ).toString("utf8")
       );
       expect(mirrorRead.lang).toBe("mirror-only");
     });
@@ -548,17 +556,23 @@ function composeLeafletId(leaflet: {
       await expect(
         contract.update(orgBCtx as any, createdPayload)
       ).rejects.toThrow(AuthorizationError);
-      await expect(
-        contract.delete(orgBCtx as any, leafId)
-      ).rejects.toThrow(AuthorizationError);
+      await expect(contract.delete(orgBCtx as any, leafId)).rejects.toThrow(
+        AuthorizationError
+      );
 
       const single = parseLeaflet(await contract.read(orgBCtx as any, leafId));
       expect(single.lang).toBe("de");
 
       const listed = JSON.parse(
-        await contract.statement(orgBCtx as any, "listBy", JSON.stringify(["lang", "asc"]))
+        await contract.statement(
+          orgBCtx as any,
+          "listBy",
+          JSON.stringify(["lang", "asc"])
+        )
       ) as any[];
-      expect(listed.some((entry) => parseLeaflet(entry).lang === "de")).toBe(true);
+      expect(listed.some((entry) => parseLeaflet(entry).lang === "de")).toBe(
+        true
+      );
 
       const paged = JSON.parse(
         await contract.paginateBy(
@@ -573,7 +587,11 @@ function composeLeafletId(leaflet: {
       const queryList = JSON.parse(
         await contract.query(
           orgBCtx as any,
-          JSON.stringify({ attr1: "lang", operator: "EQUAL", comparison: "de" }),
+          JSON.stringify({
+            attr1: "lang",
+            operator: "EQUAL",
+            comparison: "de",
+          }),
           "lang",
           "asc"
         )
@@ -585,11 +603,9 @@ function composeLeafletId(leaflet: {
       const customType = "prescribingInfo";
 
       it("keeps owner reads on the private collection while writes replicate for custom types", async () => {
-        const leaflet = buildLeafletWithoutOptional(
-          generateGtin(),
-          "fr",
-          { leafletType: customType }
-        );
+        const leaflet = buildLeafletWithoutOptional(generateGtin(), "fr", {
+          leafletType: customType,
+        });
         await contract.create(ctx as any, leaflet.serialize());
         ensureCommitted();
 
@@ -628,7 +644,10 @@ function composeLeafletId(leaflet: {
         await contract.update(ctx as any, updatedOwner.serialize());
         ensureCommitted();
 
-        const normalAfterUpdate = await loadPrivateEntry("other_leaflet", leafId);
+        const normalAfterUpdate = await loadPrivateEntry(
+          "other_leaflet",
+          leafId
+        );
         const mirrorAfterUpdate = await loadPrivateEntry(
           "other_leaflet",
           leafId,
@@ -654,11 +673,9 @@ function composeLeafletId(leaflet: {
       });
 
       it("channels mirror MSP reads to mirror collection and forbids writes for custom types", async () => {
-        const leaflet = buildLeafletWithoutOptional(
-          generateGtin(),
-          "de",
-          { leafletType: customType }
-        );
+        const leaflet = buildLeafletWithoutOptional(generateGtin(), "de", {
+          leafletType: customType,
+        });
         await contract.create(ctx as any, leaflet.serialize());
         ensureCommitted();
 
@@ -686,9 +703,9 @@ function composeLeafletId(leaflet: {
         await expect(
           contract.update(mirrorCtx as any, payload)
         ).rejects.toThrow(AuthorizationError);
-        await expect(
-          contract.delete(mirrorCtx as any, leafId)
-        ).rejects.toThrow(AuthorizationError);
+        await expect(contract.delete(mirrorCtx as any, leafId)).rejects.toThrow(
+          AuthorizationError
+        );
 
         const mirrorRead = parseLeaflet(
           await contract.read(mirrorCtx as any, leafId)
