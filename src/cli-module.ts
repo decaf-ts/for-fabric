@@ -62,6 +62,7 @@ const compileCommand = new Command()
   .option("--strip-contract-name", "strip contract name from output", false)
   .option("--input <String>", "input folder for contracts", "lib/contracts")
   .option("--output <String>", "output folder for contracts", "./contracts")
+  .option("--sourcemaps", "includes sourcemaps in the compiled output", false)
   .action(async (options: any) => {
     const pkg = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
@@ -89,6 +90,7 @@ const compileCommand = new Command()
       bundle,
 
       tsConfigFile,
+      sourcemaps,
     } = options;
     const log = logger.for("compile-contract");
     log.debug(
@@ -116,6 +118,8 @@ const compileCommand = new Command()
             tsconfig: tsConfigFile,
             compilerOptions: {
               outDir: output,
+              sourceMap: sourcemaps,
+              inlineSources: sourcemaps,
             },
             module: "esnext",
             declaration: false,
@@ -129,14 +133,15 @@ const compileCommand = new Command()
         file: `${output}/${toPascalCase(name)}.js`,
         format: "umd",
         name: `${toPascalCase(name)}.js`,
+        sourcemap: sourcemaps,
       });
     } else {
       compileWithTsconfigOverrides(tsConfigFile, {
         outDir: output,
         module: ts.ModuleKind.ESNext,
         declaration: false,
-        sourceMap: false,
-        // rootDir: input,
+        sourceMap: sourcemaps,
+        inlineSources: sourcemaps,
       });
     }
 
