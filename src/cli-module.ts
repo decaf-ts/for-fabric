@@ -3,9 +3,8 @@ import { Logging, toPascalCase } from "@decaf-ts/logging";
 import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
-import { rollup } from "rollup";
+import { Plugin, rollup } from "rollup";
 import replace from "@rollup/plugin-replace";
-import typescript from "@rollup/plugin-typescript";
 import { InternalError, SerializationError } from "@decaf-ts/db-decorators";
 import {
   generateModelDesignDocs,
@@ -36,6 +35,32 @@ import {
 import { CouchDBDesignDoc, CreateIndexRequest } from "@decaf-ts/for-couchdb";
 
 const logger = Logging.for("fabric");
+
+function resolveBundledJsImports(): Plugin {
+  return {
+    name: "resolve-bundled-js-imports",
+    resolveId(source, importer) {
+      if (!importer || !source.startsWith(".")) {
+        return null;
+      }
+
+      const resolvedPath = path.resolve(path.dirname(importer), source);
+      const candidates = [
+        resolvedPath,
+        `${resolvedPath}.js`,
+        path.join(resolvedPath, "index.js"),
+      ];
+
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+          return candidate;
+        }
+      }
+
+      return null;
+    },
+  };
+}
 
 const compileCommand = new Command()
   .name("compile-contract")
@@ -106,35 +131,103 @@ const compileCommand = new Command()
     execSync(`rm -rf ${output}`);
     if (bundle) {
       log.info(`bundling contract from ${input}`);
-      const bundle = await rollup({
-        input: `${input}/index.ts`,
-        plugins: [
-          replace({
-            preventAssignment: true,
-            delimiters: ["", ""],
-            values: { "##VERSION##": version, "##PACKAGE##": pkg.name },
-          }),
-          typescript({
-            tsconfig: tsConfigFile,
-            compilerOptions: {
-              outDir: output,
-              sourceMap: sourcemaps,
-              inlineSources: sourcemaps,
-            },
-            module: "esnext",
-            declaration: false,
-          }),
-        ],
-      });
-      log.info(
-        `withing contract to ${output} with name ${toPascalCase(name)}.js`
+      const tempBundleDir = fs.mkdtempSync(
+        path.join(process.cwd(), ".contract-bundle-")
       );
-      await bundle.write({
-        file: `${output}/${toPascalCase(name)}.js`,
-        format: "umd",
-        name: `${toPascalCase(name)}.js`,
-        sourcemap: sourcemaps,
-      });
+      try {
+        const inputEntry = path.resolve(process.cwd(), input, "index.ts");
+        const configFile = ts.readConfigFile(tsConfigFile, ts.sys.readFile);
+        if (configFile.error) {
+          throw new InternalError(
+            ts.flattenDiagnosticMessageText(configFile.error.messageText, "\n")
+          );
+        }
+
+        const parsedConfig = ts.parseJsonConfigFileContent(
+          configFile.config,
+          ts.sys,
+          path.dirname(tsConfigFile),
+          undefined,
+          tsConfigFile
+        );
+        if (parsedConfig.errors.length) {
+          throw new InternalError(
+            parsedConfig.errors
+              .map((error) =>
+                ts.flattenDiagnosticMessageText(error.messageText, "\n")
+              )
+              .join("\n")
+          );
+        }
+
+        const tempCompilerOptions: ts.CompilerOptions = {
+          ...parsedConfig.options,
+          outDir: tempBundleDir,
+          module: ts.ModuleKind.ESNext,
+          declaration: false,
+          sourceMap: false,
+          inlineSources: false,
+        };
+        const bundledEntryPoint = ts
+          .getOutputFileNames(
+            {
+              ...parsedConfig,
+              options: tempCompilerOptions,
+            },
+            inputEntry,
+            !ts.sys.useCaseSensitiveFileNames
+          )
+          .find((fileName) => fileName.endsWith(".js"));
+
+        if (!bundledEntryPoint) {
+          throw new InternalError(
+            `Failed to determine the emitted bundle entry for ${inputEntry}`
+          );
+        }
+
+        compileWithTsconfigOverrides(tsConfigFile, tempCompilerOptions);
+        const bundledContract = await rollup({
+          input: bundledEntryPoint,
+          plugins: [
+            resolveBundledJsImports(),
+            replace({
+              preventAssignment: true,
+              delimiters: ["", ""],
+              values: { "##VERSION##": version, "##PACKAGE##": pkg.name },
+            }),
+          ],
+        });
+        log.info(
+          `withing contract to ${output} with name ${toPascalCase(name)}.js`
+        );
+        await bundledContract.write({
+          file: `${output}/${toPascalCase(name)}.js`,
+          format: "umd",
+          name: `${toPascalCase(name)}.js`,
+          sourcemap: sourcemaps,
+          sourcemapPathTransform: (relativeSourcePath, sourcemapPath) => {
+            const absoluteSourcePath = path.resolve(
+              path.dirname(sourcemapPath),
+              relativeSourcePath
+            );
+
+            if (absoluteSourcePath.startsWith(tempBundleDir)) {
+              return path.posix.join(
+                ".bundle",
+                path
+                  .relative(tempBundleDir, absoluteSourcePath)
+                  .split(path.sep)
+                  .join("/")
+              );
+            }
+
+            return relativeSourcePath;
+          },
+        });
+        await bundledContract.close();
+      } finally {
+        fs.rmSync(tempBundleDir, { recursive: true, force: true });
+      }
     } else {
       compileWithTsconfigOverrides(tsConfigFile, {
         outDir: output,
