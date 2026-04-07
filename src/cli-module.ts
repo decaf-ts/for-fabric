@@ -204,7 +204,7 @@ const compileCommand = new Command()
           file: `${output}/${toPascalCase(name)}.js`,
           format: "umd",
           name: `${toPascalCase(name)}.js`,
-          sourcemap: sourcemaps,
+          sourcemap: sourcemaps ? "inline" : false,
           sourcemapPathTransform: (relativeSourcePath, sourcemapPath) => {
             const absoluteSourcePath = path.resolve(
               path.dirname(sourcemapPath),
