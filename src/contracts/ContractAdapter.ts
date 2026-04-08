@@ -896,6 +896,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
       rebuildWithTransient: false,
       fullySegregated: false,
     };
+    if (flags instanceof FabricContractContext || flags instanceof Context) {
+      flags = flags.toOverrides();
+    }
 
     baseFlags = Object.assign(baseFlags, flags);
     const stubFromFlags =
