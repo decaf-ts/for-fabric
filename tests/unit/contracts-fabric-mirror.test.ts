@@ -263,6 +263,191 @@ describe("FabricContractAdapter forPrivate routing", () => {
     expect(stub.getQueryResultWithPagination).not.toHaveBeenCalled();
   });
 
+  it("forPrivate paginated query stops iterating early at limit", async () => {
+    const proxy = adapter.callForPrivate("mirror-collection");
+    const iterator = {
+      next: jest
+        .fn()
+        .mockResolvedValueOnce({
+          value: { key: "k1", value: Buffer.from('{"foo":"1"}') },
+          done: false,
+        })
+        .mockResolvedValueOnce({
+          value: { key: "k2", value: Buffer.from('{"foo":"2"}') },
+          done: false,
+        })
+        .mockResolvedValueOnce({
+          value: { key: "k3", value: Buffer.from('{"foo":"3"}') },
+          done: false,
+        })
+        .mockResolvedValue({ done: true }),
+      close: jest.fn().mockResolvedValue(undefined),
+    } as any;
+    (stub.getPrivateDataQueryResult as jest.Mock).mockResolvedValue({
+      iterator,
+      metadata: { bookmark: "opaque-next-token" },
+    });
+
+    const response = await (proxy as any).queryResultPaginated(
+      stub,
+      { selector: { foo: { $gte: "" } } },
+      2,
+      undefined,
+      undefined,
+      ctx
+    );
+
+    expect(iterator.next).toHaveBeenCalledTimes(3);
+    expect(iterator.close).toHaveBeenCalledTimes(1);
+    expect(response.metadata.fetchedRecordsCount).toBe(2);
+    expect(response.metadata.bookmark).toBe("opaque-next-token");
+
+    const p1 = await response.iterator.next();
+    const p2 = await response.iterator.next();
+    const p3 = await response.iterator.next();
+    expect(p1.value.key).toBe("k1");
+    expect(p2.value.key).toBe("k2");
+    expect(p3.done).toBe(true);
+  });
+
+  it("forPrivate paginated query passes CouchDB-compatible limit/bookmark as-is", async () => {
+    const proxy = adapter.callForPrivate("mirror-collection");
+    const iterator = {
+      next: jest.fn().mockResolvedValue({ done: true }),
+      close: jest.fn().mockResolvedValue(undefined),
+    } as any;
+    (stub.getPrivateDataQueryResult as jest.Mock).mockResolvedValue(iterator);
+
+    await (proxy as any).queryResultPaginated(
+      stub,
+      {
+        selector: { foo: "bar" },
+        sort: [{ _id: "asc" }],
+      },
+      3,
+      undefined,
+      "fabric-opaque-bookmark-token",
+      ctx
+    );
+
+    const calledQuery = JSON.parse(
+      (stub.getPrivateDataQueryResult as jest.Mock).mock.calls[0][1]
+    );
+    expect(calledQuery).toEqual({
+      selector: { foo: "bar" },
+      sort: [{ _id: "asc" }],
+      limit: 3,
+      bookmark: "fabric-opaque-bookmark-token",
+    });
+  });
+
+  it("forPrivate paginated query does not interpret bookmark token", async () => {
+    const proxy = adapter.callForPrivate("mirror-collection");
+    const iterator = {
+      next: jest
+        .fn()
+        .mockResolvedValueOnce({
+          value: {
+            key: "k1",
+            value: Buffer.from(JSON.stringify({ foo: "bar", ts: 100 })),
+          },
+          done: false,
+        })
+        .mockResolvedValueOnce({
+          value: {
+            key: "k2",
+            value: Buffer.from(JSON.stringify({ foo: "bar", ts: 101 })),
+          },
+          done: false,
+        })
+        .mockResolvedValue({ done: true }),
+      close: jest.fn().mockResolvedValue(undefined),
+    } as any;
+    (stub.getPrivateDataQueryResult as jest.Mock).mockResolvedValue({
+      iterator,
+      metadata: { bookmark: "opaque-next-token-2" },
+    });
+
+    const response = await (proxy as any).queryResultPaginated(
+      stub,
+      {
+        selector: { foo: "bar" },
+        sort: [{ ts: "asc" }],
+      },
+      1,
+      undefined,
+      "fabric-opaque-bookmark-token",
+      ctx
+    );
+
+    const calledQuery = JSON.parse(
+      (stub.getPrivateDataQueryResult as jest.Mock).mock.calls[0][1]
+    );
+    expect(calledQuery).toEqual({
+      selector: { foo: "bar" },
+      sort: [{ ts: "asc" }],
+      limit: 1,
+      bookmark: "fabric-opaque-bookmark-token",
+    });
+
+    expect(response.metadata.fetchedRecordsCount).toBe(1);
+    expect(response.metadata.bookmark).toBe("opaque-next-token-2");
+    const first = await response.iterator.next();
+    expect(first.value.key).toBe("k1");
+  });
+
+  it("forPrivate paginated query returns empty bookmark when API metadata has none", async () => {
+    const proxy = adapter.callForPrivate("mirror-collection");
+    const iterator = {
+      next: jest
+        .fn()
+        .mockResolvedValueOnce({
+          value: {
+            key: "k1",
+            value: Buffer.from(JSON.stringify({ foo: "bar", ts: 100 })),
+          },
+          done: false,
+        })
+        .mockResolvedValueOnce({
+          value: {
+            key: "k2",
+            value: Buffer.from(JSON.stringify({ foo: "bar", ts: 101 })),
+          },
+          done: false,
+        })
+        .mockResolvedValue({ done: true }),
+      close: jest.fn().mockResolvedValue(undefined),
+    } as any;
+    (stub.getPrivateDataQueryResult as jest.Mock).mockResolvedValue(iterator);
+
+    const response = await (proxy as any).queryResultPaginated(
+      stub,
+      {
+        selector: { foo: "bar" },
+        sort: [{ ts: "asc" }],
+      },
+      1,
+      undefined,
+      "fabric-opaque-bookmark-token",
+      ctx
+    );
+
+    const calledQuery = JSON.parse(
+      (stub.getPrivateDataQueryResult as jest.Mock).mock.calls[0][1]
+    );
+    expect(calledQuery).toEqual({
+      selector: { foo: "bar" },
+      sort: [{ ts: "asc" }],
+      limit: 1,
+      bookmark: "fabric-opaque-bookmark-token",
+    });
+
+    expect(response.metadata.fetchedRecordsCount).toBe(1);
+    expect(response.metadata.bookmark).toBe("");
+    const first = await response.iterator.next();
+    expect(first.value.key).toBe("k1");
+  });
+
   it("forPrivate proxy routes deleteState to deletePrivateData", async () => {
     const proxy = adapter.callForPrivate("mirror-collection");
     await (proxy as any).deleteState("pk", ctx);

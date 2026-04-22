@@ -731,55 +731,56 @@ export class FabricContractAdapter extends CouchDBAdapter<
               case "queryResultPaginated": {
                 const [stub, rawInput, limit, , bookmark, ...args] = argsList;
                 const { log } = thisArg["logCtx"](args, prop);
-                // Fabric has no native pagination API for private data.
-                // Emulate it: query all matching records (with selector
-                // and sort preserved), locate the bookmark position in
-                // the sorted results, then slice to the page size.
-                const query = { ...rawInput };
-                delete query.limit;
-                delete query.skip;
-                delete query.bookmark;
+                const pageSize = Math.max(1, Number(limit) || 250);
+                const query: Record<string, any> = { ...rawInput };
+                // Keep the query CouchDB-compatible and let Fabric/CouchDB own bookmark semantics.
+                query.limit = pageSize;
+                if (bookmark !== undefined && bookmark !== null && bookmark !== "") {
+                  query.bookmark = bookmark.toString();
+                } else {
+                  delete query.bookmark;
+                }
                 log.debug(
                   `Querying collection ${collection} for ${JSON.stringify(query)}`
                 );
-
-                let iterator = await (
+                const response = await (
                   stub as ChaincodeStub
                 ).getPrivateDataQueryResult(collection, JSON.stringify(query));
-                iterator = (iterator as any).iterator || iterator;
+                const iterator =
+                  ((response as any).iterator || response) as Iterators.StateQueryIterator;
+                const responseMetadata = (response as any).metadata || {};
+                const responseBookmark =
+                  typeof responseMetadata.bookmark === "string"
+                    ? responseMetadata.bookmark
+                    : "";
 
                 log.verbose(`iterator from collection ${collection} received`);
-                // Collect all matching records from the iterator
-                const allResults: Array<{ key: string; value: Buffer }> = [];
-                while (true) {
-                  const res = await iterator.next();
-                  if (res.value && res.value.value) {
-                    allResults.push({
-                      key: res.value.key,
-                      value: Buffer.isBuffer(res.value.value)
-                        ? res.value.value
-                        : Buffer.from(
-                            (res.value.value as any).toString("utf8")
-                          ),
-                    });
-                  }
-                  if (res.done) {
-                    await iterator.close();
-                    break;
-                  }
-                }
+                const paged: Array<{ key: string; value: Buffer }> = [];
 
-                // Find the bookmark position and slice the page
-                let startIndex = 0;
-                if (bookmark) {
-                  const found = allResults.findIndex((r) => r.key === bookmark);
-                  startIndex = found >= 0 ? found + 1 : 0;
+                try {
+                  while (true) {
+                    const res = await iterator.next();
+                    if (res.done) break;
+
+                    if (res.value && res.value.value) {
+                      const key = res.value.key as string;
+                      if (paged.length < pageSize) {
+                        paged.push({
+                          key,
+                          value: Buffer.isBuffer(res.value.value)
+                            ? res.value.value
+                            : Buffer.from(
+                                (res.value.value as any).toString("utf8")
+                              ),
+                        });
+                      } else {
+                        break; // early exit
+                      }
+                    }
+                  }
+                } finally {
+                  await iterator.close();
                 }
-                const paged = allResults.slice(startIndex, startIndex + limit);
-                const lastKey =
-                  paged.length > 0
-                    ? paged[paged.length - 1].key
-                    : bookmark || "";
 
                 // Wrap the page in an async iterator for resultIterator()
                 let idx = 0;
@@ -798,7 +799,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     arrayIterator as unknown as Iterators.StateQueryIterator,
                   metadata: {
                     fetchedRecordsCount: paged.length,
-                    bookmark: paged.length >= limit ? lastKey : "",
+                    bookmark: responseBookmark,
                   },
                 };
               }
