@@ -125,8 +125,11 @@ export async function ownedByOnCreate<
 ): Promise<void> {
   const { stub } = context as any;
 
+  const allowGenerationOverride =
+    context.get("allowGenerationOverride") || false;
+
   const creator = await stub.getCreator();
-  const owner = creator.mspid;
+  const owner = allowGenerationOverride ? model[key] : creator.mspid;
 
   const setOwnedByKeyValue = function <M extends Model>(
     target: M,
