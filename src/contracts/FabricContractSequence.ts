@@ -3,6 +3,7 @@ import {
   NotFoundError,
   OperationKeys,
 } from "@decaf-ts/db-decorators";
+import { Model } from "@decaf-ts/decorator-validation";
 import {
   Adapter,
   Context,
@@ -86,6 +87,9 @@ export class FabricContractSequence extends Sequence {
     ).for(this.current);
     let cachedCurrent: any;
     const { name, startWith } = this.options;
+    const adapterMeta = (ctx as FabricContractContext).getSequenceSegregation(
+      String(name)
+    );
     try {
       cachedCurrent = ctx.getFromChildren(name as any);
       if (cachedCurrent !== undefined && cachedCurrent !== null)
@@ -94,6 +98,30 @@ export class FabricContractSequence extends Sequence {
       return this.parse(sequence.current as string | number);
     } catch (e: any) {
       if (e instanceof NotFoundError) {
+        // If the sequence is supposed to live in private/shared collections,
+        // read it from those collections using the adapter (not the stub directly).
+        if (adapterMeta?.collections?.length) {
+          const adapter = this.adapter as unknown as FabricContractAdapter;
+          const tableName = Model.tableName(SequenceModel as any);
+          const publicKey = (ctx as FabricContractContext).stub.createCompositeKey(
+            tableName,
+            [String(name)]
+          );
+          for (const col of adapterMeta.collections) {
+            try {
+              const privateAdapter = adapter.forPrivate(col);
+              const raw = await (privateAdapter as any).readState(
+                publicKey,
+                ctx as any
+              );
+              if (raw && raw.current !== undefined && raw.current !== null)
+                return this.parse(raw.current as any);
+            } catch (err: any) {
+              if (err instanceof NotFoundError) continue;
+              // fall through to regular startWith fallback for any parse/IO errors
+            }
+          }
+        }
         try {
           log.debug(
             `Trying to resolve current sequence ${name} value from context tree`
@@ -172,10 +200,7 @@ export class FabricContractSequence extends Sequence {
         );
       } catch (e: any) {
         if (e instanceof NotFoundError) {
-          log.debug(
-            `Sequence create ${name} current=${currentValue as any} next=${next as any}`
-          );
-          return returnAndCache(
+          return await returnAndCache(
             this.repo.create(
               new SequenceModel({ id: name, current: next }),
               ctx
@@ -206,15 +231,19 @@ export class FabricContractSequence extends Sequence {
     };
 
     // Check if model is fully segregated — sequence goes ONLY to private collections.
-    // We check the adapter's stored metadata because the Sequence creates its own
-    // context via logCtx, losing flags set by extractSegregatedCollections.
+    // Prefer the explicit per-sequence metadata when available; otherwise fall back to
+    // the context's registered read collections (covers early pk generation paths).
     const adapterMeta = (ctx as FabricContractContext).getSequenceSegregation(
       name
     );
-    const isFullySegregated =
-      adapterMeta !== undefined &&
-      adapterMeta.fullySegregated &&
-      adapterMeta.collections.length > 0;
+    const fallbackCollections = (ctx as FabricContractContext)
+      .getReadCollections()
+      .filter(Boolean);
+    const effectiveCollections =
+      adapterMeta?.collections?.length ? adapterMeta.collections : fallbackCollections;
+    const effectiveFullySegregated =
+      (adapterMeta?.fullySegregated ?? (ctx as FabricContractContext).isFullySegregated) &&
+      effectiveCollections.length > 0;
 
     let next: any;
     if (typeName === "uuid") {
@@ -225,12 +254,12 @@ export class FabricContractSequence extends Sequence {
       next = await incrementSerial(currentValue);
     }
 
-    if (isFullySegregated) {
+    if (effectiveFullySegregated) {
       const seqModel = new SequenceModel({ id: name, current: next });
       await this.writeSequenceToCollections(
         ctx,
         seqModel,
-        adapterMeta!.collections
+        effectiveCollections
       );
       log.debug(
         `Sequence.increment (private-only) ${name} current=${currentValue as any} next=${next as any}`
@@ -244,11 +273,117 @@ export class FabricContractSequence extends Sequence {
       `Sequence.increment ${name} current=${currentValue as any} next=${next as any}`
     );
 
-    // Replicate sequence to segregated collections if model uses private/shared data
-    await this.replicateToSegregatedCollections(ctx, seq);
+    // Replicate sequence to segregated collections if model uses private/shared data.
+    // When metadata isn't available, fall back to the context's registered read collections.
+    if (effectiveCollections.length) {
+      await this.writeSequenceToCollections(ctx, seq, effectiveCollections);
+    }
 
     return seq.current as string | number | bigint;
     // }, name);
+  }
+
+  /**
+   * @description Ensures the sequence exists and is at least a given value
+   * @summary Fabric needs to respect segregated/private/shared storage rules when creating
+   * sequences (for example for persistent @version(true) and @sequence()).
+   */
+  override async ensureAtLeast(
+    value: string | number | bigint,
+    ...args: MaybeContextualArg<any>
+  ): Promise<string | number | bigint> {
+    const { ctx, log } = (
+      await this.logCtx(args, OperationKeys.UPDATE, true)
+    ).for(this.ensureAtLeast);
+    const { name } = this.options;
+    if (!name) throw new InternalError("Sequence name is required");
+
+    const desired = this.parse(value);
+
+    const greaterThan = (
+      a: string | number | bigint,
+      b: string | number | bigint
+    ): boolean => {
+      if (typeof a === "bigint" || typeof b === "bigint") {
+        return BigInt(a as any) > BigInt(b as any);
+      }
+      if (typeof a === "number" || typeof b === "number") {
+        return Number(a) > Number(b);
+      }
+      return String(a) > String(b);
+    };
+
+    const adapterMeta = (ctx as FabricContractContext).getSequenceSegregation(
+      String(name)
+    );
+    const isFullySegregated =
+      adapterMeta !== undefined &&
+      adapterMeta.fullySegregated &&
+      adapterMeta.collections.length > 0;
+
+    const readExisting = async (): Promise<SequenceModel | undefined> => {
+      try {
+        return await this.repo.read(name as string, ctx);
+      } catch (e: any) {
+        if (e instanceof NotFoundError) return undefined;
+        throw e;
+      }
+    };
+
+    const writePrivate = async (
+      seqModel: SequenceModel,
+      collections: string[]
+    ) => {
+      await this.writeSequenceToCollections(ctx, seqModel, collections);
+      ctx.cache.put(name as string, seqModel.current);
+    };
+
+    const upsertPublic = async (next: string | number | bigint) => {
+      try {
+        return await this.repo.update(
+          new SequenceModel({ id: name, current: next }),
+          ctx
+        );
+      } catch (e: any) {
+        if (e instanceof NotFoundError) {
+          return await this.repo.create(
+            new SequenceModel({ id: name, current: next }),
+            ctx
+          );
+        }
+        throw e;
+      }
+    };
+
+    const existing = await readExisting();
+    if (!existing) {
+      const seqModel = new SequenceModel({ id: name, current: desired });
+      if (isFullySegregated) {
+        await writePrivate(seqModel, adapterMeta!.collections);
+        return desired;
+      }
+      const created = await upsertPublic(desired);
+      await this.replicateToSegregatedCollections(ctx, created);
+      return this.parse(created.current as any);
+    }
+
+    const current = this.parse(existing.current as any);
+    if (!greaterThan(desired, current)) {
+      return current;
+    }
+
+    const seqModel = new SequenceModel({ id: name, current: desired });
+    if (isFullySegregated) {
+      await writePrivate(seqModel, adapterMeta!.collections);
+      log.debug(
+        `Sequence.ensureAtLeast (private-only) ${name} current=${current as any} desired=${desired as any}`
+      );
+      return desired;
+    }
+
+    const updated = await upsertPublic(desired);
+    await this.replicateToSegregatedCollections(ctx, updated);
+    return this.parse(updated.current as any);
   }
 
   /**
@@ -267,7 +402,7 @@ export class FabricContractSequence extends Sequence {
   ): Promise<void> {
     const log = ctx.logger.for(this.writeSequenceToCollections);
     const adapter = this.adapter as unknown as FabricContractAdapter;
-    const tableName = "sequence";
+    const tableName = Model.tableName(SequenceModel as any);
     const composedKey = (ctx as FabricContractContext).stub.createCompositeKey(
       tableName,
       [String(seq.id)]
