@@ -410,11 +410,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
       ...(ctx.getReadCollections() || []),
       ...(ctx.consumeReadCollections() || []),
     ]);
-    for (const col of readCollections)
-      Object.assign(
-        model,
-        await this.forPrivate(col).readState(composedKey, ctx)
+    for (const col of readCollections) {
+      try {
+        Object.assign(model, await this.forPrivate(col).readState(composedKey, ctx));
+      } catch (e: unknown) {
+        const parsed = this.parseError(e as Error);
+        if (parsed instanceof NotFoundError) continue;
+        throw parsed;
+      }
+    }
+    if (!Object.keys(model).length) {
+      throw new NotFoundError(
+        `record with id ${id} in table ${tableName} does not exist`
       );
+    }
     return model;
   }
 
@@ -1220,13 +1229,17 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const segregatedWriteKeys = ctx.getSegregatedWrites();
     const segregatedWrites: Record<string, any> = {};
-    if (segregatedWriteKeys) {
+    // Only apply segregated writes when the current model actually has a transient split.
+    // The same FabricContractContext can be reused across nested operations (for example
+    // sequence upserts during persistent version generation). In those cases, we must not
+    // attempt to apply parent-model segregated write keys to unrelated models.
+    if (segregatedWriteKeys && split.transient && typeof split.transient === "object") {
       for (const collection in segregatedWriteKeys) {
         segregatedWrites[collection] = segregatedWrites[collection] || {};
         segregatedWrites[collection][id as any] = mapToRecord(
           ctx.getOrUndefined("forceSegregateWrite")
             ? split.model
-            : (split.transient as any),
+            : ((split.transient as any) || {}),
           segregatedWriteKeys[collection]
         );
       }

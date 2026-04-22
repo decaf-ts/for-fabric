@@ -1,9 +1,8 @@
 import { Model } from "@decaf-ts/decorator-validation";
 import { Repository } from "@decaf-ts/core";
-import { apply, Constructor, Metadata, metadata } from "@decaf-ts/decoration";
+import { apply, metadata } from "@decaf-ts/decoration";
 import {
   afterDelete,
-  DBKeys,
   InternalError,
   onUpdate,
   OperationKeys,
@@ -15,28 +14,6 @@ import type {
   FabricContractFlags,
 } from "../../contracts/index";
 import { History } from "./History";
-
-/**
- * Correctly extracts the version number from a model by inspecting
- * the property decorated with `@version()`.
- *
- * `Model.versionProp()` has a bug where it returns `Object.keys(meta)[0]`
- * (the first metadata key overall) instead of the actual version property name.
- * This helper uses `Metadata.get()` correctly to find the `DBKeys.VERSION`
- * entry and then reads the first property name from it.
- *
- * @returns the version number (>= 1), or undefined if none found.
- */
-function getVersionOf(model: Model): number | undefined {
-  const meta = Metadata.get(model.constructor as Constructor<Model>);
-  if (!meta) return undefined;
-  const versionMeta = (meta as Record<string, any>)[DBKeys.VERSION];
-  if (!versionMeta || typeof versionMeta !== "object") return undefined;
-  const versionProp = Object.keys(versionMeta)[0];
-  if (!versionProp) return undefined;
-  const value = (model as any)[versionProp];
-  return typeof value === "number" && value >= 1 ? value : undefined;
-}
 
 export async function updateHistoryHandler<
   M extends Model,
@@ -54,8 +31,15 @@ export async function updateHistoryHandler<
 
   const table = Model.tableName(oldModel);
   const pk: PrimaryKeyType = Model.pk(oldModel, true) as any;
-  const version = getVersionOf(oldModel);
-  if (version === undefined) return; // model has no @version field — skip history
+  let version: number;
+  try {
+    version = Model.versionOf(oldModel as any);
+  } catch {
+    context.logger.warn(
+      `History for ${table}'s ${pk.toString()} could not be created due to missing version`
+    );
+    return; // model has no @version field — skip history
+  }
 
   // Populate relations on a non-mutating copy of oldModel, then convert to a
   // plain object so no model-anchor (__model) keys appear in the stored JSON.
@@ -103,8 +87,15 @@ export async function deleteHistoryHandler<
 
   const table = Model.tableName(model);
   const pk: PrimaryKeyType = Model.pk(model, true) as any;
-  const version = getVersionOf(model);
-  if (version === undefined) return; // model has no @version field — skip history
+  let version: number;
+  try {
+    version = Model.versionOf(model as any);
+  } catch {
+    context.logger.warn(
+      `History for ${table}'s ${pk.toString()} could not be created due to missing version`
+    );
+    return; // model has no @version field — skip history
+  }
 
   // Populate relations on a non-mutating copy of model, then convert to a
   // plain object so no model-anchor (__model) keys appear in the stored JSON.

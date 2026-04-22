@@ -10,6 +10,7 @@ import {
   OrderDirection,
   pk,
   table,
+  version,
 } from "@decaf-ts/core";
 // import {BlockOperations, OperationKeys, readonly} from "@decaf-ts/db-decorators";
 import { uses } from "@decaf-ts/decoration";
@@ -23,7 +24,6 @@ import {
   ownedBy,
   sharedData,
 } from "../../shared/index";
-import { version } from "@decaf-ts/db-decorators";
 import { OtherProductStrength } from "./OtherProductStrength";
 import { OtherMarket } from "./OtherMarket";
 import { assignProductOwner } from "./decorators";
@@ -93,7 +93,7 @@ export class OtherProductShared extends BaseIdentifiedModel {
   // @column()
   // healthcarePractitionerInfo?: string;
 
-  @version()
+  @version(true)
   counter?: number;
 
   @oneToMany(

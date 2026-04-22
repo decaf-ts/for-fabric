@@ -89,8 +89,15 @@ export class FabricContractContext extends Context<FabricContractFlags> {
     collections: string[]
   ): void {
     let map = this.getFromChildren("sequenceSegregation");
-    map = !map || !Object.keys(map).length ? new Map() : map;
-    map.set(seqName, { fullySegregated, collections });
+    map = map instanceof Map ? map : new Map();
+    const existing = map.get(seqName);
+    const mergedCollections = existing
+      ? [...new Set([...(existing.collections || []), ...(collections || [])])]
+      : collections;
+    map.set(seqName, {
+      fullySegregated: fullySegregated || !!existing?.fullySegregated,
+      collections: mergedCollections,
+    });
     this.put("sequenceSegregation", map);
   }
 

@@ -632,14 +632,43 @@ export async function extractSegregatedCollections<M extends Model>(
   }
   applySegregationFlags(model, collections, context);
 
-  // Store segregation metadata on the adapter (persists across context chains).
-  // The Sequence creates its own context via logCtx, losing context-stored flags.
-  const seqName = Model.sequenceName(model, "pk");
+  // Store segregation metadata per-sequence so FabricContractSequence can decide
+  // where to store/replicate sequence records (public vs private/shared).
+  //
+  // - `@pk()` sequences use the shared name `${table}_pk` (no id component).
+  // - `@sequence()` / persistent `@version(true)` sequences are per-model-instance:
+  //   `${table}_${id}_${property}`.
+  const keyArray = (Array.isArray(keys) ? keys : [keys]) as (keyof M)[];
+  const pkKey = Model.pk(model.constructor as any) as keyof M;
+  const pkSeqName = Model.sequenceName(model, "pk");
+
+  const idValue = (model as any)[pkKey as any];
+  const canBuildPerInstance =
+    typeof idValue !== "undefined" && idValue !== null;
+
+  // Always union collections for the pk sequence when the model uses segregated data.
   (context as any).setSequenceSegregation(
-    seqName,
+    pkSeqName,
     (context as any).isFullySegregated,
     collections
   );
+
+  // For per-property sequences, only register when we can compute an id-scoped name.
+  // This keeps sequences constrained to the collections the attribute exists in.
+  if (canBuildPerInstance) {
+    for (const k of keyArray) {
+      const propSeqName = Model.sequenceName(
+        model,
+        String(idValue),
+        String(k)
+      );
+      (context as any).setSequenceSegregation(
+        propSeqName,
+        (context as any).isFullySegregated,
+        collections
+      );
+    }
+  }
 }
 
 export async function segregatedDataOnCreate<M extends Model>(
