@@ -125,8 +125,7 @@ export class SerializedCrudContract<
     direction: string,
     ref: string
   ): Promise<string> {
-    const reference =
-      typeof ref === "string" ? JSON.parse(ref) : (ref as any);
+    const reference = typeof ref === "string" ? JSON.parse(ref) : (ref as any);
     const result = await super.page(ctx, value, direction, reference);
     return JSON.stringify(result);
   }

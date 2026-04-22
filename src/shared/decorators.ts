@@ -126,10 +126,15 @@ export async function ownedByOnCreate<
   const { stub } = context as any;
 
   const allowGenerationOverride =
-    context.get("allowGenerationOverride") || false;
+    context.getOrUndefined("allowGenerationOverride") || false;
 
   const creator = await stub.getCreator();
-  const owner = allowGenerationOverride ? model[key] : creator.mspid;
+  let owner = creator.mspid;
+  context.log.info(
+    `Expected mspid to be ${model[key]} | ${owner}. \n Using allowGenerationOverride: ${allowGenerationOverride}`
+  );
+
+  if (allowGenerationOverride) owner = model[key] ? model[key] : owner;
 
   const setOwnedByKeyValue = function <M extends Model>(
     target: M,
