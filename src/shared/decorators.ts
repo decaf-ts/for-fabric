@@ -130,7 +130,7 @@ export async function ownedByOnCreate<
 
   const creator = await stub.getCreator();
   let owner = creator.mspid;
-  context.log.info(
+  context.logger.info(
     `Expected mspid to be ${model[key]} | ${owner}. \n Using allowGenerationOverride: ${allowGenerationOverride}`
   );
 
@@ -665,11 +665,7 @@ export async function extractSegregatedCollections<M extends Model>(
   // This keeps sequences constrained to the collections the attribute exists in.
   if (canBuildPerInstance) {
     for (const k of keyArray) {
-      const propSeqName = Model.sequenceName(
-        model,
-        String(idValue),
-        String(k)
-      );
+      const propSeqName = Model.sequenceName(model, String(idValue), String(k));
       (context as any).setSequenceSegregation(
         propSeqName,
         (context as any).isFullySegregated,
