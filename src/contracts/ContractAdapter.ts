@@ -1059,6 +1059,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const { skip, limit } = rawInput;
     const bookmark = rawInput["bookmark"];
+    const paginationActive = Boolean(limit || skip || bookmark);
     let resp = { docs: [], bookmark: undefined as string | undefined };
 
     // Query public state only when the model is NOT fully segregated
@@ -1129,12 +1130,24 @@ export class FabricContractAdapter extends CouchDBAdapter<
         );
         segregated.push(fromCols);
       }
-      // choose the response with the most results
-      resp = segregated.reduce((acc, curr) => {
-        if (!acc) return curr;
-        if (curr.docs && curr.docs.length >= acc?.docs.length) return curr;
-        return acc;
-      }, resp);
+      if (paginationActive) {
+        // For paginated flows, keep source selection deterministic so
+        // externally generated opaque bookmarks stay valid across pages.
+        if (fullySegregated) {
+          resp = (segregated[0] as any) || resp;
+        } else if (!resp.docs?.length && segregated.length) {
+          // Preserve public-state priority for mixed models, but allow a
+          // stable fallback when public query returns no docs.
+          resp = segregated[0] as any;
+        }
+      } else {
+        // Non-paginated reads can still prefer the richest response.
+        resp = segregated.reduce((acc, curr) => {
+          if (!acc) return curr;
+          if (curr.docs && curr.docs.length >= acc?.docs.length) return curr;
+          return acc;
+        }, resp);
+      }
     }
 
     if (docsOnly) {

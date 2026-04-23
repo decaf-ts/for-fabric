@@ -1,13 +1,13 @@
 {
   "name": "@decaf-ts/for-fabric",
-  "version": "0.5.1",
+  "version": "0.5.1-query.2",
   "description": "Abstracts fabric logic",
   "type": "module",
   "exports": {
     ".": {
       "require": "./lib/index.cjs",
       "import": "./lib/esm/index.js",
-      "types": ".</lib/index.d.ts"
+      "types": "./lib/index.d.ts"
     },
     "./client": {
       "require": "./lib/client/index.cjs",
