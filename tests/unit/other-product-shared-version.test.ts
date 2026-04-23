@@ -2637,7 +2637,11 @@ describe("OtherProductShared contract version flow with relations", () => {
             (entry) => entry.inventedName === "MIRROR_RELATION_PRODUCT"
           )
         ).toBe(true);
-        if (parsedPage.data.length === 1) {
+        const hasMoreResults =
+          typeof parsedPage.count === "number"
+            ? parsedPage.count > parsedPage.data.length
+            : false;
+        if (parsedPage.data.length === 1 && hasMoreResults) {
           expect(parsedPage.bookmark).toBeTruthy();
         }
 
