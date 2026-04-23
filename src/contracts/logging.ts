@@ -1,8 +1,8 @@
 import {
   LoggerFactory,
   Logging,
-  Logger,
   LogLevel,
+  LogMeta,
   MiniLogger,
   NumericLogLevels,
   StringLike,
@@ -10,6 +10,12 @@ import {
 import { LoggingConfig } from "@decaf-ts/logging";
 import { Context as Ctx } from "fabric-contract-api";
 import { InternalError } from "@decaf-ts/db-decorators";
+import {
+  enrichContractLoggingConfig,
+  ensureContractLogFieldRegistration,
+} from "../contract/logging-context";
+
+ensureContractLogFieldRegistration();
 
 /**
  * @description Logger implementation for Fabric chaincode contracts
@@ -42,23 +48,39 @@ import { InternalError } from "@decaf-ts/db-decorators";
  * ```
  */
 export class ContractLogger extends MiniLogger {
-  /**
-   * @description The underlying Fabric logger instance
-   */
-  protected logger!: Logger;
+  protected sink!: {
+    verbose: (msg: string) => void;
+    info: (msg: string) => void;
+    debug: (msg: string) => void;
+    error: (msg: string) => void;
+    trace: (msg: string) => void;
+    warn: (msg: string) => void;
+    silly: (msg: string) => void;
+  };
 
   constructor(
     context: string,
     conf: Partial<LoggingConfig> | undefined,
     ctx?: Ctx
   ) {
-    super(context, conf);
+    const normalizedConfig = enrichContractLoggingConfig(conf, ctx);
+    super(context, normalizedConfig);
 
     if (!ctx) {
-      this.logger = new MiniLogger(context, conf);
+      this.sink = {
+        info: (msg: string) => console.log(msg),
+        verbose: (msg: string) => console.log(msg),
+        debug: (msg: string) => console.debug(msg),
+        error: (msg: string) => console.error(msg),
+        trace: (msg: string) => console.trace(msg),
+        warn: (msg: string) => console.warn(msg),
+        silly: (msg: string) => console.debug(msg),
+      };
     } else {
-      this.logger = ctx.logging.getLogger(context) as unknown as Logger;
-      ctx.logging.setLevel(conf?.level || Logging.getConfig().level);
+      this.sink = ctx.logging.getLogger(context) as unknown as typeof this.sink;
+      ctx.logging.setLevel(
+        normalizedConfig?.level || Logging.getConfig().level
+      );
     }
   }
 
@@ -73,7 +95,8 @@ export class ContractLogger extends MiniLogger {
   protected override log(
     level: LogLevel,
     msg: StringLike | Error,
-    stack?: Error
+    error?: Error,
+    meta?: LogMeta
   ) {
     if (
       NumericLogLevels[this.config("level") as LogLevel] <
@@ -84,33 +107,33 @@ export class ContractLogger extends MiniLogger {
     let method;
     switch (level) {
       case LogLevel.benchmark:
-        method = this.logger.verbose;
+        method = this.sink.verbose;
         break;
       case LogLevel.info:
-        method = this.logger.info;
+        method = this.sink.info;
         break;
       case LogLevel.verbose:
-        method = this.logger.verbose;
+        method = this.sink.verbose;
         break;
       case LogLevel.debug:
-        method = this.logger.debug;
+        method = this.sink.debug;
         break;
       case LogLevel.error:
-        method = this.logger.error;
+        method = this.sink.error;
         break;
       case LogLevel.trace:
-        method = this.logger.trace;
+        method = this.sink.trace;
         break;
       case LogLevel.warn:
-        method = this.logger.warn;
+        method = this.sink.warn;
         break;
       case LogLevel.silly:
-        method = this.logger.silly;
+        method = this.sink.silly;
         break;
       default:
         throw new InternalError("Invalid log level");
     }
-    method.call(this.logger, this.createLog(level, msg, stack));
+    method.call(this.sink, this.createLog(level, msg, error, meta));
   }
 }
 

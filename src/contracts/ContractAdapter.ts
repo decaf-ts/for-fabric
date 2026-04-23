@@ -747,8 +747,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   stub as ChaincodeStub
                 ).getPrivateDataQueryResult(collection, JSON.stringify(query));
                 const iterator =
-                  ((response as any).iterator || response) as Iterators.StateQueryIterator;
-                const responseMetadata = (response as any).metadata || {};
+                  ((response as any).iterator ||
+                    response) as Iterators.StateQueryIterator;
+                const responseMetadata =
+                  (response as any).metadata || (iterator as any).metadata || {};
                 const responseBookmark =
                   typeof responseMetadata.bookmark === "string"
                     ? responseMetadata.bookmark
