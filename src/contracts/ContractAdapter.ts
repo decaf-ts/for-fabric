@@ -181,6 +181,25 @@ export class FabricContractAdapter extends CouchDBAdapter<
   void,
   FabricContractContext
 > {
+  private static readonly PRIVATE_BOOKMARK_PREFIX = "__dcf_pvtbm__";
+
+  private static parseSyntheticPrivateBookmark(
+    bookmark: unknown
+  ): number | undefined {
+    if (typeof bookmark !== "string") return undefined;
+    if (!bookmark.startsWith(FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX))
+      return undefined;
+    const raw = bookmark.slice(
+      FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX.length
+    );
+    const parsed = Number(raw);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+  }
+
+  private static buildSyntheticPrivateBookmark(offset: number): string {
+    return `${FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX}${offset}`;
+  }
+
   protected override getClient(): void {
     throw new UnsupportedError("Client is not supported in Fabric contracts");
   }
@@ -729,16 +748,38 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 }
               }
               case "queryResultPaginated": {
-                const [stub, rawInput, limit, , bookmark, ...args] = argsList;
+                const [stub, rawInput, limit, skip, bookmark, ...args] = argsList;
                 const { log } = thisArg["logCtx"](args, prop);
                 const pageSize = Math.max(1, Number(limit) || 250);
                 const query: Record<string, any> = { ...rawInput };
+                const skipValue = Number(skip);
+                const parsedSkip =
+                  Number.isInteger(skipValue) && skipValue >= 0
+                    ? skipValue
+                    : undefined;
+                const syntheticOffset =
+                  FabricContractAdapter.parseSyntheticPrivateBookmark(bookmark) ??
+                  parsedSkip ??
+                  0;
+                const hasOpaqueBookmark =
+                  bookmark !== undefined &&
+                  bookmark !== null &&
+                  bookmark !== "" &&
+                  typeof bookmark === "string" &&
+                  !bookmark.startsWith(FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX);
                 // Keep the query CouchDB-compatible and let Fabric/CouchDB own bookmark semantics.
-                query.limit = pageSize;
-                if (bookmark !== undefined && bookmark !== null && bookmark !== "") {
+                // Synthetic mode fetches one extra record to detect whether a next page exists.
+                query.limit = hasOpaqueBookmark ? pageSize : pageSize + 1;
+                if (hasOpaqueBookmark) {
                   query.bookmark = bookmark.toString();
+                  delete query.skip;
                 } else {
                   delete query.bookmark;
+                  if (syntheticOffset > 0) {
+                    query.skip = syntheticOffset;
+                  } else {
+                    delete query.skip;
+                  }
                 }
                 log.debug(
                   `Querying collection ${collection} for ${JSON.stringify(query)}`
@@ -758,6 +799,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
                 log.verbose(`iterator from collection ${collection} received`);
                 const paged: Array<{ key: string; value: Buffer }> = [];
+                let hasMore = false;
 
                 try {
                   while (true) {
@@ -776,6 +818,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                               ),
                         });
                       } else {
+                        hasMore = true;
                         break; // early exit
                       }
                     }
@@ -801,7 +844,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     arrayIterator as unknown as Iterators.StateQueryIterator,
                   metadata: {
                     fetchedRecordsCount: paged.length,
-                    bookmark: responseBookmark,
+                    bookmark:
+                      responseBookmark ||
+                      (hasMore
+                        ? FabricContractAdapter.buildSyntheticPrivateBookmark(
+                            syntheticOffset + paged.length
+                          )
+                        : ""),
                   },
                 };
               }

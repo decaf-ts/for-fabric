@@ -396,7 +396,7 @@ describe("FabricContractAdapter forPrivate routing", () => {
     expect(first.value.key).toBe("k1");
   });
 
-  it("forPrivate paginated query returns empty bookmark when API metadata has none", async () => {
+  it("forPrivate paginated query synthesizes bookmark when API metadata has none", async () => {
     const proxy = adapter.callForPrivate("mirror-collection");
     const iterator = {
       next: jest
@@ -443,7 +443,7 @@ describe("FabricContractAdapter forPrivate routing", () => {
     });
 
     expect(response.metadata.fetchedRecordsCount).toBe(1);
-    expect(response.metadata.bookmark).toBe("");
+    expect(response.metadata.bookmark).toBe("__dcf_pvtbm__1");
     const first = await response.iterator.next();
     expect(first.value.key).toBe("k1");
   });

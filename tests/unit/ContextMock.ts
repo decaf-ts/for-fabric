@@ -169,11 +169,6 @@ export function getStubMock() {
   const pendingDeletes: Set<string> = new Set();
   const pendingPrivateState: Record<string, Record<string, Buffer>> = {};
   const pendingPrivateDeletes: Record<string, Set<string>> = {};
-  const privateBookmarkStore = new Map<
-    string,
-    { collection: string; signature: string; index: number }
-  >();
-  let privateBookmarkCounter = 0;
 
   return {
     state: state,
@@ -356,41 +351,13 @@ export function getStubMock() {
       const { selector, sort } = parsed;
       const rows = filterRows(privateState[collection] || {}, selector, sort);
       const pageSize = Math.max(1, Number(parsed.limit) || rows.length || 1);
-      const signature = JSON.stringify({
-        selector: selector || {},
-        sort: sort || [],
-        limit: pageSize,
-      });
-
-      let startIndex = 0;
-      const bookmarkToken =
-        typeof parsed.bookmark === "string" ? parsed.bookmark : "";
-      if (bookmarkToken) {
-        const entry = privateBookmarkStore.get(bookmarkToken);
-        if (
-          entry &&
-          entry.collection === collection &&
-          entry.signature === signature
-        ) {
-          startIndex = entry.index;
-        }
-      }
+      const parsedSkip = Number(parsed.skip);
+      const startIndex =
+        Number.isInteger(parsedSkip) && parsedSkip > 0 ? parsedSkip : 0;
 
       const paged = rows.slice(startIndex, startIndex + pageSize);
-      const nextIndex = startIndex + paged.length;
-      let nextBookmark = "";
-      if (nextIndex < rows.length) {
-        nextBookmark = `pvt-bm-${privateBookmarkCounter++}`;
-        privateBookmarkStore.set(nextBookmark, {
-          collection,
-          signature,
-          index: nextIndex,
-        });
-      }
-
       const iterator = createIterator(paged) as any;
       iterator.metadata = {
-        bookmark: nextBookmark,
         fetchedRecordsCount: paged.length,
       };
       return iterator;
