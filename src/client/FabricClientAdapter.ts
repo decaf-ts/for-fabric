@@ -1566,6 +1566,22 @@ export class FabricClientAdapter extends Adapter<
     );
   }
 
+  async migrate(
+    reference: string,
+    ...args: MaybeContextualArg<Context<FabricClientFlags>>
+  ): Promise<Uint8Array> {
+    const { ctxArgs } = (
+      await this.logCtx([args], PersistenceKeys.MIGRATION, true)
+    ).for(this.migrate);
+    return this.submitTransaction(
+      ctxArgs[0] as Context<FabricClientFlags>,
+      "migrate",
+      [reference, args],
+      undefined,
+      undefined
+    );
+  }
+
   /**
    * @description Shuts down the connection to the Fabric network
    * @summary Closes the active dispatch (which in turn closes any gateway
@@ -1573,7 +1589,9 @@ export class FabricClientAdapter extends Adapter<
    * Works correctly regardless of whether `syntheticEvents` is enabled.
    * @return {Promise<void>} Promise that resolves when all connections are closed
    */
-  override async shutdown(...args: MaybeContextualArg<Context<FabricClientFlags>>): Promise<void> {
+  override async shutdown(
+    ...args: MaybeContextualArg<Context<FabricClientFlags>>
+  ): Promise<void> {
     // Base class handles dispatch.close() internally.
     await super.shutdown(...args);
     if (this.client) {

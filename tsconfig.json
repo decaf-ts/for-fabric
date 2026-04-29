@@ -57,6 +57,9 @@
     "paths": {
       "@decaf-ts/core/tasks": [
         "./node_modules/@decaf-ts/core/lib/esm/tasks/index.d.ts"
+      ],
+      "@decaf-ts/core/migrations": [
+        "./node_modules/@decaf-ts/core/lib/esm/migrations/index.d.ts"
       ]
     },
     // "baseUrl": "./",                             /* Base directory to resolve non-absolute module names. */

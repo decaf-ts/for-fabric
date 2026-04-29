@@ -16,3 +16,4 @@ export * from "./FabricContractRepository";
 export * from "./FabricContractRepositoryObservableHandler";
 export * from "./logging";
 export * from "./types";
+export * from "./MigrationContract";
