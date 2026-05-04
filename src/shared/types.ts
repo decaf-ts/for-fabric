@@ -128,4 +128,5 @@ export type FabricFlags<LOG extends Logger = Logger> = AdapterFlags<LOG> & {
   mirror?: boolean;
   mirrorCollection?: string;
   identity?: string | ClientIdentity;
+  ownerOverride?: string;
 };

@@ -740,7 +740,13 @@ export async function segregatedDataOnRead<M extends Model>(
       `Segregated data keys and metadata length mismatch`
     );
 
-  const msp = Model.ownerOf(model) || extractMspId(context.get("identity"));
+  const m =
+    context.getOrUndefined("allowGenerationOverride") || false
+      ? context.getOrUndefined("ownerOverride")
+      : undefined;
+
+  const msp =
+    m || Model.ownerOf(model) || extractMspId(context.get("identity"));
   if (!msp)
     throw new ValidationError(
       `There's no assigned organization for model ${model.constructor.name}`
@@ -823,7 +829,13 @@ export async function segregatedDataOnDelete<
       `Segregated data keys and metadata length mismatch`
     );
 
+  const m =
+    context.getOrUndefined("allowGenerationOverride") || false
+      ? context.getOrUndefined("ownerOverride")
+      : undefined;
+
   const msp =
+    m ||
     Model.ownerOf(model) ||
     extractMspId(
       context.get("identity") as string | ClientIdentity | undefined

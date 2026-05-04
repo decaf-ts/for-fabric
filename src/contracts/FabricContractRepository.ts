@@ -329,7 +329,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
         ) + "\n"
       );
     }
-      return serialization;
+    return serialization;
   }
 
   override async statement(
@@ -585,9 +585,7 @@ async function countStoredEntries<M extends Model>(
     const msp = extractMspId(ctx.identity);
     const collections = await Promise.all(
       resolvers.map((resolver) =>
-        typeof resolver === "string"
-          ? resolver
-          : resolver(clazz, msp, ctx)
+        typeof resolver === "string" ? resolver : resolver(clazz, msp, ctx)
       )
     );
     for (const collection of collections) {
