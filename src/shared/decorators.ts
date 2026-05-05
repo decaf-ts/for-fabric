@@ -617,11 +617,14 @@ export async function extractSegregatedCollections<M extends Model>(
     Array.isArray(data) ? data : [data]
   ) as SegregatedDataMetadata[];
 
+  const m =
+    context.getOrUndefined("allowGenerationOverride") || false
+      ? context.getOrUndefined("ownerOverride")
+      : undefined;
+
   const msp =
-    Model.ownerOf(model) ||
-    extractMspId(
-      context.get("identity") as string | ClientIdentity | undefined
-    );
+    m || Model.ownerOf(model) || extractMspId(context.get("identity"));
+
   if (!msp) {
     // Can't extract collections without MSP, will be caught by later handlers
     return;
