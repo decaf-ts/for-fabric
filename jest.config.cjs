@@ -4,7 +4,9 @@ const path = require("path");
 const config = {
   verbose: true,
   rootDir: __dirname,
-  transform: { "^.+\\.ts$": "ts-jest" },
+  transform: {
+    "^.+\\.ts$": ["ts-jest", { tsconfig: "<rootDir>/tsconfig.tests.json" }],
+  },
   testEnvironment: "node",
   testRegex: "/tests/.*\\.(test|spec)\\.(ts|tsx)$",
   watchman: false,
