@@ -5,30 +5,37 @@
   "type": "module",
   "exports": {
     ".": {
-      "require": "./lib/index.cjs",
+      "types": "./lib/types/index.d.ts",
       "import": "./lib/esm/index.js",
-      "types": "./lib/index.d.ts"
+      "require": "./lib/cjs/index.cjs",
+      "default": "./lib/esm/index.js"
     },
     "./client": {
-      "require": "./lib/client/index.cjs",
+      "types": "./lib/types/client/index.d.ts",
       "import": "./lib/esm/client/index.js",
-      "types": "./lib/client/index.d.ts"
+      "require": "./lib/cjs/client/index.cjs",
+      "default": "./lib/esm/client/index.js"
     },
     "./contracts": {
-      "require": "./lib/contracts/index.cjs",
+      "types": "./lib/types/contracts/index.d.ts",
       "import": "./lib/esm/contracts/index.js",
-      "types": "./lib/contracts/index.d.ts"
+      "require": "./lib/cjs/contracts/index.cjs",
+      "default": "./lib/esm/contracts/index.js"
     },
     "./shared": {
-      "require": "./lib/shared/index.cjs",
+      "types": "./lib/types/shared/index.d.ts",
       "import": "./lib/esm/shared/index.js",
-      "types": "./lib/shared/index.d.ts"
+      "require": "./lib/cjs/shared/index.cjs",
+      "default": "./lib/esm/shared/index.js"
     }
   },
   "bin": {
-    "for-fabric": "lib/bin/cli.cjs"
+    "for-fabric": "lib/cjs/bin/cli.cjs"
   },
-  "types": "lib/index.d.ts",
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/cjs/index.cjs",
+  "module": "./lib/esm/index.js",
+  "sideEffects": false,
   "scripts": {
     "do-install": "NPM_TOKEN=$(cat .npmtoken) npm install",
     "update-dependencies": "PREFIX=\"decaf-ts\"; npm ls | grep \"$PREFIX\" | awk -F/ '{print $NF}' | sed 's/@.*//' | xargs -I package npm update @\"$PREFIX\"/package",
@@ -37,8 +44,8 @@
     "set-git-auth": "git config url.\"https://api:$(cat .token)@github.com/\".insteadOf \"https://github.com/\" && git config url.\"https://ssh:$(cat .token)@github.com/\".insteadOf \"ssh://git@github.com/\" && git config url.\"https://git:$(cat .token)@github.com/\".insteadOf \"git@github.com:\"",
     "flash-forward": "npx npm-check-updates -u && npm run do-install",
     "reset": "rm -rf * && git checkout . && git pull && npm run do-install",
-    "build": "npx decaf build --dev && sed -i -e '1i#!/usr/bin/env node\\' lib/bin/*.cjs",
-    "build:prod": "npx decaf build --prod && sed -i -e '1i#!/usr/bin/env node\\' lib/bin/*.cjs",
+    "build": "npx build-scripts --dev && sed -i -e '1i#!/usr/bin/env node\\' lib/cjs/bin/cli.cjs",
+    "build:prod": "npx build-scripts --prod && sed -i -e '1i#!/usr/bin/env node\\' lib/cjs/bin/cli.cjs",
     "test": "jest --runInBand --coverage --detectOpenHandles",
     "test:unit": "jest --testPathPatterns=\"/tests/unit\" --passWithNoTests --detectOpenHandles",
     "test:integration": "jest --testPathPatterns=\"/tests/(integration)\" --passWithNoTests --detectOpenHandles",
@@ -53,7 +60,7 @@
     "clean-publish": "npx clean-publish",
     "drawings": "for FILE in workdocs/drawings/*.drawio; do echo \"converting $FILE to image...\" && docker run --rm -v $(pwd):/data rlespinasse/drawio-export --format png $FILE; done && cp -rf workdocs/drawings/export/* workdocs/resources/",
     "uml": "cd workdocs/uml && for FILE in ./*.puml; do docker run --rm -v $(pwd):/work -w /work miy4/plantuml -DPLANTUML_LIMIT_SIZE=8192 -tpng $FILE; done && cd ../.. && cp -fr workdocs/uml/*.png workdocs/resources/",
-    "docs": "npx rimraf ./docs && mkdir docs && npx decaf build --docs",
+    "docs": "npx rimraf ./docs && mkdir docs && npx build-scripts --docs",
     "extract:indexes": "npx decaf fabric extract-indexes --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/GlobalContract",
     "extract:collections": "npx decaf fabric extract-collections --folder ./lib/contract --outDir ./docker/infrastructure/chaincode/GlobalContract --mspIds '[\"org-b\",\"org-c\"]' --mainMspId org-a",
     "infrastructure:up": "docker compose -f ./docker/infrastructure/docker-compose.yaml up -d",
@@ -142,10 +149,7 @@
     },
     "fabric-ca-client": {
       "jsrsasign": "^11.1.0"
-    },
-    "minimatch": "^10.2.3",
-    "test-exclude": "7.0.1",
-    "serialize-javascript": "^7.0.3"
+    }
   },
   "optionalDependencies": {
     "pkcs11js": "^2.1.6"
