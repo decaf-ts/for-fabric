@@ -12,7 +12,7 @@ import {
   MigrationError,
   PersistenceKeys,
 } from "@decaf-ts/core";
-import { Migration } from "@decaf-ts/core/migrations";
+import { Migration } from "@decaf-ts/core";
 import {
   FabricContextualizedArgs,
   FabricContractAdapter,

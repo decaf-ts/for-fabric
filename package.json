@@ -35,7 +35,12 @@
   "types": "./lib/types/index.d.ts",
   "main": "./lib/cjs/index.cjs",
   "module": "./lib/esm/index.js",
-  "sideEffects": false,
+  "sideEffects": [
+    "./lib/esm/contracts/overrides.js",
+    "./lib/esm/shared/overrides/overrides.js",
+    "./lib/cjs/contracts/overrides.cjs",
+    "./lib/cjs/shared/overrides/overrides.cjs"
+  ],
   "scripts": {
     "do-install": "NPM_TOKEN=$(cat .npmtoken) npm install",
     "update-dependencies": "PREFIX=\"decaf-ts\"; npm ls | grep \"$PREFIX\" | awk -F/ '{print $NF}' | sed 's/@.*//' | xargs -I package npm update @\"$PREFIX\"/package",
