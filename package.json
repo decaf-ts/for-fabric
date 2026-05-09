@@ -1,6 +1,6 @@
 {
   "name": "@decaf-ts/for-fabric",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "description": "Abstracts fabric logic",
   "type": "module",
   "exports": {
@@ -36,10 +36,12 @@
   "main": "./lib/cjs/index.cjs",
   "module": "./lib/esm/index.js",
   "sideEffects": [
-    "./lib/esm/contracts/overrides.js",
+    "./lib/esm/shared/overrides/index.js",
     "./lib/esm/shared/overrides/overrides.js",
-    "./lib/cjs/contracts/overrides.cjs",
-    "./lib/cjs/shared/overrides/overrides.cjs"
+    "./lib/esm/contracts/overrides.js",
+    "./lib/cjs/shared/overrides/index.cjs",
+    "./lib/cjs/shared/overrides/overrides.cjs",
+    "./lib/cjs/contracts/overrides.cjs"
   ],
   "scripts": {
     "do-install": "NPM_TOKEN=$(cat .npmtoken) npm install",
@@ -148,14 +150,6 @@
     "fabric-network": "^2.2.20",
     "fabric-shim": "^2.5.8"
   },
-  "sideEffects": [
-    "./lib/esm/shared/overrides/index.js",
-    "./lib/esm/shared/overrides/overrides.js",
-    "./lib/esm/contracts/overrides.js",
-    "./lib/cjs/shared/overrides/index.cjs",
-    "./lib/cjs/shared/overrides/overrides.cjs",
-    "./lib/cjs/contracts/overrides.cjs"
-  ],
   "overrides": {
     "fabric-common": {
       "jsrsasign": "^11.1.0"
