@@ -5,34 +5,54 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./lib/types/index.d.ts",
-      "import": "./lib/esm/index.js",
-      "require": "./lib/cjs/index.cjs",
+      "import": {
+        "types": "./lib/types/index.d.mts",
+        "default": "./lib/esm/index.js"
+      },
+      "require": {
+        "types": "./lib/types/index.d.cts",
+        "default": "./lib/cjs/index.cjs"
+      },
       "default": "./lib/esm/index.js"
     },
     "./client": {
-      "types": "./lib/types/client/index.d.ts",
-      "import": "./lib/esm/client/index.js",
-      "require": "./lib/cjs/client/index.cjs",
+      "import": {
+        "types": "./lib/types/client/index.d.mts",
+        "default": "./lib/esm/client/index.js"
+      },
+      "require": {
+        "types": "./lib/types/client/index.d.cts",
+        "default": "./lib/cjs/client/index.cjs"
+      },
       "default": "./lib/esm/client/index.js"
     },
     "./contracts": {
-      "types": "./lib/types/contracts/index.d.ts",
-      "import": "./lib/esm/contracts/index.js",
-      "require": "./lib/cjs/contracts/index.cjs",
+      "import": {
+        "types": "./lib/types/contracts/index.d.mts",
+        "default": "./lib/esm/contracts/index.js"
+      },
+      "require": {
+        "types": "./lib/types/contracts/index.d.cts",
+        "default": "./lib/cjs/contracts/index.cjs"
+      },
       "default": "./lib/esm/contracts/index.js"
     },
     "./shared": {
-      "types": "./lib/types/shared/index.d.ts",
-      "import": "./lib/esm/shared/index.js",
-      "require": "./lib/cjs/shared/index.cjs",
+      "import": {
+        "types": "./lib/types/shared/index.d.mts",
+        "default": "./lib/esm/shared/index.js"
+      },
+      "require": {
+        "types": "./lib/types/shared/index.d.cts",
+        "default": "./lib/cjs/shared/index.cjs"
+      },
       "default": "./lib/esm/shared/index.js"
     }
   },
   "bin": {
     "for-fabric": "lib/cjs/bin/cli.cjs"
   },
-  "types": "./lib/types/index.d.ts",
+  "types": "./lib/types/index.d.mts",
   "main": "./lib/cjs/index.cjs",
   "module": "./lib/esm/index.js",
   "sideEffects": [
