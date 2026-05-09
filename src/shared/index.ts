@@ -4,6 +4,8 @@
  * @namespace shared
  * @memberOf module:for-fabric
  */
+import "./overrides";
+
 export * from "./erc20";
 export * from "./interfaces";
 export * from "./model";

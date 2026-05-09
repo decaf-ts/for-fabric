@@ -4,6 +4,8 @@
  * @namespace contracts
  * @memberOf module:for-fabric
  */
+import "./overrides";
+
 export * from "./overrides"; // first one on purpose
 export * from "./auth";
 export * from "./crud";
