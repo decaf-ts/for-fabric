@@ -88,10 +88,13 @@ const compileCommand = new Command()
   .option("--input <String>", "input folder for contracts", "lib/contracts")
   .option("--output <String>", "output folder for contracts", "./contracts")
   .option("--sourcemaps", "includes sourcemaps in the compiled output", false)
+  .option("--npmrc", "includes .npmrc in the compiled output", false)
   .action(async (options: any) => {
     const pkg = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
     );
+
+    let npmrcContent = undefined;
 
     const version = pkg.version;
 
@@ -115,9 +118,38 @@ const compileCommand = new Command()
       bundle,
 
       tsConfigFile,
+      // eslint-disable-next-line prefer-const
       sourcemaps,
+      // eslint-disable-next-line prefer-const
+      npmrc,
     } = options;
     const log = logger.for("compile-contract");
+    try {
+      npmrcContent = JSON.parse(
+        fs.readFileSync(path.join(process.cwd(), ".npmrc"), "utf-8")
+      );
+
+      const replaced = npmrcContent.replace(
+        /\$\{([^}]+)\}/g,
+        (_: any, varName: string) => {
+          const value = process.env[varName];
+
+          if (value === undefined) {
+            console.warn(
+              `Warning: Environment variable "${varName}" is not set`
+            );
+            return "";
+          }
+
+          return value;
+        }
+      );
+
+      npmrcContent = replaced;
+    } catch {
+      log.info(`No .npmrc file found, skipping copying .npmrc to output`);
+    }
+
     log.debug(
       `running with options: ${JSON.stringify(options)} for ${pkg.name} version ${version}`
     );
@@ -263,6 +295,8 @@ const compileCommand = new Command()
       path.join(output, "package.json"),
       JSON.stringify(contractPackage)
     );
+
+    if (npmrc) fs.writeFileSync(path.join(output, ".npmrc"), npmrc);
 
     log.info(`Installing and shrinkwrapping dependencies`);
     execSync(`npm install`, { cwd: output });
