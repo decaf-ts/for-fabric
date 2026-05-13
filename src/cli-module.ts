@@ -298,7 +298,7 @@ const compileCommand = new Command()
       JSON.stringify(contractPackage)
     );
 
-    if (npmrc) fs.writeFileSync(path.join(output, ".npmrc"), npmrc);
+    if (npmrc) fs.writeFileSync(path.join(output, ".npmrc"), npmrcContent);
 
     log.info(`Installing and shrinkwrapping dependencies`);
     execSync(`npm install`, { cwd: output });
