@@ -126,8 +126,9 @@ const compileCommand = new Command()
     const log = logger.for("compile-contract");
     try {
       if (npmrc) {
-        npmrcContent = JSON.parse(
-          fs.readFileSync(path.join(process.cwd(), ".npmrc"), "utf-8")
+        npmrcContent = fs.readFileSync(
+          path.join(process.cwd(), ".npmrc"),
+          "utf-8"
         );
 
         const replaced = npmrcContent.replace(
