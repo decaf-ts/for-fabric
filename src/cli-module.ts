@@ -125,27 +125,29 @@ const compileCommand = new Command()
     } = options;
     const log = logger.for("compile-contract");
     try {
-      npmrcContent = JSON.parse(
-        fs.readFileSync(path.join(process.cwd(), ".npmrc"), "utf-8")
-      );
+      if (npmrc) {
+        npmrcContent = JSON.parse(
+          fs.readFileSync(path.join(process.cwd(), ".npmrc"), "utf-8")
+        );
 
-      const replaced = npmrcContent.replace(
-        /\$\{([^}]+)\}/g,
-        (_: any, varName: string) => {
-          const value = process.env[varName];
+        const replaced = npmrcContent.replace(
+          /\$\{([^}]+)\}/g,
+          (_: any, varName: string) => {
+            const value = process.env[varName];
 
-          if (value === undefined) {
-            console.warn(
-              `Warning: Environment variable "${varName}" is not set`
-            );
-            return "";
+            if (value === undefined) {
+              console.warn(
+                `Warning: Environment variable "${varName}" is not set`
+              );
+              return "";
+            }
+
+            return value;
           }
+        );
 
-          return value;
-        }
-      );
-
-      npmrcContent = replaced;
+        npmrcContent = replaced;
+      }
     } catch {
       log.info(`No .npmrc file found, skipping copying .npmrc to output`);
     }
