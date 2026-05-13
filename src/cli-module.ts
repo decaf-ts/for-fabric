@@ -126,10 +126,9 @@ const compileCommand = new Command()
     const log = logger.for("compile-contract");
     try {
       if (npmrc) {
-        npmrcContent = fs.readFileSync(
-          path.join(process.cwd(), ".npmrc"),
-          "utf-8"
-        );
+        npmrcContent = fs
+          .readFileSync(path.join(process.cwd(), ".npmrc"), "utf-8")
+          .toString();
 
         const replaced = npmrcContent.replace(
           /\$\{([^}]+)\}/g,
@@ -299,7 +298,8 @@ const compileCommand = new Command()
       JSON.stringify(contractPackage)
     );
 
-    if (npmrc) fs.writeFileSync(path.join(output, ".npmrc"), npmrcContent);
+    if (npmrc && npmrcContent)
+      fs.writeFileSync(path.join(output, ".npmrc"), npmrcContent);
 
     log.info(`Installing and shrinkwrapping dependencies`);
     execSync(`npm install`, { cwd: output });
