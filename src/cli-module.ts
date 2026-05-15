@@ -94,6 +94,10 @@ const compileCommand = new Command()
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
     );
 
+    const pkgLock = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "package-lock.json"), "utf-8")
+    );
+
     let npmrcContent = undefined;
 
     const version = pkg.version;
@@ -281,6 +285,7 @@ const compileCommand = new Command()
     };
 
     const contractPackage = pkg;
+    const contractPackageLock = pkgLock;
 
     contractPackage.name = name;
     contractPackage.description = description;
@@ -296,6 +301,11 @@ const compileCommand = new Command()
     fs.writeFileSync(
       path.join(output, "package.json"),
       JSON.stringify(contractPackage)
+    );
+
+    fs.writeFileSync(
+      path.join(output, "package-lock.json"),
+      JSON.stringify(contractPackageLock)
     );
 
     if (npmrc && npmrcContent)
