@@ -5,6 +5,7 @@
 !configtx.yaml
 !docker-compose.yaml
 !docker-compose-hsm.yaml
+!docker-compose-ccaas.yaml
 
 
 !.gitignore
