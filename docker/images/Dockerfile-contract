@@ -15,6 +15,7 @@ COPY ./tsconfig.json ./
 COPY ./src/ ./src/
 
 RUN --mount=type=secret,id=TOKEN NPM_TOKEN=$(cat /run/secrets/TOKEN) npm ci && npm cache clean --force && chown -R node:node .
+RUN
 RUN npm run build && npm run build:contract:docker
 
 ARG NODE_VERSION=24

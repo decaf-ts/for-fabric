@@ -78,7 +78,7 @@ export class HSMSignerFactoryCustom {
     if (slots.length === 0) {
       throw new Error("No pkcs11 slots can be found");
     }
-    const slot = slots.find((slotToCheck) => {
+    const slot = slots.find((slotToCheck: pkcs11.Handle) => {
       const tokenInfo = (
         HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11
       ).C_GetTokenInfo(slotToCheck);
