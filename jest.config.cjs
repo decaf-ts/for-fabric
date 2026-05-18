@@ -7,6 +7,7 @@ const config = {
   transform: {
     "^.+\\.ts$": ["ts-jest", { tsconfig: "<rootDir>/tsconfig.tests.json" }],
   },
+  setupFiles: ["<rootDir>/tests/bootstrap.ts"],
   testEnvironment: "node",
   testRegex: "/tests/.*\\.(test|spec)\\.(ts|tsx)$",
   watchman: false,

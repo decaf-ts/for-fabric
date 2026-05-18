@@ -1,14 +1,10 @@
-import { Adapter } from "@decaf-ts/core";
-import { FabricFlavour } from "../../src/shared/constants";
+import "../bootstrap";
 import { Info } from "fabric-contract-api";
-import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
-FabricContractAdapter.decoration();
-Adapter.setCurrent(FabricFlavour);
 import { NotFoundError } from "@decaf-ts/db-decorators";
-import { Product } from "./models/Product";
 import { SerializedCrudContract } from "../../src/contracts/crud/serialized-crud-contract";
 import { getMockCtx } from "./ContextMock";
 import { Model } from "@decaf-ts/decorator-validation";
+import { Product } from "./models/Product";
 
 @Info({
   title: "ProductContract",

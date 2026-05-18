@@ -1,3 +1,4 @@
+import "../bootstrap";
 import "../../shared/overrides";
 import {
   FabricContextualizedArgs,

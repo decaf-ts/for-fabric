@@ -4,6 +4,7 @@
  * @namespace contracts
  * @memberOf module:for-fabric
  */
+import "./bootstrap";
 import "./overrides";
 
 export * from "./overrides"; // first one on purpose
