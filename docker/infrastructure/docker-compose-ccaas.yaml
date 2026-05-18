@@ -1301,14 +1301,14 @@ services:
     hostname: org-a-ccaas-global
     image: ghcr.io/decaf-ts/for-fabric:contract-latest
     restart: unless-stopped
-    profiles:
-      - ccaas
+    # profiles:
+    #   - ccaas
     # volumes:
     #   - org-ccaas-tls-vol:/opt/hyperledger/tls:rw
     #   - org-contracts-vol:/weaver/contract:rw
     ports:
       - "7070:7070"
-    depensds_on:
+    depends_on:
       org-a-peer-0:
         condition: service_healthy
     environment:
@@ -1329,14 +1329,14 @@ services:
     hostname: org-b-ccaas-global
     image: ghcr.io/decaf-ts/for-fabric:contract-latest
     restart: unless-stopped
-    profiles:
-      - ccaas
+    # profiles:
+    #   - ccaas
     # volumes:
     #   - org-ccaas-tls-vol:/opt/hyperledger/tls:rw
     #   - org-contracts-vol:/weaver/contract:rw
     ports:
       - "7071:7071"
-    depensds_on:
+    depends_on:
       org-b-peer-0:
         condition: service_healthy
     environment:
@@ -1357,14 +1357,14 @@ services:
     hostname: org-c-ccaas-global
     image: ghcr.io/decaf-ts/for-fabric:contract-latest
     restart: unless-stopped
-    profiles:
-      - ccaas
+    # profiles:
+    #   - ccaas
     # volumes:
     #   - org-ccaas-tls-vol:/opt/hyperledger/tls:rw
     #   - org-contracts-vol:/weaver/contract:rw
     ports:
       - "7072:7072"
-    depensds_on:
+    depends_on:
       org-c-peer-0:
         condition: service_healthy
     environment:
