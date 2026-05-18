@@ -37,6 +37,17 @@
       },
       "default": "./lib/esm/contracts/index.js"
     },
+    "./contracts/bootstrap": {
+      "import": {
+        "types": "./lib/types/contracts/bootstrap.d.mts",
+        "default": "./lib/esm/contracts/bootstrap.js"
+      },
+      "require": {
+        "types": "./lib/types/contracts/bootstrap.d.cts",
+        "default": "./lib/cjs/contracts/bootstrap.cjs"
+      },
+      "default": "./lib/esm/contracts/bootstrap.js"
+    },
     "./shared": {
       "import": {
         "types": "./lib/types/shared/index.d.mts",
@@ -56,11 +67,15 @@
   "main": "./lib/cjs/index.cjs",
   "module": "./lib/esm/index.js",
   "sideEffects": [
+    "./lib/esm/contracts/bootstrap.js",
+    "./lib/cjs/contracts/bootstrap.cjs",
     "./lib/esm/shared/overrides/index.js",
     "./lib/esm/shared/overrides/overrides.js",
+    "./lib/esm/shared/index.js",
     "./lib/esm/contracts/overrides.js",
     "./lib/cjs/shared/overrides/index.cjs",
     "./lib/cjs/shared/overrides/overrides.cjs",
+    "./lib/cjs/shared/index.cjs",
     "./lib/cjs/contracts/overrides.cjs"
   ],
   "scripts": {

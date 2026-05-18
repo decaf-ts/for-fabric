@@ -1,3 +1,4 @@
+import "../contracts/bootstrap";
 import { FabricCrudContract } from "../contracts/crud/crud-contract";
 console.log(FabricCrudContract.name);
 import { type Contract } from "fabric-contract-api";
