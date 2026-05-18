@@ -27,6 +27,7 @@
 /docker/docker-data
 /global
 /indexes
+/contracts
 
 
 /tests/integration/chaincodeTrackers/*

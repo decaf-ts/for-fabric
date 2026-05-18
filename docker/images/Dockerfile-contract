@@ -2,7 +2,7 @@ ARG NODE_VERSION=24
 FROM node:${NODE_VERSION}-alpine AS builder
 
 RUN apk update && apk upgrade
-RUN apk add jq
+RUN apk add --no-cache jq python3 make g++ linux-headers
 
 ENV WORKDIR="/contract"
 ENV NODE_ENV="development"
@@ -14,15 +14,14 @@ COPY ./package*.json ./
 COPY ./tsconfig.json ./
 COPY ./src/ ./src/
 
-RUN --mount=type=secret,id=TOKEN NPM_TOKEN=$(cat /run/secrets/TOKEN) npm ci && npm cache clean --force && chown -R node:node .
-RUN
+RUN --mount=type=secret,id=TOKEN NPM_TOKEN=$(cat /run/secrets/TOKEN) npm ci --include=optional && npm cache clean --force && chown -R node:node .
 RUN npm run build && npm run build:contract:docker
 
 ARG NODE_VERSION=24
 FROM node:${NODE_VERSION}-alpine AS production
 
 RUN apk update && apk upgrade
-RUN apk add jq
+RUN apk add --no-cache jq python3 make g++ linux-headers
 
 ENV WORKDIR="/contract"
 ENV NODE_ENV="production"
@@ -33,4 +32,4 @@ COPY --from=builder --chown=node:node ${WORKDIR}/contracts ./
 RUN npm uninstall @decaf-ts/for-http @decaf-ts/for-nano @decaf-ts/for-typeorm
 COPY --from=builder --chown=node:node ${WORKDIR}/.npmrc ./
 
-RUN --mount=type=secret,id=TOKEN NPM_TOKEN=$(cat /run/secrets/TOKEN) npm ci && npm cache clean --force && chown -R node:node .
+RUN --mount=type=secret,id=TOKEN NPM_TOKEN=$(cat /run/secrets/TOKEN) npm ci --include=optional && npm cache clean --force && chown -R node:node .
