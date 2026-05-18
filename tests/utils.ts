@@ -129,7 +129,8 @@ export function approveContract(
   contractName: string,
   tlsCertName: string,
   sequence: number = 1,
-  version: string = "1.0"
+  version: string = "1.0",
+  collections: boolean = false
 ) {
   execSync(`docker exec ${dockerName} node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
     --orderer-address org-a-orderer-0:7021 \
@@ -138,7 +139,8 @@ export function approveContract(
     --chaincode-version ${version} \
     --sequence ${sequence} \
     --enable-tls \
-    --tls-ca-cert-file /weaver/peer/${tlsCertName}`);
+    --tls-ca-cert-file /weaver/peer/${tlsCertName} \
+     ${collections ? `--collections-config ./weaver/chaincode/GlobalContract/collections_config.json` : ""}`);
 }
 
 export function deployContract(
@@ -146,7 +148,8 @@ export function deployContract(
   contractName: string,
   sequence: number = 1,
   version: string = "1.0",
-  peers: string[] = ["org-a-peer-0", "org-b-peer-0", "org-c-peer-0"]
+  peers: string[] = ["org-a-peer-0", "org-b-peer-0", "org-c-peer-0"],
+  collections: boolean = false
 ) {
   try {
     for (const peer of peers) {
@@ -157,7 +160,8 @@ export function deployContract(
         contractName,
         peer === "org-a-peer-0" ? "tls-ca-cert.pem" : "orderer-tls-ca-cert.pem",
         sequence,
-        version
+        version,
+        collections
       );
     }
   } catch (err: any) {
@@ -168,7 +172,8 @@ export function deployContract(
 export function commitChaincode(
   contractName: string,
   sequence: number = 1,
-  version: string = "1.0"
+  version: string = "1.0",
+  collections: boolean = false
 ): void {
   execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs commit-chaincode -d -s \
     --orderer-address org-a-orderer-0:7021 \
@@ -179,7 +184,8 @@ export function commitChaincode(
     --enable-tls \
     --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem \
     --peer-addresses org-a-peer-0:7031,org-b-peer-0:7032,org-c-peer-0:7033 \
-    --peer-root-tls ./weaver/peer/tls-ca-cert.pem,./weaver/peer/org-b-tls-ca-cert.pem,./weaver/peer/org-c-tls-ca-cert.pem`);
+    --peer-root-tls ./weaver/peer/tls-ca-cert.pem,./weaver/peer/org-b-tls-ca-cert.pem,./weaver/peer/org-c-tls-ca-cert.pem \
+    ${collections ? `--collections-config ./weaver/chaincode/GlobalContract/collections_config.json` : ""}`);
 }
 
 export function nextChaincodeSequence(
