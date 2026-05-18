@@ -1,0 +1,695 @@
+import { execSync } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
+import {
+  commitChaincode,
+  compileContract,
+  createCompositeKey,
+  deployContract,
+  ensureContractReadiness,
+  ensureInfrastructureBooted,
+  invokeChaincode,
+  invokePrivateChaincode,
+  queryChaincode,
+  randomName,
+  randomNif,
+  trim,
+} from "../utils";
+
+import { Model, ModelArg, required } from "@decaf-ts/decorator-validation";
+import { column, pk } from "@decaf-ts/core";
+
+jest.setTimeout(5000000);
+
+describe("Boot Contracts", () => {});
+
+// class TestPrivateModel extends Model {
+//   @pk({ type: Number })
+//   id!: number;
+
+//   @column()
+//   @required()
+//   name!: string;
+
+//   @column()
+//   @required()
+//   nif!: string;
+//   constructor(m?: ModelArg<TestPrivateModel>) {
+//     super(m);
+//   }
+// }
+
+// describe.skip("Test Serialized Crud Contract With Private Model", () => {
+//   const contractFolderName = "serialized-contract-private-model";
+//   const contractName = "contractname"; //TestPrivateModelContract.name;
+//   const sequenceTableName = "??sequence";
+//   const modelTableName = "tst_private_user";
+//   const sequenceId = `${modelTableName}_pk`;
+//   const private_collection = "_implicit_org_Peer0OrgaMSP";
+//   const contract_sequence = 1;
+//   const version = "2.0";
+
+//   const getData = () => {
+//     return {
+//       name: randomName(6),
+//       nif: randomNif(9),
+//     };
+//   };
+
+//   const getCurrentId = (collection: string = "none") => {
+//     let sequence;
+
+//     const args = [
+//       createCompositeKey(sequenceTableName, [sequenceId]),
+//       collection,
+//     ].filter((el) => el !== undefined);
+
+//     try {
+//       sequence = queryChaincode(contractName, "readByPass", args);
+//     } catch (error) {
+//       expect(error).toBeUndefined();
+//     }
+//     console.log("Model created successfully: ", sequence);
+
+//     expect(sequence).toBeDefined();
+//     sequence = JSON.parse(sequence!);
+//     expect(sequence.id).toBe(sequenceId);
+//     expect(sequence.current).toBeGreaterThan(0);
+
+//     return sequence.current;
+//   };
+
+//   beforeAll(async () => {
+//     //Boot infrastructure for testing
+//     execSync(`npm run infrastructure:up`, { stdio: "inherit" });
+
+//     //Ensure Infrastructure is ready
+//     await ensureInfrastructureBooted();
+
+//     // Check if contract folder exists and compile it if not
+//     if (
+//       fs.existsSync(
+//         path.join(
+//           __dirname,
+//           "../../docker/infrastructure/chaincode",
+//           contractFolderName
+//         )
+//       )
+//     ) {
+//       console.log("Contract folder already exists");
+//       return;
+//     }
+
+//     console.log("Compiling contract: ", contractName);
+
+//     // Compile contract
+//     // execSync(
+//     //   `npm run build:contracts -- --dev --debug --name private-contract --output ./tests/assets/contract/serialized-contract-private-model`
+//     // );
+//     compileContract(contractFolderName);
+
+//     //Deploy contract
+//     deployContract(
+//       contractFolderName,
+//       contractName,
+//       contract_sequence,
+//       version
+//     );
+
+//     // Commit Chaincode
+//     commitChaincode(contractName, contract_sequence, version);
+//   });
+
+//   it("Deploys contract corretly", async () => {
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(ready).toBeDefined();
+//   });
+
+//   it("Should initialize contract", async () => {
+//     const ready = await ensureContractReadiness(contractName);
+
+//     if (trim(ready) === "false") {
+//       try {
+//         console.log("Initializing contract...");
+//         invokeChaincode(contractName, "init", []);
+//       } catch (error: any) {
+//         console.error("Error initializing contract:", error);
+//         expect(error).toBeUndefined();
+//       }
+//     }
+
+//     const readyCheck = await ensureContractReadiness(contractName);
+//     expect(trim(readyCheck)).toBe("true");
+//   });
+
+//   it("Whoami", async () => {
+//     try {
+//       console.log("Initializing contract...");
+//       let res = queryChaincode(contractName, "whoami", []);
+//       console.log("Whoami result: ", res);
+//       res = JSON.parse(res);
+//       expect((res as any).whoami).toBe(contractName);
+//     } catch (error: any) {
+//       console.error("Error initializing contract:", error);
+//       expect(error).toBeUndefined();
+//     }
+//   });
+
+//   it("Should create model", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const model = new TestPrivateModel(getData());
+//     console.log("Using model: ", model.serialize());
+
+//     try {
+//       invokePrivateChaincode(contractName, "create", [model.serialize()]);
+//     } catch (e) {
+//       expect(e).toBeUndefined();
+//     }
+
+//     //Giving some time for the transaction to be committed
+//     await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+//     let id = undefined;
+
+//     try {
+//       id = getCurrentId(private_collection);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+
+//     expect(id).toBeDefined();
+
+//     try {
+//       const args = [
+//         createCompositeKey(modelTableName, [String(id)]),
+//         private_collection,
+//       ];
+//       let record = queryChaincode(contractName, "readByPass", args) as any;
+//       expect(record).toBeDefined();
+
+//       record = JSON.parse(record.toString());
+
+//       expect(record["tst_name"]).toBe(model.name);
+//       expect(record["tst_nif"]).toBe(model.nif);
+//       expect(record.id).toBe(id);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+//   });
+
+//   it("Should create model with transient data", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const data = getData();
+
+//     const model = new TestPrivateModel({ name: data.name });
+//     console.log("Using model: ", model.serialize());
+
+//     const encoded = Buffer.from(
+//       Model.build({ nif: data.nif }, model.constructor.name).serialize()
+//     ).toString("base64");
+
+//     const transient = {
+//       [modelTableName]: encoded,
+//     };
+
+//     try {
+//       invokePrivateChaincode(
+//         contractName,
+//         "create",
+//         [model.serialize()],
+//         transient
+//       );
+//     } catch (e) {
+//       expect(e).toBeUndefined();
+//     }
+
+//     //Giving some time for the transaction to be committed
+//     await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+//     let id = undefined;
+
+//     try {
+//       id = getCurrentId(private_collection);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+
+//     expect(id).toBeDefined();
+
+//     try {
+//       const args = [
+//         createCompositeKey(modelTableName, [String(id)]),
+//         private_collection,
+//       ];
+//       let record = queryChaincode(contractName, "readByPass", args) as any;
+//       expect(record).toBeDefined();
+
+//       record = JSON.parse(record.toString());
+
+//       expect(record["tst_name"]).toBe(data.name);
+//       expect(record["tst_nif"]).toBe(data.nif);
+//       expect(record.id).toBe(id);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+//   });
+
+//   it("Should fail to create model with existing id", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const id = 1;
+
+//     const model = new TestPrivateModel({ ...getData(), id: id });
+//     console.log("Using model: ", model.serialize());
+
+//     let error = false;
+//     try {
+//       invokePrivateChaincode(contractName, "create", [model.serialize()]);
+//     } catch (e: unknown) {
+//       error = true;
+//       expect(e).toBeDefined();
+//       expect((e as any).message).toContain(
+//         `[ConflictError] Conflict detected while creating model with id: ${id} already exists`
+//       );
+//     }
+
+//     expect(error).toBe(true);
+//   });
+
+//   it("Should read model", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const model = new TestPrivateModel(getData());
+//     console.log("Using model: ", model.serialize());
+
+//     try {
+//       invokePrivateChaincode(contractName, "create", [model.serialize()]);
+//     } catch (e) {
+//       expect(e).toBeUndefined();
+//     }
+
+//     //Giving some time for the transaction to be committed
+//     await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+//     let id = undefined;
+
+//     try {
+//       id = getCurrentId(private_collection);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+
+//     expect(id).toBeDefined();
+
+//     try {
+//       const args = [String(id)];
+//       let record = queryChaincode(contractName, "read", args) as any;
+//       expect(record).toBeDefined();
+
+//       record = JSON.parse(record.toString());
+
+//       expect(record.name).toBe(model.name);
+//       expect(record.nif).toBe(model.nif);
+//       expect(record.id).toBe(id);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+//   });
+
+//   it("Should fail to read model with non-existing id", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const model = new TestPrivateModel(getData());
+//     console.log("Using model: ", model.serialize());
+
+//     const id = 1000000000;
+
+//     let error = false;
+
+//     try {
+//       const args = [String(id)];
+//       queryChaincode(contractName, "read", args) as any;
+//     } catch (err: any) {
+//       error = true;
+//       expect(err).toBeDefined();
+//       expect(err.message).toContain(
+//         `[NotFoundError] Entry with id ${id} doesn't exist...`
+//       );
+//     }
+
+//     expect(error).toBe(true);
+//   });
+
+//   it("Should update model", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const model = new TestPrivateModel(getData());
+//     console.log("Using model: ", model.serialize());
+
+//     try {
+//       invokePrivateChaincode(contractName, "create", [model.serialize()]);
+//     } catch (e) {
+//       expect(e).toBeUndefined();
+//     }
+
+//     //Giving some time for the transaction to be committed
+//     await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+//     let id = undefined;
+
+//     try {
+//       id = getCurrentId(private_collection);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+
+//     expect(id).toBeDefined();
+
+//     try {
+//       const args = [String(id)];
+//       let record = queryChaincode(contractName, "read", args) as any;
+//       expect(record).toBeDefined();
+
+//       record = JSON.parse(record.toString());
+
+//       expect(record.name).toBe(model.name);
+//       expect(record.nif).toBe(model.nif);
+//       expect(record.id).toBe(id);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+//     const newModel = new TestPrivateModel(getData());
+//     newModel.id = id;
+
+//     console.log("Using model: ", newModel.serialize());
+
+//     try {
+//       invokePrivateChaincode(contractName, "update", [newModel.serialize()]);
+//     } catch (e) {
+//       expect(e).toBeUndefined();
+//     }
+
+//     //Giving some time for the transaction to be committed
+//     await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+//     try {
+//       const args = [String(id)];
+//       let record = queryChaincode(contractName, "read", args) as any;
+//       expect(record).toBeDefined();
+
+//       record = JSON.parse(record.toString());
+
+//       expect(record.name).toBe(newModel.name);
+//       expect(record.nif).toBe(newModel.nif);
+//       expect(record.name).not.toBe(model.name);
+//       expect(record.nif).not.toBe(model.nif);
+//       expect(record.id).toBe(id);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+//   });
+
+//   it("Should update model with transient data", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const data = getData();
+
+//     const model = new TestPrivateModel({ name: data.name });
+//     console.log("Using model: ", model.serialize());
+
+//     const encoded = Buffer.from(
+//       Model.build({ nif: data.nif }, model.constructor.name).serialize()
+//     ).toString("base64");
+
+//     const transient = {
+//       [modelTableName]: encoded,
+//     };
+
+//     try {
+//       invokePrivateChaincode(
+//         contractName,
+//         "create",
+//         [model.serialize()],
+//         transient
+//       );
+//     } catch (e) {
+//       expect(e).toBeUndefined();
+//     }
+
+//     //Giving some time for the transaction to be committed
+//     await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+//     let id = undefined;
+
+//     try {
+//       id = getCurrentId(private_collection);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+
+//     expect(id).toBeDefined();
+
+//     try {
+//       const args = [String(id)];
+//       let record = queryChaincode(contractName, "read", args) as any;
+//       expect(record).toBeDefined();
+
+//       record = JSON.parse(record.toString());
+
+//       expect(record.name).toBe(data.name);
+//       expect(record.nif).toBe(data.nif);
+//       expect(record.id).toBe(id);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+
+//     const data1 = getData();
+
+//     const newModel = new TestPrivateModel({ name: data1.name });
+//     console.log("Using model: ", newModel.serialize());
+
+//     const encoded1 = Buffer.from(
+//       Model.build({ nif: data1.nif }, newModel.constructor.name).serialize()
+//     ).toString("base64");
+
+//     const transient1 = {
+//       [modelTableName]: encoded1,
+//     };
+
+//     newModel.id = id;
+
+//     console.log("Using model: ", newModel.serialize());
+
+//     try {
+//       invokePrivateChaincode(
+//         contractName,
+//         "update",
+//         [newModel.serialize()],
+//         transient1
+//       );
+//     } catch (e) {
+//       expect(e).toBeUndefined();
+//     }
+
+//     //Giving some time for the transaction to be committed
+//     await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+//     try {
+//       const args = [String(id)];
+//       let record = queryChaincode(contractName, "read", args) as any;
+//       expect(record).toBeDefined();
+
+//       record = JSON.parse(record.toString());
+
+//       expect(record.name).toBe(data1.name);
+//       expect(record.nif).toBe(data1.nif);
+//       expect(record.name).not.toBe(model.name);
+//       expect(record.nif).not.toBe(model.nif);
+//       expect(record.id).toBe(id);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+//   });
+
+//   it("Should fail to update model with non-existing id", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const model = new TestPrivateModel(getData());
+//     console.log("Using model: ", model.serialize());
+
+//     const id = 10000000000;
+
+//     model.id = id;
+
+//     let error = false;
+
+//     try {
+//       invokePrivateChaincode(contractName, "update", [model.serialize()]);
+//     } catch (e) {
+//       error = true;
+//       expect(e).toBeDefined();
+//       expect((e as any).message).toContain(
+//         `[NotFoundError] Entry with id ${id} doesn't exist...`
+//       );
+//     }
+
+//     expect(error).toBe(true);
+//   });
+
+//   it("Should delete model", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const model = new TestPrivateModel(getData());
+//     console.log("Using model: ", model.serialize());
+
+//     try {
+//       invokePrivateChaincode(contractName, "create", [model.serialize()]);
+//     } catch (e) {
+//       expect(e).toBeUndefined();
+//     }
+
+//     //Giving some time for the transaction to be committed
+//     await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+//     let id = undefined;
+
+//     try {
+//       id = getCurrentId(private_collection);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+
+//     expect(id).toBeDefined();
+
+//     try {
+//       const args = [String(id)];
+//       let record = queryChaincode(contractName, "read", args) as any;
+//       expect(record).toBeDefined();
+
+//       record = JSON.parse(record.toString());
+
+//       expect(record.name).toBe(model.name);
+//       expect(record.nif).toBe(model.nif);
+//       expect(record.id).toBe(id);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+
+//     try {
+//       invokePrivateChaincode(contractName, "delete", [String(id)]);
+//     } catch (e) {
+//       expect(e).toBeUndefined();
+//     }
+
+//     //Giving some time for the transaction to be committed
+//     await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+//     let error = false;
+//     try {
+//       const args = [String(id)];
+//       queryChaincode(contractName, "read", args) as any;
+//     } catch (err: any) {
+//       error = true;
+//       expect(err).toBeDefined();
+//       expect(err.message).toContain(
+//         `[NotFoundError] Entry with id ${id} doesn't exist...`
+//       );
+//     }
+
+//     expect(error).toBe(true);
+//   });
+
+//   it("Should fail to delete model with non-existing id", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const id = 10000000000;
+
+//     let error = false;
+
+//     try {
+//       invokeChaincode(contractName, "delete", [String(id)]);
+//     } catch (e: any) {
+//       expect(e).toBeDefined();
+//       error = true;
+//       expect(e.message).toContain(
+//         `[NotFoundError] Entry with id ${id} doesn't exist...`
+//       );
+//     }
+
+//     expect(error).toBe(true);
+//   });
+
+//   it("Should raw", async () => {
+//     // Ensure contract is initialized
+//     const ready = await ensureContractReadiness(contractName);
+//     expect(trim(ready)).toBe("true");
+
+//     const model = new TestPrivateModel(getData());
+//     console.log("Using model: ", model.serialize());
+
+//     try {
+//       invokePrivateChaincode(contractName, "create", [model.serialize()]);
+//     } catch (e) {
+//       expect(e).toBeUndefined();
+//     }
+
+//     //Giving some time for the transaction to be committed
+//     await new Promise((r) => setTimeout(r, 15000)); // Wait for 15 seconds before retrying
+
+//     let id = undefined;
+
+//     try {
+//       id = getCurrentId(private_collection);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+
+//     expect(id).toBeDefined();
+
+//     const mango = {
+//       selector: {
+//         id: id,
+//       },
+//     };
+
+//     try {
+//       const args = [JSON.stringify(mango), String(true)];
+//       let record = queryChaincode(contractName, "raw", args) as any;
+//       expect(record).toBeDefined();
+
+//       record = JSON.parse(record.toString());
+//       console.log("Raw response: ", record);
+
+//       const result = record[0];
+
+//       expect(result).toBeDefined();
+//       expect(result["id"]).toBe(id);
+//       expect(result["tst_name"]).toEqual(model.name);
+//       expect(result["tst_nif"]).toEqual(model.nif);
+//     } catch (error: any) {
+//       expect(error).toBeUndefined();
+//     }
+//   });
+// });
