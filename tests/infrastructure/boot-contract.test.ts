@@ -1,4 +1,5 @@
 import { execSync } from "child_process";
+import { writeFile } from "fs/promises";
 import {
   commitChaincode,
   deployContract,
@@ -6,8 +7,16 @@ import {
   nextChaincodeSequence,
 } from "../utils";
 
+import path from "path";
+
 jest.setTimeout(5000000);
 const skipContract = false;
+
+async function writeJsonFile<T>(filePath: string, data: T): Promise<void> {
+  const json = JSON.stringify(data, null, 2);
+
+  await writeFile(filePath, json, "utf8");
+}
 
 describe("Boot Contracts", () => {
   beforeAll(async () => {
@@ -21,6 +30,10 @@ describe("Boot Contracts", () => {
     execSync(`npm run infrastructure:up`, { stdio: "inherit" });
     await ensureInfrastructureBooted();
 
+    execSync(`rm -rf ./docker/infrastructure/chaincode/GlobalContract`, {
+      stdio: "inherit",
+    });
+
     //Compile
     execSync(`npm run build:contract:shared`, { stdio: "inherit" });
 
@@ -29,6 +42,59 @@ describe("Boot Contracts", () => {
       `rm -f ./docker/infrastructure/chaincode/GlobalContract/META-INF/collections_config.json`,
       { stdio: "inherit" }
     );
+
+    execSync(
+      `rm -f ./docker/infrastructure/chaincode/GlobalContract/collections_config.json`,
+      { stdio: "inherit" }
+    );
+
+    const collections: { [indexer: string]: any }[] = [
+      {
+        name: "decaf-namespace-mirror",
+        policy: "OR('Peer0OrgaMSP.member')",
+        requiredPeerCount: 0,
+        maxPeerCount: 0,
+        blockToLive: 0,
+        memberOnlyRead: true,
+        memberOnlyWrite: false,
+        endorsementPolicy: {
+          signaturePolicy: "OR('Peer0OrgaMSP.peer')",
+        },
+      },
+      {
+        name: "decaf-namespaceOrg-B",
+        policy: "OR('Peer0OrgbMSP.member','Peer0OrgaMSP.member')",
+        requiredPeerCount: 1,
+        maxPeerCount: 2,
+        blockToLive: 0,
+        memberOnlyRead: true,
+        memberOnlyWrite: true,
+        endorsementPolicy: {
+          signaturePolicy: "AND('Peer0OrgbMSP.peer','Peer0OrgaMSP.peer')",
+        },
+      },
+      {
+        name: "decaf-namespaceOrg-C",
+        policy: "OR('Peer0OrgbMSP.member','Peer0OrgaMSP.member')",
+        requiredPeerCount: 1,
+        maxPeerCount: 2,
+        blockToLive: 0,
+        memberOnlyRead: true,
+        memberOnlyWrite: true,
+        endorsementPolicy: {
+          signaturePolicy: "AND('Peer0OrgbMSP.peer','Peer0OrgaMSP.peer')",
+        },
+      },
+    ];
+
+    const p = path.join(
+      __dirname,
+      "../../docker/infrastructure/chaincode/GlobalContract/collections_config.json"
+    );
+
+    console.log(p);
+
+    await writeJsonFile(p, collections);
 
     // Deploy contract
     deployContract(
