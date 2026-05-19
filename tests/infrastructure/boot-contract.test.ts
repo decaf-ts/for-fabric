@@ -51,38 +51,38 @@ describe("Boot Contracts", () => {
     const collections: { [indexer: string]: any }[] = [
       {
         name: "decaf-namespace-mirror",
-        policy: "OR('Peer0OrgaMSP.member')",
+        policy: "OR('OrgaMSP.member')",
         requiredPeerCount: 0,
         maxPeerCount: 0,
         blockToLive: 0,
         memberOnlyRead: true,
         memberOnlyWrite: false,
         endorsementPolicy: {
-          signaturePolicy: "OR('Peer0OrgaMSP.peer')",
+          signaturePolicy: "OR('OrgaMSP.peer')",
         },
       },
       {
         name: "decaf-namespaceOrg-B",
-        policy: "OR('Peer0OrgbMSP.member','Peer0OrgaMSP.member')",
+        policy: "OR('OrgbMSP.member','OrgaMSP.member')",
         requiredPeerCount: 1,
         maxPeerCount: 2,
         blockToLive: 0,
         memberOnlyRead: true,
         memberOnlyWrite: true,
         endorsementPolicy: {
-          signaturePolicy: "AND('Peer0OrgbMSP.peer','Peer0OrgaMSP.peer')",
+          signaturePolicy: "AND('OrgbMSP.peer','OrgaMSP.peer')",
         },
       },
       {
         name: "decaf-namespaceOrg-C",
-        policy: "OR('Peer0OrgbMSP.member','Peer0OrgaMSP.member')",
+        policy: "OR('OrgbMSP.member','OrgaMSP.member')",
         requiredPeerCount: 1,
         maxPeerCount: 2,
         blockToLive: 0,
         memberOnlyRead: true,
         memberOnlyWrite: true,
         endorsementPolicy: {
-          signaturePolicy: "AND('Peer0OrgbMSP.peer','Peer0OrgaMSP.peer')",
+          signaturePolicy: "AND('OrgbMSP.peer','OrgaMSP.peer')",
         },
       },
     ];
@@ -105,6 +105,10 @@ describe("Boot Contracts", () => {
       ["org-a-peer-0", "org-b-peer-0", "org-c-peer-0"],
       true
     );
+
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    console.log("Commiting");
 
     // Commit Chaincode
     commitChaincode(contractName, contract_sequence, version, true);

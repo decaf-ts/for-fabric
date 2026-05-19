@@ -132,7 +132,7 @@ export function approveContract(
   version: string = "1.0",
   collections: boolean = false
 ) {
-  execSync(`docker exec ${dockerName} node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
+  const p = `docker exec ${dockerName} node ./weaver/lib/core/cli.cjs approve-chaincode -d -s \
     --orderer-address org-a-orderer-0:7021 \
     --channel-id simple-channel \
     --chaincode-name ${contractName} \
@@ -140,7 +140,10 @@ export function approveContract(
     --sequence ${sequence} \
     --enable-tls \
     --tls-ca-cert-file /weaver/peer/${tlsCertName} \
-     ${collections ? `--collections-config ./weaver/chaincode/GlobalContract/collections_config.json` : ""}`);
+     ${collections ? `--collections-config ./weaver/chaincode/GlobalContract/collections_config.json` : ""}`;
+
+  console.log(p);
+  execSync(p);
 }
 
 export function deployContract(
@@ -175,7 +178,7 @@ export function commitChaincode(
   version: string = "1.0",
   collections: boolean = false
 ): void {
-  execSync(`docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs commit-chaincode -d -s \
+  const p = `docker exec org-a-peer-0 node ./weaver/lib/core/cli.cjs commit-chaincode -d -s \
     --orderer-address org-a-orderer-0:7021 \
     --channel-id simple-channel \
     --chaincode-name ${contractName} \
@@ -185,7 +188,10 @@ export function commitChaincode(
     --tls-ca-cert-file /weaver/peer/tls-ca-cert.pem \
     --peer-addresses org-a-peer-0:7031,org-b-peer-0:7032,org-c-peer-0:7033 \
     --peer-root-tls ./weaver/peer/tls-ca-cert.pem,./weaver/peer/org-b-tls-ca-cert.pem,./weaver/peer/org-c-tls-ca-cert.pem \
-    ${collections ? `--collections-config ./weaver/chaincode/GlobalContract/collections_config.json` : ""}`);
+    ${collections ? `--collections-config ./weaver/chaincode/GlobalContract/collections_config.json` : ""}`;
+
+  console.log(p);
+  execSync(p);
 }
 
 export function nextChaincodeSequence(

@@ -982,6 +982,10 @@ services:
       COUCHDB_PASSWORD: admin-pw
     volumes:
       - org-a-peer-0-couchdb-vol:/opt/couchdb/data
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     networks:
       test_network:
     ports:
@@ -1002,6 +1006,10 @@ services:
       COUCHDB_PASSWORD: admin-pw
     volumes:
       - org-b-peer-0-couchdb-vol:/opt/couchdb/data
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     networks:
       test_network:
     ports:
@@ -1022,6 +1030,10 @@ services:
       COUCHDB_PASSWORD: admin-pw
     volumes:
       - org-c-peer-0-couchdb-vol:/opt/couchdb/data
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     networks:
       test_network:
     ports:
@@ -1075,7 +1087,7 @@ services:
       --gossip-external-endpoint org-a-peer-0:7031
       --file-system-path /weaver/peer/production
       --local-mspdir /weaver/peer/client/msp
-      --local-mspid Peer0OrgaMSP
+      --local-mspid OrgaMSP
       --vm-network-mode test_network
       --network-id test_network
       --state-database CouchDB
@@ -1128,7 +1140,7 @@ services:
       --gossip-external-endpoint org-b-peer-0:7032
       --file-system-path /weaver/peer/production
       --local-mspdir /weaver/peer/client/msp
-      --local-mspid Peer0OrgbMSP
+      --local-mspid OrgbMSP
       --vm-network-mode test_network
       --network-id test_network
       --state-database CouchDB
@@ -1181,7 +1193,7 @@ services:
       --gossip-external-endpoint org-c-peer-0:7033
       --file-system-path /weaver/peer/production
       --local-mspdir /weaver/peer/client/msp
-      --local-mspid Peer0OrgcMSP
+      --local-mspid OrgcMSP
       --vm-network-mode test_network
       --network-id test_network
       --state-database CouchDB

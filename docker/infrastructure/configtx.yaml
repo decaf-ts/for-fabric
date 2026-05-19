@@ -73,15 +73,15 @@ Organizations:
 
         # In theory you can add more here from other orgs including peers and orderers
 
-  - &Peer0Orga
+  - &Orga
     # Name is the key by which this org will be referenced in channel
     # configuration transactions.
     # Name can include alphanumeric characters as well as dots and dashes.
-    Name: Peer0Orga
+    Name: Orga
 
     # ID is the key by which this org's MSP definition will be referenced.
     # ID can include alphanumeric characters as well as dots and dashes.
-    ID: Peer0OrgaMSP
+    ID: OrgaMSP
 
     # MSPDir is the filesystem path which contains the MSP configuration.
     MSPDir: /weaver/client/peer-a/client/msp
@@ -92,35 +92,35 @@ Organizations:
     Policies: &Peer0Org1Policies
       Readers:
         Type: Signature
-        Rule: "OR('Peer0OrgaMSP.member')"
+        Rule: "OR('OrgaMSP.member')"
         # If your MSP is configured with the new NodeOUs, you might
         # want to use a more specific rule like the following:
         # Rule: "OR('SampleOrg.admin', 'SampleOrg.peer', 'SampleOrg.client')"
       Writers:
         Type: Signature
-        Rule: "OR('Peer0OrgaMSP.member')"
+        Rule: "OR('OrgaMSP.member')"
       # If your MSP is configured with the new NodeOUs, you might
       # want to use a more specific rule like the following:
       # Rule: "OR('SampleOrg.admin', 'SampleOrg.client')"
       Admins:
         Type: Signature
-        Rule: "OR('Peer0OrgaMSP.member')"
+        Rule: "OR('OrgaMSP.member')"
       Endorsement:
         Type: Signature
-        Rule: "OR('Peer0OrgaMSP.member')"
+        Rule: "OR('OrgaMSP.member')"
     AnchorPeers:
       - Host: org-a-peer-0
         Port: 7031
 
-  - &Peer0Orgb
+  - &Orgb
     # Name is the key by which this org will be referenced in channel
     # configuration transactions.
     # Name can include alphanumeric characters as well as dots and dashes.
-    Name: Peer0Orgb
+    Name: Orgb
 
     # ID is the key by which this org's MSP definition will be referenced.
     # ID can include alphanumeric characters as well as dots and dashes.
-    ID: Peer0OrgbMSP
+    ID: OrgbMSP
 
     # MSPDir is the filesystem path which contains the MSP configuration.
     MSPDir: /weaver/client/peer-b/client/msp
@@ -131,35 +131,35 @@ Organizations:
     Policies: &Peer1OrgPolicies
       Readers:
         Type: Signature
-        Rule: "OR('Peer0OrgbMSP.member')"
+        Rule: "OR('OrgbMSP.member')"
       # If your MSP is configured with the new NodeOUs, you might
       # want to use a more specific rule like the following:
       # Rule: "OR('SampleOrg.admin', 'SampleOrg.peer', 'SampleOrg.client')"
       Writers:
         Type: Signature
-        Rule: "OR('Peer0OrgbMSP.member')"
+        Rule: "OR('OrgbMSP.member')"
       # If your MSP is configured with the new NodeOUs, you might
       # want to use a more specific rule like the following:
       # Rule: "OR('SampleOrg.admin', 'SampleOrg.client')"
       Admins:
         Type: Signature
-        Rule: "OR('Peer0OrgbMSP.member')"
+        Rule: "OR('OrgbMSP.member')"
       Endorsement:
         Type: Signature
-        Rule: "OR('Peer0OrgbMSP.member')"
+        Rule: "OR('OrgbMSP.member')"
     AnchorPeers:
       - Host: org-b-peer-0
         Port: 7032
 
-  - &Peer0Orgc
+  - &Orgc
     # Name is the key by which this org will be referenced in channel
     # configuration transactions.
     # Name can include alphanumeric characters as well as dots and dashes.
-    Name: Peer0Orgc
+    Name: Orgc
 
     # ID is the key by which this org's MSP definition will be referenced.
     # ID can include alphanumeric characters as well as dots and dashes.
-    ID: Peer0OrgcMSP
+    ID: OrgcMSP
 
     # MSPDir is the filesystem path which contains the MSP configuration.
     MSPDir: /weaver/client/peer-c/client/msp
@@ -170,22 +170,22 @@ Organizations:
     Policies: &Peer1OrgPolicies
       Readers:
         Type: Signature
-        Rule: "OR('Peer0OrgcMSP.member')"
+        Rule: "OR('OrgcMSP.member')"
       # If your MSP is configured with the new NodeOUs, you might
       # want to use a more specific rule like the following:
       # Rule: "OR('SampleOrg.admin', 'SampleOrg.peer', 'SampleOrg.client')"
       Writers:
         Type: Signature
-        Rule: "OR('Peer0OrgcMSP.member')"
+        Rule: "OR('OrgcMSP.member')"
       # If your MSP is configured with the new NodeOUs, you might
       # want to use a more specific rule like the following:
       # Rule: "OR('SampleOrg.admin', 'SampleOrg.client')"
       Admins:
         Type: Signature
-        Rule: "OR('Peer0OrgcMSP.member')"
+        Rule: "OR('OrgcMSP.member')"
       Endorsement:
         Type: Signature
-        Rule: "OR('Peer0OrgcMSP.member')"
+        Rule: "OR('OrgcMSP.member')"
     AnchorPeers:
       - Host: org-c-peer-0
         Port: 7033
@@ -557,7 +557,7 @@ Profiles:
     Application:
       <<: *ApplicationDefaults
       Organizations:
-        - <<: *Peer0Orga
-        - <<: *Peer0Orgb
-        - <<: *Peer0Orgc
+        - <<: *Orga
+        - <<: *Orgb
+        - <<: *Orgc
       Capabilities: *ApplicationCapabilities
