@@ -16,20 +16,28 @@ import { OtherMarketContract } from "./OtherMarketContract";
 import { OtherProductImageContract } from "./OtherProductImageContract";
 import { OtherAuditContract } from "./OtherAuditContract";
 import { MigrationContract } from "../contracts/MigrationContract";
+import { OtherProductContract } from "./OtherProductContract";
+import { OtherBatchContract } from "./OtherBatchContract";
+import { OtherLeafletContract } from "./OtherLeafletContract";
+import { OtherLeafletFileContract } from "./OtherLeafletFileContract";
 
 export const contracts: (typeof Contract)[] = [
-  ProductContract,
-  ProductStrengthContract,
+  // ProductContract,
+  // ProductStrengthContract,
   OtherProductStrengthContract,
-  MarketContract,
+  OtherProductContract,
+  OtherBatchContract,
+  OtherLeafletContract,
+  OtherLeafletFileContract,
+  // MarketContract,
   OtherMarketContract,
   OtherProductImageContract,
-  BatchContract,
-  UserContract,
+  // BatchContract,
+  // UserContract,
   OtherAuditContract,
-  AddressContract,
+  // AddressContract,
   OtherProductSharedContract,
-  SegregatedPrivateDocumentContract,
-  SegregatedSharedDocumentContract,
-  MigrationContract,
+  // SegregatedPrivateDocumentContract,
+  // SegregatedSharedDocumentContract,
+  // MigrationContract,
 ];

@@ -1,0 +1,83 @@
+import type { ModelArg } from "@decaf-ts/decorator-validation";
+import { model, required } from "@decaf-ts/decorator-validation";
+import {
+  column,
+  defaultQueryAttr,
+  index,
+  OrderDirection,
+  pk,
+  table,
+  uuid,
+} from "@decaf-ts/core";
+import { description, uses } from "@decaf-ts/decoration";
+import { BaseIdentifiedModel } from "../models/BaseIdentifiedModel";
+
+import {
+  FabricFlavour,
+  mirror,
+  NamespaceCollection,
+  sharedData,
+} from "../../shared/index";
+import { composed, InternalError, version } from "@decaf-ts/db-decorators";
+import { gtin } from "../models/gtin";
+import { historyDec } from "../models/history-dec";
+
+function strengthSeed(m: OtherProductStrength) {
+  try {
+    return `${m.productCode}${m.strength}${m.substance ? m.substance : ""}`;
+  } catch (e: unknown) {
+    throw new InternalError(`Failed to generate deterministic uuid: ${e}`);
+  }
+}
+
+@sharedData(NamespaceCollection("decaf-namespace"))
+@uses(FabricFlavour)
+@table("other_product_strength")
+@model()
+@description("Represents the product’s strength and composition details.")
+export class OtherProductStrength extends BaseIdentifiedModel {
+  @pk()
+  @mirror("mirror-collection", "org-b")
+  @composed(["productCode", "uuid"], ":")
+  @description("Unique identifier of the product strength.")
+  id!: string;
+
+  @uuid(strengthSeed)
+  @required()
+  @description("Unique identifier of the audit record.")
+  uuid!: string;
+
+  // @manyToOne(
+  //   () => Product,
+  //   { update: Cascade.NONE, delete: Cascade.NONE },
+  //   false
+  // )
+  @gtin()
+  @defaultQueryAttr()
+  @index([OrderDirection.ASC, OrderDirection.DSC])
+  @description("Product code associated with this strength entry.")
+  productCode!: string;
+
+  @column()
+  @required()
+  @defaultQueryAttr()
+  @index([OrderDirection.ASC, OrderDirection.DSC])
+  @description("Product concentration or dosage (e.g., 500mg, 10%).")
+  strength!: string;
+
+  @column()
+  @index([OrderDirection.ASC, OrderDirection.DSC])
+  @description("Active substance related to this product strength.")
+  substance?: string;
+
+  @column()
+  @description("Legal entity name responsible for the product.")
+  legalEntityName?: string;
+
+  @version()
+  counter?: number;
+
+  constructor(model?: ModelArg<OtherProductStrength>) {
+    super(model);
+  }
+}

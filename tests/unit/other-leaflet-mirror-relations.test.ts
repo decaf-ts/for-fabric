@@ -68,12 +68,13 @@ describe("OtherLeaflet relation and mirror integration", () => {
       fileName: `${productCode}-xml.xml`,
       fileContent: `<xml>${productCode}</xml>`,
     });
-    const otherFiles = ["manual", "supplement"].map((suffix) =>
-      new OtherLeafletFile({
-        leafletId: id,
-        fileName: `${productCode}-${suffix}.pdf`,
-        fileContent: `${productCode}-${suffix}`,
-      })
+    const otherFiles = ["manual", "supplement"].map(
+      (suffix) =>
+        new OtherLeafletFile({
+          leafletId: id,
+          fileName: `${productCode}-${suffix}.pdf`,
+          fileContent: `${productCode}-${suffix}`,
+        })
     );
     return new OtherLeaflet({
       id,
@@ -105,12 +106,13 @@ describe("OtherLeaflet relation and mirror integration", () => {
       fileName: `${productCode}-xml.xml`,
       fileContent: `<xml>${productCode}</xml>`,
     });
-    const otherFiles = ["manual", "supplement"].map((suffix) =>
-      new OtherLeafletFile({
-        leafletId: id,
-        fileName: `${productCode}-${suffix}.pdf`,
-        fileContent: `${productCode}-${suffix}`,
-      })
+    const otherFiles = ["manual", "supplement"].map(
+      (suffix) =>
+        new OtherLeafletFile({
+          leafletId: id,
+          fileName: `${productCode}-${suffix}.pdf`,
+          fileContent: `${productCode}-${suffix}`,
+        })
     );
     return new OtherLeaflet({
       id,
@@ -211,7 +213,11 @@ describe("OtherLeaflet relation and mirror integration", () => {
     const newRefs = updatedRefs.filter((ref) => !fileRefs.includes(ref));
     expect(newRefs).toHaveLength(1);
     await loadPrivateEntry("other_leaflet_file", newRefs[0]);
-    await loadPrivateEntry("other_leaflet_file", newRefs[0], "mirror-collection");
+    await loadPrivateEntry(
+      "other_leaflet_file",
+      newRefs[0],
+      "mirror-collection"
+    );
 
     await contract.delete(ctx as any, leafId);
     ensureCommitted();
@@ -331,10 +337,7 @@ describe("OtherLeaflet relation and mirror integration", () => {
     });
     const updated = new OtherLeaflet({
       ...read,
-      otherFilesContent: [
-        ...(read.otherFilesContent as string[]),
-        extraFile,
-      ],
+      otherFilesContent: [...(read.otherFilesContent as string[]), extraFile],
     });
     await contract.update(ctx as any, updated.serialize());
     ensureCommitted();
@@ -485,7 +488,11 @@ describe("OtherLeaflet relation and mirror integration", () => {
       const newFiles = nowFiles.filter((ref) => !previousSet.has(ref));
       expect(newFiles).toHaveLength(1);
       await loadPrivateEntry("other_leaflet_file", newFiles[0]);
-      await loadPrivateEntry("other_leaflet_file", newFiles[0], "mirror-collection");
+      await loadPrivateEntry(
+        "other_leaflet_file",
+        newFiles[0],
+        "mirror-collection"
+      );
 
       await contract.delete(ctx as any, leafId);
       ensureCommitted();
@@ -540,7 +547,9 @@ describe("OtherLeaflet relation and mirror integration", () => {
         AuthorizationError
       );
 
-      const mirrorRead = parseLeaflet(await contract.read(mirrorCtx as any, leafId));
+      const mirrorRead = parseLeaflet(
+        await contract.read(mirrorCtx as any, leafId)
+      );
       expect(mirrorRead.lang).toBe("mirror-only");
 
       const mirrorListed = JSON.parse(
