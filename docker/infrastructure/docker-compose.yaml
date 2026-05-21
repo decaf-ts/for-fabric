@@ -172,6 +172,14 @@ services:
       --tls-certfiles /weaver/server/ca-cert.pem \
       --mspdir /weaver/client/admin/msp &&
 
+      docker exec org-a-tls node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command register \
+      --url https://org-a-tls:7001 \
+      --id-name org-a-ccaas \
+      --id-secret org-a-ccaas-pw \
+      --tls-certfiles /weaver/server/ca-cert.pem \
+      --mspdir /weaver/client/admin/msp &&
+
       node ./weaver/lib/core/cli.cjs copy -s \
       --origin ./weaver/server/ca-cert.pem \
       --dest ./weaver/client/tls-ca-cert.pem &&
@@ -241,6 +249,14 @@ services:
       --tls-certfiles /weaver/server/ca-cert.pem \
       --mspdir /weaver/client/admin/msp &&
 
+      docker exec org-b-tls node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command register \
+      --url https://org-b-tls:7002 \
+      --id-name org-b-ccaas \
+      --id-secret org-b-ccaas-pw \
+      --tls-certfiles /weaver/server/ca-cert.pem \
+      --mspdir /weaver/client/admin/msp &&
+
       node ./weaver/lib/core/cli.cjs copy -s \
       --origin ./weaver/server/ca-cert.pem \
       --dest ./weaver/client/tls-ca-cert.pem &&
@@ -307,6 +323,14 @@ services:
       --url https://org-c-tls:7003 \
       --id-name org-c-peer-0 \
       --id-secret org-c-peer-0-pw \
+      --tls-certfiles /weaver/server/ca-cert.pem \
+      --mspdir /weaver/client/admin/msp &&
+
+      docker exec org-c-tls node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command register \
+      --url https://org-c-tls:7003 \
+      --id-name org-c-ccaas \
+      --id-secret org-c-ccaas-pw \
       --tls-certfiles /weaver/server/ca-cert.pem \
       --mspdir /weaver/client/admin/msp &&
 
@@ -591,6 +615,34 @@ services:
       --mspdir /weaver/client/peers/peer-0/tls-msp \
       --rename-key &&
 
+
+      docker exec org-a node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command register \
+      --url https://org-a:7011 \
+      --id-name org-a-ccaas \
+      --id-secret org-a-ccaas-pw \
+      --id-type client \
+      --tls-certfiles /weaver/client/tls-ca-cert.pem \
+      --mspdir /weaver/client/admin/msp &&
+
+      docker exec org-a node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command enroll \
+      --url https://org-a-ccaas:org-a-ccaas-pw@org-a:7011 \
+      --tls-certfiles /weaver/client/tls-ca-cert.pem \
+      --mspdir /weaver/client/ccaas/global/msp \
+      --csr-hosts org-a-ccaas,0.0.0.0,localhost \
+      --home /weaver/client/ccaas/global &&
+
+      docker exec org-a node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command enroll \
+      --url https://org-a-ccaas:org-a-ccaas-pw@org-a-tls:7001 \
+      --enrollment-profile tls \
+      --csr-hosts org-a-ccaas,0.0.0.0,localhost \
+      --tls-certfiles /weaver/client/tls-ca-cert.pem \
+      --mspdir /weaver/client/ccaas/global/tls-msp \
+      --home /weaver/client/ccaas/global/tls-msp \
+      --rename-key &&
+
       docker exec org-a node ./weaver/lib/core/cli.cjs node-ou \
       --enable \
       --mspdir 'weaver/client/orderers/orderer-0/msp' -s &&
@@ -714,6 +766,34 @@ services:
       --mspdir /weaver/client/peers/peer-0/tls-msp \
       --rename-key &&
 
+
+      docker exec org-b node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command register \
+      --id-name org-b-ccaas \
+      --id-secret org-b-ccaas-pw \
+      --id-type client \
+      --url https://org-b:7012 \
+      --tls-certfiles /weaver/client/tls-ca-cert.pem \
+      --mspdir /weaver/client/admin/msp &&
+
+      docker exec org-b node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command enroll \
+      --url https://org-b-ccaas:org-b-ccaas-pw@org-b:7012 \
+      --tls-certfiles /weaver/client/tls-ca-cert.pem \
+      --mspdir /weaver/client/ccaas/global/msp \
+      --csr-hosts org-b-ccaas,0.0.0.0,localhost \
+      --home /weaver/client/ccaas/global &&
+
+      docker exec org-b node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command enroll \
+      --url https://org-b-ccaas:org-b-ccaas-pw@org-b-tls:7002 \
+      --enrollment-profile tls \
+      --csr-hosts org-b-ccaas,0.0.0.0,localhost \
+      --home /weaver/client/ccaas/global/tls-msp \
+      --tls-certfiles /weaver/client/tls-ca-cert.pem \
+      --mspdir /weaver/client/ccaas/global/tls-msp \
+      --rename-key &&
+
       docker exec org-b node ./weaver/lib/core/cli.cjs node-ou \
       --enable \
       --mspdir 'weaver/client/peers/peer-0/msp' -s &&
@@ -816,6 +896,34 @@ services:
       --tls-certfiles /weaver/client/tls-ca-cert.pem \
       --mspdir /weaver/client/peers/peer-0/tls-msp \
       --rename-key &&
+
+      docker exec org-c node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command register \
+      --id-name org-c-ccaas \
+      --id-secret org-c-ccaas-pw \
+      --id-type client \
+      --url https://org-c:7013 \
+      --tls-certfiles /weaver/client/tls-ca-cert.pem \
+      --mspdir /weaver/client/admin/msp &&
+
+      docker exec org-c node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command enroll \
+      --url https://org-c-ccaas:org-c-ccaas-pw@org-c:7013 \
+      --tls-certfiles /weaver/client/tls-ca-cert.pem \
+      --mspdir /weaver/client/ccaas/global/msp \
+      --csr-hosts org-c-ccaas,0.0.0.0,localhost \
+      --home /weaver/client/ccaas/global &&
+
+      docker exec org-c node ./weaver/lib/core/cli.cjs client-enrollment \
+      -d -s --command enroll \
+      --url https://org-c-ccaas:org-c-ccaas-pw@org-c-tls:7003 \
+      --enrollment-profile tls \
+      --csr-hosts org-c-ccaas,0.0.0.0,localhost \
+      --home /weaver/client/ccaas/global/tls-msp \
+      --tls-certfiles /weaver/client/tls-ca-cert.pem \
+      --mspdir /weaver/client/ccaas/global/tls-msp \
+      --rename-key &&
+
 
       docker exec org-c node ./weaver/lib/core/cli.cjs node-ou \
       --enable \

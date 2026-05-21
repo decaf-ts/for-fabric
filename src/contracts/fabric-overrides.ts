@@ -4,14 +4,8 @@ import {
   Metadata,
   propMetadata,
 } from "@decaf-ts/decoration";
-import {
-  PersistenceKeys,
-  UnsupportedError,
-} from "@decaf-ts/core";
-import {
-  onCreate,
-  onCreateUpdate,
-} from "@decaf-ts/db-decorators";
+import { PersistenceKeys, UnsupportedError } from "@decaf-ts/core";
+import { onCreate, onCreateUpdate } from "@decaf-ts/db-decorators";
 import { FabricFlavour } from "../shared/constants";
 import {
   Property,
