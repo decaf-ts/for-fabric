@@ -56,7 +56,7 @@ function uuidSeed(m: OtherAudit, ...args: ContextualArgs<any>) {
 export class OtherAudit extends BaseModel {
   @pk()
   @uuid(uuidSeed)
-  @mirror("mirror-collection", "org-b")
+  @mirror("mirror-collection", "OrgaMSP")
   @description("Unique identifier of the audit record.")
   id!: string;
 

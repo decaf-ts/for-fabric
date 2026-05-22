@@ -1190,6 +1190,7 @@ services:
       --tls-key /weaver/peer/client/tls-msp/keystore/key.pem
       --tls-rootca /weaver/peer/tls-ca-cert.pem
       --peer-id org-a-peer-0
+      --chaincode-listen-address 0.0.0.0:7061
       --listen-address 0.0.0.0:7031
       --address org-a-peer-0:7031
       --gossip-external-endpoint org-a-peer-0:7031
@@ -1204,6 +1205,8 @@ services:
       --couchdb-address org-a-peer-0-couchdb:5984
       --operations-address 127.0.0.1:8010
       --snapshot-root-dir /weaver/peer/production/snapshot-dir
+
+  # --enable-ccaas
 
   org-b-peer-0:
     container_name: org-b-peer-0
@@ -1257,7 +1260,7 @@ services:
       --couchdb-address org-b-peer-0-couchdb:5984
       --operations-address 127.0.0.1:8010
       --snapshot-root-dir /weaver/peer/production/snapshot-dir
-
+  # --enable-ccaas
   org-c-peer-0:
     container_name: org-c-peer-0
     hostname: org-c-peer-0
@@ -1310,7 +1313,7 @@ services:
       --couchdb-address org-c-peer-0-couchdb:5984
       --operations-address 127.0.0.1:8010
       --snapshot-root-dir /weaver/peer/production/snapshot-dir
-
+  # --enable-ccaas
   boot-org-a-peer-0:
     container_name: boot-org-a-peer-0
     image: dregistry.pdmfc.com/pdmfcsa/fabric-weaver:weaver-2.5.12-latest

@@ -33,7 +33,7 @@ import { historyDec } from "../models/history-dec";
 export class OtherMarket extends BaseIdentifiedModel {
   @pk({ type: String, generated: false })
   @historyDec()
-  @mirror("mirror-collection", "org-b")
+  @mirror("mirror-collection", "OrgaMSP")
   @composed(["productCode", "marketId"], ":", true)
   @description("Unique identifier composed of product code and market ID.")
   id!: string;

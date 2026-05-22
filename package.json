@@ -127,7 +127,7 @@
     "build:contract:shared": "npm run compile:contract:shared && npm run extract:indexes:shared && npm run extract:collections:shared",
     "compile:contract:shared": "decaf fabric compile-contract --dev --debug --bundle --name ${CONTRACT_NAME:-GlobalContract} --input ./src/contracts --output ./docker/infrastructure/chaincode",
     "extract:indexes:shared": "decaf fabric extract-indexes --folder ./lib/cjs/contract/trackedModels --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract}",
-    "extract:collections:shared": "decaf fabric extract-collections --folder ./lib/cjs/contract/trackedModels --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract} --mspIds '[\"org-a\",\"org-c\"]' --mainMspId org-b",
+    "extract:collections:shared": "decaf fabric extract-collections --folder ./lib/cjs/contract/trackedModels --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract} --mspIds '[\"OrgbMSP\",\"OrgcMSP\"]' --mainMspId OrgaMSP",
     "docker:build-contracts": "DOCKER_BUILDKIT=1 docker build --no-cache --secret id=TOKEN,src=$PWD/.npmtoken -t ghcr.io/decaf-ts/for-fabric:contract-$(cat package.json | jq -r '.version') -t ghcr.io/decaf-ts/for-fabric:contract-${VERSION:-latest} -f ./docker/images/Dockerfile-contract .",
     "build:contract:docker": "npm run compile:contract:docker && npm run extract:indexes:docker && npm run extract:collections:docker",
     "compile:contract:docker": "decaf fabric compile-contract --dev --debug --bundle --ccaas --name ${CONTRACT_NAME:-global} --input ./src/contracts --output ./contracts --strip-contract-name",

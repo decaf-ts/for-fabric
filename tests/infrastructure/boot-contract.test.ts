@@ -1,5 +1,7 @@
 import { execSync } from "child_process";
 import { writeFile } from "fs/promises";
+import * as fs from "fs";
+
 import {
   commitChaincode,
   deployContract,
@@ -16,6 +18,22 @@ async function writeJsonFile<T>(filePath: string, data: T): Promise<void> {
   const json = JSON.stringify(data, null, 2);
 
   await writeFile(filePath, json, "utf8");
+}
+
+function readJsonFile(filePath: string) {
+  try {
+    const data = fs.readFileSync(filePath, "utf8");
+    return JSON.parse(data);
+  } catch (error: any) {
+    console.error("Error reading JSON file:", error.message);
+    return null;
+  }
+}
+
+function filterCollections<T extends { name: string }>(items: T[]): T[] {
+  return items.filter(
+    (item) => !item.name.startsWith("_") && !item.name.startsWith("-")
+  );
 }
 
 describe("Boot Contracts", () => {
@@ -43,58 +61,64 @@ describe("Boot Contracts", () => {
       { stdio: "inherit" }
     );
 
+    const c = readJsonFile(
+      "./docker/infrastructure/chaincode/GlobalContract/collections_config.json"
+    );
+
+    const collection = filterCollections(c);
+
     execSync(
       `rm -f ./docker/infrastructure/chaincode/GlobalContract/collections_config.json`,
       { stdio: "inherit" }
     );
 
-    const collections: { [indexer: string]: any }[] = [
-      {
-        name: "decaf-namespace-mirror",
-        policy: "OR('OrgaMSP.member')",
-        requiredPeerCount: 0,
-        maxPeerCount: 0,
-        blockToLive: 0,
-        memberOnlyRead: true,
-        memberOnlyWrite: false,
-        endorsementPolicy: {
-          signaturePolicy: "OR('OrgaMSP.peer')",
-        },
-      },
-      {
-        name: "decaf-namespaceOrg-B",
-        policy: "OR('OrgbMSP.member','OrgaMSP.member')",
-        requiredPeerCount: 1,
-        maxPeerCount: 2,
-        blockToLive: 0,
-        memberOnlyRead: true,
-        memberOnlyWrite: true,
-        endorsementPolicy: {
-          signaturePolicy: "AND('OrgbMSP.peer','OrgaMSP.peer')",
-        },
-      },
-      {
-        name: "decaf-namespaceOrg-C",
-        policy: "OR('OrgbMSP.member','OrgaMSP.member')",
-        requiredPeerCount: 1,
-        maxPeerCount: 2,
-        blockToLive: 0,
-        memberOnlyRead: true,
-        memberOnlyWrite: true,
-        endorsementPolicy: {
-          signaturePolicy: "AND('OrgbMSP.peer','OrgaMSP.peer')",
-        },
-      },
-    ];
+    // const collections: { [indexer: string]: any }[] = [
+    //   {
+    //     name: "decaf-namespace-mirror",
+    //     policy: "OR('OrgaMSP.member')",
+    //     requiredPeerCount: 0,
+    //     maxPeerCount: 0,
+    //     blockToLive: 0,
+    //     memberOnlyRead: true,
+    //     memberOnlyWrite: false,
+    //     endorsementPolicy: {
+    //       signaturePolicy: "OR('OrgaMSP.peer')",
+    //     },
+    //   },
+    //   {
+    //     name: "decaf-namespaceOrg-B",
+    //     policy: "OR('OrgbMSP.member','OrgaMSP.member')",
+    //     requiredPeerCount: 1,
+    //     maxPeerCount: 2,
+    //     blockToLive: 0,
+    //     memberOnlyRead: true,
+    //     memberOnlyWrite: true,
+    //     endorsementPolicy: {
+    //       signaturePolicy: "AND('OrgbMSP.peer','OrgaMSP.peer')",
+    //     },
+    //   },
+    //   {
+    //     name: "decaf-namespaceOrg-C",
+    //     policy: "OR('OrgbMSP.member','OrgaMSP.member')",
+    //     requiredPeerCount: 1,
+    //     maxPeerCount: 2,
+    //     blockToLive: 0,
+    //     memberOnlyRead: true,
+    //     memberOnlyWrite: true,
+    //     endorsementPolicy: {
+    //       signaturePolicy: "AND('OrgbMSP.peer','OrgaMSP.peer')",
+    //     },
+    //   },
+    // ];
 
     const p = path.join(
       __dirname,
       "../../docker/infrastructure/chaincode/GlobalContract/collections_config.json"
     );
 
-    console.log(p);
+    // console.log(p);
 
-    await writeJsonFile(p, collections);
+    await writeJsonFile(p, collection);
 
     // Deploy contract
     deployContract(
