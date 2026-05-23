@@ -31,7 +31,7 @@ import {
 @model()
 export class History extends Model {
   @pk()
-  @mirror("ptp-history-mirror", "OrgaMSP")
+  @mirror("ptp-history-mirror", "PharmaledgerassocMSP")
   @composed(["table", "key", "version"], ":")
   @description("Unique identifier of the history record.")
   id!: string;

@@ -25,7 +25,7 @@ export class OtherProduct extends BaseIdentifiedModel {
   @pk()
   @gtin()
   @historyDec()
-  @mirror("mirror-collection", "OrgaMSP")
+  @mirror("mirror-collection", "PharmaledgerassocMSP")
   @audit(OtherProduct)
   productCode!: string;
 

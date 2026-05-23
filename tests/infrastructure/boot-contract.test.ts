@@ -44,9 +44,9 @@ describe("Boot Contracts", () => {
     const contract_sequence = nextChaincodeSequence(contractName);
     const version = `${contract_sequence}.0`;
 
-    //Boot infrastructure for testing
-    execSync(`npm run infrastructure:up`, { stdio: "inherit" });
-    await ensureInfrastructureBooted();
+    // //Boot infrastructure for testing
+    // execSync(`npm run infrastructure:up`, { stdio: "inherit" });
+    // await ensureInfrastructureBooted();
 
     execSync(`rm -rf ./docker/infrastructure/chaincode/GlobalContract`, {
       stdio: "inherit",
@@ -120,22 +120,22 @@ describe("Boot Contracts", () => {
 
     await writeJsonFile(p, collection);
 
-    // Deploy contract
-    deployContract(
-      contractFolderName,
-      contractName,
-      contract_sequence,
-      version,
-      ["org-a-peer-0", "org-b-peer-0", "org-c-peer-0"],
-      true
-    );
+    // // Deploy contract
+    // deployContract(
+    //   contractFolderName,
+    //   contractName,
+    //   contract_sequence,
+    //   version,
+    //   ["org-a-peer-0", "org-b-peer-0", "org-c-peer-0"],
+    //   true
+    // );
 
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+    // await new Promise((resolve) => setTimeout(resolve, 10000));
 
-    console.log("Commiting");
+    // console.log("Commiting");
 
-    // Commit Chaincode
-    commitChaincode(contractName, contract_sequence, version, true);
+    // // Commit Chaincode
+    // commitChaincode(contractName, contract_sequence, version, true);
   });
 
   it("logs", async () => {

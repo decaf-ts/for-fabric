@@ -21,7 +21,7 @@ import {
 @model()
 export class OtherLeafletFile extends BaseIdentifiedModel {
   @pk()
-  @mirror("mirror-collection", "OrgaMSP")
+  @mirror("mirror-collection", "PharmaledgerassocMSP")
   @composed(["leafletId", "fileName"], ":")
   @description("Unique identifier of the leaflet file.")
   id!: string;
