@@ -3,7 +3,10 @@ import { Logging, toPascalCase } from "@decaf-ts/logging";
 import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import { builtinModules, createRequire } from "node:module";
 import { Plugin, rollup } from "rollup";
+import commonjs from "@rollup/plugin-commonjs";
+import { nodeResolve } from "@rollup/plugin-node-resolve";
 import replace from "@rollup/plugin-replace";
 import { InternalError, SerializationError } from "@decaf-ts/db-decorators";
 import {
@@ -62,6 +65,96 @@ function resolveBundledJsImports(): Plugin {
   };
 }
 
+function resolveDecafPackageImports(): Plugin {
+  const contractRequire = createRequire(path.join(process.cwd(), "package.json"));
+
+  return {
+    name: "resolve-decaf-package-imports",
+    resolveId(source) {
+      if (!source.startsWith("@decaf-ts/")) {
+        return null;
+      }
+
+      try {
+        return contractRequire.resolve(source);
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+const fabricPeerDependencies = new Set([
+  "@grpc/grpc-js",
+  "@hyperledger/fabric-gateway",
+  "@peculiar/webcrypto",
+  "fabric-ca-client",
+  "fabric-common",
+  "fabric-contract-api",
+  "fabric-network",
+  "fabric-shim",
+  "fabric-shim-api",
+]);
+
+function isNodeBuiltin(id: string): boolean {
+  const normalized = id.startsWith("node:") ? id.slice(5) : id;
+  return builtinModules.includes(normalized);
+}
+
+function shouldBundleContractModule(id: string): boolean {
+  if (id.startsWith(".") || path.isAbsolute(id)) return true;
+  if (id.startsWith("@decaf-ts/")) return true;
+  if (fabricPeerDependencies.has(id)) return false;
+  if (isNodeBuiltin(id)) return false;
+  return true;
+}
+
+function normalizeSideEffectPath(input: string): string {
+  return input.split(path.sep).join("/");
+}
+
+function buildSideEffectMatcher(extraPaths: string[]) {
+  const normalizedExtras = extraPaths.map((extraPath) => {
+    const normalized = normalizeSideEffectPath(extraPath.trim());
+    return {
+      raw: normalized,
+      resolved: path.isAbsolute(extraPath)
+        ? normalizeSideEffectPath(path.resolve(extraPath))
+        : normalizeSideEffectPath(path.resolve(process.cwd(), extraPath)),
+    };
+  });
+
+  return (id: string): boolean => {
+    const normalized = normalizeSideEffectPath(id);
+    const builtIns = [
+      "/src/contracts/bootstrap",
+      "/src/contracts/overrides",
+      "/src/contracts/fabric-overrides",
+      "/src/shared/overrides",
+      "/node_modules/@decaf-ts/",
+    ];
+
+    if (builtIns.some((needle) => normalized.includes(needle))) {
+      return true;
+    }
+
+    return normalizedExtras.some(({ raw, resolved }) => {
+      return (
+        normalized.includes(raw) ||
+        normalized.includes(resolved) ||
+        normalized.endsWith(`${raw}.js`) ||
+        normalized.endsWith(`${raw}.cjs`) ||
+        normalized.endsWith(`${raw}/index.js`) ||
+        normalized.endsWith(`${raw}/index.cjs`) ||
+        normalized.endsWith(`${resolved}.js`) ||
+        normalized.endsWith(`${resolved}.cjs`) ||
+        normalized.endsWith(`${resolved}/index.js`) ||
+        normalized.endsWith(`${resolved}/index.cjs`)
+      );
+    });
+  };
+}
+
 const compileCommand = new Command()
   .name("compile-contract")
   .description("Creates a global contract")
@@ -89,6 +182,10 @@ const compileCommand = new Command()
   .option("--output <String>", "output folder for contracts", "./contracts")
   .option("--sourcemaps", "includes sourcemaps in the compiled output", false)
   .option("--npmrc", "includes .npmrc in the compiled output", false)
+  .option(
+    "--side-effect-paths <paths...>",
+    "additional paths or package roots that must be preserved as side-effectful during contract bundling"
+  )
   .action(async (options: any) => {
     const pkg = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
@@ -126,6 +223,8 @@ const compileCommand = new Command()
       sourcemaps,
       // eslint-disable-next-line prefer-const
       npmrc,
+      // eslint-disable-next-line prefer-const
+      sideEffectPaths,
     } = options;
     const log = logger.for("compile-contract");
     try {
@@ -168,6 +267,9 @@ const compileCommand = new Command()
     log.info(`Deleting existing output folder (if exists) under ${output}`);
     execSync(`rm -rf ${output}`);
     if (bundle) {
+      const sideEffectMatcher = buildSideEffectMatcher(
+        Array.isArray(sideEffectPaths) ? sideEffectPaths : []
+      );
       log.info(`bundling contract from ${input}`);
       const tempBundleDir = fs.mkdtempSync(
         path.join(process.cwd(), ".contract-bundle-")
@@ -226,8 +328,23 @@ const compileCommand = new Command()
         compileWithTsconfigOverrides(tsConfigFile, tempCompilerOptions);
         const bundledContract = await rollup({
           input: bundledEntryPoint,
+          external: (id) => !shouldBundleContractModule(id),
+          treeshake: {
+            moduleSideEffects: (id) => sideEffectMatcher(id),
+          },
           plugins: [
+            resolveDecafPackageImports(),
             resolveBundledJsImports(),
+            nodeResolve({
+              extensions: [".mjs", ".js", ".json", ".cjs", ".ts"],
+              moduleDirectories: ["node_modules"],
+              modulePaths: [path.join(process.cwd(), "node_modules")],
+              exportConditions: ["node", "default", "require", "import"],
+              preferBuiltins: true,
+            }),
+            commonjs({
+              include: /node_modules/,
+            }),
             replace({
               preventAssignment: true,
               delimiters: ["", ""],
