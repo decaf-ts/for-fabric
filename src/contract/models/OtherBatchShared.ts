@@ -168,7 +168,7 @@ export class OtherBatchShared extends BaseIdentifiedModel {
   @pk()
   @audit(OtherBatchShared)
   @historyDec()
-  @mirror("mirror-collection", "OrgaMSP")
+  @mirror("mirror-collection", "PharmaledgerassocMSP")
   @composed(["productCode", "batchNumber"], ":")
   @description("Unique identifier composed of product code and batch number.")
   id!: string;

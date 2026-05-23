@@ -25,7 +25,7 @@ export class OtherProductImage extends BaseIdentifiedModel {
   @historyDec()
   @gtin()
   @defaultQueryAttr()
-  @mirror("mirror-collection", "OrgaMSP")
+  @mirror("mirror-collection", "PharmaledgerassocMSP")
   productCode!: string;
 
   @column()
