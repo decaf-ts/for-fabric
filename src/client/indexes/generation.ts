@@ -44,7 +44,9 @@ export function readModelFile(file: any) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const exports = require(path.join(process.cwd(), file.parentPath, file.name));
+  const filePath = path.resolve(file.parentPath, file.name);
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const exports = require(filePath);
 
   const values = Object.values(exports).filter((e) => {
     try {
@@ -63,12 +65,15 @@ export async function readModelFolders(
 ): Promise<ModelConstructor<any>[]> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require("path");
 
   const result: ModelConstructor<any>[] = [];
 
   for (const folder of folders) {
+    const resolvedFolder = path.resolve(folder);
     const files = fs
-      .readdirSync(folder, {
+      .readdirSync(resolvedFolder, {
         withFileTypes: true,
         recursive: true,
       })
