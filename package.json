@@ -124,7 +124,7 @@
     "repo:tests": "codex exec \"$(cat ./.codex/prompts/bulk-tests.md)\nbase_path is ./ and coverage is 95%\" -s workspace-write",
     "repo:readme": "codex exec \"$(cat ./.codex/prompts/update-readme.md)\nbase_path is ./\" -s workspace-write",
     "repo:pr": "npm run repo:doc && npm run repo:tests && npm run repo:readme",
-    "build:contract:shared": "npm run compile:contract:shared && npm run extract:indexes:shared && npm run extract:collections:shared",
+    "build:contract:shared": "npm run compile:contract:shared && npm run extract:indexes:shared",
     "docker:build-contracts": "DOCKER_BUILDKIT=1 docker build --no-cache --secret id=TOKEN,src=$PWD/.npmtoken -t ghcr.io/decaf-ts/for-fabric:contract-$(cat package.json | jq -r '.version') -t ghcr.io/decaf-ts/for-fabric:contract-${VERSION:-latest} -f ./docker/images/Dockerfile-contract .",
     "build:contract:docker": "npm run compile:contract:docker && npm run extract:indexes:docker && npm run extract:collections:docker",
     "compile:contract:docker": "decaf fabric compile-contract --dev --debug --bundle --ccaas --name ${CONTRACT_NAME:-global} --input ./src/contracts --output ./contracts --strip-contract-name",
