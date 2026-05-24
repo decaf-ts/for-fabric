@@ -131,7 +131,7 @@
     "extract:indexes:docker": "decaf fabric extract-indexes --folder ./lib/cjs/contract/models --outDir ./contracts",
     "extract:collections:docker": "decaf fabric extract-collections --folder ./lib/cjs/contract/models --outDir ./contracts --mspIds '[\"org-b\",\"org-c\"]' --mainMspId org-a",
     "sync-codex": "./bin/sync-codex.sh",
-    "compile:contract:shared": "decaf fabric compile-contract --dev --debug --bundle --name ${CONTRACT_NAME:-Global} --input ./src/contracts --output ./docker/infrastructure/chaincode",
+    "compile:contract:shared": "decaf fabric compile-contract --ccaas --dev --debug --bundle --name ${CONTRACT_NAME:-Global} --input ./src/contracts --output ./docker/infrastructure/chaincode",
     "extract:indexes:shared": "decaf fabric extract-indexes --folder ./lib/cjs/contract/trackedModels --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-Global}",
     "extract:collections:shared": "decaf fabric extract-collections --folder ./lib/cjs/contract/trackedModels --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-Global}"
   },
