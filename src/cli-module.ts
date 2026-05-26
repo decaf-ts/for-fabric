@@ -66,7 +66,9 @@ function resolveBundledJsImports(): Plugin {
 }
 
 function resolveDecafPackageImports(): Plugin {
-  const contractRequire = createRequire(path.join(process.cwd(), "package.json"));
+  const contractRequire = createRequire(
+    path.join(process.cwd(), "package.json")
+  );
 
   return {
     name: "resolve-decaf-package-imports",
@@ -853,6 +855,101 @@ const getCryptoMaterial = new Command()
     });
   });
 
+const getCopyToPTP = new Command()
+  .name("prepare-ptp")
+  .description("copies contract to the ptp folder")
+  .option("--origin-folder <String>", "origin workspace folder", undefined)
+  .option(
+    "--dest-folder <String>",
+    "folder to the destination workspace",
+    undefined
+  )
+  .action(async (options: any) => {
+    if (!(options.originFolder && options.destFolder)) {
+      logger
+        .for("prepare-ptp")
+        .error(
+          "Both --origin-folder and --dest-folder options are required to prepare-ptp"
+        );
+      return;
+    }
+
+    function copyFolder(source: string, target: string) {
+      // Remove existing target folder
+      if (fs.existsSync(target)) {
+        fs.rmSync(target, {
+          recursive: true,
+          force: true,
+        });
+      }
+
+      // Ensure parent exists
+      fs.mkdirSync(path.dirname(target), {
+        recursive: true,
+      });
+
+      // Copy folder
+      fs.cpSync(source, target, {
+        recursive: true,
+        force: true,
+      });
+
+      console.log(`Copied: ${source} 
+      -> ${target}`);
+    }
+
+    const origin = path.resolve(options.originFolder);
+    const dest = path.resolve(options.destFolder);
+
+    execSync(`cd for-fabric && npm run build`, { cwd: origin });
+    execSync(`cd for-fabric && npm run build:contract:shared`, { cwd: origin });
+
+    const sourceLib = path.join(origin, "for-fabric", "lib");
+    const targetLib = path.join(dest, "infra", "for-fabric", "lib");
+
+    copyFolder(sourceLib, targetLib);
+
+    const sourceGlobal = path.join(
+      origin,
+      "docker",
+      "infrastructure",
+      "chaincode",
+      "Global"
+    );
+
+    const targetContracts = path.join(dest, "toolkit", "contracts");
+
+    fs.mkdirSync(targetContracts, {
+      recursive: true,
+    });
+
+    for (const item of fs.readdirSync(sourceGlobal)) {
+      const sourceItem = path.join(sourceGlobal, item);
+      const targetItem = path.join(targetContracts, item);
+
+      // Remove existing target item if needed
+      if (fs.existsSync(targetItem)) {
+        fs.rmSync(targetItem, {
+          recursive: true,
+          force: true,
+        });
+      }
+
+      fs.cpSync(sourceItem, targetItem, {
+        recursive: true,
+        force: true,
+      });
+
+      console.log(`Copied: ${sourceItem} 
+      -> ${targetItem}`);
+    }
+
+    execSync(`cd toolkit && npm run build`, { cwd: dest });
+    execSync(`cd toolkit && npm run docker:build-contracts`, { cwd: dest });
+    execSync(`cd infra && npm run build`, { cwd: dest });
+    execSync(`cd infra && npm run build:jest:image`, { cwd: dest });
+  });
+
 const fabricCmd = new Command()
   .name("for-fabric")
   .command("fabric")
@@ -866,6 +963,7 @@ fabricCmd.addCommand(ensureInfra);
 fabricCmd.addCommand(deployContract);
 fabricCmd.addCommand(getCryptoMaterial);
 fabricCmd.addCommand(extractCollections);
+fabricCmd.addCommand(getCopyToPTP);
 
 export default function fabric() {
   return fabricCmd;
