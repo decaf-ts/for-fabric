@@ -381,8 +381,11 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
             resultArgs.push(result);
           }
           this.updateObservers(
-            ...(resultArgs as Parameters<typeof this.updateObservers>),
-            ...ctxArgs
+            resultArgs[0],
+            resultArgs[1],
+            resultArgs[2],
+            ...resultArgs.slice(3),
+            ...(ctxArgs as ContextualArgs<Context<FabricClientFlags>>)
           ).catch((e: unknown) =>
             log.error(
               `Failed to dispatch observer refresh for ${toWrap} on ${clazz.name || clazz} for ${ids}: ${e}`
