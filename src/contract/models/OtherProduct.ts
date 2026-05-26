@@ -16,7 +16,7 @@ import {
 import { version } from "@decaf-ts/db-decorators";
 import { historyDec } from "./history-dec";
 
-@privateData()
+// @privateData()
 @uses(FabricFlavour)
 // @BlockOperations([OperationKeys.DELETE])
 @table("other_product")
