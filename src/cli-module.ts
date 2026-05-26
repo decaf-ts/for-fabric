@@ -917,6 +917,7 @@ const getCopyToPTP = new Command()
 
     const sourceGlobal = path.join(
       origin,
+      "for-fabric",
       "docker",
       "infrastructure",
       "chaincode",
