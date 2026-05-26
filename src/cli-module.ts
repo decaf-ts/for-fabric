@@ -901,8 +901,14 @@ const getCopyToPTP = new Command()
     const origin = path.resolve(options.originFolder);
     const dest = path.resolve(options.destFolder);
 
-    execSync(`cd for-fabric && npm run build`, { cwd: origin });
-    execSync(`cd for-fabric && npm run build:contract:shared`, { cwd: origin });
+    execSync(`cd for-fabric && npm run build`, {
+      cwd: origin,
+      stdio: "inherit",
+    });
+    execSync(`cd for-fabric && npm run build:contract:shared`, {
+      cwd: origin,
+      stdio: "inherit",
+    });
 
     const sourceLib = path.join(origin, "for-fabric", "lib");
     const targetLib = path.join(dest, "infra", "for-fabric", "lib");
@@ -944,10 +950,16 @@ const getCopyToPTP = new Command()
       -> ${targetItem}`);
     }
 
-    execSync(`cd toolkit && npm run build`, { cwd: dest });
-    execSync(`cd toolkit && npm run docker:build-contracts`, { cwd: dest });
-    execSync(`cd infra && npm run build`, { cwd: dest });
-    execSync(`cd infra && npm run build:jest:image`, { cwd: dest });
+    execSync(`cd toolkit && npm run build`, { cwd: dest, stdio: "inherit" });
+    execSync(`cd toolkit && npm run docker:build-contracts`, {
+      cwd: dest,
+      stdio: "inherit",
+    });
+    execSync(`cd infra && npm run build`, { cwd: dest, stdio: "inherit" });
+    execSync(`cd infra && npm run build:jest:image`, {
+      cwd: dest,
+      stdio: "inherit",
+    });
   });
 
 const fabricCmd = new Command()
