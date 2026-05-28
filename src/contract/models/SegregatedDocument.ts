@@ -27,11 +27,11 @@ export class SegregatedPrivateDocument extends BaseIdentifiedModel {
   title!: string;
 
   @column()
-  @privateData(PRIVATE_COLLECTION_A)
+  // @privateData(PRIVATE_COLLECTION_A)
   privateNoteA?: string;
 
   @column()
-  @privateData(PRIVATE_COLLECTION_B)
+  // @privateData(PRIVATE_COLLECTION_B)
   privateNoteB?: string;
 
   @column()

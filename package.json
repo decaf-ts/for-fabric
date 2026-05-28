@@ -1,6 +1,7 @@
 {
   "name": "@decaf-ts/for-fabric",
   "version": "0.12.8",
+  "packageManager": "npm@11.13.0",
   "description": "Abstracts fabric logic",
   "type": "module",
   "exports": {
@@ -170,7 +171,8 @@
     "@decaf-ts/cli": "latest",
     "@decaf-ts/fabric-weaver": "latest",
     "@decaf-ts/utils": "latest",
-    "@types/jest": "^30.0.0"
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.9.1"
   },
   "dependencies": {
     "@decaf-ts/core": "latest",
