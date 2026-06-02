@@ -157,6 +157,10 @@ function buildSideEffectMatcher(extraPaths: string[]) {
   };
 }
 
+function removeSrcFromPath(path: string): string {
+  return path.replace(/^\.\/src\//, "./");
+}
+
 const compileCommand = new Command()
   .name("compile-contract")
   .description("Creates a global contract")
@@ -415,7 +419,7 @@ const compileCommand = new Command()
     delete contractPackage.exports;
     contractPackage.main = bundle
       ? `${toPascalCase(name)}.js`
-      : `${input}/index.js`;
+      : `${removeSrcFromPath(input)}/index.js`;
 
     fs.writeFileSync(
       path.join(output, "package.json"),
