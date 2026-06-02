@@ -161,6 +161,27 @@ function removeSrcFromPath(path: string): string {
   return path.replace(/^\.\/src\//, "./");
 }
 
+function copyFolderContents(sourceDir: string, targetDir: string) {
+  if (!fs.existsSync(sourceDir)) {
+    throw new Error(`Source directory does not exist: ${sourceDir}`);
+  }
+
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  for (const item of fs.readdirSync(sourceDir)) {
+    const sourcePath = path.join(sourceDir, item);
+    const targetPath = path.join(targetDir, item);
+
+    const stat = fs.statSync(sourcePath);
+
+    if (stat.isDirectory()) {
+      copyFolderContents(sourcePath, targetPath);
+    } else {
+      fs.copyFileSync(sourcePath, targetPath);
+    }
+  }
+}
+
 const compileCommand = new Command()
   .name("compile-contract")
   .description("Creates a global contract")
@@ -188,6 +209,11 @@ const compileCommand = new Command()
   .option("--output <String>", "output folder for contracts", "./contracts")
   .option("--sourcemaps", "includes sourcemaps in the compiled output", false)
   .option("--npmrc", "includes .npmrc in the compiled output", false)
+  .option(
+    "--from-lib",
+    "indicates that the contract to deploy is located in the lib folder and not pre-compiled in the contracts folder",
+    false
+  )
   .option(
     "--side-effect-paths <paths...>",
     "additional paths or package roots that must be preserved as side-effectful during contract bundling"
@@ -231,6 +257,8 @@ const compileCommand = new Command()
       npmrc,
       // eslint-disable-next-line prefer-const
       sideEffectPaths,
+      // eslint-disable-next-line prefer-const
+      fromLib,
     } = options;
     const log = logger.for("compile-contract");
     try {
@@ -272,7 +300,7 @@ const compileCommand = new Command()
     output = stripContractName ? output : path.join(output, name);
     log.info(`Deleting existing output folder (if exists) under ${output}`);
     execSync(`rm -rf ${output}`);
-    if (bundle) {
+    if (bundle && !fromLib) {
       const sideEffectMatcher = buildSideEffectMatcher(
         Array.isArray(sideEffectPaths) ? sideEffectPaths : []
       );
@@ -389,7 +417,7 @@ const compileCommand = new Command()
       } finally {
         fs.rmSync(tempBundleDir, { recursive: true, force: true });
       }
-    } else {
+    } else if (!fromLib) {
       compileWithTsconfigOverrides(tsConfigFile, {
         outDir: output,
         module: ts.ModuleKind.ESNext,
@@ -397,6 +425,11 @@ const compileCommand = new Command()
         sourceMap: sourcemaps,
         inlineSources: sourcemaps,
       });
+    } else {
+      copyFolderContents(
+        path.join(process.cwd(), "./lib/cjs"),
+        path.join(process.cwd(), output)
+      );
     }
 
     const scripts = {
@@ -419,7 +452,7 @@ const compileCommand = new Command()
     delete contractPackage.exports;
     contractPackage.main = bundle
       ? `${toPascalCase(name)}.js`
-      : `${removeSrcFromPath(input)}/index.js`;
+      : `${removeSrcFromPath(input)}/${fromLib ? "index.cjs" : "index.js"}`;
 
     fs.writeFileSync(
       path.join(output, "package.json"),
