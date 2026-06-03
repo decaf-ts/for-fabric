@@ -41,7 +41,7 @@ describe("IdentityService", () => {
     });
 
     await Service.boot();
-    service = Service.get("Identity") as ExtendedFabricIdentityService;
+    service = Service.get<ExtendedFabricIdentityService>("Identity");
   });
 
   it("should initialize FabricIdentityService", async () => {
