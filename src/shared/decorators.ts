@@ -5,6 +5,7 @@ import {
   UnsupportedError,
   Repository,
   ContextOf,
+  ContextualArgs,
 } from "@decaf-ts/core";
 import {
   generated,
@@ -40,6 +41,38 @@ import { toPascalCase } from "@decaf-ts/logging";
 import { FabricContractFlags } from "../contracts/types";
 import "../shared/overrides";
 import { type FabricContractContext } from "../contracts/ContractContext";
+
+export type ResolverFunction<T> = (
+  model: Constructor<Model<any>>,
+  ...args: ContextualArgs<any>
+) => Promise<T> | T;
+
+export const DefaultContractResolver = (
+  model: Constructor<Model<any>>,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  ...args: ContextualArgs<any>
+) => {
+  return model.name + "Contract";
+};
+
+export type ChaincodeMetadata = {
+  resolver: string | ResolverFunction<string>;
+};
+
+export function contract(resolver: any) {
+  const meta: ChaincodeMetadata = { resolver };
+  return metadata(FabricModelKeys.CONTRACT, meta);
+}
+
+export function chaincode(resolver: any) {
+  const meta: ChaincodeMetadata = { resolver };
+  return metadata(FabricModelKeys.CHAINCODE, meta);
+}
+
+export function channel(resolver: any) {
+  const meta: ChaincodeMetadata = { resolver };
+  return metadata(FabricModelKeys.CHANNEL, meta);
+}
 
 /**
  * @description Extracts the MSP ID from either a string or ClientIdentity object

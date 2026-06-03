@@ -223,7 +223,7 @@ describe("FabricClientAdapter", () => {
       expect.any(Array),
       {},
       undefined,
-      "ERC20Wallet"
+      ERC20Wallet
     );
   });
 

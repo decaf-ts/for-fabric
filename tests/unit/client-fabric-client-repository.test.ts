@@ -42,6 +42,7 @@ const createAdapter = () => {
   return {
     alias: `adapter-${Math.random().toString(36).slice(2)}`,
     flavour: "hlf-fabric",
+    decode: (data: Uint8Array) => new TextDecoder().decode(data),
     logCtx: jest.fn().mockImplementation((ctxArgs: any[]) => {
       const contextualized: any = {
         ctx: new Context(),
@@ -157,5 +158,24 @@ describe("FabricClientRepository default query statements", () => {
     expect(call[2]).toBe(OrderDirection.ASC);
     expect(call[3]).toEqual(ref);
     expect(statementSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes the model constructor to adapter statements", async () => {
+    const adapter = createAdapter();
+    const repo = new FabricClientRepository(adapter, Wallet);
+    const evaluateSpy = jest
+      .spyOn(adapter, "evaluateTransaction")
+      .mockResolvedValue(new TextEncoder().encode("[]"));
+
+    await repo.statement("customStatement");
+
+    expect(evaluateSpy).toHaveBeenCalledWith(
+      expect.any(Context),
+      "statement",
+      ["customStatement", "[]"],
+      undefined,
+      undefined,
+      Wallet
+    );
   });
 });

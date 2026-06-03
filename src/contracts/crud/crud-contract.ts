@@ -38,7 +38,11 @@ import {
   OperationKeys,
   PrimaryKeyType,
 } from "@decaf-ts/db-decorators";
-import { MissingContextError } from "../../shared/index";
+import {
+  FabricFlags,
+  FabricModelKeys,
+  MissingContextError,
+} from "../../shared/index";
 import { extractMspId } from "../../shared/decorators";
 import { PACKAGE_NAME, VERSION } from "../../version";
 
@@ -355,13 +359,17 @@ export abstract class FabricCrudContract<M extends Model>
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
+    if (typeof model === "string") model = this.deserialize<M>(model) as M;
     const { log, ctxArgs, ctx } = (
-      await this.logCtx([...args, context], OperationKeys.CREATE, true)
+      await this.logCtx(
+        [...args, context],
+        OperationKeys.CREATE,
+        true,
+        this.extractOverrides(model)
+      )
     ).for(this.create);
     this.ensureMirrorWritePermissions(ctx);
     log.info(`CONTRACT CREATE, ${ctxArgs}`);
-
-    if (typeof model === "string") model = this.deserialize<M>(model) as M;
 
     log.info(`Creating model: ${JSON.stringify(model)}`);
 
@@ -422,6 +430,15 @@ export abstract class FabricCrudContract<M extends Model>
     return transient;
   }
 
+  protected extractOverrides(
+    obj: any | any[]
+  ): Partial<FabricFlags<any>> | undefined {
+    if ((obj as any)[FabricModelKeys.OVERRIDES]) {
+      return (obj as any)[FabricModelKeys.OVERRIDES];
+    }
+    return undefined;
+  }
+
   /**
    * @description Updates a single model in the state database
    * @summary Delegates to the repository's update method
@@ -435,11 +452,17 @@ export abstract class FabricCrudContract<M extends Model>
     model: string | M,
     ...args: any[]
   ): Promise<string | M> {
+    if (typeof model === "string") model = this.deserialize<M>(model) as M;
+
     const { log, ctxArgs, ctx } = (
-      await this.logCtx([...args, context], OperationKeys.UPDATE, true)
+      await this.logCtx(
+        [...args, context],
+        OperationKeys.UPDATE,
+        true,
+        this.extractOverrides(model)
+      )
     ).for(this.update);
     this.ensureMirrorWritePermissions(ctx);
-    if (typeof model === "string") model = this.deserialize<M>(model) as M;
 
     log.info(`Updating model: ${JSON.stringify(model)}`);
 
@@ -490,11 +513,11 @@ export abstract class FabricCrudContract<M extends Model>
     keys: PrimaryKeyType[] | string,
     ...args: any[]
   ): Promise<M[] | string> {
+    if (typeof keys === "string") keys = JSON.parse(keys) as string[];
     const { ctxArgs, ctx: fabricCtx } = (
       await this.logCtx([...args, ctx], BulkCrudOperationKeys.DELETE_ALL, true)
     ).for(this.deleteAll);
     this.ensureMirrorWritePermissions(fabricCtx);
-    if (typeof keys === "string") keys = JSON.parse(keys) as string[];
     const deleted = await this.repo.deleteAll(keys, ...ctxArgs);
     const result = deleted.map((c) => new this.clazz(Model.segregate(c).model));
     return result;
@@ -513,10 +536,10 @@ export abstract class FabricCrudContract<M extends Model>
     keys: PrimaryKeyType[] | string,
     ...args: any[]
   ): Promise<M[] | string> {
+    if (typeof keys === "string") keys = JSON.parse(keys) as string[];
     const { ctxArgs } = (
       await this.logCtx([...args, ctx], BulkCrudOperationKeys.READ_ALL, true)
     ).for(this.create);
-    if (typeof keys === "string") keys = JSON.parse(keys) as string[];
     return this.repo.readAll(keys, ...ctxArgs);
   }
 
@@ -533,18 +556,19 @@ export abstract class FabricCrudContract<M extends Model>
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    const { log, ctxArgs, ctx } = (
-      await this.logCtx(
-        [...args, context],
-        BulkCrudOperationKeys.UPDATE_ALL,
-        true
-      )
-    ).for(this.updateAll);
-    this.ensureMirrorWritePermissions(ctx);
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
         .map((m) => this.deserialize(m))
         .map((m) => new this.clazz(m)) as any;
+    const { log, ctxArgs, ctx } = (
+      await this.logCtx(
+        [...args, context],
+        BulkCrudOperationKeys.UPDATE_ALL,
+        true,
+        this.extractOverrides(models)
+      )
+    ).for(this.updateAll);
+    this.ensureMirrorWritePermissions(ctx);
 
     const transient = this.getTransientData(ctx);
 
@@ -664,18 +688,19 @@ export abstract class FabricCrudContract<M extends Model>
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    const { log, ctxArgs, ctx } = (
-      await this.logCtx(
-        [...args, context],
-        BulkCrudOperationKeys.CREATE_ALL,
-        true
-      )
-    ).for(this.createAll);
-    this.ensureMirrorWritePermissions(ctx);
     if (typeof models === "string")
       models = (JSON.parse(models) as [])
         .map((m) => this.deserialize(m))
         .map((m) => new this.clazz(m)) as any;
+    const { log, ctxArgs, ctx } = (
+      await this.logCtx(
+        [...args, context],
+        BulkCrudOperationKeys.CREATE_ALL,
+        true,
+        this.extractOverrides(models)
+      )
+    ).for(this.createAll);
+    this.ensureMirrorWritePermissions(ctx);
 
     const transient = this.getTransientData(ctx);
 
@@ -732,7 +757,8 @@ export abstract class FabricCrudContract<M extends Model>
   >(
     args: MaybeContextualArg<FabricContractContext, ARGS>,
     operation: METHOD,
-    allowCreate: true
+    allowCreate: true,
+    overrides?: Partial<FabricFlags<any>>
   ): Promise<
     FabricContextualizedArgs<ARGS, METHOD extends string ? true : false>
   >;
@@ -742,7 +768,8 @@ export abstract class FabricCrudContract<M extends Model>
   >(
     args: MaybeContextualArg<FabricContractContext, ARGS>,
     operation: METHOD,
-    allowCreate: boolean = false
+    allowCreate: boolean = false,
+    overrides?: Partial<FabricFlags<any>>
   ):
     | Promise<
         FabricContextualizedArgs<ARGS, METHOD extends string ? true : false>
@@ -756,7 +783,7 @@ export abstract class FabricCrudContract<M extends Model>
       [this.clazz as any, ...args] as any,
       operation,
       allowCreate as any,
-      ctx
+      allowCreate && overrides ? ctx.accumulate(overrides) : ctx
     ) as
       | FabricContextualizedArgs<ARGS, METHOD extends string ? true : false>
       | Promise<

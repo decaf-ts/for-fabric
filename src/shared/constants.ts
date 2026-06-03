@@ -14,6 +14,10 @@ export enum FabricModelKeys {
   OWNED_BY = "owned-by",
   TRANSACTION_ID = "transaction-id",
   MIRROR = "mirror",
+  CONTRACT = `${FabricModelKeys.FABRIC}.contract`,
+  CHAINCODE = `${FabricModelKeys.FABRIC}.chaincode`,
+  CHANNEL = `${FabricModelKeys.FABRIC}.channel`,
+  OVERRIDES = `__overrides`,
 }
 /**
  * @description Supported identity types for Fabric credentials

@@ -2,8 +2,13 @@ import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { FabricModelKeys } from "../constants";
 import { SegregatedModel } from "../types";
-import { DBKeys } from "@decaf-ts/db-decorators";
-import { CollectionResolver, MirrorMetadata } from "../decorators";
+import { DBKeys, InternalError } from "@decaf-ts/db-decorators";
+import {
+  ChaincodeMetadata,
+  CollectionResolver,
+  MirrorMetadata,
+} from "../decorators";
+import { Context, ContextualArgs } from "@decaf-ts/core";
 
 Model.prototype.isShared = function isShared<M extends Model>(
   this: M
@@ -161,4 +166,52 @@ Model.prototype.segregate = function segregate<M extends Model>(
     privateCols: privateMeta?.collections || [],
     sharedCols: sharedMeta?.collections || [],
   };
+}.bind(Model);
+
+(Model as any).chaincodeOf = function chaincodeOf<M extends Model>(
+  model: Constructor<M>,
+  ...args: ContextualArgs<any>
+): string | undefined | Promise<string | undefined> {
+  const m: ChaincodeMetadata = Metadata.get(
+    model as any,
+    FabricModelKeys.CHAINCODE
+  );
+  if (!m || !m.resolver) return undefined;
+  if (typeof m.resolver === "string") return m.resolver;
+  const ctx = args.pop();
+  if (!ctx || !(ctx instanceof Context))
+    throw new InternalError(`No context provided for chaincode resolution`);
+  return m.resolver(model, ...args, ctx);
+}.bind(Model);
+
+(Model as any).contractOf = function contractOf<M extends Model>(
+  model: Constructor<M>,
+  ...args: ContextualArgs<any>
+): string | undefined | Promise<string | undefined> {
+  const m: ChaincodeMetadata = Metadata.get(
+    model as any,
+    FabricModelKeys.CONTRACT
+  );
+  if (!m || !m.resolver) return undefined;
+  if (typeof m.resolver === "string") return m.resolver;
+  const ctx = args.pop();
+  if (!ctx || !(ctx instanceof Context))
+    throw new InternalError(`No context provided for chaincode resolution`);
+  return m.resolver(model, ...args, ctx);
+}.bind(Model);
+
+(Model as any).channelOf = function channelOf<M extends Model>(
+  model: Constructor<M>,
+  ...args: ContextualArgs<any>
+): string | undefined | Promise<string | undefined> {
+  const m: ChaincodeMetadata = Metadata.get(
+    model as any,
+    FabricModelKeys.CHANNEL
+  );
+  if (!m || !m.resolver) return undefined;
+  if (typeof m.resolver === "string") return m.resolver;
+  const ctx = args.pop();
+  if (!ctx || !(ctx instanceof Context))
+    throw new InternalError(`No context provided for chaincode resolution`);
+  return m.resolver(model, ...args, ctx);
 }.bind(Model);

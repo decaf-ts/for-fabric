@@ -2,6 +2,7 @@ import { SegregatedModel } from "../types";
 import { Constructor } from "@decaf-ts/decoration";
 import "@decaf-ts/decorator-validation";
 import { CollectionResolver, MirrorMetadata } from "../decorators";
+import { ContextualArgs } from "@decaf-ts/core";
 
 declare module "@decaf-ts/decorator-validation" {
   export interface Model {
@@ -25,5 +26,17 @@ declare module "@decaf-ts/decorator-validation" {
       privateCols: (string | CollectionResolver)[];
       sharedCols: (string | CollectionResolver)[];
     };
+    function chaincodeOf<M extends Model>(
+      model: Constructor<M>,
+      ...args: ContextualArgs<any>
+    ): string | undefined | Promise<string | undefined>;
+    function contractOf<M extends Model>(
+      model: Constructor<M>,
+      ...args: ContextualArgs<any>
+    ): string | undefined | Promise<string | undefined>;
+    function channelOf<M extends Model>(
+      model: Constructor<M>,
+      ...args: ContextualArgs<any>
+    ): string | undefined | Promise<string | undefined>;
   }
 }

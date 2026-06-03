@@ -222,7 +222,7 @@ export class FabricClientRepository<
           [name, JSON.stringify(callArgs)],
           undefined,
           undefined,
-          this.class.name
+          this.class
         )
       )
     );

@@ -90,7 +90,7 @@ import { DefaultFabricClientFlags } from "./constants";
 import fs from "fs";
 import { CryptoUtils } from "./crypto";
 import { extractIds } from "./ids/id-extraction";
-import { Identity } from "../shared/index";
+import { DefaultContractResolver, Identity } from "../shared/index";
 
 type LegacyPeerTarget = {
   mspId: string;
@@ -182,6 +182,27 @@ export class FabricClientAdapter extends Adapter<
       FabricFlavour,
       alias
     );
+  }
+
+  protected chaincodeFor(
+    model: Constructor<Model<any>>,
+    ...args: ContextualArgs<Context<FabricClientFlags>>
+  ) {
+    return FabricClientAdapter.chaincodeFor(model, this.config, ...args);
+  }
+
+  protected channelFor(
+    model: Constructor<Model<any>>,
+    ...args: ContextualArgs<Context<FabricClientFlags>>
+  ) {
+    return FabricClientAdapter.channelFor(model, this.config, ...args);
+  }
+
+  protected contractFor(
+    model: Constructor<Model<any>>,
+    ...args: ContextualArgs<Context<FabricClientFlags>>
+  ) {
+    return FabricClientAdapter.contractFor(model, this.config, ...args);
   }
 
   override Statement<M extends Model>(
@@ -403,7 +424,7 @@ export class FabricClientAdapter extends Adapter<
       ],
       transientPayload as any,
       this.getEndorsingOrganizations(ctx),
-      clazz.name
+      clazz
     );
 
     let res: Record<string, any>[];
@@ -459,7 +480,7 @@ export class FabricClientAdapter extends Adapter<
       [JSON.stringify(ids)],
       undefined,
       undefined,
-      clazz.name
+      clazz
     );
     try {
       return JSON.parse(this.decode(result)).map((r: any) => JSON.parse(r));
@@ -509,7 +530,7 @@ export class FabricClientAdapter extends Adapter<
       ],
       transientPayload as any,
       this.getEndorsingOrganizations(ctx),
-      clazz.name
+      clazz
     );
 
     let res: any;
@@ -572,7 +593,7 @@ export class FabricClientAdapter extends Adapter<
       [JSON.stringify(ids)],
       undefined,
       this.getEndorsingOrganizations(ctx),
-      clazz.name
+      clazz
     );
     try {
       return shouldHydrate
@@ -779,7 +800,7 @@ export class FabricClientAdapter extends Adapter<
       [this.serializer.serialize(model, clazz.name)],
       transientPayload as any,
       this.getEndorsingOrganizations(ctx),
-      clazz.name
+      clazz
     );
     const deserialized = this.serializer.deserialize(this.decode(result));
     if (this.shouldRefreshAfterWrite(clazz, ctx, needsFullPayload, id)) {
@@ -816,7 +837,7 @@ export class FabricClientAdapter extends Adapter<
       [],
       undefined,
       undefined,
-      clazz.name
+      clazz
     );
     return JSON.parse(this.decode(result));
   }
@@ -846,7 +867,7 @@ export class FabricClientAdapter extends Adapter<
       [id.toString()],
       undefined,
       undefined,
-      clazz.name
+      clazz
     );
     return this.serializer.deserialize(this.decode(result));
   }
@@ -903,7 +924,7 @@ export class FabricClientAdapter extends Adapter<
       [this.serializer.serialize(model, clazz.name || clazz)], // TODO should be receving class but is receiving string
       transientPayload as any,
       this.getEndorsingOrganizations(ctx),
-      clazz.name
+      clazz
     );
     const deserialized = this.serializer.deserialize(this.decode(result));
     if (this.shouldRefreshAfterWrite(clazz, ctx, needsFullPayload, id)) {
@@ -961,7 +982,7 @@ export class FabricClientAdapter extends Adapter<
       [id.toString()],
       undefined,
       this.getEndorsingOrganizations(ctx),
-      clazz.name
+      clazz
     );
     return shouldHydrate
       ? result
@@ -1001,7 +1022,6 @@ export class FabricClientAdapter extends Adapter<
     ...args: ContextualArgs<Context<FabricClientFlags>>
   ): Promise<V> {
     const { log, ctx } = this.logCtx(args, this.raw);
-    const tableName = clazz.name;
     log.info(`Performing raw statement on table ${Model.tableName(clazz)}`);
     let transactionResult: any;
     try {
@@ -1011,7 +1031,7 @@ export class FabricClientAdapter extends Adapter<
         [JSON.stringify(rawInput), docsOnly],
         undefined,
         undefined,
-        tableName
+        clazz
       );
     } catch (e: unknown) {
       throw this.parseError(e as Error);
@@ -1101,11 +1121,6 @@ export class FabricClientAdapter extends Adapter<
     return FabricClientAdapter.getGateway(ctx, this.config, this.client);
   }
 
-  private getContractName(className?: string) {
-    if (!className) return undefined;
-    return `${className}Contract`;
-  }
-
   /**
    * @description Gets a Contract instance for the Fabric chaincode
    * @summary Creates a new Contract instance using the current Gateway
@@ -1113,12 +1128,13 @@ export class FabricClientAdapter extends Adapter<
    */
   protected async Contract(
     ctx: Context<FabricClientFlags>,
-    contractName?: string
+    clazzOrContractName?: Constructor<Model<any>> | string
   ): Promise<Contrakt> {
     return FabricClientAdapter.getContract(
       await this.Gateway(ctx),
       this.config,
-      contractName
+      clazzOrContractName,
+      ctx
     );
   }
 
@@ -1157,17 +1173,14 @@ export class FabricClientAdapter extends Adapter<
     args?: any[],
     transientData: Record<string, string> = {},
     endorsingOrganizations?: string[],
-    className?: string
+    clazzOrContractName?: Constructor<Model<any>> | string
   ): Promise<Uint8Array> {
     const log = this.log.for(this.transaction);
     const gateway = await this.Gateway(ctx);
     try {
-      const contract = await this.Contract(
-        ctx,
-        this.getContractName(className)
-      );
+      const contract = await this.Contract(ctx, clazzOrContractName);
       log.verbose(
-        `${submit ? "Submit" : "Evaluate"}ting transaction ${this.getContractName(className) || this.config.contractName}.${api}`
+        `${submit ? "Submit" : "Evaluate"}ting transaction ${contract.getContractName()}.${api}`
       );
       log.debug(`args: ${args?.map((a) => a.toString()).join("\n") || "none"}`);
       const method = submit ? contract.submit : contract.evaluate;
@@ -1306,7 +1319,7 @@ export class FabricClientAdapter extends Adapter<
     args: string[],
     transientMap: Record<string, Buffer> | undefined,
     peerConfigs: LegacyPeerTarget[],
-    className?: string
+    clazzOrContractName?: Constructor<Model<any>> | string
   ): Promise<Uint8Array> {
     const log = this.log.for(this.submitLegacyWithExplicitEndorsers);
     const peers = this.normalizeLegacyPeers(peerConfigs);
@@ -1339,11 +1352,28 @@ export class FabricClientAdapter extends Adapter<
         },
       });
 
-      const network = await gateway.getNetwork(this.config.channel);
-      const contract = network.getContract(
-        this.config.chaincodeName,
-        this.getContractName(className)
-      );
+      let channel = this.config.channel;
+      let chaincode = this.config.chaincodeName;
+      let contractName = this.config.contractName;
+
+      if (clazzOrContractName) {
+        if (typeof clazzOrContractName === "string")
+          contractName = clazzOrContractName;
+        else {
+          if (!ctx)
+            throw new InternalError(
+              `No context received to determine chaincode config`
+            );
+          channel =
+            (await this.channelFor(clazzOrContractName, ctx)) || channel;
+          chaincode =
+            (await this.chaincodeFor(clazzOrContractName, ctx)) || chaincode;
+          contractName = await this.contractFor(clazzOrContractName, ctx);
+        }
+      }
+
+      const network = await gateway.getNetwork(channel);
+      const contract = network.getContract(chaincode, contractName);
       const transaction = contract.createTransaction(fcn);
 
       if (transientMap) {
@@ -1358,7 +1388,7 @@ export class FabricClientAdapter extends Adapter<
       }
 
       log.verbose(
-        `Legacy submitting ${this.getContractName(className) || this.config.contractName}.${fcn} via peers ${peers.map((p) => p.peerEndpoint).join(", ")}`
+        `Legacy submitting ${contractName}.${fcn} via peers ${peers.map((p) => p.peerEndpoint).join(", ")}`
       );
 
       const result = await transaction.submit(...args);
@@ -1512,7 +1542,7 @@ export class FabricClientAdapter extends Adapter<
     args?: any[],
     transientData?: Record<string, string>,
     endorsingOrganizations?: Array<string>,
-    className?: string
+    clazzOrContractName?: Constructor<Model<any>> | string
   ): Promise<Uint8Array> {
     if (this.shouldUseLegacyGateway(ctx)) {
       const legacyArgs = this.prepareLegacyArgs(args);
@@ -1524,7 +1554,7 @@ export class FabricClientAdapter extends Adapter<
         legacyArgs,
         transientMap,
         peerConfigs,
-        className
+        clazzOrContractName
       );
     }
     return this.transaction(
@@ -1534,7 +1564,7 @@ export class FabricClientAdapter extends Adapter<
       args,
       transientData,
       endorsingOrganizations,
-      className
+      clazzOrContractName
     );
   }
 
@@ -1553,7 +1583,7 @@ export class FabricClientAdapter extends Adapter<
     args?: any[],
     transientData?: Record<string, string>,
     endorsingOrganizations?: Array<string>,
-    className?: string
+    clazzOrContractName?: Constructor<Model<any>> | string
   ): Promise<Uint8Array> {
     return this.transaction(
       ctx,
@@ -1562,7 +1592,7 @@ export class FabricClientAdapter extends Adapter<
       args,
       transientData,
       endorsingOrganizations,
-      className
+      clazzOrContractName
     );
   }
 
@@ -1607,20 +1637,42 @@ export class FabricClientAdapter extends Adapter<
    * @param {PeerConfig} config - The peer configuration
    * @return {Contrakt} The Contract instance
    */
-  static getContract(
+  static async getContract(
     gateway: Gateway,
     config: PeerConfig,
-    contractName?: string
-  ): Contrakt {
+    clazzOrContractName?: string | Constructor<Model<any>>,
+    ctx?: Context<FabricClientFlags>
+  ): Promise<Contrakt> {
     const log = this.log.for(this.getContract);
-    const network = this.getNetwork(gateway, config.channel);
+
+    let channel = config.channel;
+    let chaincode = config.chaincodeName;
+    let contractName = config.contractName;
+
+    if (clazzOrContractName) {
+      if (typeof clazzOrContractName === "string")
+        contractName = clazzOrContractName;
+      else {
+        if (!ctx)
+          throw new InternalError(
+            `No context received to determine chaincode config`
+          );
+        channel =
+          (await this.channelFor(clazzOrContractName, config, ctx)) || channel;
+        chaincode =
+          (await this.chaincodeFor(clazzOrContractName, config, ctx)) ||
+          chaincode;
+        contractName = await this.contractFor(clazzOrContractName, config, ctx);
+      }
+    }
+
+    const network = this.getNetwork(gateway, channel);
     let contract: Contrakt;
     try {
       log.debug(
-        `Retrieving chaincode ${config.chaincodeName} contract ${contractName || config.contractName} from network ${config.channel}`
+        `Retrieving chaincode ${chaincode} contract ${contractName} from network ${channel}`
       );
-      contractName = contractName ? contractName : config.contractName;
-      contract = network.getContract(config.chaincodeName, contractName);
+      contract = network.getContract(chaincode, contractName);
     } catch (e: any) {
       throw this.parseError(e);
     }
@@ -1814,6 +1866,33 @@ export class FabricClientAdapter extends Adapter<
    */
   override Dispatch(): FabricClientDispatch {
     return new FabricClientAdapter["_baseDispatch"](this.client);
+  }
+
+  protected static chaincodeFor(
+    model: Constructor<Model<any>>,
+    config: PeerConfig,
+    ...args: ContextualArgs<Context<FabricClientFlags>>
+  ) {
+    return Model.chaincodeOf(model, ...args) || config.chaincodeName;
+  }
+
+  protected static channelFor(
+    model: Constructor<Model<any>>,
+    config: PeerConfig,
+    ...args: ContextualArgs<Context<FabricClientFlags>>
+  ) {
+    return Model.channelOf(model, ...args) || config.channel;
+  }
+
+  protected static contractFor(
+    model: Constructor<Model<any>>,
+    config: PeerConfig,
+    ...args: ContextualArgs<Context<FabricClientFlags>>
+  ) {
+    return (
+      Model.contractOf(model, ...args) ||
+      DefaultContractResolver(model, ...args)
+    );
   }
 
   /**
