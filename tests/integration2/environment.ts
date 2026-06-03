@@ -36,7 +36,7 @@ export function getOrgEnv(orgWithCap: string) {
     tlsVerify: true,
     peerEndpoint: "localhost:8250",
     peerHostAlias: `${orgName}-peer-0`,
-    chaincodeName: "ptp-contract",
+    chaincodeName: "ptp-chaincode",
     caEndpoint: "https://localhost:8210",
     ca: `${orgName}-ca`,
     mspId: `${orgWithCap}MSP`,
