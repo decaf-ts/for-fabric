@@ -1,4 +1,4 @@
-import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
+import { OtherProductShared } from "../../src/contract/trackedModels/OtherProductShared";
 import {
   extractCollections,
   PrivateCollection,

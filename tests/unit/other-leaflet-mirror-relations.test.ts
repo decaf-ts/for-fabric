@@ -3,8 +3,8 @@ import { AuthorizationError, NotFoundError } from "@decaf-ts/db-decorators";
 import { OrderDirection } from "@decaf-ts/core";
 import { SerializedCrudContract } from "../../src/contracts/crud/serialized-crud-contract";
 import { getMockCtx, getStubMock } from "./ContextMock";
-import { Leaflet as OtherLeaflet } from "../../src/contract/models/OtherLeaflet";
-import { OtherLeafletFile } from "../../src/contract/models/OtherLeafletFile";
+import { Leaflet as OtherLeaflet } from "../../src/contract/trackedModels/OtherLeaflet";
+import { OtherLeafletFile } from "../../src/contract/trackedModels/OtherLeafletFile";
 import { generateGtin } from "../../src/contract/models/gtin";
 
 jest.setTimeout(30000);

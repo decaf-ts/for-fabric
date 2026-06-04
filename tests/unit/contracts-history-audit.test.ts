@@ -2,11 +2,11 @@ import "../../src/shared/overrides";
 import { Model } from "@decaf-ts/decorator-validation";
 import { getMockCtx, getStubMock } from "./ContextMock";
 import { OtherProductSharedContract } from "../../src/contract/OtherProductSharedContract";
-import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
+import { OtherProductShared } from "../../src/contract/trackedModels/OtherProductShared";
 import { generateGtin } from "../../src/contract/models/gtin";
-import { OtherMarket } from "../../src/contract/models/OtherMarket";
-import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
-import { History } from "../../src/contract/models/History";
+import { OtherMarket } from "../../src/contract/trackedModels/OtherMarket";
+import { OtherProductStrength } from "../../src/contract/trackedModels/OtherProductStrength";
+import { History } from "../../src/contract/trackedModels/History";
 import { InternalError, NotFoundError } from "@decaf-ts/db-decorators";
 
 jest.setTimeout(60000);

@@ -68,9 +68,9 @@ describe("shared/decorators contract resolution", () => {
     @contract(resolver)
     class DynamicContractModel extends Model {}
 
-    await expect(
-      Model.contractOf(DynamicContractModel, "suffix", ctx as any)
-    ).resolves.toBe("DynamicContractModel:suffix:ctx");
+    expect(Model.contractOf(DynamicContractModel, "suffix", ctx as any)).toBe(
+      "DynamicContractModel:suffix:ctx"
+    );
     expect(resolver).toHaveBeenCalledWith(DynamicContractModel, "suffix", ctx);
   });
 

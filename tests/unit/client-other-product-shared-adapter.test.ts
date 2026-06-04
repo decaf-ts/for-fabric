@@ -7,9 +7,9 @@ import { OperationKeys } from "@decaf-ts/db-decorators";
 import { Model } from "@decaf-ts/decorator-validation";
 import { PeerConfig } from "../../src/shared/types";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
-import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
-import { OtherMarket } from "../../src/contract/models/OtherMarket";
-import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
+import { OtherProductShared } from "../../src/contract/trackedModels/OtherProductShared";
+import { OtherMarket } from "../../src/contract/trackedModels/OtherMarket";
+import { OtherProductStrength } from "../../src/contract/trackedModels/OtherProductStrength";
 
 const peerConfig: PeerConfig = {
   cryptoPath: "/tmp",

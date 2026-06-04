@@ -420,9 +420,9 @@ export abstract class FabricCrudContract<M extends Model>
 
     if (transientMap.has("__overrides")) {
       const overrides = JSON.parse(
-        (
-          transientMap.get(this.repo["tableName"]) as unknown as Buffer
-        )?.toString("utf8") as string
+        (transientMap.get("__overrides") as unknown as Buffer)?.toString(
+          "utf8"
+        ) as string
       );
 
       ctx.accumulate(overrides);

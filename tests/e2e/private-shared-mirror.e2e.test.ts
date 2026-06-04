@@ -8,7 +8,7 @@ import {
   SegregatedSharedDocument,
 } from "../../src/contract/models/SegregatedDocument";
 import { execSync } from "child_process";
-import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
+import { OtherProductShared } from "../../src/contract/trackedModels/OtherProductShared";
 
 const { adapterFactory } = E2eConfig;
 const makeId = (prefix: string) =>

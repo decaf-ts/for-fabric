@@ -7,7 +7,7 @@ import { Constructor } from "@decaf-ts/decoration";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricClientPaginator } from "../../src/client/FabricClientPaginator";
-import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
+import { OtherProductStrength } from "../../src/contract/trackedModels/OtherProductStrength";
 import { FabricFlavour } from "../../src/shared/constants";
 
 const logger = {
@@ -111,7 +111,7 @@ const stubAdapter = {
           ["select", JSON.stringify(this.command)],
           undefined,
           undefined,
-          OtherProductStrength.name
+          OtherProductStrength
         );
         return JSON.parse(stubAdapter.decode(data as Buffer));
       },
@@ -189,7 +189,7 @@ describe("client other-product strength repository", () => {
       .calls[0];
     expect(statementCall[0]).toBe(ctx);
     expect(statementCall[1]).toBe(PersistenceKeys.STATEMENT);
-    expect(statementCall[5]).toBe(OtherProductStrength.name);
+    expect(statementCall[5]).toBe(OtherProductStrength);
     const callPayload = JSON.parse(statementCall[2][1]);
     expect(callPayload[0]).toBe("productCode");
     expect(callPayload[1]).toBe(OrderDirection.ASC);
@@ -219,7 +219,7 @@ describe("client other-product strength repository", () => {
   it("routes select queries through prepared statements", async () => {
     const ctx = createContext();
     const selectPayload = [{ productCode: "select-1" }];
-    (stubAdapter.evaluateTransaction as jest.Mock).mockResolvedValueOnce(
+    (stubAdapter.evaluateTransaction as jest.Mock).mockResolvedValue(
       Buffer.from(JSON.stringify(selectPayload))
     );
 

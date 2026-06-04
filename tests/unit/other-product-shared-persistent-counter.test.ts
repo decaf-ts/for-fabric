@@ -5,7 +5,7 @@ import { NotFoundError } from "@decaf-ts/db-decorators";
 import { SequenceModel } from "@decaf-ts/core";
 import { getMockCtx } from "./ContextMock";
 import { OtherProductSharedContract } from "../../src/contract/OtherProductSharedContract";
-import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
+import { OtherProductShared } from "../../src/contract/trackedModels/OtherProductShared";
 import { generateGtin } from "../../src/contract/models/gtin";
 
 jest.setTimeout(30000);

@@ -3,7 +3,7 @@ import { Model } from "@decaf-ts/decorator-validation";
 import { Metadata } from "@decaf-ts/decoration";
 import { NotFoundError } from "@decaf-ts/db-decorators";
 import { OtherProductSharedContract } from "../../src/contract/OtherProductSharedContract";
-import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
+import { OtherProductShared } from "../../src/contract/trackedModels/OtherProductShared";
 import { generateGtin } from "../../src/contract/models/gtin";
 
 describe("Tests Shared and mirrored models", () => {

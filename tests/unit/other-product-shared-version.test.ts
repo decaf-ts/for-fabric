@@ -7,20 +7,21 @@ import { OtherProductSharedContract } from "../../src/contract/OtherProductShare
 import { OtherProductStrengthContract } from "../../src/contract/OtherProductStrengthContract";
 import { OtherMarketContract } from "../../src/contract/OtherMarketContract";
 import { OtherProductImageContract } from "../../src/contract/OtherProductImageContract";
-import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
+import { OtherProductShared } from "../../src/contract/trackedModels/OtherProductShared";
 import { generateGtin } from "../../src/contract/models/gtin";
 import { AuthorizationError, Paginator, SerializedPage } from "@decaf-ts/core";
-import { OtherMarket } from "../../src/contract/models/OtherMarket";
-import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
+import { OtherMarket } from "../../src/contract/trackedModels/OtherMarket";
+import { OtherProductStrength } from "../../src/contract/trackedModels/OtherProductStrength";
 import { GtinOwner } from "../../src/contract/models/GtinOwner";
 import { FabricClientPaginator } from "../../src/client/FabricClientPaginator";
-import { OtherBatchShared } from "../../src/contract/models/OtherBatchShared";
+import { OtherBatchShared } from "../../src/contract/trackedModels/OtherBatchShared";
 import { OtherBatchContract } from "../../src/contract/OtherBatchContract";
 import { AuditContract } from "../../src/contract/AuditContract";
-import { OtherAudit } from "../../src/contract/models/OtherAudit";
-import { History } from "../../src/contract/models/History";
+import { OtherAudit } from "../../src/contract/trackedModels/OtherAudit";
+import { History } from "../../src/contract/trackedModels/History";
 import { OtherAuditContract } from "../../src/contract/OtherAuditContract";
-import { OtherProductImage } from "../../src/contract/models/OtherProductImage";
+import { OtherProductImage } from "../../src/contract/trackedModels/OtherProductImage";
+import { FabricContractContext } from "../../src/contracts/ContractContext";
 
 jest.setTimeout(50000);
 
@@ -81,7 +82,7 @@ describe("OtherProductShared contract version flow with relations", () => {
     const transient = segregated.transient || {};
 
     transientSpy.mockImplementation(() => transient);
-    return Model.merge(segregated.model, transient as any);
+    return segregated.model;
   }
 
   function currentOwner() {
@@ -193,7 +194,8 @@ describe("OtherProductShared contract version flow with relations", () => {
     return loadPrivateSharedModel(
       "other_batch_shared",
       `${productCode}:${batch}`,
-      OtherBatchShared
+      OtherBatchShared,
+      collection
     );
   }
 
@@ -1259,8 +1261,7 @@ describe("OtherProductShared contract version flow with relations", () => {
     let updated: OtherBatchShared;
 
     it("update with shared data", async () => {
-      const baseModel = new OtherBatchShared({
-        ...created,
+      const baseModel = Object.assign(created, {
         expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
       });
 
@@ -1350,13 +1351,11 @@ describe("OtherProductShared contract version flow with relations", () => {
     });
 
     it("updates in bulk", async () => {
-      const toUpdate = batchBulk.map((b, i) => {
-        return new OtherBatchShared({
-          ...b,
+      const toUpdate = batchBulk.map((b, i) =>
+        Object.assign(b, {
           manufacturerName: `Manufacturer Name Update ${i}`,
-        });
-      });
-
+        })
+      );
       const payload = JSON.stringify(preparePayloadBulk(toUpdate));
 
       JSON.parse(await batchContract.updateAll(ctx as any, payload)).map(
@@ -2292,21 +2291,25 @@ describe("OtherProductShared contract version flow with relations", () => {
     function getOrgBCtx() {
       const baseCtx = getMockCtx();
       const orgBStub = Object.create(stub);
+      const orgBIdentity = {
+        getID: () => "id-org-b",
+        getMSPID: () => "org-b",
+        getIDBytes: () => Buffer.from("creatorID-org-b"),
+        getAttributeValue: (name: string) =>
+          name === "roles" ? ["admin"] : undefined,
+      };
       orgBStub.getCreator = async () => ({
         idBytes: Buffer.from("creatorID-org-b"),
         mspid: "org-b",
       });
       orgBStub.getMspID = () => "org-b";
-      return Object.assign(baseCtx, {
+      const orgBCtx = new FabricContractContext();
+      return orgBCtx.accumulate({
         stub: orgBStub,
-        clientIdentity: {
-          getID: () => "id-org-b",
-          getMSPID: () => "org-b",
-          getIDBytes: () => Buffer.from("creatorID-org-b"),
-          getAttributeValue: (name: string) =>
-            name === "roles" ? ["admin"] : undefined,
-        },
-      });
+        identity: orgBIdentity,
+        clientIdentity: orgBIdentity,
+        logger: baseCtx.logging.getLogger("org-b"),
+      } as any);
     }
 
     describe("product mirror", () => {
@@ -2783,7 +2786,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         // Diagnostic: check mirroredAt and mirror data
         const mirrorMeta = (Model as any).mirroredAt(OtherBatchShared);
         expect(mirrorMeta).toBeDefined();
-        expect(mirrorMeta.mspId).toBe("org-b");
+        expect(mirrorMeta.mspId).toBe("PharmaledgerassocMSP");
 
         const batchKey = stub.createCompositeKey("other_batch_shared", [
           mirrorBatches[0].id,

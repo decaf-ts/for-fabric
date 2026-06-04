@@ -3,9 +3,9 @@ import { Model } from "@decaf-ts/decorator-validation";
 import { NotFoundError } from "@decaf-ts/db-decorators";
 import { getMockCtx, getStubMock } from "./ContextMock";
 import { OtherProductSharedContract } from "../../src/contract/OtherProductSharedContract";
-import { OtherProductShared } from "../../src/contract/models/OtherProductShared";
-import { OtherMarket } from "../../src/contract/models/OtherMarket";
-import { OtherProductStrength } from "../../src/contract/models/OtherProductStrength";
+import { OtherProductShared } from "../../src/contract/trackedModels/OtherProductShared";
+import { OtherMarket } from "../../src/contract/trackedModels/OtherMarket";
+import { OtherProductStrength } from "../../src/contract/trackedModels/OtherProductStrength";
 import { GtinOwner } from "../../src/contract/models/GtinOwner";
 import { generateGtin } from "../../src/contract/models/gtin";
 

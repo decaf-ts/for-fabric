@@ -641,7 +641,7 @@ describe("FabricClientAdapter", () => {
         expect.any(Array),
         {},
         undefined,
-        "ERC20Wallet"
+        ERC20Wallet
       );
       const payload = JSON.parse(submitSpy.mock.calls[0][2][0]);
       expect(payload.__overrides).toEqual({
@@ -705,7 +705,7 @@ describe("FabricClientAdapter", () => {
         expect.any(Array),
         {},
         undefined,
-        "ERC20Wallet"
+        ERC20Wallet
       );
       const serializedPayload = JSON.parse(submitSpy.mock.calls[0][2][0]);
       expect(serializedPayload.__overrides).toEqual({
@@ -737,7 +737,7 @@ describe("FabricClientAdapter", () => {
         ["w-4"],
         undefined,
         undefined,
-        "ERC20Wallet"
+        ERC20Wallet
       );
       expect(result.id).toBe("w-4");
     });

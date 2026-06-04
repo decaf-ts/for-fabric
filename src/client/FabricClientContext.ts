@@ -18,7 +18,7 @@ const CLIENT_OVERRIDE_KEYS: (keyof FabricClientFlags)[] = [
  * back as overrides so only intentional client flags are forwarded.
  */
 export class FabricClientContext extends Context<FabricClientFlags> {
-  constructor(ctx?: FabricClientContext) {
+  constructor(ctx?: Context<FabricClientFlags>) {
     super(ctx);
   }
 

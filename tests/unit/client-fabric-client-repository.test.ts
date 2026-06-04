@@ -43,6 +43,7 @@ const createAdapter = () => {
     alias: `adapter-${Math.random().toString(36).slice(2)}`,
     flavour: "hlf-fabric",
     decode: (data: Uint8Array) => new TextDecoder().decode(data),
+    evaluateTransaction: jest.fn(async () => Buffer.from(JSON.stringify([]))),
     logCtx: jest.fn().mockImplementation((ctxArgs: any[]) => {
       const contextualized: any = {
         ctx: new Context(),
