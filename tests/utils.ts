@@ -213,7 +213,7 @@ export function nextChaincodeSequence(
     } catch {
       // fall back to regex parsing below
     }
-    const match = output.match(/\"sequence\"\s*:\s*\"?(\d+)\"?/);
+    const match = output.match(/"sequence"\s*:\s*"?(\d+)"?/);
     if (match) {
       return Number(match[1]) + 1;
     }

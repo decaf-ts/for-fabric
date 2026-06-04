@@ -2,14 +2,7 @@ import { Context } from "@decaf-ts/core";
 import { FabricClientFlags } from "./types";
 
 const CLIENT_OVERRIDE_KEYS: (keyof FabricClientFlags)[] = [
-  "allowGatewayOverride",
-  "allowManualEndorsingOrgs",
-  "legacy",
-  "rebuildWithTransient",
-  "encryptTransient",
-  "syntheticEvents",
-  "endorsingOrgs",
-  "mspEventOnly",
+  "allowGenerationOverride",
 ];
 
 /**

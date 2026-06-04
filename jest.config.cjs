@@ -1,4 +1,3 @@
-const path = require("path");
 // import { Config } from "@jest/types";
 
 const config = {

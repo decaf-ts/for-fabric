@@ -405,7 +405,7 @@ export class FabricClientAdapter extends Adapter<
       throw new InternalError("Ids and models must have the same length");
     //HERE!
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = ctxArgs.shift() as Record<string, any>;
+    const transient = ctxArgs.shift() as Record<string, any> | undefined;
     const { log, ctx } = this.logCtx(
       ctxArgs as ContextualArgs<FabricClientContext>,
       this.createAll
@@ -417,20 +417,15 @@ export class FabricClientAdapter extends Adapter<
     const hasTransient = transient && Object.keys(transient).length > 0;
     const needsFullPayload =
       hasTransient || this.shouldForceGatewayHydration(ctx);
-    const transientPayload = hasTransient ? { [tableName]: transient } : {};
     const serializedModels = models.map((m) =>
       JSON.parse(this.serializer.serialize(m, clazz.name))
     );
-    const overrides = (ctx as any)?.toOverrides?.();
-    if (overrides && serializedModels.length) {
-      serializedModels[0][FabricModelKeys.OVERRIDES] = overrides;
-    }
 
     const result = await this.submitTransaction(
       ctx,
       BulkCrudOperationKeys.CREATE_ALL,
       [JSON.stringify(serializedModels)],
-      transientPayload as any,
+      hasTransient ? { [tableName]: transient } : undefined,
       this.getEndorsingOrganizations(ctx),
       clazz
     );
@@ -455,7 +450,10 @@ export class FabricClientAdapter extends Adapter<
         extractIds(
           clazz,
           models.map((m, i) =>
-            Model.merge(Object.assign({}, m as any, transient[i] || {}), res[i])
+            Model.merge(
+              Object.assign({}, m as any, transient?.[i] || {}),
+              res[i]
+            )
           ),
           ids
         ),
@@ -515,7 +513,7 @@ export class FabricClientAdapter extends Adapter<
     if (ids.length !== models.length)
       throw new InternalError("Ids and models must have the same length");
     const ctxArgs = [...(args as unknown as any[])];
-    const transient = ctxArgs.shift() as Record<string, any>;
+    const transient = ctxArgs.shift() as Record<string, any> | undefined;
     const { log, ctx } = this.logCtx(
       ctxArgs as ContextualArgs<FabricClientContext>,
       this.updateAll
@@ -526,20 +524,15 @@ export class FabricClientAdapter extends Adapter<
     const hasTransient = transient && Object.keys(transient).length > 0;
     const needsFullPayload =
       hasTransient || this.shouldForceGatewayHydration(ctx);
-    const transientPayload = hasTransient ? { [tableName]: transient } : {};
     const serializedModels = models.map((m) =>
       JSON.parse(this.serializer.serialize(m, clazz.name))
     );
-    const overrides = (ctx as any)?.toOverrides?.();
-    if (overrides && serializedModels.length) {
-      serializedModels[0][FabricModelKeys.OVERRIDES] = overrides;
-    }
 
     const result = await this.submitTransaction(
       ctx,
       BulkCrudOperationKeys.UPDATE_ALL,
       [JSON.stringify(serializedModels)],
-      transientPayload as any,
+      hasTransient ? { [tableName]: transient } : undefined,
       this.getEndorsingOrganizations(ctx),
       clazz
     );
@@ -557,7 +550,10 @@ export class FabricClientAdapter extends Adapter<
         extractIds(
           clazz,
           models.map((m, i) =>
-            Model.merge(Object.assign({}, m as any, transient[i] || {}), res[i])
+            Model.merge(
+              Object.assign({}, m as any, transient?.[i] || {}),
+              res[i]
+            )
           ),
           ids
         ),
@@ -755,21 +751,28 @@ export class FabricClientAdapter extends Adapter<
     return hasId;
   }
 
-  private withContextOverrides<M extends Record<string, any>>(
-    model: M,
+  private injectTransientOverrides(
+    transientData: Record<string, any> | undefined,
     ctx: FabricClientContext
-  ): M {
-    const ctxOverrides = ctx.toOverrides();
-    const modelOverrides = (model as any)[FabricModelKeys.OVERRIDES];
-    const overrides = Object.assign(
-      {},
-      modelOverrides || {},
-      ctxOverrides || {}
-    );
-    if (!Object.keys(overrides).length) return model;
-    return Object.assign({}, model, {
-      [FabricModelKeys.OVERRIDES]: overrides,
-    });
+  ): Record<string, any> | undefined {
+    const hasTransientData = this.hasMeaningfulTransientData(transientData);
+    const shouldInject = !!ctx.getOrUndefined("allowContextTransientMap");
+    if (!hasTransientData && !shouldInject) return undefined;
+    const overrides = ctx.toOverrides();
+    const payload = hasTransientData ? Object.assign({}, transientData) : {};
+    if (shouldInject && Object.keys(overrides).length) {
+      payload[FabricModelKeys.OVERRIDES] = overrides;
+    }
+    return Object.keys(payload).length ? payload : undefined;
+  }
+
+  private hasMeaningfulTransientData(value: unknown): boolean {
+    if (value === undefined || value === null) return false;
+    if (Array.isArray(value)) return value.some((item) => this.hasMeaningfulTransientData(item));
+    if (typeof value !== "object") return true;
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (!entries.length) return false;
+    return entries.some(([, entry]) => this.hasMeaningfulTransientData(entry));
   }
 
   private getEndorsingOrganizations(
@@ -821,17 +824,11 @@ export class FabricClientAdapter extends Adapter<
     const hasTransient = transient && Object.keys(transient).length > 0;
     const needsFullPayload =
       hasTransient || this.shouldForceGatewayHydration(ctx);
-    const transientPayload = hasTransient ? { [tableName]: transient } : {};
     const result = await this.submitTransaction(
       ctx,
       OperationKeys.CREATE,
-      [
-        this.serializer.serialize(
-          this.withContextOverrides(model, ctx),
-          clazz.name
-        ),
-      ],
-      transientPayload as any,
+      [this.serializer.serialize(model, clazz.name)],
+      hasTransient ? { [tableName]: transient } : undefined,
       this.getEndorsingOrganizations(ctx),
       clazz
     );
@@ -950,12 +947,11 @@ export class FabricClientAdapter extends Adapter<
     const hasTransient = transient && Object.keys(transient).length > 0;
     const needsFullPayload =
       hasTransient || this.shouldForceGatewayHydration(ctx);
-    const transientPayload = hasTransient ? { [tableName]: transient } : {};
     const result = await this.submitTransaction(
       ctx,
       OperationKeys.UPDATE,
-      [this.serializer.serialize(this.withContextOverrides(model, ctx), clazz)], // TODO should be receving class but is receiving string
-      transientPayload as any,
+      [this.serializer.serialize(model, clazz.name)],
+      hasTransient ? { [tableName]: transient } : undefined,
       this.getEndorsingOrganizations(ctx),
       clazz
     );
@@ -1204,11 +1200,25 @@ export class FabricClientAdapter extends Adapter<
     api: string,
     submit = true,
     args?: any[],
-    transientData: Record<string, string> = {},
+    transientData: Record<string, any> | undefined = {},
     endorsingOrganizations?: string[],
     clazzOrContractName?: Constructor<Model<any>> | string
   ): Promise<Uint8Array> {
     const log = this.log.for(this.transaction);
+    transientData = this.injectTransientOverrides(transientData, ctx);
+    if (submit && this.shouldUseLegacyGateway(ctx)) {
+      const legacyArgs = this.prepareLegacyArgs(args);
+      const transientMap = this.buildLegacyTransient(transientData);
+      const peerConfigs = this.buildLegacyPeerConfigs(ctx);
+      return await this.submitLegacyWithExplicitEndorsers(
+        ctx,
+        api,
+        legacyArgs,
+        transientMap,
+        peerConfigs,
+        clazzOrContractName
+      );
+    }
     const gateway = await this.Gateway(ctx);
     try {
       const contract = await this.Contract(ctx, clazzOrContractName);
@@ -1217,19 +1227,19 @@ export class FabricClientAdapter extends Adapter<
       );
       log.debug(`args: ${args?.map((a) => a.toString()).join("\n") || "none"}`);
       const method = submit ? contract.submit : contract.evaluate;
+      const transientEntries = Object.entries(transientData || {});
 
       endorsingOrganizations = endorsingOrganizations?.length
         ? endorsingOrganizations
         : undefined;
       const proposalOptions: ProposalOptions = {
         arguments: args || [],
-        transientData: Object.entries(transientData).reduce(
-          (acc, [key, val]) => {
-            acc[key] = JSON.stringify(val);
-            return acc;
-          },
-          {} as typeof transientData
-        ),
+        transientData: transientEntries.length
+          ? transientEntries.reduce<Record<string, string>>((acc, [key, val]) => {
+              acc[key] = JSON.stringify(val);
+              return acc;
+            }, {})
+          : undefined,
         endorsingOrganizations: ctx.getOrUndefined("allowManualEndorsingOrgs")
           ? endorsingOrganizations || undefined
           : undefined, // mspId list
@@ -1255,7 +1265,7 @@ export class FabricClientAdapter extends Adapter<
   }
 
   private buildLegacyTransient(
-    transientData?: Record<string, string>
+    transientData?: Record<string, any>
   ): Record<string, Buffer> | undefined {
     if (!transientData) return undefined;
     const entries = Object.entries(transientData);
@@ -1573,23 +1583,10 @@ export class FabricClientAdapter extends Adapter<
     ctx: FabricClientContext,
     api: string,
     args?: any[],
-    transientData?: Record<string, string>,
+    transientData?: Record<string, any>,
     endorsingOrganizations?: Array<string>,
     clazzOrContractName?: Constructor<Model<any>> | string
   ): Promise<Uint8Array> {
-    if (this.shouldUseLegacyGateway(ctx)) {
-      const legacyArgs = this.prepareLegacyArgs(args);
-      const transientMap = this.buildLegacyTransient(transientData);
-      const peerConfigs = this.buildLegacyPeerConfigs(ctx);
-      return this.submitLegacyWithExplicitEndorsers(
-        ctx,
-        api,
-        legacyArgs,
-        transientMap,
-        peerConfigs,
-        clazzOrContractName
-      );
-    }
     return this.transaction(
       ctx,
       api,
@@ -1614,7 +1611,7 @@ export class FabricClientAdapter extends Adapter<
     ctx: FabricClientContext,
     api: string,
     args?: any[],
-    transientData?: Record<string, string>,
+    transientData?: Record<string, any>,
     endorsingOrganizations?: Array<string>,
     clazzOrContractName?: Constructor<Model<any>> | string
   ): Promise<Uint8Array> {

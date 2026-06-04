@@ -11,7 +11,6 @@ import {
   FabricFlavour,
   mirror,
   ownedBy,
-  privateData,
 } from "../../shared/index";
 import { version } from "@decaf-ts/db-decorators";
 import { historyDec } from "../models/history-dec";

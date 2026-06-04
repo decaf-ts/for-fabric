@@ -158,10 +158,6 @@ export async function updateAuditHandler<
 ): Promise<void> {
   const repo = Repository.forModel(Audit);
 
-  const collections = Model.collectionsFor(Audit);
-  //
-  // model = await rebuildForMatchingCollection(model, context, collections);
-
   if (!context.identity || !context.identity.getID)
     throw new InternalError(`Lost context apparently for audit`);
 

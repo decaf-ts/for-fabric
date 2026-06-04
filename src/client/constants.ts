@@ -8,6 +8,7 @@ export const DefaultFabricClientFlags: FabricClientFlags = Object.assign({
   legacy: false,
   allowManualEndorsingOrgs: false,
   allowGatewayOverride: false,
+  allowContextTransientMap: false,
   rebuildWithTransient: true,
   encryptTransient: false,
   syntheticEvents: true,

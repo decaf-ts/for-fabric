@@ -3,7 +3,6 @@ import {
   CouchDBGroupOperator,
   CouchDBKeys,
   CouchDBOperator,
-  CouchDBQueryLimit,
   MangoOperator,
   MangoQuery,
   MangoSelector,
@@ -20,7 +19,6 @@ import {
   QueryError,
 } from "@decaf-ts/core";
 import { InternalError } from "@decaf-ts/db-decorators";
-import { Constructor } from "@decaf-ts/decoration";
 import {
   applyMirrorFlags,
   applySegregationFlags,

@@ -45,8 +45,7 @@ export class MigrationContract extends Contract {
         this._adapter = Adapter.get(FabricFlavour) as any;
         if (!this._adapter)
           throw new InternalError(`failed to load adapter. instantiation`);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (e: unknown) {
+      } catch {
         try {
           this._adapter = new FabricContractAdapter();
         } catch (e: unknown) {
@@ -74,7 +73,7 @@ export class MigrationContract extends Contract {
       await this.logCtx([...argz, context], PersistenceKeys.MIGRATION, true)
     ).for(this.migrate);
 
-    const migrations = this.getRegisteredMigrations(ctx);
+    const migrations = this.getRegisteredMigrations();
 
     const migrationMeta = migrations.find((m) => m.reference === reference);
 
@@ -113,7 +112,7 @@ export class MigrationContract extends Contract {
     }
   }
 
-  protected getRegisteredMigrations(context: FabricContractContext): Array<{
+  protected getRegisteredMigrations(): Array<{
     class: any;
     reference: string;
     flavour: string;
@@ -126,7 +125,7 @@ export class MigrationContract extends Contract {
 
     const migrationList = (Metadata as any).migrations();
 
-    for (const [name, MigrationClass] of migrationList) {
+    for (const [, MigrationClass] of migrationList) {
       const meta = Metadata.get(MigrationClass, PersistenceKeys.MIGRATION);
 
       if (!meta) continue;

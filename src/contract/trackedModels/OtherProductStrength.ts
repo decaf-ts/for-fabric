@@ -20,7 +20,6 @@ import {
 } from "../../shared/index";
 import { composed, InternalError, version } from "@decaf-ts/db-decorators";
 import { gtin } from "../models/gtin";
-import { historyDec } from "../models/history-dec";
 
 function strengthSeed(m: OtherProductStrength) {
   try {

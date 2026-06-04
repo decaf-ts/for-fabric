@@ -10,9 +10,7 @@ import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
 export type Index = CreateIndexRequest;
 
 function ensureDirectoryExistence(filePath: string) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path");
   const dirname: string = path.dirname(filePath);
   if (fs.existsSync(dirname)) {
@@ -41,19 +39,15 @@ export function generateModelDesignDocs<M extends Model>(
 }
 
 export function readModelFile(file: any) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const filePath = path.resolve(file.parentPath, file.name);
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const exports = require(filePath);
 
   const values = Object.values(exports).filter((e) => {
     try {
       const m = new (e as Constructor)();
       return m instanceof Model;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (e: unknown) {
+    } catch {
       return false;
     }
   }) as ModelConstructor<any>[];
@@ -63,9 +57,7 @@ export function readModelFile(file: any) {
 export async function readModelFolders(
   ...folders: string[]
 ): Promise<ModelConstructor<any>[]> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path");
 
   const result: ModelConstructor<any>[] = [];
@@ -90,9 +82,7 @@ export function writeIndexes(
   p: string = process.cwd(),
   collection?: string
 ) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path");
 
   indexes.forEach((index) => {
@@ -113,9 +103,7 @@ export function writeDesignDocs(
   collection?: string
 ) {
   if (!designDocs.length) return;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require("fs");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path");
 
   designDocs.forEach((doc) => {

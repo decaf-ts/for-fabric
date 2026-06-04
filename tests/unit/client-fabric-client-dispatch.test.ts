@@ -293,10 +293,14 @@ describe.skip("FabricClientDispatch", () => {
     let iteration = 0;
     dispatch["listeningStack"] = {
       [Symbol.asyncIterator]: async function* () {
-        while (iteration < 1) {
+        if (iteration < 1) {
           iteration += 1;
-          throw new Error("iterator failed");
+          yield {
+            eventName: "wallets_update",
+            payload: new TextEncoder().encode(JSON.stringify({ id: "doc-1" })),
+          };
         }
+        throw new Error("iterator failed");
       },
       close: jest.fn(),
     };

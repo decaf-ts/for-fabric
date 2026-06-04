@@ -69,7 +69,7 @@ import {
 } from "fabric-shim-api";
 import { FabricStatement } from "./FabricContractStatement";
 import { FabricContractSequence } from "./FabricContractSequence";
-import { FabricFlavour } from "../shared/constants";
+import { FabricFlavour, FabricModelKeys } from "../shared/constants";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
 import {
   apply,
@@ -431,7 +431,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ]);
     for (const col of readCollections) {
       try {
-        Object.assign(model, await this.forPrivate(col).readState(composedKey, ctx));
+        Object.assign(
+          model,
+          await this.forPrivate(col).readState(composedKey, ctx)
+        );
       } catch (e: unknown) {
         const parsed = this.parseError(e as Error);
         if (parsed instanceof NotFoundError) continue;
@@ -503,9 +506,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 clazz,
                 i,
                 ...args,
-                ctx.override({ noEmitSingle: true })
+                (ctx as any).override({ noEmitSingle: true })
               )
-            : this.read(clazz, i, ...args, ctx.override({ noEmitSingle: true }))
+            : this.read(
+                clazz,
+                i,
+                ...args,
+                (ctx as any).override({ noEmitSingle: true })
+              )
       );
 
       const rawResult = continueOnError
@@ -748,7 +756,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 }
               }
               case "queryResultPaginated": {
-                const [stub, rawInput, limit, skip, bookmark, ...args] = argsList;
+                const [stub, rawInput, limit, skip, bookmark, ...args] =
+                  argsList;
                 const { log } = thisArg["logCtx"](args, prop);
                 const pageSize = Math.max(1, Number(limit) || 250);
                 const query: Record<string, any> = { ...rawInput };
@@ -758,7 +767,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     ? skipValue
                     : undefined;
                 const syntheticOffset =
-                  FabricContractAdapter.parseSyntheticPrivateBookmark(bookmark) ??
+                  FabricContractAdapter.parseSyntheticPrivateBookmark(
+                    bookmark
+                  ) ??
                   parsedSkip ??
                   0;
                 const hasOpaqueBookmark =
@@ -766,7 +777,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   bookmark !== null &&
                   bookmark !== "" &&
                   typeof bookmark === "string" &&
-                  !bookmark.startsWith(FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX);
+                  !bookmark.startsWith(
+                    FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX
+                  );
                 // Keep the query CouchDB-compatible and let Fabric/CouchDB own bookmark semantics.
                 // Synthetic mode fetches one extra record to detect whether a next page exists.
                 query.limit = hasOpaqueBookmark ? pageSize : pageSize + 1;
@@ -787,11 +800,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 const response = await (
                   stub as ChaincodeStub
                 ).getPrivateDataQueryResult(collection, JSON.stringify(query));
-                const iterator =
-                  ((response as any).iterator ||
-                    response) as Iterators.StateQueryIterator;
+                const iterator = ((response as any).iterator ||
+                  response) as Iterators.StateQueryIterator;
                 const responseMetadata =
-                  (response as any).metadata || (iterator as any).metadata || {};
+                  (response as any).metadata ||
+                  (iterator as any).metadata ||
+                  {};
                 const responseBookmark =
                   typeof responseMetadata.bookmark === "string"
                     ? responseMetadata.bookmark
@@ -1301,13 +1315,17 @@ export class FabricContractAdapter extends CouchDBAdapter<
     // The same FabricContractContext can be reused across nested operations (for example
     // sequence upserts during persistent version generation). In those cases, we must not
     // attempt to apply parent-model segregated write keys to unrelated models.
-    if (segregatedWriteKeys && split.transient && typeof split.transient === "object") {
+    if (
+      segregatedWriteKeys &&
+      split.transient &&
+      typeof split.transient === "object"
+    ) {
       for (const collection in segregatedWriteKeys) {
         segregatedWrites[collection] = segregatedWrites[collection] || {};
         segregatedWrites[collection][id as any] = mapToRecord(
           ctx.getOrUndefined("forceSegregateWrite")
             ? split.model
-            : ((split.transient as any) || {}),
+            : (split.transient as any) || {},
           segregatedWriteKeys[collection]
         );
       }
@@ -1543,24 +1561,56 @@ export class FabricContractAdapter extends CouchDBAdapter<
         FabricContextualizedArgs<ARGS, METHOD extends string ? true : false>
       >
     | FabricContextualizedArgs<ARGS, METHOD extends string ? true : false> {
+    const ctx = args[args.length - 1];
+    let mergedOverrides =
+      overrides as Partial<FlagsOf<FabricContractContext>> | Ctx | undefined;
+
+    if (
+      ctx instanceof FabricContractContext &&
+      ctx.getOrUndefined("allowContextTransientMap") &&
+      ctx.getOrUndefined("stub")
+    ) {
+      const transientOverrides = this.readTransientOverrides(ctx);
+      if (transientOverrides) {
+        mergedOverrides = Object.assign({}, overrides || {}, transientOverrides);
+      }
+    }
+
     if (!allowCreate)
       return super.logCtx<ARGS, METHOD>(
         args,
         operation as any,
         allowCreate as any,
-        overrides as any
+        mergedOverrides as any
       ) as any;
 
     return super.logCtx
-      .call(this, args, operation as any, allowCreate, overrides as any)
+      .call(this, args, operation as any, allowCreate, mergedOverrides as any)
       .then((res) => {
         if (!(res.ctx instanceof FabricContractContext))
           throw new InternalError(`Invalid context binding`);
         return Object.assign(res, {
-          stub: res.ctx.stub,
-          identity: res.ctx.identity,
+          ...(res.ctx.getOrUndefined("stub")
+            ? { stub: res.ctx.getOrUndefined("stub") }
+            : {}),
+          ...(res.ctx.getOrUndefined("identity")
+            ? { identity: res.ctx.getOrUndefined("identity") }
+            : {}),
         });
       }) as any;
+  }
+
+  private readTransientOverrides(
+    ctx: FabricContractContext
+  ): Partial<FlagsOf<FabricContractContext>> | undefined {
+    if (!ctx.getOrUndefined("allowContextTransientMap")) return;
+    const stub = ctx.getOrUndefined("stub") as ChaincodeStub | undefined;
+    if (!stub) return undefined;
+    const transientMap = stub.getTransient();
+    if (!transientMap.has(FabricModelKeys.OVERRIDES)) return undefined;
+    const raw = transientMap.get(FabricModelKeys.OVERRIDES);
+    if (!raw) return undefined;
+    return JSON.parse(Buffer.from(raw).toString("utf8"));
   }
 
   override async updateObservers(

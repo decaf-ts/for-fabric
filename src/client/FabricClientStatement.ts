@@ -1,7 +1,6 @@
 import {
   AdapterFlags,
   Condition,
-  Context,
   GroupOperator,
   MaybeContextualArg,
   Operator,

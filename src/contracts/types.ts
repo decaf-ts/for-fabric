@@ -30,6 +30,7 @@ export interface FabricContractFlags extends FabricFlags {
   segregateRead?: string | string[];
   forceSegregateWrite?: boolean;
   fullySegregated?: boolean;
+  allowContextTransientMap?: boolean;
   sequenceSegregation?: Map<
     string,
     { fullySegregated: boolean; collections: string[] }

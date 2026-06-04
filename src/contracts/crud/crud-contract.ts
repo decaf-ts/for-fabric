@@ -365,8 +365,7 @@ export abstract class FabricCrudContract<M extends Model>
       await this.logCtx(
         [...args, context],
         OperationKeys.CREATE,
-        true,
-        this.extractOverrides(model)
+        true
       )
     ).for(this.create);
     this.ensureMirrorWritePermissions(ctx);
@@ -418,30 +417,7 @@ export abstract class FabricCrudContract<M extends Model>
       );
     }
 
-    if (transientMap.has("__overrides")) {
-      const overrides = JSON.parse(
-        (transientMap.get("__overrides") as unknown as Buffer)?.toString(
-          "utf8"
-        ) as string
-      );
-
-      ctx.accumulate(overrides);
-    }
-
     return transient;
-  }
-
-  protected extractOverrides(
-    obj: any | any[]
-  ): Partial<FabricFlags<any>> | undefined {
-    if (Array.isArray(obj)) {
-      const first = obj[0] as any;
-      return first ? first[FabricModelKeys.OVERRIDES] : undefined;
-    }
-    if ((obj as any)[FabricModelKeys.OVERRIDES]) {
-      return (obj as any)[FabricModelKeys.OVERRIDES];
-    }
-    return undefined;
   }
 
   protected deserializeBulkModels(models: string): M[] {
@@ -450,7 +426,6 @@ export abstract class FabricCrudContract<M extends Model>
       throw new SerializationError(
         new Error("Bulk payload must be an array of serialized models")
       );
-    const overrides = this.extractOverrides(parsed);
     const hydrated = parsed.map((entry: string | Record<string, any>) => {
       const serialized =
         typeof entry === "string"
@@ -460,18 +435,10 @@ export abstract class FabricCrudContract<M extends Model>
                 Object.entries(entry).filter(
                   ([key]) => key !== FabricModelKeys.OVERRIDES
                 )
-              )
-            );
+            )
+          );
       return new this.clazz(this.deserialize(serialized));
     }) as M[];
-    if (overrides && hydrated.length) {
-      Object.defineProperty(hydrated[0], FabricModelKeys.OVERRIDES, {
-        enumerable: false,
-        configurable: true,
-        writable: true,
-        value: overrides,
-      });
-    }
     return hydrated;
   }
 
@@ -494,8 +461,7 @@ export abstract class FabricCrudContract<M extends Model>
       await this.logCtx(
         [...args, context],
         OperationKeys.UPDATE,
-        true,
-        this.extractOverrides(model)
+        true
       )
     ).for(this.update);
     this.ensureMirrorWritePermissions(ctx);
@@ -597,8 +563,7 @@ export abstract class FabricCrudContract<M extends Model>
       await this.logCtx(
         [...args, context],
         BulkCrudOperationKeys.UPDATE_ALL,
-        true,
-        this.extractOverrides(models)
+        true
       )
     ).for(this.updateAll);
     this.ensureMirrorWritePermissions(ctx);
@@ -726,8 +691,7 @@ export abstract class FabricCrudContract<M extends Model>
       await this.logCtx(
         [...args, context],
         BulkCrudOperationKeys.CREATE_ALL,
-        true,
-        this.extractOverrides(models)
+        true
       )
     ).for(this.createAll);
     this.ensureMirrorWritePermissions(ctx);

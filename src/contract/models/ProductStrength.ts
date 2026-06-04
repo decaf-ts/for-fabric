@@ -2,7 +2,6 @@ import type { ModelArg } from "@decaf-ts/decorator-validation";
 import { model, required } from "@decaf-ts/decorator-validation";
 import {
   column,
-  ContextualArgs,
   index,
   OrderDirection,
   pk,
@@ -13,12 +12,7 @@ import { TableNames } from "./constants";
 import { description, uses } from "@decaf-ts/decoration";
 import { BaseIdentifiedModel } from "./BaseIdentifiedModel";
 
-import {
-  FabricFlavour,
-  mirror,
-  NamespaceCollection,
-  sharedData,
-} from "../../shared/index";
+import { FabricFlavour } from "../../shared/index";
 import { composed, InternalError } from "@decaf-ts/db-decorators";
 import { gtin } from "./gtin";
 

@@ -1,5 +1,6 @@
 import "reflect-metadata";
 
+import { Model } from "@decaf-ts/decorator-validation";
 import { InternalError, OperationKeys } from "@decaf-ts/db-decorators";
 import {
   Context,
@@ -12,6 +13,7 @@ import { ERC20Wallet } from "../../src/contracts/erc20/models";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
+import { FabricModelKeys } from "../../src/shared/constants";
 import type { PeerConfig } from "../../src/shared/types";
 
 jest.mock("@hyperledger/fabric-gateway", () => ({
@@ -198,6 +200,105 @@ describe("FabricClientAdapter", () => {
     ).rejects.toThrow(InternalError);
   });
 
+  it("omits transient payload when no transient data exists", async () => {
+    const adapter = newAdapter();
+    const ctx = createContext();
+    const submitSpy = jest
+      .spyOn(adapter as any, "submitTransaction")
+      .mockResolvedValue(
+        new TextEncoder().encode(
+          JSON.stringify({ [ModelKeys.ANCHOR]: "ERC20Wallet", id: "wallet-1" })
+        )
+      );
+
+    await adapter.create(
+      ERC20Wallet,
+      "wallet-1",
+      { id: "wallet-1" },
+      {},
+      ctx
+    );
+
+    expect(submitSpy.mock.calls[0][3]).toBeUndefined();
+  });
+
+  it("forwards transient overrides through contract.submit", async () => {
+    const adapter = newAdapter();
+    const gateway = { close: jest.fn() };
+    const contract = {
+      getContractName: jest.fn().mockReturnValue("wallet-contract"),
+      submit: jest.fn().mockResolvedValue(Buffer.from("submit-ok")),
+      evaluate: jest.fn(),
+    };
+    jest.spyOn(adapter as any, "Gateway").mockResolvedValue(gateway as any);
+    jest.spyOn(adapter as any, "Contract").mockResolvedValue(contract as any);
+
+    const ctx = createContext();
+    ctx.accumulate({
+      allowContextTransientMap: true,
+      allowGenerationOverride: true,
+    });
+
+    const result = await adapter.submitTransaction(
+      ctx,
+      "create",
+      [{ id: "wallet-1" }],
+      { secret: "value" }
+    );
+
+    expect(contract.submit).toHaveBeenCalledWith("create", {
+        arguments: [{ id: "wallet-1" }],
+        transientData: {
+          secret: JSON.stringify("value"),
+          [FabricModelKeys.OVERRIDES]: JSON.stringify({
+            allowGenerationOverride: true,
+          }),
+        },
+        endorsingOrganizations: undefined,
+    });
+    expect(contract.evaluate).not.toHaveBeenCalled();
+    expect(gateway.close).toHaveBeenCalledTimes(1);
+    expect(new TextDecoder().decode(result)).toBe("submit-ok");
+  });
+
+  it("forwards transient overrides through contract.evaluate", async () => {
+    const adapter = newAdapter();
+    const gateway = { close: jest.fn() };
+    const contract = {
+      getContractName: jest.fn().mockReturnValue("wallet-contract"),
+      submit: jest.fn(),
+      evaluate: jest.fn().mockResolvedValue(Buffer.from("evaluate-ok")),
+    };
+    jest.spyOn(adapter as any, "Gateway").mockResolvedValue(gateway as any);
+    jest.spyOn(adapter as any, "Contract").mockResolvedValue(contract as any);
+
+    const ctx = createContext();
+    ctx.accumulate({
+      allowContextTransientMap: true,
+      allowGenerationOverride: true,
+    });
+
+    const result = await adapter.evaluateTransaction(
+      ctx,
+      "read",
+      [{ id: "wallet-1" }],
+      {}
+    );
+
+    expect(contract.evaluate).toHaveBeenCalledWith("read", {
+        arguments: [{ id: "wallet-1" }],
+        transientData: {
+          [FabricModelKeys.OVERRIDES]: JSON.stringify({
+            allowGenerationOverride: true,
+          }),
+        },
+        endorsingOrganizations: undefined,
+    });
+    expect(contract.submit).not.toHaveBeenCalled();
+    expect(gateway.close).toHaveBeenCalledTimes(1);
+    expect(new TextDecoder().decode(result)).toBe("evaluate-ok");
+  });
+
   it("parses createAll results", async () => {
     const adapter = newAdapter();
     (adapter as any).serializer = {
@@ -214,6 +315,7 @@ describe("FabricClientAdapter", () => {
     const context = createContext();
     context.accumulate({
       allowGatewayOverride: true,
+      allowContextTransientMap: true,
       endorsingOrgs: ["Org1MSP"],
     });
 
@@ -230,15 +332,10 @@ describe("FabricClientAdapter", () => {
       expect.any(Context),
       expect.any(String),
       expect.any(Array),
-      {},
+      undefined,
       ["Org1MSP"],
       ERC20Wallet
     );
-    const createAllPayload = JSON.parse(submitSpy.mock.calls[0][2][0]);
-    expect(createAllPayload[0].__overrides).toEqual({
-      allowGatewayOverride: true,
-      endorsingOrgs: ["Org1MSP"],
-    });
   });
 
   it("wraps raw evaluation errors with parseError", async () => {
@@ -412,6 +509,7 @@ describe("FabricClientAdapter", () => {
     const ctx = createContext();
     ctx.accumulate({
       allowGatewayOverride: true,
+      allowContextTransientMap: true,
     });
     const payload = { foo: "bar" };
     const transient = { secret: "value" };
@@ -440,11 +538,8 @@ describe("FabricClientAdapter", () => {
     expect(readSpy).toHaveBeenCalledWith(ERC20Wallet, "wallet-1", ctx);
     expect(result).not.toEqual(serializedResult);
     expect(result).toEqual({ ...serializedResult, secret: "value" });
-    const createPayload = JSON.parse(
-      (adapter as any).submitTransaction.mock.calls[0][2][0]
-    );
-    expect(createPayload.__overrides).toEqual({
-      allowGatewayOverride: true,
+    expect((adapter as any).submitTransaction.mock.calls[0][3]).toEqual({
+      [Model.tableName(ERC20Wallet)]: transient,
     });
   });
 
@@ -453,6 +548,7 @@ describe("FabricClientAdapter", () => {
     const ctx = createContext();
     ctx.accumulate({
       allowGatewayOverride: true,
+      allowContextTransientMap: true,
     });
     const payload = { foo: "baz" };
     const transient = { secret: "new" };
@@ -493,11 +589,8 @@ describe("FabricClientAdapter", () => {
       updatedBy: "system",
       updatedAt: "2026-02-13T00:00:00.000Z",
     });
-    const updatePayload = JSON.parse(
-      (adapter as any).submitTransaction.mock.calls[0][2][0]
-    );
-    expect(updatePayload.__overrides).toEqual({
-      allowGatewayOverride: true,
+    expect((adapter as any).submitTransaction.mock.calls[0][3]).toEqual({
+      [Model.tableName(ERC20Wallet)]: transient,
     });
   });
 
@@ -624,6 +717,7 @@ describe("FabricClientAdapter", () => {
 
       ctx.accumulate({
         allowGatewayOverride: true,
+        allowContextTransientMap: true,
         legacy: true,
       });
 
@@ -639,15 +733,10 @@ describe("FabricClientAdapter", () => {
         expect.any(Context),
         OperationKeys.CREATE,
         expect.any(Array),
-        {},
+        undefined,
         undefined,
         ERC20Wallet
       );
-      const payload = JSON.parse(submitSpy.mock.calls[0][2][0]);
-      expect(payload.__overrides).toEqual({
-        allowGatewayOverride: true,
-        legacy: true,
-      });
       expect(result.id).toBe("w-1");
     });
 
@@ -689,6 +778,7 @@ describe("FabricClientAdapter", () => {
 
       ctx.accumulate({
         allowGatewayOverride: true,
+        allowContextTransientMap: true,
       });
 
       const result = await adapter.update(
@@ -703,14 +793,10 @@ describe("FabricClientAdapter", () => {
         expect.any(Context),
         OperationKeys.UPDATE,
         expect.any(Array),
-        {},
+        undefined,
         undefined,
         ERC20Wallet
       );
-      const serializedPayload = JSON.parse(submitSpy.mock.calls[0][2][0]);
-      expect(serializedPayload.__overrides).toEqual({
-        allowGatewayOverride: true,
-      });
       expect(result.id).toBe("w-3");
     });
 
@@ -773,6 +859,7 @@ describe("FabricClientAdapter", () => {
       const ctx = createContext();
       ctx.accumulate({
         allowGatewayOverride: true,
+        allowContextTransientMap: true,
         endorsingOrgs: ["Org1MSP"],
       });
       const records = [
@@ -796,11 +883,7 @@ describe("FabricClientAdapter", () => {
       );
 
       expect(submitSpy).toHaveBeenCalled();
-      const outerPayload = JSON.parse(submitSpy.mock.calls[0][2][0]);
-      expect(outerPayload[0].__overrides).toEqual({
-        allowGatewayOverride: true,
-        endorsingOrgs: ["Org1MSP"],
-      });
+      expect(submitSpy.mock.calls[0][3]).toBeUndefined();
       expect(result).toHaveLength(2);
     });
 
@@ -891,7 +974,11 @@ describe("FabricClientAdapter", () => {
         .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
         .mockResolvedValue(new TextEncoder().encode("ok"));
       const ctx = createContext();
-      ctx.accumulate({ legacy: true });
+      ctx.accumulate({
+        legacy: true,
+        allowContextTransientMap: true,
+        allowGenerationOverride: true,
+      });
 
       await adapter.submitTransaction(ctx, "create", [
         { foo: "bar" },
@@ -913,7 +1000,11 @@ describe("FabricClientAdapter", () => {
         .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
         .mockResolvedValue(new TextEncoder().encode("ok"));
       const ctx = createContext();
-      ctx.accumulate({ legacy: true });
+      ctx.accumulate({
+        legacy: true,
+        allowContextTransientMap: true,
+        allowGenerationOverride: true,
+      });
 
       await adapter.submitTransaction(ctx, "create", [], {
         secret: "value",
@@ -921,6 +1012,10 @@ describe("FabricClientAdapter", () => {
 
       const calledTransient = legacySpy.mock.calls[0][3]; // transientMap
       expect(calledTransient).toBeDefined();
+      expect(Buffer.isBuffer(calledTransient.__overrides)).toBe(true);
+      expect(JSON.parse(calledTransient.__overrides.toString())).toEqual({
+        allowGenerationOverride: true,
+      });
       expect(Buffer.isBuffer(calledTransient.secret)).toBe(true);
       expect(calledTransient.secret.toString()).toBe(JSON.stringify("value"));
     });

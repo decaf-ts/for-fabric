@@ -4,8 +4,6 @@ import {
   Dispatch,
   EventIds,
   UnsupportedError,
-  Context,
-  MaybeContextualArg,
   PersistenceKeys,
 } from "@decaf-ts/core";
 import { PeerConfig } from "../shared/types";

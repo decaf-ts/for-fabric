@@ -5,7 +5,6 @@ import {
   FlagsOf,
   ObserverHandler,
   OrderDirection,
-  Paginator,
   PersistenceKeys,
   PreparedStatementKeys,
   Repository,
@@ -15,7 +14,6 @@ import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
 import { type FabricClientAdapter } from "./FabricClientAdapter";
 import {
-  BulkCrudOperationKeys,
   enforceDBDecorators,
   OperationKeys,
   PrimaryKeyType,

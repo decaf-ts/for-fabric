@@ -73,7 +73,10 @@ describe("contracts/ContractAdapter helpers", () => {
       }
     }
 
-    const adapter = new TestAdapter(undefined as any);
+    const adapter = new TestAdapter(
+      undefined as any,
+      `adapter-${Math.random().toString(36).slice(2)}`
+    );
     const log = {
       debug: jest.fn(),
       error: jest.fn(),
@@ -110,6 +113,38 @@ describe("contracts/ContractAdapter helpers", () => {
         model
       )
     ).rejects.toBeInstanceOf(UnsupportedError);
+  });
+
+  it("applies transient overrides in contract adapter logCtx when enabled", async () => {
+    class TestAdapter extends FabricContractAdapter {
+      public callLogCtx(...args: any[]) {
+        return super.logCtx(...args);
+      }
+    }
+
+    const adapter = new TestAdapter(undefined as any, `adapter-${Math.random().toString(36).slice(2)}`);
+    const fakeStub = {
+      getTransient: () => transient,
+    };
+    const transient = new Map<string, Buffer>([
+      [
+        "__overrides",
+        Buffer.from(
+          JSON.stringify({
+            allowGenerationOverride: true,
+          })
+        ),
+      ],
+    ]);
+    const context = createContext();
+    const contextWithOverrides = context.override({
+      allowContextTransientMap: true,
+      stub: fakeStub,
+    }) as FabricContractContext;
+
+    const { ctx } = await adapter.callLogCtx([contextWithOverrides], "create", true);
+
+    expect(ctx.getOrUndefined("allowGenerationOverride")).toBe(true);
   });
 
   it.skip("pkFabricOnCreate requests sequence and defines immutable id", async () => {
