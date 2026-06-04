@@ -1,7 +1,8 @@
 import "reflect-metadata";
 
 import { pk, OrderDirection } from "@decaf-ts/core";
-import { Context, OperationKeys } from "@decaf-ts/db-decorators";
+import { Context } from "@decaf-ts/core";
+import { OperationKeys } from "@decaf-ts/db-decorators";
 import { model, Model } from "@decaf-ts/decorator-validation";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
 

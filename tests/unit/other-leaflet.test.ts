@@ -139,16 +139,16 @@ describe("OtherLeaflet relations and mirror enforcement", () => {
     const baseCtx = getMockCtx();
     const orgBStub = Object.create(stub);
     orgBStub.getCreator = async () => ({
-      idBytes: Buffer.from("creatorID-org-b"),
-      mspid: "org-b",
+      idBytes: Buffer.from("creator-Pharmaledgerassoc"),
+      mspid: "PharmaledgerassocMSP",
     });
-    orgBStub.getMspID = () => "org-b";
+    orgBStub.getMspID = () => "PharmaledgerassocMSP";
     return Object.assign(baseCtx, {
       stub: orgBStub,
       clientIdentity: {
-        getID: () => "id-org-b",
-        getMSPID: () => "org-b",
-        getIDBytes: () => Buffer.from("creatorID-org-b"),
+        getID: () => "id-Pharmaledgerassoc",
+        getMSPID: () => "PharmaledgerassocMSP",
+        getIDBytes: () => Buffer.from("creator-Pharmaledgerassoc"),
         getAttributeValue: (name: string) =>
           name === "roles" ? ["admin"] : undefined,
       },
@@ -234,14 +234,14 @@ describe("OtherLeaflet relations and mirror enforcement", () => {
     ensureCommitted();
 
     await expect(
-      stub.getPrivateData("decaf-namespaceAeon", rootKey)
+      stub.getPrivateData("decaf-namespace", rootKey)
     ).rejects.toThrow(NotFoundError);
     await expect(
       stub.getPrivateData("mirror-collection", rootKey)
     ).rejects.toThrow(NotFoundError);
     await expect(
       stub.getPrivateData(
-        "decaf-namespaceAeon",
+        "decaf-namespace",
         stub.createCompositeKey("other_leaflet_file", [newIds[0]])
       )
     ).rejects.toThrow(NotFoundError);
@@ -542,7 +542,7 @@ describe("OtherLeaflet relations and mirror enforcement", () => {
       const normalEntry = await loadPrivateEntry("other_leaflet", leafId);
       normalEntry.lang = "normal";
       await stub.putPrivateData(
-        "decaf-namespaceAeon",
+        "decaf-namespace",
         key,
         Buffer.from(JSON.stringify(normalEntry))
       );
@@ -668,7 +668,7 @@ describe("OtherLeaflet relations and mirror enforcement", () => {
           stub.getPrivateData("mirror-collection", key)
         ).rejects.toThrow(NotFoundError);
         await expect(
-          stub.getPrivateData("decaf-namespaceAeon", key)
+          stub.getPrivateData("decaf-namespace", key)
         ).rejects.toThrow(NotFoundError);
       });
 

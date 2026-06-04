@@ -1,7 +1,6 @@
 import "reflect-metadata";
 
-import { Adapter } from "@decaf-ts/core";
-import { Context } from "@decaf-ts/db-decorators";
+import { Adapter, Context } from "@decaf-ts/core";
 import type { Client } from "@grpc/grpc-js";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";

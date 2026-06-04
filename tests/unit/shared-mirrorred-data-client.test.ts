@@ -166,16 +166,29 @@ describe("shared and mirrored data - client", () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const created = await repo.create(model);
       expect(transactionMock).toHaveBeenCalled();
-      expect(transactionMock).toHaveBeenCalledWith(
-        expect.any(Context),
-        "create",
-        true,
-        [new PrivateClass().serialize()],
-        {
-          private_class: { name: "name", id: undefined, createdAt: undefined },
-        },
-        undefined,
-        PrivateClass.name
+      const call = transactionMock.mock.calls[0];
+      expect(call[0]).toEqual(expect.any(Context));
+      expect(call[1]).toBe("create");
+      expect(call[2]).toBe(true);
+      expect(call[4]).toEqual({
+        private_class: { name: "name", id: undefined, createdAt: undefined },
+      });
+      expect(call[5]).toBeUndefined();
+      expect(call[6]).toBe(PrivateClass);
+
+      const serialized = JSON.parse(call[3][0]);
+      expect(serialized).toEqual(
+        expect.objectContaining({
+          __model: "PrivateClass",
+          __overrides: expect.objectContaining({
+            allowGatewayOverride: false,
+            allowManualEndorsingOrgs: false,
+            legacy: false,
+            rebuildWithTransient: false,
+            encryptTransient: false,
+            syntheticEvents: true,
+          }),
+        })
       );
     });
   });

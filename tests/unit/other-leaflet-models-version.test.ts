@@ -139,16 +139,16 @@ function buildLeafletWithoutOptional(
     const mirrorCtx = getMockCtx();
     const mirrorStub = Object.create(stub);
     mirrorStub.getCreator = async () => ({
-      idBytes: Buffer.from("creator-org-b"),
-      mspid: "org-b",
+      idBytes: Buffer.from("creator-Pharmaledgerassoc"),
+      mspid: "PharmaledgerassocMSP",
     });
-    mirrorStub.getMspID = () => "org-b";
+    mirrorStub.getMspID = () => "PharmaledgerassocMSP";
     return Object.assign(mirrorCtx, {
       stub: mirrorStub,
       clientIdentity: {
-        getID: () => "id-org-b",
-        getMSPID: () => "org-b",
-        getIDBytes: () => Buffer.from("creator-org-b"),
+        getID: () => "id-Pharmaledgerassoc",
+        getMSPID: () => "PharmaledgerassocMSP",
+        getIDBytes: () => Buffer.from("creator-Pharmaledgerassoc"),
         getAttributeValue: (name: string) =>
           name === "roles" ? ["admin"] : undefined,
       },
@@ -232,7 +232,7 @@ function buildLeafletWithoutOptional(
     );
     const leafletKey = stub.createCompositeKey("other_leaflet", [leafId]);
     await expect(
-      stub.getPrivateData("decaf-namespaceAeon", leafletKey)
+      stub.getPrivateData("decaf-namespace", leafletKey)
     ).rejects.toThrow(NotFoundError);
     await expect(
       stub.getPrivateData("mirror-collection", leafletKey)
@@ -244,7 +244,7 @@ function buildLeafletWithoutOptional(
     if (xmlFileId) {
       const xmlKey = stub.createCompositeKey("other_leaflet_file", [xmlFileId]);
       await expect(
-        stub.getPrivateData("decaf-namespaceAeon", xmlKey)
+        stub.getPrivateData("decaf-namespace", xmlKey)
       ).rejects.toThrow(NotFoundError);
       await expect(
         stub.getPrivateData("mirror-collection", xmlKey)
@@ -527,7 +527,7 @@ function buildLeafletWithoutOptional(
         stub.getPrivateData("mirror-collection", key)
       ).rejects.toThrow(NotFoundError);
       await expect(
-        stub.getPrivateData("decaf-namespaceAeon", key)
+        stub.getPrivateData("decaf-namespace", key)
       ).rejects.toThrow(NotFoundError);
     });
 
@@ -580,7 +580,7 @@ function buildLeafletWithoutOptional(
           JSON.stringify({
             attr1: "lang",
             operator: "EQUAL",
-          comparison: mirrorLang,
+            comparison: mirrorLang,
           }),
           "lang",
           "asc"
@@ -667,7 +667,7 @@ function buildLeafletWithoutOptional(
           stub.getPrivateData("mirror-collection", key)
         ).rejects.toThrow(NotFoundError);
         await expect(
-          stub.getPrivateData("decaf-namespaceAeon", key)
+          stub.getPrivateData("decaf-namespace", key)
         ).rejects.toThrow(NotFoundError);
       });
 

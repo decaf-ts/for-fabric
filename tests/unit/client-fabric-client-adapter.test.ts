@@ -231,7 +231,7 @@ describe("FabricClientAdapter", () => {
       expect.any(String),
       expect.any(Array),
       {},
-      undefined,
+      ["Org1MSP"],
       ERC20Wallet
     );
     const createAllPayload = JSON.parse(submitSpy.mock.calls[0][2][0]);

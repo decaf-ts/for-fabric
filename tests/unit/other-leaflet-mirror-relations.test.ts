@@ -140,16 +140,16 @@ describe("OtherLeaflet relation and mirror integration", () => {
     const mirrorCtx = getMockCtx();
     const mirrorStub = Object.create(stub);
     mirrorStub.getCreator = async () => ({
-      idBytes: Buffer.from("creator-org-b"),
-      mspid: "org-b",
+      idBytes: Buffer.from("creator-Pharmaledgerassoc"),
+      mspid: "PharmaledgerassocMSP",
     });
-    mirrorStub.getMspID = () => "org-b";
+    mirrorStub.getMspID = () => "PharmaledgerassocMSP";
     return Object.assign(mirrorCtx, {
       stub: mirrorStub,
       clientIdentity: {
-        getID: () => "id-org-b",
-        getMSPID: () => "org-b",
-        getIDBytes: () => Buffer.from("creator-org-b"),
+        getID: () => "id-Pharmaledgerassoc",
+        getMSPID: () => "PharmaledgerassocMSP",
+        getIDBytes: () => Buffer.from("creator-Pharmaledgerassoc"),
         getAttributeValue: (name: string) =>
           name === "roles" ? ["admin"] : undefined,
       },
@@ -227,7 +227,7 @@ describe("OtherLeaflet relation and mirror integration", () => {
     );
     const leafKey = stub.createCompositeKey("other_leaflet", [leafId]);
     await expect(
-      stub.getPrivateData("decaf-namespaceAeon", leafKey)
+      stub.getPrivateData("decaf-namespace", leafKey)
     ).rejects.toThrow(NotFoundError);
     await expect(
       stub.getPrivateData("mirror-collection", leafKey)
@@ -498,7 +498,7 @@ describe("OtherLeaflet relation and mirror integration", () => {
       ensureCommitted();
 
       await expect(
-        stub.getPrivateData("decaf-namespaceAeon", key)
+        stub.getPrivateData("decaf-namespace", key)
       ).rejects.toThrow(NotFoundError);
       await expect(
         stub.getPrivateData("mirror-collection", key)
@@ -517,7 +517,7 @@ describe("OtherLeaflet relation and mirror integration", () => {
         lang: "owner-final",
       };
       await stub.putPrivateData(
-        "decaf-namespaceAeon",
+        "decaf-namespace",
         key,
         Buffer.from(JSON.stringify(normalEntry))
       );

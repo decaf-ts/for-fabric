@@ -2292,23 +2292,23 @@ describe("OtherProductShared contract version flow with relations", () => {
       const baseCtx = getMockCtx();
       const orgBStub = Object.create(stub);
       const orgBIdentity = {
-        getID: () => "id-org-b",
-        getMSPID: () => "org-b",
-        getIDBytes: () => Buffer.from("creatorID-org-b"),
+        getID: () => "id-Pharmaledgerassoc",
+        getMSPID: () => "PharmaledgerassocMSP",
+        getIDBytes: () => Buffer.from("creator-Pharmaledgerassoc"),
         getAttributeValue: (name: string) =>
           name === "roles" ? ["admin"] : undefined,
       };
       orgBStub.getCreator = async () => ({
-        idBytes: Buffer.from("creatorID-org-b"),
-        mspid: "org-b",
+        idBytes: Buffer.from("creator-Pharmaledgerassoc"),
+        mspid: "PharmaledgerassocMSP",
       });
-      orgBStub.getMspID = () => "org-b";
+      orgBStub.getMspID = () => "PharmaledgerassocMSP";
       const orgBCtx = new FabricContractContext();
       return orgBCtx.accumulate({
         stub: orgBStub,
         identity: orgBIdentity,
         clientIdentity: orgBIdentity,
-        logger: baseCtx.logging.getLogger("org-b"),
+        logger: baseCtx.logging.getLogger("PharmaledgerassocMSP"),
       } as any);
     }
 
@@ -2457,7 +2457,6 @@ describe("OtherProductShared contract version flow with relations", () => {
         const parsedPage = Paginator.deserialize(page);
         expect(FabricClientPaginator.isSerializedPage(parsedPage)).toBe(true);
         expect(parsedPage.data.length).toEqual(3);
-        // expect(parsedPage.count).toBeGreaterThanOrEqual(mirrorProducts.length);
       });
 
       it("reads product and relation rows exclusively from mirror collection (single + bulk reads)", async () => {
@@ -2843,7 +2842,6 @@ describe("OtherProductShared contract version flow with relations", () => {
         const parsedPage = Paginator.deserialize(page);
         expect(FabricClientPaginator.isSerializedPage(parsedPage)).toBe(true);
         expect(parsedPage.data.length).toEqual(3);
-        // expect(parsedPage.count).toEqual(mirrorBatches.length);
       });
     });
 

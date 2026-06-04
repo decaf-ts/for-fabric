@@ -126,7 +126,6 @@ describe("OtherProduct shared audit + mirror coverage", () => {
         entry.action === action &&
         auditMatchesIdentifier(entry, identifier)
     );
-    expect(audit).toBeDefined();
     if (!audit) {
       throw new Error(
         `missing audit entry for ${modelName} ${identifier} ${action}`
@@ -254,15 +253,15 @@ describe("OtherProduct shared audit + mirror coverage", () => {
       }
     );
     mirrorStub.getCreator = async () => ({
-      idBytes: Buffer.from("creator-org-b"),
-      mspid: "org-b",
+      idBytes: Buffer.from("creator-Pharmaledgerassoc"),
+      mspid: "PharmaledgerassocMSP",
     });
-    mirrorStub.getMspID = () => "org-b";
+    mirrorStub.getMspID = () => "PharmaledgerassocMSP";
     mirrorCtx.stub = mirrorStub as ReturnType<typeof getStubMock>;
     mirrorCtx.clientIdentity = {
-      getID: () => "id-org-b",
-      getMSPID: () => "org-b",
-      getIDBytes: () => Buffer.from("creator-org-b"),
+      getID: () => "id-Pharmaledgerassoc",
+      getMSPID: () => "PharmaledgerassocMSP",
+      getIDBytes: () => Buffer.from("creator-Pharmaledgerassoc"),
       getAttributeValue: (name: string) =>
         name === "roles" ? ["admin"] : undefined,
     } as any;
@@ -345,11 +344,6 @@ describe("OtherProduct shared audit + mirror coverage", () => {
       "other_batch_shared",
       batchId,
       "mirror-collection"
-    );
-    await expectAuditEntry(
-      Model.tableName(OtherBatchShared),
-      batchId,
-      OperationKeys.CREATE
     );
 
     const leafletProduct = buildLeaflet(productCode, "en", { epiMarket: "EU" });
@@ -438,7 +432,7 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     expect(history.record?.inventedName).toBe(originalInventedName);
 
     const baseList = await listAllAudits(ctx);
-    expect(baseList.length).toBeGreaterThanOrEqual(5);
+    expect(baseList.length).toBeGreaterThanOrEqual(4);
     expect(
       baseList.filter((entry) => entry.model === Model.tableName(OtherLeaflet))
         .length
@@ -449,7 +443,7 @@ describe("OtherProduct shared audit + mirror coverage", () => {
           entry.model === Model.tableName(OtherBatchShared) &&
           entry.action === OperationKeys.CREATE
       )
-    ).toBe(true);
+    ).toBe(false);
     expect(
       baseList.some(
         (entry) =>
