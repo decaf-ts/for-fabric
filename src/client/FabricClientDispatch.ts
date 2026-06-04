@@ -11,6 +11,7 @@ import {
 import { PeerConfig } from "../shared/types";
 import { Client } from "@grpc/grpc-js";
 import { FabricClientAdapter } from "./FabricClientAdapter";
+import { FabricClientContext } from "./FabricClientContext";
 import {
   BulkCrudOperationKeys,
   InternalError,
@@ -23,7 +24,6 @@ import {
 import { parseEventName } from "../shared/events";
 import { Model } from "@decaf-ts/decorator-validation";
 import { Constructor } from "@decaf-ts/decoration";
-import { FabricClientFlags } from "./types";
 
 /**
  * @description Event dispatcher for Hyperledger Fabric chaincode events
@@ -99,7 +99,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    * @return {Promise<void>} Promise that resolves when the connection is closed
    */
   override async close(
-    ...ctxArgs: ContextualArgs<Context<FabricClientFlags>>
+    ...ctxArgs: ContextualArgs<FabricClientContext>
   ): Promise<void> {
     const { log, ctxArgs: loggedArgs } = (
       await this.logCtx(ctxArgs, PersistenceKeys.SHUTDOWN, true)
@@ -158,9 +158,9 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
     model: Constructor<any> | string,
     event: OperationKeys | BulkCrudOperationKeys | string,
     id: EventIds,
-    ...args: ContextualArgs<Context<FabricClientFlags>>
+    ...args: ContextualArgs<FabricClientContext>
   ): Promise<void> {
-    const { log, ctxArgs } = Adapter.logCtx<Context<FabricClientFlags>>(
+    const { log, ctxArgs } = Adapter.logCtx<FabricClientContext>(
       this.updateObservers,
       event,
       false,
@@ -201,7 +201,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
    *   Observers-->>FabricDispatch: Callbacks executed
    */
   protected async handleEvents(
-    ctxArg?: Context<FabricClientFlags>
+    ctxArg?: FabricClientContext
   ): Promise<void> {
     if (!this.listeningStack)
       throw new InternalError(
@@ -385,7 +385,7 @@ export class FabricClientDispatch extends Dispatch<FabricClientAdapter> {
             resultArgs[1],
             resultArgs[2],
             ...resultArgs.slice(3),
-            ...(ctxArgs as ContextualArgs<Context<FabricClientFlags>>)
+            ...(ctxArgs as ContextualArgs<FabricClientContext>)
           ).catch((e: unknown) =>
             log.error(
               `Failed to dispatch observer refresh for ${toWrap} on ${clazz.name || clazz} for ${ids}: ${e}`

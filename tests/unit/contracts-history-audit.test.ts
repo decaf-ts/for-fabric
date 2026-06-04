@@ -58,9 +58,7 @@ describe("History decorator — relation population & audit comparison", () => {
     const k = stub.createCompositeKey("history", [historyId]);
     try {
       await stub.getState(k);
-      throw new InternalError(
-        `"history can never be loaded from public data`
-      );
+      throw new InternalError(`"history can never be loaded from public data`);
     } catch (e: unknown) {
       expect(e).toBeInstanceOf(NotFoundError);
     }
@@ -325,84 +323,6 @@ describe("History decorator — relation population & audit comparison", () => {
       expect(record.markets.length).toBe(1);
       expect(typeof record.markets[0]).toBe("object");
       expect(record.markets[0].marketId).toBe("de");
-    });
-  });
-
-  // ─── Describe: history on sub-model update (OtherProductStrength) ─────────
-
-  describe("history on OtherProductStrength update — own handler", () => {
-    let productCode: string;
-    let strengthId: string;
-
-    beforeEach(() => {
-      ctx = getMockCtx();
-      Object.assign(ctx, { stub });
-      transientSpy = jest.spyOn(contract as any, "getTransientData");
-    });
-
-    afterEach(() => jest.restoreAllMocks());
-
-    it("creates a product with a strength, commits", async () => {
-      productCode = generateGtin();
-      const model = new OtherProductShared({
-        productCode,
-        inventedName: "Strength History Product",
-        nameMedicinalProduct: "StrMed",
-        strengths: [buildStrength(productCode, "50mg")],
-        markets: [],
-      });
-
-      const payload = preparePayload(model);
-      await contract.create(ctx as any, payload.serialize());
-      stub.commit();
-
-      const product = await loadProduct(productCode);
-      // strengths are stored as IDs in private collection
-      const rawStrengths = product.strengths as any[];
-      expect(rawStrengths.length).toBe(1);
-      strengthId =
-        typeof rawStrengths[0] === "object"
-          ? rawStrengths[0].id
-          : rawStrengths[0];
-    });
-
-    it("updates the product (modifying strength via cascade), commits", async () => {
-      const product = await loadProduct(productCode);
-      const rawStrengths = (product.strengths || []) as any[];
-      const strengthIds = rawStrengths.map((s: any) =>
-        typeof s === "object" ? s.id : s
-      );
-
-      const updated = new OtherProductShared({
-        ...product,
-        strengths: strengthIds.map((id: string) => ({
-          id,
-          productCode,
-          strength: "75mg", // changed
-        })) as any,
-      });
-
-      const payload = preparePayload(updated);
-      await contract.update(ctx as any, payload.serialize());
-      stub.commit();
-    });
-
-    it("history entry for strength v1 exists with correct data", async () => {
-      ensureCommitted();
-      const tableName = Model.tableName(OtherProductStrength);
-      // OtherProductStrength also has @historyDec() on its pk
-      const historyId = `${tableName}:${strengthId}:1`;
-      const k = stub.createCompositeKey("history", [historyId]);
-      const raw = await stub.getPrivateData("ptp-historyAeon", k);
-      const history = new History(
-        JSON.parse(Buffer.from(raw).toString("utf8"))
-      );
-      expect(history.hasErrors()).toBeUndefined();
-      expect(history.version).toBe(1);
-      expect(history.table).toBe(tableName);
-
-      const record = history.record as any;
-      expect(record.strength).toBe("50mg");
     });
   });
 

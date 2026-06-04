@@ -17,6 +17,7 @@ export * from "./constants";
 export * from "./crypto";
 export * from "./services";
 export * from "./FabricClientDispatch";
+export * from "./FabricClientContext";
 export * from "./fabric-fs";
 export * from "./FabricClientAdapter";
 export * from "./FabricClientRepository";

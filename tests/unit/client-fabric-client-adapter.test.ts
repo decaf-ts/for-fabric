@@ -1,13 +1,13 @@
 import "reflect-metadata";
 
+import { InternalError, OperationKeys } from "@decaf-ts/db-decorators";
 import {
-  BulkCrudOperationKeys,
-  InternalError,
-  OperationKeys,
+  Context,
+  PreparedStatementKeys,
   UnsupportedError,
-} from "@decaf-ts/db-decorators";
-import { Context, PreparedStatementKeys } from "@decaf-ts/core";
+} from "@decaf-ts/core";
 import { ModelKeys } from "@decaf-ts/decorator-validation";
+import { FabricClientContext } from "../../src/client/FabricClientContext";
 import { ERC20Wallet } from "../../src/contracts/erc20/models";
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";
@@ -147,7 +147,7 @@ const newAdapter = (overrides: Partial<PeerConfig> = {}) => {
 };
 
 const createContext = () => {
-  const ctx = new Context();
+  const ctx = new FabricClientContext();
   const logger = {
     for: jest.fn().mockReturnThis(),
     clear: jest.fn().mockReturnThis(),
@@ -185,6 +185,11 @@ describe("FabricClientAdapter", () => {
     expect(adapter.repository()).toBe(FabricClientRepository);
   });
 
+  it("uses FabricClientContext for adapter contexts", () => {
+    const adapter = newAdapter();
+    expect((adapter as any).Context).toBe(FabricClientContext);
+  });
+
   it("rejects mismatched ids and models on createAll", async () => {
     const adapter = newAdapter();
     const context = createContext();
@@ -207,6 +212,10 @@ describe("FabricClientAdapter", () => {
       );
 
     const context = createContext();
+    context.accumulate({
+      allowGatewayOverride: true,
+      endorsingOrgs: ["Org1MSP"],
+    });
 
     const result = await adapter.createAll(
       ERC20Wallet,
@@ -225,6 +234,11 @@ describe("FabricClientAdapter", () => {
       undefined,
       ERC20Wallet
     );
+    const createAllPayload = JSON.parse(submitSpy.mock.calls[0][2][0]);
+    expect(createAllPayload[0].__overrides).toEqual({
+      allowGatewayOverride: true,
+      endorsingOrgs: ["Org1MSP"],
+    });
   });
 
   it("wraps raw evaluation errors with parseError", async () => {
@@ -360,9 +374,7 @@ describe("FabricClientAdapter", () => {
     const legacySpy = jest
       .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
       .mockResolvedValue(new TextEncoder().encode("legacy"));
-    const randomSpy = jest
-      .spyOn(Math, "random")
-      .mockReturnValue(0.1); // deterministic selection order
+    const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0.1); // deterministic selection order
     const ctx = createContext();
     ctx.accumulate({
       legacy: true,
@@ -372,9 +384,7 @@ describe("FabricClientAdapter", () => {
     await adapter.submitTransaction(ctx, "create");
 
     const peerConfigs = legacySpy.mock.calls[0][4];
-    const extraPeers = peerConfigs.filter(
-      (peer) => peer.mspId === MIRROR_MSP
-    );
+    const extraPeers = peerConfigs.filter((peer) => peer.mspId === MIRROR_MSP);
     expect(extraPeers).toHaveLength(2);
 
     randomSpy.mockRestore();
@@ -400,6 +410,9 @@ describe("FabricClientAdapter", () => {
   it("refreshes model after create when transient data exist", async () => {
     const adapter = newAdapter();
     const ctx = createContext();
+    ctx.accumulate({
+      allowGatewayOverride: true,
+    });
     const payload = { foo: "bar" };
     const transient = { secret: "value" };
     const serializedResult = {
@@ -427,11 +440,20 @@ describe("FabricClientAdapter", () => {
     expect(readSpy).toHaveBeenCalledWith(ERC20Wallet, "wallet-1", ctx);
     expect(result).not.toEqual(serializedResult);
     expect(result).toEqual({ ...serializedResult, secret: "value" });
+    const createPayload = JSON.parse(
+      (adapter as any).submitTransaction.mock.calls[0][2][0]
+    );
+    expect(createPayload.__overrides).toEqual({
+      allowGatewayOverride: true,
+    });
   });
 
   it("refreshes model after update when transient data exist", async () => {
     const adapter = newAdapter();
     const ctx = createContext();
+    ctx.accumulate({
+      allowGatewayOverride: true,
+    });
     const payload = { foo: "baz" };
     const transient = { secret: "new" };
     const serializedResult = {
@@ -470,6 +492,12 @@ describe("FabricClientAdapter", () => {
       createdAt: "2026-02-13T00:00:00.000Z",
       updatedBy: "system",
       updatedAt: "2026-02-13T00:00:00.000Z",
+    });
+    const updatePayload = JSON.parse(
+      (adapter as any).submitTransaction.mock.calls[0][2][0]
+    );
+    expect(updatePayload.__overrides).toEqual({
+      allowGatewayOverride: true,
     });
   });
 
@@ -594,6 +622,11 @@ describe("FabricClientAdapter", () => {
           new TextEncoder().encode(JSON.stringify(serialized))
         );
 
+      ctx.accumulate({
+        allowGatewayOverride: true,
+        legacy: true,
+      });
+
       const result = await adapter.create(
         ERC20Wallet,
         "w-1",
@@ -610,6 +643,11 @@ describe("FabricClientAdapter", () => {
         undefined,
         "ERC20Wallet"
       );
+      const payload = JSON.parse(submitSpy.mock.calls[0][2][0]);
+      expect(payload.__overrides).toEqual({
+        allowGatewayOverride: true,
+        legacy: true,
+      });
       expect(result.id).toBe("w-1");
     });
 
@@ -649,6 +687,10 @@ describe("FabricClientAdapter", () => {
           new TextEncoder().encode(JSON.stringify(serialized))
         );
 
+      ctx.accumulate({
+        allowGatewayOverride: true,
+      });
+
       const result = await adapter.update(
         ERC20Wallet,
         "w-3",
@@ -665,6 +707,10 @@ describe("FabricClientAdapter", () => {
         undefined,
         "ERC20Wallet"
       );
+      const serializedPayload = JSON.parse(submitSpy.mock.calls[0][2][0]);
+      expect(serializedPayload.__overrides).toEqual({
+        allowGatewayOverride: true,
+      });
       expect(result.id).toBe("w-3");
     });
 
@@ -708,14 +754,12 @@ describe("FabricClientAdapter", () => {
       const evalSpy = jest
         .spyOn(adapter as any, "evaluateTransaction")
         .mockResolvedValue(
-          new TextEncoder().encode(JSON.stringify(records.map((r) => JSON.stringify(r))))
+          new TextEncoder().encode(
+            JSON.stringify(records.map((r) => JSON.stringify(r)))
+          )
         );
 
-      const result = await adapter.readAll(
-        ERC20Wallet,
-        ["w-1", "w-2"],
-        ctx
-      );
+      const result = await adapter.readAll(ERC20Wallet, ["w-1", "w-2"], ctx);
 
       expect(evalSpy).toHaveBeenCalled();
       expect(result).toHaveLength(2);
@@ -727,6 +771,10 @@ describe("FabricClientAdapter", () => {
         serialize: jest.fn((m: any) => JSON.stringify(m)),
       };
       const ctx = createContext();
+      ctx.accumulate({
+        allowGatewayOverride: true,
+        endorsingOrgs: ["Org1MSP"],
+      });
       const records = [
         { id: "w-1", token: "TK", balance: 100 },
         { id: "w-2", token: "TK", balance: 200 },
@@ -748,6 +796,11 @@ describe("FabricClientAdapter", () => {
       );
 
       expect(submitSpy).toHaveBeenCalled();
+      const outerPayload = JSON.parse(submitSpy.mock.calls[0][2][0]);
+      expect(outerPayload[0].__overrides).toEqual({
+        allowGatewayOverride: true,
+        endorsingOrgs: ["Org1MSP"],
+      });
       expect(result).toHaveLength(2);
     });
 
@@ -766,11 +819,7 @@ describe("FabricClientAdapter", () => {
           )
         );
 
-      const result = await adapter.deleteAll(
-        ERC20Wallet,
-        ["w-1", "w-2"],
-        ctx
-      );
+      const result = await adapter.deleteAll(ERC20Wallet, ["w-1", "w-2"], ctx);
 
       expect(submitSpy).toHaveBeenCalled();
       expect(result).toHaveLength(2);
@@ -873,9 +922,7 @@ describe("FabricClientAdapter", () => {
       const calledTransient = legacySpy.mock.calls[0][3]; // transientMap
       expect(calledTransient).toBeDefined();
       expect(Buffer.isBuffer(calledTransient.secret)).toBe(true);
-      expect(calledTransient.secret.toString()).toBe(
-        JSON.stringify("value")
-      );
+      expect(calledTransient.secret.toString()).toBe(JSON.stringify("value"));
     });
 
     it("passes peer config from adapter config", async () => {
@@ -886,18 +933,18 @@ describe("FabricClientAdapter", () => {
       const ctx = createContext();
       ctx.accumulate({ legacy: true });
 
-    await adapter.submitTransaction(ctx, "create");
+      await adapter.submitTransaction(ctx, "create");
 
-    const calledPeerConfigs = legacySpy.mock.calls[0][4];
-    expect(calledPeerConfigs).toEqual([
-      {
-        mspId: config.mspId,
-        peerEndpoint: config.peerEndpoint,
-        peerHostAlias: config.peerHostAlias,
-        tlsCert: config.tlsCert,
-      },
-    ]);
-  });
+      const calledPeerConfigs = legacySpy.mock.calls[0][4];
+      expect(calledPeerConfigs).toEqual([
+        {
+          mspId: config.mspId,
+          peerEndpoint: config.peerEndpoint,
+          peerHostAlias: config.peerHostAlias,
+          tlsCert: config.tlsCert,
+        },
+      ]);
+    });
 
     it("builds a manual connection profile using provided peers", async () => {
       const adapter = newAdapter({ allowGatewayOverride: true });
@@ -962,13 +1009,8 @@ describe("FabricClientAdapter", () => {
         );
       const readSpy = jest
         .spyOn(adapter, "read")
-        .mockResolvedValue(
-          { id: "wallet-1", token: "TK", balance: 25 } as any
-        );
-      const refreshSpy = jest.spyOn(
-        adapter as any,
-        "shouldRefreshAfterWrite"
-      );
+        .mockResolvedValue({ id: "wallet-1", token: "TK", balance: 25 } as any);
+      const refreshSpy = jest.spyOn(adapter as any, "shouldRefreshAfterWrite");
 
       const result = await adapter.create(
         ERC20Wallet,
@@ -1006,16 +1048,11 @@ describe("FabricClientAdapter", () => {
             ])
           )
         );
-      const readAllSpy = jest
-        .spyOn(adapter, "readAll")
-        .mockResolvedValue([
-          { id: "wallet-1", token: "TK", balance: 50 },
-          { id: "wallet-2", token: "TK", balance: 75 },
-        ] as any);
-      const refreshSpy = jest.spyOn(
-        adapter as any,
-        "shouldRefreshAfterWrite"
-      );
+      const readAllSpy = jest.spyOn(adapter, "readAll").mockResolvedValue([
+        { id: "wallet-1", token: "TK", balance: 50 },
+        { id: "wallet-2", token: "TK", balance: 75 },
+      ] as any);
+      const refreshSpy = jest.spyOn(adapter as any, "shouldRefreshAfterWrite");
 
       const result = await adapter.createAll(
         ERC20Wallet,
@@ -1050,13 +1087,8 @@ describe("FabricClientAdapter", () => {
         .mockResolvedValue(new TextEncoder().encode("{}"));
       const readSpy = jest
         .spyOn(adapter, "read")
-        .mockResolvedValue(
-          { id: "wallet-1", token: "TK", balance: 5 } as any
-        );
-      const refreshSpy = jest.spyOn(
-        adapter as any,
-        "shouldRefreshAfterWrite"
-      );
+        .mockResolvedValue({ id: "wallet-1", token: "TK", balance: 5 } as any);
+      const refreshSpy = jest.spyOn(adapter as any, "shouldRefreshAfterWrite");
 
       const result = await adapter.delete(ERC20Wallet, "wallet-1", ctx);
 
@@ -1086,16 +1118,9 @@ describe("FabricClientAdapter", () => {
         .mockResolvedValue([
           { id: "wallet-1", token: "TK", balance: 90 },
         ] as any);
-      const refreshSpy = jest.spyOn(
-        adapter as any,
-        "shouldRefreshAfterWrite"
-      );
+      const refreshSpy = jest.spyOn(adapter as any, "shouldRefreshAfterWrite");
 
-      const result = await adapter.deleteAll(
-        ERC20Wallet,
-        ["wallet-1"],
-        ctx
-      );
+      const result = await adapter.deleteAll(ERC20Wallet, ["wallet-1"], ctx);
 
       expect(refreshSpy).toHaveBeenCalledWith(
         ERC20Wallet,
@@ -1103,11 +1128,7 @@ describe("FabricClientAdapter", () => {
         true,
         "wallet-1"
       );
-      expect(readAllSpy).toHaveBeenCalledWith(
-        ERC20Wallet,
-        ["wallet-1"],
-        ctx
-      );
+      expect(readAllSpy).toHaveBeenCalledWith(ERC20Wallet, ["wallet-1"], ctx);
       expect(result).toEqual([{ id: "wallet-1", token: "TK", balance: 90 }]);
     });
   });
@@ -1122,9 +1143,7 @@ describe("FabricClientAdapter", () => {
       ];
       jest
         .spyOn(adapter as any, "evaluateTransaction")
-        .mockResolvedValue(
-          new TextEncoder().encode(JSON.stringify(docs))
-        );
+        .mockResolvedValue(new TextEncoder().encode(JSON.stringify(docs)));
 
       const result = await adapter.raw(
         { selector: { token: "TK" } },
@@ -1145,9 +1164,7 @@ describe("FabricClientAdapter", () => {
       };
       jest
         .spyOn(adapter as any, "evaluateTransaction")
-        .mockResolvedValue(
-          new TextEncoder().encode(JSON.stringify(response))
-        );
+        .mockResolvedValue(new TextEncoder().encode(JSON.stringify(response)));
 
       const result = await adapter.raw(
         { selector: { token: "TK" } },
@@ -1200,9 +1217,9 @@ describe("FabricClientAdapter — syntheticEvents: true delivers events end-to-e
       resolveInit = r;
     });
 
-    const origInit = FabricClientDispatch.prototype[
-      "initialize"
-    ] as (...args: any[]) => Promise<void>;
+    const origInit = FabricClientDispatch.prototype["initialize"] as (
+      ...args: any[]
+    ) => Promise<void>;
     jest
       .spyOn(FabricClientDispatch.prototype as any, "initialize")
       .mockImplementation(async function (this: any, ...args: any[]) {
@@ -1312,9 +1329,7 @@ describe("FabricClientAdapter — syntheticEvents: true delivers events end-to-e
 
   it("fires an UPDATE event for updateAll (bulk)", async () => {
     const adapter = newAdapter({ syntheticEvents: true });
-    (adapter as any).updateAll = jest
-      .fn()
-      .mockResolvedValue([{ id: "a" }]);
+    (adapter as any).updateAll = jest.fn().mockResolvedValue([{ id: "a" }]);
 
     const received: Array<{ model: any; event: string; id: any }> = [];
     await attachObserver(adapter, received);

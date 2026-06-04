@@ -20,6 +20,7 @@ import {
 } from "@decaf-ts/core";
 import { Model } from "@decaf-ts/decorator-validation";
 import { FabricClientAdapter } from "./FabricClientAdapter";
+import { FabricClientContext } from "./FabricClientContext";
 import {
   CouchDBKeys,
   CouchDBOperator,
@@ -35,7 +36,6 @@ import {
   CouchDBViewMetadata,
   ViewResponse,
 } from "@decaf-ts/for-couchdb";
-import { FabricClientFlags } from "./types";
 import { toCamelCase } from "@decaf-ts/logging";
 import { DBKeys, InternalError } from "@decaf-ts/db-decorators";
 import { Metadata } from "@decaf-ts/decoration";
@@ -95,7 +95,7 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
   }
 
   protected override squash(
-    ctx: Context<FabricClientFlags>
+    ctx: FabricClientContext
   ): PreparedStatement<any> | undefined {
     const squashed: PreparedStatement<M> | undefined = super.squash(
       ctx as never
@@ -128,7 +128,7 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
   }
 
   protected override async executePrepared(
-    ...argz: MaybeContextualArg<Context<FabricClientFlags>>
+    ...argz: MaybeContextualArg<FabricClientContext>
   ): Promise<R> {
     const repo = Repository.forModel(this.fromSelector, this.adapter.alias);
     const { method, args } = this.prepared as PreparedStatement<any>;
@@ -136,7 +136,7 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
   }
 
   override async prepare(
-    ctx?: Context<FabricClientFlags>
+    ctx?: FabricClientContext
   ): Promise<StatementExecutor<M, R>> {
     ctx =
       ctx ||
@@ -146,11 +146,10 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
         this.fromSelector
       ));
 
-    if (
-      this.isSimpleQuery() &&
-      (ctx as Context<FabricClientFlags>).get("forcePrepareSimpleQueries")
-    ) {
-      const squashed = this.squash(ctx as Context<FabricClientFlags>);
+    if (!ctx) throw new InternalError("No context available for statement");
+
+    if (this.isSimpleQuery() && ctx.get("forcePrepareSimpleQueries")) {
+      const squashed = this.squash(ctx);
       if (squashed) {
         this.prepared = squashed;
         return this;
@@ -194,7 +193,7 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
    */
   protected override processRecord(
     record: any,
-    ctx: Context<FabricClientFlags>
+    ctx: FabricClientContext
   ): M {
     const pkAttr = Model.pk(this.fromSelector);
     const type = Metadata.get(
@@ -552,7 +551,7 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
    */
   private async executeAggregate<R>(
     info: FabricAggregateInfo,
-    ctx: Context<FabricClientFlags>
+    ctx: FabricClientContext
   ): Promise<R> {
     if (!this.isViewAggregate(info)) {
       return this.handleAverage<R>(info, ctx);
@@ -573,7 +572,7 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
    */
   private async handleAverage<R>(
     info: FabricAggregateInfo,
-    ctx: Context<FabricClientFlags>
+    ctx: FabricClientContext
   ): Promise<R> {
     if (info.kind !== "avg")
       throw new QueryError("Average descriptor is not valid");

@@ -18,4 +18,5 @@ export type FabricClientFlags = FabricFlags & {
   allowManualEndorsingOrgs: boolean;
   encryptTransient?: false | string | (() => string);
   syntheticEvents?: boolean;
+  mspEventOnly?: boolean;
 };

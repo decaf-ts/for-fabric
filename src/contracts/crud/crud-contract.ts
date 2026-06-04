@@ -37,6 +37,7 @@ import {
   BulkCrudOperationKeys,
   OperationKeys,
   PrimaryKeyType,
+  SerializationError,
 } from "@decaf-ts/db-decorators";
 import {
   FabricFlags,
@@ -433,10 +434,45 @@ export abstract class FabricCrudContract<M extends Model>
   protected extractOverrides(
     obj: any | any[]
   ): Partial<FabricFlags<any>> | undefined {
+    if (Array.isArray(obj)) {
+      const first = obj[0] as any;
+      return first ? first[FabricModelKeys.OVERRIDES] : undefined;
+    }
     if ((obj as any)[FabricModelKeys.OVERRIDES]) {
       return (obj as any)[FabricModelKeys.OVERRIDES];
     }
     return undefined;
+  }
+
+  protected deserializeBulkModels(models: string): M[] {
+    const parsed = JSON.parse(models);
+    if (!Array.isArray(parsed))
+      throw new SerializationError(
+        new Error("Bulk payload must be an array of serialized models")
+      );
+    const overrides = this.extractOverrides(parsed);
+    const hydrated = parsed.map((entry: string | Record<string, any>) => {
+      const serialized =
+        typeof entry === "string"
+          ? entry
+          : JSON.stringify(
+              Object.fromEntries(
+                Object.entries(entry).filter(
+                  ([key]) => key !== FabricModelKeys.OVERRIDES
+                )
+              )
+            );
+      return new this.clazz(this.deserialize(serialized));
+    }) as M[];
+    if (overrides && hydrated.length) {
+      Object.defineProperty(hydrated[0], FabricModelKeys.OVERRIDES, {
+        enumerable: false,
+        configurable: true,
+        writable: true,
+        value: overrides,
+      });
+    }
+    return hydrated;
   }
 
   /**
@@ -556,10 +592,7 @@ export abstract class FabricCrudContract<M extends Model>
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    if (typeof models === "string")
-      models = (JSON.parse(models) as [])
-        .map((m) => this.deserialize(m))
-        .map((m) => new this.clazz(m)) as any;
+    if (typeof models === "string") models = this.deserializeBulkModels(models);
     const { log, ctxArgs, ctx } = (
       await this.logCtx(
         [...args, context],
@@ -688,10 +721,7 @@ export abstract class FabricCrudContract<M extends Model>
     models: string | M[],
     ...args: any[]
   ): Promise<string | M[]> {
-    if (typeof models === "string")
-      models = (JSON.parse(models) as [])
-        .map((m) => this.deserialize(m))
-        .map((m) => new this.clazz(m)) as any;
+    if (typeof models === "string") models = this.deserializeBulkModels(models);
     const { log, ctxArgs, ctx } = (
       await this.logCtx(
         [...args, context],
