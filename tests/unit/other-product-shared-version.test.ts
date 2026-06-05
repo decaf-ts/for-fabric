@@ -2133,7 +2133,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         (entry) => normalizeStrength(entry).strength!
       );
       const sortedAscEntries = [...strengthEntries].sort((a, b) =>
-        a.productCode.localeCompare(b.productCode)
+        a.strength.localeCompare(b.strength)
       );
       const expectedFirstStrengths = sortedAscEntries
         .slice(0, pageLimit)
@@ -2177,8 +2177,8 @@ describe("OtherProductShared contract version flow with relations", () => {
           : new OtherProductStrength(entry)
       );
       const descProductCodes = descEntries.map((entry) => entry.productCode!);
-      const expectedDescProductCodes = [...strengthEntries]
-        .sort((a, b) => b.productCode.localeCompare(a.productCode))
+      const expectedDescProductCodes = [...sortedAscEntries]
+        .reverse()
         .slice(0, pageLimit)
         .map((entry) => entry.productCode);
       expect(descProductCodes).toEqual(expectedDescProductCodes);

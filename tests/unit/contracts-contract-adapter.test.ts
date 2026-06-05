@@ -14,7 +14,7 @@ import { UnsupportedError } from "@decaf-ts/core";
 import { OperationKeys } from "@decaf-ts/db-decorators";
 import type { Logger } from "@decaf-ts/logging";
 import { prop } from "@decaf-ts/decoration";
-import { ClientIdentity } from "fabric-shim-api";
+import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
 
 @model()
 class TestModel extends Model {
@@ -278,5 +278,56 @@ describe("contracts/ContractAdapter helpers", () => {
 
       expect(handler.updateObservers).not.toHaveBeenCalled();
     });
+  });
+
+  it("routes bookmark-only raw queries through pagination without mutating the caller input", async () => {
+    const adapter = new FabricContractAdapter(
+      undefined as any,
+      `adapter-${Math.random().toString(36).slice(2)}`
+    );
+    const context = createContext({
+      getIDBytes: jest.fn().mockReturnValue(Buffer.from("id")),
+      getAttributeValue: jest.fn().mockReturnValue(undefined),
+      getID: jest.fn().mockReturnValue("client"),
+    } as ClientIdentity);
+
+    const iterator = {
+      next: jest
+        .fn()
+        .mockResolvedValueOnce({
+          value: {
+            value: Buffer.from(JSON.stringify({ id: "row-1" })),
+          },
+          done: false,
+        })
+        .mockResolvedValue({ done: true }),
+      close: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
+    const stub = {
+      getQueryResultWithPagination: jest.fn().mockResolvedValue({
+        iterator,
+        metadata: { bookmark: "next" },
+      }),
+      getQueryResult: jest.fn(),
+      getTxID: jest.fn().mockReturnValue("tx-1"),
+    } as unknown as ChaincodeStub;
+
+    context.accumulate({ stub } as any);
+
+    const query = { selector: { foo: "bar" }, bookmark: "opaque-token" } as any;
+    const result = await adapter.raw(query, false, context);
+
+    expect(query).toEqual({
+      selector: { foo: "bar" },
+      bookmark: "opaque-token",
+    });
+    expect(stub.getQueryResultWithPagination).toHaveBeenCalledWith(
+      JSON.stringify({ selector: { foo: "bar" } }),
+      250,
+      "opaque-token"
+    );
+    expect(result.docs).toEqual([{ id: "row-1" }]);
+    expect(result.bookmark).toBe("next");
   });
 });

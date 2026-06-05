@@ -187,6 +187,7 @@ export class FabricContractPaginator<
         throw new PagingError("No bookmark. Did you start in the first page?");
       statement["bookmark"] = this._bookmark as string;
     }
+    (statement as Record<string, any>)["__pkField"] = Model.pk(this.clazz);
     const rawResult = (await this.adapter.raw(statement, false, ctx)) as any;
 
     const { docs, bookmark: nextBookmark } = rawResult;

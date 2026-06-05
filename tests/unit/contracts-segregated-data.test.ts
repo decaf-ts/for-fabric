@@ -962,6 +962,7 @@ describe("Private data queries with pagination", () => {
         Buffer.from(
           JSON.stringify({
             $$table: "public_test",
+            id: key,
             publicField: `item-${i}`,
           })
         )
@@ -972,7 +973,11 @@ describe("Private data queries with pagination", () => {
     const firstCtx = createMockContext({ stub, identity }).context;
     firstCtx.readFrom(COLLECTION_A);
     const page1: any = await adapter.raw(
-      { selector: { $$table: "public_test" }, limit: 3 },
+      {
+        selector: { $$table: "public_test" },
+        sort: [{ publicField: "asc" }],
+        limit: 3,
+      },
       false,
       firstCtx
     );
@@ -986,6 +991,7 @@ describe("Private data queries with pagination", () => {
     const page2: any = await adapter.raw(
       {
         selector: { $$table: "public_test" },
+        sort: [{ publicField: "asc" }],
         limit: 3,
         bookmark: page1.bookmark,
       },
@@ -1040,6 +1046,7 @@ describe("Private data queries with pagination", () => {
           $$table: "multi_private_test",
           secretFieldB: "bravo",
         },
+        sort: [{ publicField: "asc" }],
         limit: 1,
       },
       false,

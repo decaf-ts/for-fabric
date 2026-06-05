@@ -18,7 +18,6 @@ import {
   OrderDirection,
   QueryError,
 } from "@decaf-ts/core";
-import { InternalError } from "@decaf-ts/db-decorators";
 import {
   applyMirrorFlags,
   applySegregationFlags,
@@ -69,13 +68,9 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
     ...args: MaybeContextualArg<FabricContractContext>
   ) {
     const newArgs = args.filter(
-      Boolean
+      (arg) => arg !== undefined && arg !== null
     ) as MaybeContextualArg<FabricContractContext>;
-    if (args.length !== newArgs.length)
-      throw new InternalError(
-        `Received an undefined in the paginator for ${method}: ${args}`
-      );
-    return super.executionPrefix(method, ...args);
+    return super.executionPrefix(method, ...newArgs);
   }
 
   protected override build(): MangoQuery {
