@@ -247,9 +247,21 @@ export class FabricContractRepository<M extends Model> extends Repository<
     log.verbose(
       `listing ${Model.tableName(this.class)} by ${key as string} ${order}`
     );
-    return this.select()
+
+    const paginator = await this.select()
       .orderBy([key, order])
-      .execute(...ctxArgs);
+      .paginate(250, undefined, ...ctxArgs);
+
+    const results: M[] = [];
+    let page = await paginator.page(1, ...ctxArgs);
+    results.push(...page);
+
+    while ((paginator as any)["_bookmark"]) {
+      page = await paginator.next(...ctxArgs);
+      results.push(...page);
+    }
+
+    return results;
   }
 
   override async find(
