@@ -247,14 +247,14 @@ describe("FabricClientAdapter", () => {
     );
 
     expect(contract.submit).toHaveBeenCalledWith("create", {
-        arguments: [{ id: "wallet-1" }],
-        transientData: {
-          secret: JSON.stringify("value"),
-          [FabricModelKeys.OVERRIDES]: JSON.stringify({
-            allowGenerationOverride: true,
-          }),
-        },
-        endorsingOrganizations: undefined,
+      arguments: [JSON.stringify({ id: "wallet-1" })],
+      transientData: {
+        secret: JSON.stringify("value"),
+        [FabricModelKeys.OVERRIDES]: JSON.stringify({
+          allowGenerationOverride: true,
+        }),
+      },
+      endorsingOrganizations: undefined,
     });
     expect(contract.evaluate).not.toHaveBeenCalled();
     expect(gateway.close).toHaveBeenCalledTimes(1);
@@ -286,13 +286,13 @@ describe("FabricClientAdapter", () => {
     );
 
     expect(contract.evaluate).toHaveBeenCalledWith("read", {
-        arguments: [{ id: "wallet-1" }],
-        transientData: {
-          [FabricModelKeys.OVERRIDES]: JSON.stringify({
-            allowGenerationOverride: true,
-          }),
-        },
-        endorsingOrganizations: undefined,
+      arguments: [JSON.stringify({ id: "wallet-1" })],
+      transientData: {
+        [FabricModelKeys.OVERRIDES]: JSON.stringify({
+          allowGenerationOverride: true,
+        }),
+      },
+      endorsingOrganizations: undefined,
     });
     expect(contract.submit).not.toHaveBeenCalled();
     expect(gateway.close).toHaveBeenCalledTimes(1);
@@ -1133,7 +1133,7 @@ describe("FabricClientAdapter", () => {
       const adapter = newAdapter({ allowGatewayOverride: true });
       (adapter as any).serializer = buildSerializer();
       const ctx = createContext();
-      jest
+      const submitSpy = jest
         .spyOn(adapter as any, "submitTransaction")
         .mockResolvedValue(
           new TextEncoder().encode(
@@ -1165,6 +1165,19 @@ describe("FabricClientAdapter", () => {
         ctx,
         true,
         "wallet-1"
+      );
+      expect(submitSpy).toHaveBeenCalledWith(
+        expect.any(Context),
+        expect.any(String),
+        [
+          JSON.stringify([
+            JSON.stringify({ id: "wallet-1", token: "TK", balance: 5 }),
+            JSON.stringify({ id: "wallet-2", token: "TK", balance: 15 }),
+          ]),
+        ],
+        undefined,
+        undefined,
+        ERC20Wallet
       );
       expect(readAllSpy).toHaveBeenCalledTimes(1);
       expect(result).toEqual([
@@ -1269,6 +1282,40 @@ describe("FabricClientAdapter", () => {
       );
 
       expect(result).toEqual(response);
+    });
+  });
+
+  describe("Gateway argument normalization", () => {
+    it("stringifies object and array arguments before invoking the gateway contract", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+      const close = jest.fn();
+      const submit = jest.fn().mockResolvedValue(
+        new TextEncoder().encode(JSON.stringify({ ok: true }))
+      );
+      const contract = {
+        getContractName: jest.fn(() => "erc20"),
+        submit,
+        evaluate: jest.fn(),
+      };
+
+      jest.spyOn(adapter as any, "Gateway").mockResolvedValue({ close } as any);
+      jest.spyOn(adapter as any, "Contract").mockResolvedValue(contract as any);
+
+      await adapter.submitTransaction(
+        ctx,
+        "migrate",
+        ["test-1.0.0", { nested: ["x"], page: { limit: 10 } }, ["a", "b"]]
+      );
+
+      expect(submit).toHaveBeenCalledTimes(1);
+      const [, proposalOptions] = submit.mock.calls[0];
+      expect(proposalOptions.arguments).toEqual([
+        "test-1.0.0",
+        JSON.stringify({ nested: ["x"], page: { limit: 10 } }),
+        JSON.stringify(["a", "b"]),
+      ]);
+      expect(close).toHaveBeenCalledTimes(1);
     });
   });
 });

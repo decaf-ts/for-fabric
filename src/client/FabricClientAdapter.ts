@@ -418,7 +418,7 @@ export class FabricClientAdapter extends Adapter<
     const needsFullPayload =
       hasTransient || this.shouldForceGatewayHydration(ctx);
     const serializedModels = models.map((m) =>
-      JSON.parse(this.serializer.serialize(m, clazz.name))
+      this.serializer.serialize(m, clazz.name)
     );
 
     const result = await this.submitTransaction(
@@ -525,7 +525,7 @@ export class FabricClientAdapter extends Adapter<
     const needsFullPayload =
       hasTransient || this.shouldForceGatewayHydration(ctx);
     const serializedModels = models.map((m) =>
-      JSON.parse(this.serializer.serialize(m, clazz.name))
+      this.serializer.serialize(m, clazz.name)
     );
 
     const result = await this.submitTransaction(
@@ -1227,13 +1227,16 @@ export class FabricClientAdapter extends Adapter<
       );
       log.debug(`args: ${args?.map((a) => a.toString()).join("\n") || "none"}`);
       const method = submit ? contract.submit : contract.evaluate;
+      const normalizedArgs = (args || []).map((arg) =>
+        this.normalizeTransactionArgument(arg)
+      );
       const transientEntries = Object.entries(transientData || {});
 
       endorsingOrganizations = endorsingOrganizations?.length
         ? endorsingOrganizations
         : undefined;
       const proposalOptions: ProposalOptions = {
-        arguments: args || [],
+        arguments: normalizedArgs,
         transientData: transientEntries.length
           ? transientEntries.reduce<Record<string, string>>((acc, [key, val]) => {
               acc[key] = JSON.stringify(val);
@@ -1252,6 +1255,14 @@ export class FabricClientAdapter extends Adapter<
       this.log.debug(`Closing ${this.config.mspId} gateway connection`);
       gateway.close();
     }
+  }
+
+  private normalizeTransactionArgument(arg: any): any {
+    if (arg === null || arg === undefined) return arg;
+    if (typeof arg === "string") return arg;
+    if (typeof arg !== "object") return arg;
+    if (arg instanceof Uint8Array) return arg;
+    return JSON.stringify(arg);
   }
 
   private shouldUseLegacyGateway(ctx: FabricClientContext): boolean {
