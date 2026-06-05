@@ -185,6 +185,7 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
 
     if (this.offsetSelector) query.skip = this.offsetSelector;
     this.attachDefaultQueryIndex(query);
+    log.debug(`built mango query ${JSON.stringify(query)}`);
 
     return query;
   }

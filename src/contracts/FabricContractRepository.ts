@@ -393,15 +393,29 @@ export class FabricContractRepository<M extends Model> extends Repository<
     log.verbose(
       `paging ${Model.tableName(this.class)} by default query attributes ${attrs.join(", ")}`
     );
+    log.debug(
+      `default query page request value=${value} direction=${direction} ref=${JSON.stringify(ref)} attrs=${JSON.stringify(
+        attrs
+      )}`
+    );
 
     const decoded = this.decodeDefaultQueryBookmark(ref.bookmark);
+    if (decoded) {
+      log.debug(
+        `decoded default query bookmark attr=${decoded.attr} bookmark=${decoded.bookmark}`
+      );
+    }
     if (decoded?.attr && attrs.includes(decoded.attr as keyof M)) {
+      log.debug(`continuing default query page using attr=${decoded.attr}`);
       const page = await this.pageByDefaultAttr(
         decoded.attr as keyof M,
         value,
         direction,
         { ...ref, bookmark: decoded.bookmark },
         ...ctxArgs
+      );
+      log.debug(
+        `default query page completed for attr=${decoded.attr} count=${page.data.length} bookmark=${page.bookmark}`
       );
       return this.encodeDefaultQueryBookmark(
         decoded.attr as keyof M,
@@ -411,12 +425,16 @@ export class FabricContractRepository<M extends Model> extends Repository<
     }
 
     for (const attr of attrs) {
+      log.debug(`trying default query page attr=${String(attr)}`);
       const page = await this.pageByDefaultAttr(
         attr as keyof M,
         value,
         direction,
         ref,
         ...ctxArgs
+      );
+      log.debug(
+        `default query page attr=${String(attr)} returned count=${page.data.length} bookmark=${page.bookmark}`
       );
       if (page.data.length > 0) {
         return this.encodeDefaultQueryBookmark(attr as keyof M, page.bookmark, page);
@@ -454,11 +472,23 @@ export class FabricContractRepository<M extends Model> extends Repository<
   ): Promise<SerializedPage<M>> {
     const limit = ref.limit || 10;
     const bookmark = ref.bookmark;
+    const { log } = await this.logCtx(args, PreparedStatementKeys.PAGE, true);
+    log.debug(
+      `pageByDefaultAttr attr=${String(attr)} value=${value} direction=${direction} limit=${limit} bookmark=${bookmark}`
+    );
     const paginator = await this.select()
       .where(this.attr(attr).startsWith(value))
       .orderBy([attr, direction])
       .paginate(limit as number, bookmark as any, ...args);
     const paged = await paginator.page(ref.offset || 1, bookmark as any, ...args);
+    const pagedCount = Array.isArray((paged as any)?.data)
+      ? (paged as any).data.length
+      : Array.isArray(paged)
+        ? paged.length
+        : undefined;
+    log.debug(
+      `pageByDefaultAttr attr=${String(attr)} paged count=${String(pagedCount)} paginatorBookmark=${(paginator as any)["_bookmark"]}`
+    );
     return paginator.serialize(paged) as SerializedPage<M>;
   }
 

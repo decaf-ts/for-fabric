@@ -854,6 +854,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   !bookmark.startsWith(
                     FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX
                   );
+                log.debug(
+                  `Private paginated query input collection=${collection} limit=${limit} skip=${skip} bookmark=${bookmark} sortField=${sortField} direction=${sortDirection} opaque=${hasOpaqueBookmark} synthetic=${Boolean(
+                    syntheticCursor
+                  )}`
+                );
                 // Private rich queries cannot be trusted with offset-based pagination.
                 // Synthetic mode advances using a cursor on the sorted field plus the document id.
                 query.limit = hasOpaqueBookmark ? pageSize : pageSize + 1;
@@ -881,6 +886,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   (response as any).metadata ||
                   (iterator as any).metadata ||
                   {};
+                log.debug(
+                  `Private paginated response collection=${collection} metadata=${JSON.stringify(
+                    responseMetadata
+                  )}`
+                );
 
                 log.verbose(`iterator from collection ${collection} received`);
                 const paged: Array<{ key: string; value: Buffer }> = [];
@@ -911,6 +921,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 } finally {
                   await iterator.close();
                 }
+
+                log.debug(
+                  `Private paginated collection=${collection} produced ${paged.length} rows hasMore=${hasMore}`
+                );
 
                 // Wrap the page in an async iterator for resultIterator()
                 let idx = 0;
@@ -1225,6 +1239,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const bookmark = rawInput["bookmark"];
     const paginationActive = Boolean(limit || skip || bookmark);
     let resp = { docs: [], bookmark: undefined as string | undefined };
+    log.debug(
+      `raw query start fullySegregated=${fullySegregated} enableSegregates=${enableSegregates} paginationActive=${paginationActive} limit=${limit} skip=${skip} bookmark=${bookmark} query=${JSON.stringify(
+        rawInput
+      )}`
+    );
 
     // Query public state only when the model is NOT fully segregated
     if (!fullySegregated) {
@@ -1247,6 +1266,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
         resp.bookmark = response.metadata.bookmark;
         iterator = response.iterator;
         log.debug(`Retrieved public paging iterator`);
+        log.debug(
+          `public paginated response bookmark=${resp.bookmark} query=${JSON.stringify(
+            rawInput
+          )}`
+        );
       } else {
         log.debug("Retrieving listing public iterator");
         iterator = (await this.queryResult(
@@ -1272,6 +1296,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
 
     const collections = enableSegregates ? ctx.getReadCollections() : undefined;
+    log.debug(
+      `read collections for raw query: ${JSON.stringify(collections || [])}`
+    );
 
     if (collections && collections.length) {
       // Build a fresh input with limit/skip/bookmark restored
@@ -1279,6 +1306,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
       if (limit) segregatedInput.limit = limit;
       if (skip) segregatedInput.skip = skip;
       if (bookmark) segregatedInput["bookmark"] = bookmark;
+      log.debug(
+        `segregated input prepared: ${JSON.stringify(segregatedInput)}`
+      );
 
       const segregated: any[] = [];
       for (const collection of collections) {
@@ -1301,11 +1331,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
         if (curr.docs && curr.docs.length >= acc?.docs.length) return curr;
         return acc;
       }, resp);
+      log.debug(
+        `segregated query resolved docs=${Array.isArray(resp.docs) ? resp.docs.length : 0} bookmark=${resp.bookmark}`
+      );
     }
 
     if (docsOnly) {
+      log.debug(
+        `raw query returning docsOnly=${docsOnly} docs=${Array.isArray(resp.docs) ? resp.docs.length : 0}`
+      );
       return resp.docs as any;
     }
+    log.debug(
+      `raw query returning docs/bookmark docs=${Array.isArray(resp.docs) ? resp.docs.length : 0} bookmark=${resp.bookmark}`
+    );
     return resp as any;
   }
 
