@@ -129,4 +129,15 @@ export type FabricFlags<LOG extends Logger = Logger> = AdapterFlags<LOG> & {
   mirrorCollection?: string;
   identity?: string | ClientIdentity;
   ownerOverride?: string;
+  /**
+   * Enables strict Mango pagination for private data collections.
+   * When enabled, private paginated rich queries must use a generated
+   * CouchDB index and an adapter-generated synthetic bookmark.
+   */
+  strictPrivateMangoPagination?: boolean;
+  /**
+   * Field used as the deterministic tie-breaker for strict private Mango
+   * pagination.
+   */
+  privatePaginationTieBreaker?: string;
 };

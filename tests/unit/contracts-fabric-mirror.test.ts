@@ -283,7 +283,7 @@ describe("FabricContractAdapter forPrivate routing", () => {
         ctx
       )
     ).rejects.toThrow(
-      "Private collection pagination only supports adapter-generated synthetic bookmarks"
+      "Private Mango pagination only supports adapter-generated synthetic bookmarks"
     );
 
     expect(stub.getPrivateDataQueryResult).not.toHaveBeenCalled();
@@ -302,7 +302,7 @@ describe("FabricContractAdapter forPrivate routing", () => {
         ctx
       )
     ).rejects.toThrow(
-      "Private collection pagination does not support skip/offset pagination. Use the returned bookmark instead."
+      "Private Mango pagination does not support skip/offset pagination. Use the returned synthetic bookmark instead."
     );
 
     expect(stub.getPrivateDataQueryResult).not.toHaveBeenCalled();
@@ -321,7 +321,7 @@ describe("FabricContractAdapter forPrivate routing", () => {
         ctx
       )
     ).rejects.toThrow(
-      "Private collection pagination requires an explicit Mango sort"
+      "Private Mango pagination requires an explicit sort. Add orderBy(...) so a stable generated index can be selected."
     );
   });
 
@@ -437,7 +437,7 @@ describe("FabricContractAdapter forPrivate routing", () => {
         ctx
       )
     ).rejects.toThrow(
-      "Private collection bookmark does not match the current query"
+      "Private Mango bookmark does not match the current query"
     );
   });
 
@@ -534,11 +534,7 @@ describe("FabricContractAdapter forPrivate routing", () => {
       (stub.getPrivateDataQueryResult as jest.Mock).mock.calls[1][1]
     );
     expect(secondQuery.skip).toBeUndefined();
-    expect(secondQuery.selector).toEqual(
-      expect.objectContaining({
-        $and: expect.any(Array),
-      })
-    );
+    expect(JSON.stringify(secondQuery.selector)).not.toContain("$or");
     expect(secondPage.metadata.fetchedRecordsCount).toBe(2);
     expect(await secondPage.iterator.next()).toEqual(
       expect.objectContaining({ done: false })
