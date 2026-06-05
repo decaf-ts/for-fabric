@@ -6,14 +6,23 @@ import {
   generateViews,
 } from "@decaf-ts/for-couchdb";
 import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
+import type { Logger } from "@decaf-ts/logging";
 
 export type Index = CreateIndexRequest;
 
 function withDefaultQueryPkTieBreaker<M extends Model>(
   indexes: Index[],
-  m: Constructor<M>
+  m: Constructor<M>,
+  log: Logger
 ): Index[] {
-  const pkField = Model.pk(m);
+  let pkField: string;
+  try {
+    pkField = String(Model.pk(m));
+  } catch (error) {
+    const message = `Skipping ${m.name} while extracting indexes: no primary key is defined`;
+    log.verbose(message);
+    return indexes;
+  }
 
   return indexes.map((index) => {
     const fields = (index as any)?.index?.fields;
@@ -77,9 +86,10 @@ function ensureDirectoryExistence(filePath: string) {
 }
 
 export function generateModelIndexes<M extends Model>(
-  m: Constructor<M>
+  m: Constructor<M>,
+  log: Logger
 ): Index[] {
-  return withDefaultQueryPkTieBreaker(generateIndexes([m]), m);
+  return withDefaultQueryPkTieBreaker(generateIndexes([m]), m, log);
 }
 
 export function generateModelDesignDocs<M extends Model>(

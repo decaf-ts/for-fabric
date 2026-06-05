@@ -525,7 +525,7 @@ const extractIndexes = new Command()
 
     for (const m of models) {
       log.verbose(`Extracting indexes for table ${Model.tableName(m)}`);
-      const indexes = generateModelIndexes(m);
+      const indexes = generateModelIndexes(m, log);
       indexes.forEach((index) => {
         if (index.name) {
           result[index.name] = index;
@@ -680,7 +680,7 @@ const extractCollections = new Command()
             log
               .for(Model.tableName(clazz))
               .verbose(`generating indexes for collections`);
-            indexes = generateModelIndexes(clazz);
+            indexes = generateModelIndexes(clazz, log.for(Model.tableName(clazz)));
             log
               .for(Model.tableName(clazz))
               .info(`found ${indexes.length} indexes`);

@@ -26,8 +26,20 @@ import {
   writeDesignDocs,
   writeIndexes,
 } from "../../src/client/indexes";
+import type { Logger } from "@decaf-ts/logging";
 
 Model.setBuilder(Model.fromModel);
+
+const verboseLogger = {
+  verbose: jest.fn(),
+  for: jest.fn().mockReturnThis(),
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  silly: jest.fn(),
+  clear: jest.fn(),
+} as unknown as Logger;
 
 @uses(FabricFlavour)
 @table("fabric_view_model")
@@ -65,9 +77,20 @@ class FabricDefaultQueryModel extends BaseModel {
   }
 }
 
+@table("fabric_no_pk_model")
+@model()
+class FabricNoPkModel extends BaseModel {
+  @defaultQueryAttr()
+  name!: string;
+
+  constructor(arg?: ModelArg<FabricNoPkModel>) {
+    super(arg);
+  }
+}
+
 describe("index generation utilities", () => {
   it("generates indexes and design docs for decorated models", () => {
-    const indexes = generateModelIndexes(FabricViewModel);
+    const indexes = generateModelIndexes(FabricViewModel, verboseLogger);
     expect(indexes.length).toBeGreaterThan(0);
 
     const accumulator: Record<string, CouchDBDesignDoc> = {};
@@ -81,7 +104,7 @@ describe("index generation utilities", () => {
 
   it("writes indexes and design docs to META-INF structure", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fabric-indexes-"));
-    const indexes = generateModelIndexes(FabricViewModel);
+    const indexes = generateModelIndexes(FabricViewModel, verboseLogger);
     const designDocs = generateModelDesignDocs(FabricViewModel);
 
     writeIndexes(indexes, tmpDir);
@@ -117,7 +140,7 @@ describe("index generation utilities", () => {
   });
 
   it("includes the model pk as a tie-breaker in sorted default query indexes", () => {
-    const indexes = generateModelIndexes(FabricDefaultQueryModel);
+    const indexes = generateModelIndexes(FabricDefaultQueryModel, verboseLogger);
     const defaultQueryAsc = indexes.find(
       (index) => index.name === "fabric_default_query_model_model_defaultQuery_asc_index"
     );
@@ -137,5 +160,20 @@ describe("index generation utilities", () => {
       { model: "desc" },
       { code: "desc" },
     ]);
+  });
+
+  it("skips default query pk tie-breakers for models without a pk", () => {
+    const log = { verbose: jest.fn() };
+    const indexes = generateModelIndexes(FabricNoPkModel, log);
+
+    expect(indexes.length).toBeGreaterThan(0);
+    expect(log.verbose).toHaveBeenCalledWith(
+      expect.stringContaining("Skipping FabricNoPkModel while extracting indexes")
+    );
+    expect(
+      indexes.some((index) =>
+        String(index.name || "").includes("defaultQuery")
+      )
+    ).toBe(true);
   });
 });
