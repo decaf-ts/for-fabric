@@ -232,6 +232,84 @@ export class FabricContractAdapter extends CouchDBAdapter<
       .digest("base64url");
   }
 
+  private static countSelectorFieldOccurrences(
+    selector: unknown,
+    counts: Map<string, number> = new Map<string, number>()
+  ): Map<string, number> {
+    if (!selector || typeof selector !== "object") {
+      return counts;
+    }
+
+    if (Array.isArray(selector)) {
+      for (const entry of selector) {
+        FabricContractAdapter.countSelectorFieldOccurrences(entry, counts);
+      }
+      return counts;
+    }
+
+    for (const [key, value] of Object.entries(selector as Record<string, any>)) {
+      if (!["$and", "$or", "$not"].includes(key)) {
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+
+      if (value && typeof value === "object") {
+        FabricContractAdapter.countSelectorFieldOccurrences(value, counts);
+      }
+    }
+
+    return counts;
+  }
+
+  private static isNullLowerBoundMarker(value: unknown): boolean {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+
+    const entries = Object.entries(value as Record<string, any>);
+    if (entries.length !== 1) {
+      return false;
+    }
+
+    const [operator, bound] = entries[0];
+    return (
+      (operator === "$gt" || operator === "$gte") &&
+      bound === null
+    );
+  }
+
+  private static normalizeMangoQueryForExecution(query: MangoQuery): MangoQuery {
+    const normalized: MangoQuery = {
+      ...query,
+      selector:
+        query.selector && typeof query.selector === "object"
+          ? { ...(query.selector as Record<string, any>) }
+          : query.selector,
+    };
+
+    if (!normalized.selector || typeof normalized.selector !== "object") {
+      return normalized;
+    }
+
+    const counts = FabricContractAdapter.countSelectorFieldOccurrences(
+      normalized.selector
+    );
+
+    for (const [field, value] of Object.entries(
+      normalized.selector as Record<string, any>
+    )) {
+      if (
+        !FabricContractAdapter.isNullLowerBoundMarker(value) ||
+        (counts.get(field) || 0) <= 1
+      ) {
+        continue;
+      }
+
+      delete (normalized.selector as Record<string, any>)[field];
+    }
+
+    return normalized;
+  }
+
   private static buildPrivateContinuationSelector(
     selector: Record<string, any>,
     sortField: string,
@@ -424,10 +502,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
       }
 
       const remaining = pageSize + 1 - paged.length;
-      const queryForExecution: MangoQuery = {
-        ...query,
-        limit: remaining,
-      };
+      const queryForExecution: MangoQuery =
+        FabricContractAdapter.normalizeMangoQueryForExecution({
+          ...query,
+          limit: remaining,
+        });
       delete (queryForExecution as Record<string, any>).skip;
       delete (queryForExecution as Record<string, any>).bookmark;
 
@@ -1094,12 +1173,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 const [stub, rawInput, ...args] = argsList;
                 const { log } = thisArg["logCtx"](args, prop);
                 try {
+                  const normalizedInput =
+                    FabricContractAdapter.normalizeMangoQueryForExecution(
+                      rawInput
+                    );
                   log.debug(
-                    `Querying collection ${collection} for ${JSON.stringify(rawInput)}`
+                    `Querying collection ${collection} for ${JSON.stringify(normalizedInput)}`
                   );
                   const res = await stub.getPrivateDataQueryResult(
                     collection,
-                    JSON.stringify(rawInput)
+                    JSON.stringify(normalizedInput)
                   );
                   log.verbose(
                     `iterator from collection ${collection} received`
@@ -1164,15 +1247,19 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   log
                 );
 
+                const normalizedQuery =
+                  FabricContractAdapter.normalizeMangoQueryForExecution(query);
+
                 log.debug(
                   `Private paginated query input collection=${collection} limit=${limit} skip=${skip} bookmark=${bookmark} sortField=${sortField} direction=${sortDirection} synthetic=${Boolean(
                     syntheticCursor
                   )}`
                 );
 
-                query.limit = pageSize + 1;
+                normalizedQuery.limit = pageSize + 1;
 
-                const queryHash = FabricContractAdapter.privateQueryHash(query);
+                const queryHash =
+                  FabricContractAdapter.privateQueryHash(normalizedQuery);
                 if (syntheticCursor) {
                   if (syntheticCursor.queryHash !== queryHash) {
                     throw new PagingError(
@@ -1183,11 +1270,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
                 const queries = syntheticCursor
                   ? FabricContractAdapter.buildOrlessKeysetContinuationQueries(
-                      query,
+                      normalizedQuery,
                       syntheticCursor,
                       pageSize
                     )
-                  : [{ ...query, limit: pageSize + 1 } as MangoQuery];
+                  : [{ ...normalizedQuery, limit: pageSize + 1 } as MangoQuery];
 
                 const paged =
                   await FabricContractAdapter.executePrivateMangoPageQueries(
@@ -1293,7 +1380,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<Iterators.StateQueryIterator> {
-    return stub.getQueryResult(JSON.stringify(rawInput));
+    return stub.getQueryResult(
+      JSON.stringify(
+        FabricContractAdapter.normalizeMangoQueryForExecution(rawInput)
+      )
+    );
   }
 
   protected async queryResultPaginated(
@@ -1306,7 +1397,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ...args: any[]
   ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
     return stub.getQueryResultWithPagination(
-      JSON.stringify(rawInput),
+      JSON.stringify(
+        FabricContractAdapter.normalizeMangoQueryForExecution(rawInput)
+      ),
       limit,
       bookmark?.toString()
     );
