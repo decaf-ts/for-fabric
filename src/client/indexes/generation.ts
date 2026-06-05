@@ -10,17 +10,24 @@ import type { Logger } from "@decaf-ts/logging";
 
 export type Index = CreateIndexRequest;
 
-function withDefaultQueryPkTieBreaker<M extends Model>(
-  indexes: Index[],
+function resolvePrimaryKeyField<M extends Model>(
   m: Constructor<M>,
   log: Logger
-): Index[] {
-  let pkField: string;
+): string | undefined {
   try {
-    pkField = String(Model.pk(m));
+    return String(Model.pk(m));
   } catch (error) {
     const message = `Skipping ${m.name} while extracting indexes: no primary key is defined`;
     log.verbose(message);
+    return undefined;
+  }
+}
+
+function withDefaultQueryPkTieBreaker<M extends Model>(
+  indexes: Index[],
+  pkField: string
+): Index[] {
+  if (!pkField) {
     return indexes;
   }
 
@@ -89,7 +96,9 @@ export function generateModelIndexes<M extends Model>(
   m: Constructor<M>,
   log: Logger
 ): Index[] {
-  return withDefaultQueryPkTieBreaker(generateIndexes([m]), m, log);
+  const indexes = generateIndexes([m]);
+  const pkField = resolvePrimaryKeyField(m, log);
+  return withDefaultQueryPkTieBreaker(indexes, pkField || "");
 }
 
 export function generateModelDesignDocs<M extends Model>(

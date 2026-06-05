@@ -92,6 +92,16 @@ describe("index generation utilities", () => {
   it("generates indexes and design docs for decorated models", () => {
     const indexes = generateModelIndexes(FabricViewModel, verboseLogger);
     expect(indexes.length).toBeGreaterThan(0);
+    expect(
+      indexes.some(
+        (index) => index.name === "fabric_view_model_id_asc_index"
+      )
+    ).toBe(true);
+    expect(
+      indexes.some(
+        (index) => index.name === "fabric_view_model_id_desc_index"
+      )
+    ).toBe(true);
 
     const accumulator: Record<string, CouchDBDesignDoc> = {};
     const designDocs = generateModelDesignDocs(FabricViewModel, accumulator);
