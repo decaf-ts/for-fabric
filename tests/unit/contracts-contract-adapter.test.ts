@@ -330,4 +330,56 @@ describe("contracts/ContractAdapter helpers", () => {
     expect(result.docs).toEqual([{ id: "row-1" }]);
     expect(result.bookmark).toBe("next");
   });
+
+  it("routes private limit-only raw queries through the simple private query path", async () => {
+    const adapter = new FabricContractAdapter(
+      undefined as any,
+      `adapter-${Math.random().toString(36).slice(2)}`
+    );
+    const context = createContext({
+      getIDBytes: jest.fn().mockReturnValue(Buffer.from("id")),
+      getAttributeValue: jest.fn().mockReturnValue(undefined),
+      getID: jest.fn().mockReturnValue("client"),
+    } as ClientIdentity);
+
+    const iterator = {
+      next: jest
+        .fn()
+        .mockResolvedValueOnce({
+          value: {
+            value: Buffer.from(JSON.stringify({ id: "row-1", foo: "bar" })),
+          },
+          done: false,
+        })
+        .mockResolvedValue({ done: true }),
+      close: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
+    const stub = {
+      getPrivateDataQueryResult: jest.fn().mockResolvedValue({
+        iterator,
+      }),
+      getQueryResultWithPagination: jest.fn(),
+      getQueryResult: jest.fn(),
+      getTxID: jest.fn().mockReturnValue("tx-1"),
+    } as unknown as ChaincodeStub;
+
+    context.accumulate({ stub } as any);
+
+    const proxy = adapter.forPrivate("private-collection");
+    const result = await (proxy as any).raw(
+      { selector: { foo: "bar" }, limit: 1 },
+      false,
+      true,
+      context
+    );
+
+    expect(stub.getPrivateDataQueryResult).toHaveBeenCalledWith(
+      "private-collection",
+      JSON.stringify({ selector: { foo: "bar" }, limit: 1 })
+    );
+    expect(stub.getQueryResultWithPagination).not.toHaveBeenCalled();
+    expect(result.docs).toEqual([{ id: "row-1", foo: "bar" }]);
+    expect(result.bookmark).toBeUndefined();
+  });
 });

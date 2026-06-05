@@ -1393,11 +1393,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
       originalInput["__pkField"].trim().length
         ? String(originalInput["__pkField"])
         : "id";
-    const paginationActive = Boolean(limit || skip || bookmark);
-    const queryInput: Record<string, any> = { ...originalInput };
-    delete queryInput["limit"];
-    delete queryInput["skip"];
-    delete queryInput["bookmark"];
+    const hasSkip = skip !== undefined && skip !== null && Number(skip) > 0;
+    const hasBookmark = bookmark !== undefined && bookmark !== null && bookmark !== "";
+    const paginationActive = Boolean(limit || hasSkip || hasBookmark);
+    const shouldPaginate = Boolean(
+      paginationActive && (enableSegregates || hasSkip || hasBookmark)
+    );
+    const baseInput: Record<string, any> = { ...originalInput };
+    delete baseInput["skip"];
+    delete baseInput["bookmark"];
+    delete baseInput["__pkField"];
     let resp = { docs: [], bookmark: undefined as string | undefined };
     log.debug(
       `raw query start fullySegregated=${fullySegregated} enableSegregates=${enableSegregates} paginationActive=${paginationActive} limit=${limit} skip=${skip} bookmark=${bookmark} pkField=${pkField} query=${JSON.stringify(
@@ -1408,14 +1413,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
     // Query public state only when the model is NOT fully segregated
     if (!fullySegregated) {
       let iterator: Iterators.StateQueryIterator;
-      if (paginationActive) {
+      if (shouldPaginate) {
+        const paginatedInput: Record<string, any> = { ...baseInput };
+        delete paginatedInput["limit"];
         log.debug(
           `Retrieving public paginated iterator: limit: ${limit}/ skip: ${skip} bookmark=${bookmark}`
         );
         const response: StateQueryResponse<Iterators.StateQueryIterator> =
           (await this.queryResultPaginated(
             ctx.stub,
-            { ...queryInput },
+            paginatedInput,
             limit || 250,
             (skip as any)?.toString(),
             bookmark,
@@ -1426,14 +1433,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
         log.debug(`Retrieved public paging iterator`);
         log.debug(
           `public paginated response bookmark=${resp.bookmark} query=${JSON.stringify(
-            queryInput
+            paginatedInput
           )}`
         );
       } else {
         log.debug("Retrieving listing public iterator");
         iterator = (await this.queryResult(
           ctx.stub,
-          { ...queryInput },
+          { ...baseInput },
           ctx
         )) as Iterators.StateQueryIterator;
       }
@@ -1454,10 +1461,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     if (collections && collections.length) {
       // Build a fresh input with limit/skip/bookmark restored
-      const segregatedInput = { ...queryInput };
-      if (limit) segregatedInput.limit = limit;
-      if (skip) segregatedInput.skip = skip;
-      if (bookmark) segregatedInput["bookmark"] = bookmark;
+        const segregatedInput = { ...baseInput };
+        if (limit) segregatedInput.limit = limit;
+        if (skip) segregatedInput.skip = skip;
+        if (bookmark) segregatedInput["bookmark"] = bookmark;
       log.debug(
         `segregated input prepared: ${JSON.stringify(segregatedInput)}`
       );

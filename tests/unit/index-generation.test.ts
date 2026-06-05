@@ -4,6 +4,7 @@ import os from "os";
 import path from "path";
 import {
   BaseModel,
+  defaultQueryAttr,
   index,
   OrderDirection,
   pk,
@@ -45,6 +46,21 @@ class FabricViewModel extends BaseModel {
   value!: number;
 
   constructor(arg?: ModelArg<FabricViewModel>) {
+    super(arg);
+  }
+}
+
+@table("fabric_default_query_model")
+@model()
+class FabricDefaultQueryModel extends BaseModel {
+  @pk({ type: String })
+  code!: string;
+
+  @defaultQueryAttr()
+  @index([OrderDirection.ASC])
+  model!: string;
+
+  constructor(arg?: ModelArg<FabricDefaultQueryModel>) {
     super(arg);
   }
 }
@@ -98,5 +114,28 @@ describe("index generation utilities", () => {
     expect(storedDoc._id).toBeDefined();
     expect(storedDoc._rev).toBeUndefined();
     expect(storedDoc.views).toBeDefined();
+  });
+
+  it("includes the model pk as a tie-breaker in sorted default query indexes", () => {
+    const indexes = generateModelIndexes(FabricDefaultQueryModel);
+    const defaultQueryAsc = indexes.find(
+      (index) => index.name === "fabric_default_query_model_model_defaultQuery_asc_index"
+    );
+    const defaultQueryDsc = indexes.find(
+      (index) => index.name === "fabric_default_query_model_model_defaultQuery_desc_index"
+    );
+
+    expect(defaultQueryAsc).toBeDefined();
+    expect(defaultQueryDsc).toBeDefined();
+    expect((defaultQueryAsc as any).index.fields).toEqual([
+      { "??table": "asc" },
+      { model: "asc" },
+      { code: "asc" },
+    ]);
+    expect((defaultQueryDsc as any).index.fields).toEqual([
+      { "??table": "desc" },
+      { model: "desc" },
+      { code: "desc" },
+    ]);
   });
 });

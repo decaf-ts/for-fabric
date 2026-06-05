@@ -9,6 +9,62 @@ import { Model, ModelConstructor } from "@decaf-ts/decorator-validation";
 
 export type Index = CreateIndexRequest;
 
+function withDefaultQueryPkTieBreaker<M extends Model>(
+  indexes: Index[],
+  m: Constructor<M>
+): Index[] {
+  const pkField = Model.pk(m);
+
+  return indexes.map((index) => {
+    const fields = (index as any)?.index?.fields;
+    if (
+      !index?.name ||
+      typeof index.name !== "string" ||
+      !index.name.includes("defaultQuery") ||
+      !Array.isArray(fields) ||
+      fields.length === 0
+    ) {
+      return index;
+    }
+
+    const sortedFields = fields.filter(
+      (field: any) => typeof field === "object" && !Array.isArray(field)
+    );
+    if (sortedFields.length !== fields.length) {
+      return index;
+    }
+
+    const hasPk = fields.some((field: any) => {
+      if (!field || typeof field !== "object" || Array.isArray(field)) {
+        return false;
+      }
+      return Object.prototype.hasOwnProperty.call(field, pkField);
+    });
+
+    if (hasPk) {
+      return index;
+    }
+
+    const lastField = fields[fields.length - 1] as Record<string, any>;
+    const lastDirection = String(
+      Object.values(lastField || {})[0] || "asc"
+    ).toLowerCase();
+    const direction =
+      lastDirection === "desc" ? "desc" : "asc";
+
+    return Object.assign({}, index, {
+      index: Object.assign({}, (index as any).index, {
+        fields: [
+          ...fields,
+          {
+            [pkField]: direction,
+          },
+        ],
+      }),
+    });
+  });
+}
+
 function ensureDirectoryExistence(filePath: string) {
   const fs = require("fs");
   const path = require("path");
@@ -23,7 +79,7 @@ function ensureDirectoryExistence(filePath: string) {
 export function generateModelIndexes<M extends Model>(
   m: Constructor<M>
 ): Index[] {
-  return generateIndexes([m]);
+  return withDefaultQueryPkTieBreaker(generateIndexes([m]), m);
 }
 
 export function generateModelDesignDocs<M extends Model>(
