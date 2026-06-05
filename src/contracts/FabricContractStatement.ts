@@ -184,6 +184,7 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
     }
 
     if (this.offsetSelector) query.skip = this.offsetSelector;
+    this.attachDefaultQueryIndex(query);
 
     return query;
   }

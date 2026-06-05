@@ -996,6 +996,59 @@ describe("Private data queries with pagination", () => {
     expect(page2.docs[0].publicField).toBe("item-4");
     expect(page2.bookmark).toBeDefined();
   });
+
+  it("returns the matching private collection on paginated mixed-model queries", async () => {
+    const adapter = new FabricContractAdapter(
+      undefined as any,
+      `private-query-${Math.random()}`
+    );
+    const { stub, identity } = createMockContext();
+
+    const key = `multi_private_test_${Math.random().toString(36).slice(2, 8)}`;
+    await stub.putPrivateData(
+      COLLECTION_A,
+      key,
+      Buffer.from(
+        JSON.stringify({
+          $$table: "multi_private_test",
+          id: key,
+          publicField: "shared",
+          secretFieldA: "alpha",
+        })
+      )
+    );
+    await stub.putPrivateData(
+      COLLECTION_B,
+      key,
+      Buffer.from(
+        JSON.stringify({
+          $$table: "multi_private_test",
+          id: key,
+          publicField: "shared",
+          secretFieldB: "bravo",
+        })
+      )
+    );
+    stub.commit();
+
+    const queryCtx = createMockContext({ stub, identity }).context;
+    queryCtx.readFrom([COLLECTION_A, COLLECTION_B]);
+
+    const result: any = await adapter.raw(
+      {
+        selector: {
+          $$table: "multi_private_test",
+          secretFieldB: "bravo",
+        },
+        limit: 1,
+      },
+      false,
+      queryCtx
+    );
+
+    expect(result.docs).toHaveLength(1);
+    expect(result.docs[0].secretFieldB).toBe("bravo");
+  });
 });
 
 describe("Public data flow (baseline verification)", () => {
