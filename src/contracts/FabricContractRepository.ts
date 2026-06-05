@@ -103,6 +103,9 @@ export class FabricContractRepository<M extends Model> extends Repository<
   M,
   FabricContractAdapter
 > {
+  private static readonly DEFAULT_QUERY_BOOKMARK_PREFIX =
+    "__dcf_dqbm__";
+
   protected override _overrides = Object.assign({}, super["_overrides"], {
     ignoreValidation: false,
     ignoreHandlers: false,
@@ -249,6 +252,44 @@ export class FabricContractRepository<M extends Model> extends Repository<
       .execute(...ctxArgs);
   }
 
+  override async find(
+    value: string,
+    order: OrderDirection = OrderDirection.ASC,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<M[]> {
+    if (typeof value !== "string")
+      throw new QueryError("Find value must be a string");
+    const attrs = this.getFabricDefaultQueryAttributes();
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.FIND, true)
+    ).for(this.find);
+    log.verbose(
+      `finding ${Model.tableName(this.class)} by default query attributes ${attrs.join(", ")}`
+    );
+
+    const results = await Promise.all(
+      attrs.map((attr) =>
+        this.select()
+          .where(this.attr(attr as keyof M).startsWith(value))
+          .orderBy([attr as keyof M, order])
+          .execute(...ctxArgs)
+      )
+    );
+
+    const seen = new Set<string>();
+    const merged: M[] = [];
+    const pk = Model.pk(this.class) as keyof M;
+    for (const group of results) {
+      for (const record of group || []) {
+        const id = String((record as any)[pk] ?? (record as any).id ?? "");
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        merged.push(record);
+      }
+    }
+    return merged;
+  }
+
   override async paginateBy(
     key: keyof M,
     order: OrderDirection,
@@ -330,6 +371,146 @@ export class FabricContractRepository<M extends Model> extends Repository<
       );
     }
     return serialization;
+  }
+
+  override async page(
+    value: string,
+    direction: OrderDirection = OrderDirection.ASC,
+    ref: Omit<DirectionLimitOffset, "direction"> = {
+      offset: 1,
+      limit: 10,
+    },
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<SerializedPage<M>> {
+    if (typeof value !== "string")
+      throw new QueryError("Page value must be a string");
+    ref.offset = ref.offset || 1;
+    ref.limit = ref.limit || 10;
+    const attrs = this.getFabricDefaultQueryAttributes();
+    const { log, ctxArgs } = (
+      await this.logCtx(args, PreparedStatementKeys.PAGE, true)
+    ).for(this.page);
+    log.verbose(
+      `paging ${Model.tableName(this.class)} by default query attributes ${attrs.join(", ")}`
+    );
+
+    const decoded = this.decodeDefaultQueryBookmark(ref.bookmark);
+    if (decoded?.attr && attrs.includes(decoded.attr as keyof M)) {
+      const page = await this.pageByDefaultAttr(
+        decoded.attr as keyof M,
+        value,
+        direction,
+        { ...ref, bookmark: decoded.bookmark },
+        ...ctxArgs
+      );
+      return this.encodeDefaultQueryBookmark(
+        decoded.attr as keyof M,
+        page.bookmark,
+        page
+      );
+    }
+
+    for (const attr of attrs) {
+      const page = await this.pageByDefaultAttr(
+        attr as keyof M,
+        value,
+        direction,
+        ref,
+        ...ctxArgs
+      );
+      if (page.data.length > 0) {
+        return this.encodeDefaultQueryBookmark(attr as keyof M, page.bookmark, page);
+      }
+    }
+
+    return this.encodeDefaultQueryBookmark(
+      attrs[0] as keyof M,
+      undefined,
+      {
+        current: ref.offset || 1,
+        total: 1,
+        count: 0,
+        data: [],
+        bookmark: undefined,
+      }
+    );
+  }
+
+  private getFabricDefaultQueryAttributes(): (keyof M)[] {
+    const attrs = Model.defaultQueryAttributes(this.class);
+    if (!attrs || !attrs.length)
+      throw new QueryError(
+        `No default query attributes defined for ${Model.tableName(this.class)}`
+      );
+    return attrs as (keyof M)[];
+  }
+
+  private async pageByDefaultAttr(
+    attr: keyof M,
+    value: string,
+    direction: OrderDirection,
+    ref: Omit<DirectionLimitOffset, "direction">,
+    ...args: MaybeContextualArg<FabricContractContext>
+  ): Promise<SerializedPage<M>> {
+    const limit = ref.limit || 10;
+    const bookmark = ref.bookmark;
+    const paginator = await this.select()
+      .where(this.attr(attr).startsWith(value))
+      .orderBy([attr, direction])
+      .paginate(limit as number, bookmark as any, ...args);
+    const paged = await paginator.page(ref.offset || 1, bookmark as any, ...args);
+    return paginator.serialize(paged) as SerializedPage<M>;
+  }
+
+  private encodeDefaultQueryBookmark(
+    attr: keyof M,
+    bookmark: string | number | undefined,
+    page: SerializedPage<M>
+  ): SerializedPage<M> {
+    if (!bookmark) return page;
+    return Object.assign(page, {
+      bookmark: `${FabricContractRepository.DEFAULT_QUERY_BOOKMARK_PREFIX}${Buffer.from(
+        JSON.stringify({
+          attr: String(attr),
+          bookmark,
+        })
+      ).toString("base64url")}`,
+    });
+  }
+
+  private decodeDefaultQueryBookmark(
+    bookmark: unknown
+  ): { attr: string; bookmark?: string } | undefined {
+    if (
+      typeof bookmark !== "string" ||
+      !bookmark.startsWith(
+        FabricContractRepository.DEFAULT_QUERY_BOOKMARK_PREFIX
+      )
+    )
+      return undefined;
+    try {
+      const raw = bookmark.slice(
+        FabricContractRepository.DEFAULT_QUERY_BOOKMARK_PREFIX.length
+      );
+      const parsed = JSON.parse(
+        Buffer.from(raw, "base64url").toString("utf8")
+      );
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        typeof parsed.attr !== "string"
+      )
+        return undefined;
+      return {
+        attr: parsed.attr,
+        bookmark:
+          typeof parsed.bookmark === "string"
+            ? parsed.bookmark
+            : undefined,
+      };
+    } catch {
+      return undefined;
+    }
   }
 
   override async statement(

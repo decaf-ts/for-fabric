@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import { model, Model, type ModelArg } from "@decaf-ts/decorator-validation";
-import { pk } from "@decaf-ts/core";
+import { defaultQueryAttr, pk } from "@decaf-ts/core";
 import { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
 import { OperationKeys } from "@decaf-ts/db-decorators";
@@ -18,6 +18,30 @@ class RepoTestModel extends Model {
   constructor(args?: ModelArg<RepoTestModel>) {
     super(args);
   }
+}
+
+@model()
+class MultiDefaultQueryModel extends Model {
+  @pk()
+  id!: string;
+
+  @defaultQueryAttr()
+  model!: string;
+
+  @defaultQueryAttr()
+  recordId!: string;
+
+  constructor(args?: ModelArg<MultiDefaultQueryModel>) {
+    super(args);
+  }
+}
+
+function decodeDefaultQueryBookmark(bookmark: string) {
+  const prefix = "__dcf_dqbm__";
+  if (!bookmark.startsWith(prefix)) return undefined;
+  return JSON.parse(
+    Buffer.from(bookmark.slice(prefix.length), "base64url").toString("utf8")
+  );
 }
 
 const createFabricContext = () => {
@@ -140,5 +164,106 @@ describe("FabricContractRepository", () => {
       ref,
       context
     );
+  });
+
+  it("finds across default query attributes without forcing a single index", async () => {
+    const repo = new FabricContractRepository<MultiDefaultQueryModel>(
+      createAdapter(),
+      MultiDefaultQueryModel
+    );
+    const selectSpy = jest.spyOn(repo, "select");
+    const chainA = {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue([]),
+    };
+    const chainB = {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue([
+        new MultiDefaultQueryModel({
+          id: "id-1",
+          model: "Product",
+          recordId: "12345",
+        }),
+      ]),
+    };
+    selectSpy
+      .mockReturnValueOnce(chainA as any)
+      .mockReturnValueOnce(chainB as any);
+
+    const context = createFabricContext();
+    const results = await repo.find("123", OrderDirection.ASC, context);
+
+    expect(results).toHaveLength(1);
+    expect(chainA.orderBy).toHaveBeenCalledWith(["model", OrderDirection.ASC]);
+    expect(chainB.orderBy).toHaveBeenCalledWith(["recordId", OrderDirection.ASC]);
+  });
+
+  it("pages across default query attributes using the matching attribute bookmark", async () => {
+    const repo = new FabricContractRepository<MultiDefaultQueryModel>(
+      createAdapter(),
+      MultiDefaultQueryModel
+    );
+    const selectSpy = jest.spyOn(repo, "select");
+    const paginatorA = {
+      page: jest.fn().mockResolvedValue([]),
+      serialize: jest.fn().mockReturnValue({
+        current: 1,
+        total: 1,
+        count: 0,
+        data: [],
+        bookmark: undefined,
+      }),
+    };
+    const paginatorB = {
+      page: jest.fn().mockResolvedValue([
+        new MultiDefaultQueryModel({
+          id: "id-2",
+          model: "Product",
+          recordId: "abc-2",
+        }),
+      ]),
+      serialize: jest.fn().mockReturnValue({
+        current: 1,
+        total: 2,
+        count: 1,
+        data: [
+          new MultiDefaultQueryModel({
+            id: "id-2",
+            model: "Product",
+            recordId: "abc-2",
+          }),
+        ],
+        bookmark: "inner-bookmark",
+      }),
+    };
+    const chainA = {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      paginate: jest.fn().mockReturnValue(paginatorA),
+    };
+    const chainB = {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      paginate: jest.fn().mockReturnValue(paginatorB),
+    };
+    selectSpy
+      .mockReturnValueOnce(chainA as any)
+      .mockReturnValueOnce(chainB as any);
+
+    const context = createFabricContext();
+    const page = await repo.page("abc", OrderDirection.ASC, { limit: 1, offset: 1 }, context);
+
+    expect(page.data).toHaveLength(1);
+    expect(page.bookmark).toBeDefined();
+    expect(decodeDefaultQueryBookmark(page.bookmark as string)).toEqual(
+      expect.objectContaining({
+        attr: "recordId",
+        bookmark: "inner-bookmark",
+      })
+    );
+    expect(chainA.orderBy).toHaveBeenCalledWith(["model", OrderDirection.ASC]);
+    expect(chainB.orderBy).toHaveBeenCalledWith(["recordId", OrderDirection.ASC]);
   });
 });

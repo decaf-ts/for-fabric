@@ -185,19 +185,93 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
   private static parseSyntheticPrivateBookmark(
     bookmark: unknown
-  ): number | undefined {
+  ):
+    | {
+        sortField: string;
+        direction: "asc" | "desc";
+        lastValue: any;
+        lastId: string;
+      }
+    | undefined {
     if (typeof bookmark !== "string") return undefined;
     if (!bookmark.startsWith(FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX))
       return undefined;
     const raw = bookmark.slice(
       FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX.length
     );
-    const parsed = Number(raw);
-    return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+    try {
+      const parsed = JSON.parse(
+        Buffer.from(raw, "base64url").toString("utf8")
+      );
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        typeof parsed.sortField !== "string" ||
+        typeof parsed.direction !== "string" ||
+        typeof parsed.lastId !== "string"
+      ) {
+        return undefined;
+      }
+      return {
+        sortField: parsed.sortField,
+        direction: parsed.direction === "desc" ? "desc" : "asc",
+        lastValue: (parsed as any).lastValue,
+        lastId: parsed.lastId,
+      };
+    } catch {
+      return undefined;
+    }
   }
 
-  private static buildSyntheticPrivateBookmark(offset: number): string {
-    return `${FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX}${offset}`;
+  private static buildSyntheticPrivateBookmark(cursor: {
+    sortField: string;
+    direction: "asc" | "desc";
+    lastValue: any;
+    lastId: string;
+  }): string {
+    return `${FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX}${Buffer.from(
+      JSON.stringify(cursor)
+    ).toString("base64url")}`;
+  }
+
+  private static buildPrivateCursorSelector(
+    selector: Record<string, any>,
+    sortField: string,
+    direction: "asc" | "desc",
+    cursor: {
+      lastValue: any;
+      lastId: string;
+    }
+  ): Record<string, any> {
+    const continuation =
+      direction === "desc"
+        ? {
+            $or: [
+              { [sortField]: { $lt: cursor.lastValue } },
+              {
+                $and: [
+                  { [sortField]: { $eq: cursor.lastValue } },
+                  { id: { $lt: cursor.lastId } },
+                ],
+              },
+            ],
+          }
+        : {
+            $or: [
+              { [sortField]: { $gt: cursor.lastValue } },
+              {
+                $and: [
+                  { [sortField]: { $eq: cursor.lastValue } },
+                  { id: { $gt: cursor.lastId } },
+                ],
+              },
+            ],
+          };
+
+    if (!Object.keys(selector || {}).length) return continuation;
+    return {
+      $and: [selector, continuation],
+    };
   }
 
   protected override getClient(): void {
@@ -761,17 +835,17 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 const { log } = thisArg["logCtx"](args, prop);
                 const pageSize = Math.max(1, Number(limit) || 250);
                 const query: Record<string, any> = { ...rawInput };
-                const skipValue = Number(skip);
-                const parsedSkip =
-                  Number.isInteger(skipValue) && skipValue >= 0
-                    ? skipValue
-                    : undefined;
-                const syntheticOffset =
+                const sortEntry = Array.isArray(query.sort)
+                  ? Object.entries(query.sort[0] || {})[0]
+                  : undefined;
+                const sortField = (sortEntry?.[0] as string) || "id";
+                const sortDirection = (
+                  (sortEntry?.[1] as string | undefined) || "asc"
+                ).toLowerCase() as "asc" | "desc";
+                const syntheticCursor =
                   FabricContractAdapter.parseSyntheticPrivateBookmark(
                     bookmark
-                  ) ??
-                  parsedSkip ??
-                  0;
+                  );
                 const hasOpaqueBookmark =
                   bookmark !== undefined &&
                   bookmark !== null &&
@@ -780,19 +854,20 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   !bookmark.startsWith(
                     FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX
                   );
-                // Keep the query CouchDB-compatible and let Fabric/CouchDB own bookmark semantics.
-                // Synthetic mode fetches one extra record to detect whether a next page exists.
+                // Private rich queries cannot be trusted with offset-based pagination.
+                // Synthetic mode advances using a cursor on the sorted field plus the document id.
                 query.limit = hasOpaqueBookmark ? pageSize : pageSize + 1;
-                if (hasOpaqueBookmark) {
+                delete query.skip;
+                delete query.bookmark;
+                if (syntheticCursor) {
+                  query.selector = FabricContractAdapter.buildPrivateCursorSelector(
+                    query.selector || {},
+                    syntheticCursor.sortField || sortField,
+                    syntheticCursor.direction || sortDirection,
+                    syntheticCursor
+                  );
+                } else if (hasOpaqueBookmark) {
                   query.bookmark = bookmark.toString();
-                  delete query.skip;
-                } else {
-                  delete query.bookmark;
-                  if (syntheticOffset > 0) {
-                    query.skip = syntheticOffset;
-                  } else {
-                    delete query.skip;
-                  }
                 }
                 log.debug(
                   `Querying collection ${collection} for ${JSON.stringify(query)}`
@@ -806,10 +881,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   (response as any).metadata ||
                   (iterator as any).metadata ||
                   {};
-                const responseBookmark =
-                  typeof responseMetadata.bookmark === "string"
-                    ? responseMetadata.bookmark
-                    : "";
 
                 log.verbose(`iterator from collection ${collection} received`);
                 const paged: Array<{ key: string; value: Buffer }> = [];
@@ -859,12 +930,40 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   metadata: {
                     fetchedRecordsCount: paged.length,
                     bookmark:
-                      responseBookmark ||
-                      (hasMore
-                        ? FabricContractAdapter.buildSyntheticPrivateBookmark(
-                            syntheticOffset + paged.length
-                          )
-                        : ""),
+                      typeof responseMetadata.bookmark === "string" &&
+                      responseMetadata.bookmark
+                        ? responseMetadata.bookmark
+                        : hasMore && paged.length
+                          ? FabricContractAdapter.buildSyntheticPrivateBookmark({
+                              sortField,
+                              direction: sortDirection,
+                              lastValue: (() => {
+                                try {
+                                  return (JSON.parse(
+                                    paged[
+                                      paged.length - 1
+                                    ].value.toString("utf8")
+                                  ) as any)?.[sortField];
+                                } catch {
+                                  return undefined;
+                                }
+                              })(),
+                              lastId: (() => {
+                                try {
+                                  const lastDoc = JSON.parse(
+                                    paged[
+                                      paged.length - 1
+                                    ].value.toString("utf8")
+                                  ) as any;
+                                  return String(
+                                    lastDoc?.id || paged[paged.length - 1].key
+                                  );
+                                } catch {
+                                  return String(paged[paged.length - 1].key);
+                                }
+                              })(),
+                            })
+                          : "",
                   },
                 };
               }

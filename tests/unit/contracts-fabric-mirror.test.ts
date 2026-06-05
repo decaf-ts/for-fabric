@@ -46,6 +46,14 @@ function flattenArgs(value: any): any[] {
   return [value];
 }
 
+function decodePrivateBookmark(bookmark: string) {
+  const prefix = "__dcf_pvtbm__";
+  if (!bookmark.startsWith(prefix)) return undefined;
+  return JSON.parse(
+    Buffer.from(bookmark.slice(prefix.length), "base64url").toString("utf8")
+  );
+}
+
 function enableContextPut(ctx: FabricContractContext) {
   (ctx as any).put = (key: string, value: any) =>
     ctx.accumulate({ [key]: value });
@@ -263,7 +271,7 @@ describe("FabricContractAdapter forPrivate routing", () => {
     expect(stub.getQueryResultWithPagination).not.toHaveBeenCalled();
   });
 
-  it("forPrivate paginated query stops iterating early at limit", async () => {
+  it("forPrivate paginated query preserves a native bookmark when provided", async () => {
     const proxy = adapter.callForPrivate("mirror-collection");
     const iterator = {
       next: jest
@@ -443,9 +451,115 @@ describe("FabricContractAdapter forPrivate routing", () => {
     });
 
     expect(response.metadata.fetchedRecordsCount).toBe(1);
-    expect(response.metadata.bookmark).toBe("__dcf_pvtbm__1");
+    expect(response.metadata.bookmark).toBeDefined();
+    expect(decodePrivateBookmark(response.metadata.bookmark as string)).toEqual(
+      expect.objectContaining({
+        sortField: "ts",
+        direction: "asc",
+        lastValue: 100,
+        lastId: "k1",
+      })
+    );
     const first = await response.iterator.next();
     expect(first.value.key).toBe("k1");
+  });
+
+  it("forPrivate paginated query advances with a cursor bookmark instead of skip", async () => {
+    const proxy = adapter.callForPrivate("mirror-collection");
+    const firstIterator = {
+      next: jest
+        .fn()
+        .mockResolvedValueOnce({
+          value: {
+            key: "k1",
+            value: Buffer.from(
+              JSON.stringify({ id: "doc-1", foo: "bar", ts: 100 })
+            ),
+          },
+          done: false,
+        })
+        .mockResolvedValueOnce({
+          value: {
+            key: "k2",
+            value: Buffer.from(
+              JSON.stringify({ id: "doc-2", foo: "bar", ts: 101 })
+            ),
+          },
+          done: false,
+        })
+        .mockResolvedValue({ done: true }),
+      close: jest.fn().mockResolvedValue(undefined),
+    } as any;
+    const secondIterator = {
+      next: jest
+        .fn()
+        .mockResolvedValueOnce({
+          value: {
+            key: "k3",
+            value: Buffer.from(
+              JSON.stringify({ id: "doc-3", foo: "bar", ts: 102 })
+            ),
+          },
+          done: false,
+        })
+        .mockResolvedValue({ done: true }),
+      close: jest.fn().mockResolvedValue(undefined),
+    } as any;
+    (stub.getPrivateDataQueryResult as jest.Mock)
+      .mockResolvedValueOnce({
+        iterator: firstIterator,
+        metadata: {},
+      })
+      .mockResolvedValueOnce({
+        iterator: secondIterator,
+        metadata: {},
+      });
+
+    const firstPage = await (proxy as any).queryResultPaginated(
+      stub,
+      {
+        selector: { foo: "bar" },
+        sort: [{ ts: "asc" }],
+      },
+      1,
+      undefined,
+      undefined,
+      ctx
+    );
+
+    const bookmark = firstPage.metadata.bookmark as string;
+    expect(bookmark).toBeDefined();
+    expect(decodePrivateBookmark(bookmark)).toEqual(
+      expect.objectContaining({
+        sortField: "ts",
+        direction: "asc",
+        lastValue: 100,
+        lastId: "doc-1",
+      })
+    );
+
+    const secondPage = await (proxy as any).queryResultPaginated(
+      stub,
+      {
+        selector: { foo: "bar" },
+        sort: [{ ts: "asc" }],
+      },
+      1,
+      undefined,
+      bookmark,
+      ctx
+    );
+
+    const secondQuery = JSON.parse(
+      (stub.getPrivateDataQueryResult as jest.Mock).mock.calls[1][1]
+    );
+    expect(secondQuery.skip).toBeUndefined();
+    expect(secondQuery.selector).toEqual(
+      expect.objectContaining({
+        $and: expect.any(Array),
+      })
+    );
+    expect(secondPage.metadata.fetchedRecordsCount).toBe(1);
   });
 
   it("forPrivate proxy routes deleteState to deletePrivateData", async () => {
