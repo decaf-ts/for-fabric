@@ -378,6 +378,23 @@ export abstract class FabricCrudContract<M extends Model>
     log.info(`Merging transient data...`);
     model = Model.merge(model, transient, this.clazz) as M;
 
+    try {
+      log.info(
+        `CREATE materialized model for ${this.clazz.name}: ${JSON.stringify(
+          model
+        )}`
+      );
+      log.info(
+        `CREATE materialized pk for ${this.clazz.name}: ${String(
+          Model.pk(model as M, true)
+        )}`
+      );
+    } catch (e) {
+      log.warn(
+        `CREATE materialized model logging failed for ${this.clazz.name}: ${e}`
+      );
+    }
+
     const created = await this.repo.create(model, ...ctxArgs);
 
     const result = new this.clazz(Model.segregate(created).model);

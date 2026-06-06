@@ -245,6 +245,11 @@ export async function createAssignGtinOwnerHandler<
   key: keyof M,
   model: { productCode: string }
 ): Promise<void> {
+  context.logger.info(
+    `GTIN owner create handler input for ${this?.constructor?.name || "unknown"}: ${JSON.stringify(
+      model
+    )}`
+  );
   if (!model.productCode)
     throw new UnsupportedError(`Gtin owner can only be assigned to products`);
   const repo = Repository.forModel(GtinOwner);
@@ -268,6 +273,11 @@ export async function deleteAssignGtinOwnerHandler<
   key: keyof M,
   model: { productCode: string }
 ): Promise<void> {
+  context.logger.info(
+    `GTIN owner delete handler input for ${this?.constructor?.name || "unknown"}: ${JSON.stringify(
+      model
+    )}`
+  );
   if (!model.productCode)
     throw new UnsupportedError(`Gtin owner can only be assigned to products`);
   const repo = Repository.forModel(GtinOwner);
