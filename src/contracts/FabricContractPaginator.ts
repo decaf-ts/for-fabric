@@ -72,6 +72,10 @@ export class FabricContractPaginator<
     return query;
   }
 
+  private hasBookmark(value: unknown): value is string {
+    return typeof value === "string" && value.length > 0;
+  }
+
   /**
    * @description Retrieves a specific page of results
    * @summary Executes the query with pagination and processes the results
@@ -162,35 +166,42 @@ export class FabricContractPaginator<
     if (this.isPreparedStatement())
       return await this.pagePrepared(page, ...ctxArgs);
     const statement = Object.assign({}, this.statement);
-    //
-    // if ((!this._recordCount || !this._totalPages) && !this._bookmark) {
-    //   this._totalPages = this._recordCount = 0;
-    //   const countResults =
-    //     (await this.adapter.raw<M[], true>(
-    //       { ...statement, limit: Number.MIN_SAFE_INTEGER, skip: undefined },
-    //       true,
-    //       ctx
-    //     )) || [];
-    //   this._recordCount = countResults.length;
-    //   if (this._recordCount > 0) {
-    //     const size = statement?.limit || this.size;
-    //     this._totalPages = Math.ceil(this._recordCount / size);
-    //     if (!bookmark) return await this.page(page, ...ctxArgs);
-    //   }
-    // } else if (page === 1) {
-    //   page = this.validatePage(page);
-    //   statement.skip = (page - 1) * this.size;
-    // }
-
-    if (page !== 1) {
-      if (!this._bookmark)
-        throw new PagingError("No bookmark. Did you start in the first page?");
-      statement["bookmark"] = this._bookmark as string;
+    page = this.validatePage(page ?? 1);
+    statement.limit = this.size;
+    if (page === 1) {
+      if (this.hasBookmark(bookmark)) {
+        statement.bookmark = bookmark;
+      } else {
+        delete statement.bookmark;
+      }
+    } else {
+      const explicitBookmark = bookmark || this._bookmarks.get(page);
+      if (!this.hasBookmark(explicitBookmark)) {
+        throw new PagingError(
+          "Random page access requires a cached CouchDB bookmark. Start at page 1 and page forward, or pass an explicit bookmark."
+        );
+      }
+      delete statement.skip;
+      statement.bookmark = explicitBookmark;
     }
-    (statement as Record<string, any>)["__pkField"] = Model.pk(this.clazz);
-    const rawResult = (await this.adapter.raw(statement, false, ctx)) as any;
+    delete statement.skip;
+    const tieBreaker = Model.pk(this.clazz);
+    const previousTieBreaker = ctx.getOrUndefined("privatePaginationTieBreaker");
+    ctx.put("privatePaginationTieBreaker", tieBreaker);
+    let rawResult: any;
+    try {
+      rawResult = (await this.adapter.raw(statement, false, ctx)) as any;
+    } finally {
+      ctx.put(
+        "privatePaginationTieBreaker",
+        previousTieBreaker === undefined ? undefined : previousTieBreaker
+      );
+    }
 
-    const { docs, bookmark: nextBookmark } = rawResult;
+    const { docs, bookmark: nextBookmark, warning } = rawResult;
+    if (warning) {
+      ctx.logger?.warn?.(warning);
+    }
     if (!this.clazz) throw new PagingError("No statement target defined");
     const id = Model.pk(this.clazz);
     const type = Metadata.get(
@@ -209,8 +220,21 @@ export class FabricContractPaginator<
               ctx
             );
           });
-    this._bookmark = nextBookmark;
+    const hasNextBookmark =
+      this.hasBookmark(nextBookmark) &&
+      docs.length > 0 &&
+      nextBookmark !== bookmark;
+    this._bookmark = hasNextBookmark ? nextBookmark : undefined;
+    if (hasNextBookmark) {
+      this._bookmarks.set(page + 1, nextBookmark);
+      this._totalPages = Math.max(this._totalPages || 0, page + 1);
+    }
     this._currentPage = page;
+    if (!hasNextBookmark) {
+      this._knownLastPage = page;
+      this._totalPages = page;
+      this._recordCount = (page - 1) * this.size + docs.length;
+    }
     return results;
   }
 }

@@ -2161,7 +2161,8 @@ describe("OtherProductShared contract version flow with relations", () => {
         .slice(pageLimit)
         .map((entry) => entry.strength);
       expect(secondNames).toEqual(expectedSecondStrengths);
-      expect(secondPage.bookmark).not.toEqual(firstPage.bookmark);
+      const secondRawParsed = Paginator.deserialize(secondRawPage);
+      expect(secondRawParsed.bookmark).toBeFalsy();
 
       const descRawPage = await strengthContract.page(
         ctx as any,

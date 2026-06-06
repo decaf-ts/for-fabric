@@ -1598,7 +1598,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       typeof originalInput["__pkField"] === "string" &&
       originalInput["__pkField"].trim().length
         ? String(originalInput["__pkField"])
-        : "id";
+        : String(ctx?.getOrUndefined("privatePaginationTieBreaker") || "id");
     const hasSkip = skip !== undefined && skip !== null && Number(skip) > 0;
     const hasBookmark = bookmark !== undefined && bookmark !== null && bookmark !== "";
     const paginationActive = Boolean(limit || hasSkip || hasBookmark);
@@ -1668,10 +1668,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     if (collections && collections.length) {
       // Build a fresh input with limit/skip/bookmark restored
-        const segregatedInput = { ...baseInput };
-        if (limit) segregatedInput.limit = limit;
-        if (skip) segregatedInput.skip = skip;
-        if (bookmark) segregatedInput["bookmark"] = bookmark;
+      const segregatedInput = { ...baseInput };
+      if (limit) segregatedInput.limit = limit;
+      if (skip) segregatedInput.skip = skip;
+      if (bookmark) segregatedInput["bookmark"] = bookmark;
       log.debug(
         `segregated input prepared: ${JSON.stringify(segregatedInput)}`
       );
