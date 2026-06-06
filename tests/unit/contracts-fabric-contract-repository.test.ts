@@ -166,6 +166,31 @@ describe("FabricContractRepository", () => {
     );
   });
 
+  it("listBy uses execute directly instead of paginating", async () => {
+    const repo = new FabricContractRepository<RepoTestModel>(
+      createAdapter(),
+      RepoTestModel
+    );
+    const selectSpy = jest.spyOn(repo, "select");
+    const execute = jest.fn().mockResolvedValue([{ id: "id-1" }]);
+    const paginate = jest.fn();
+    const orderBy = jest.fn().mockReturnValue({
+      execute,
+      paginate,
+    });
+    selectSpy.mockReturnValue({
+      orderBy,
+    } as any);
+
+    const context = createFabricContext();
+    const results = await repo.listBy("id", OrderDirection.ASC, context);
+
+    expect(results).toEqual([{ id: "id-1" }]);
+    expect(orderBy).toHaveBeenCalledWith(["id", OrderDirection.ASC]);
+    expect(execute).toHaveBeenCalledWith(context);
+    expect(paginate).not.toHaveBeenCalled();
+  });
+
   it("finds across default query attributes without forcing a single index", async () => {
     const repo = new FabricContractRepository<MultiDefaultQueryModel>(
       createAdapter(),
