@@ -1,16 +1,14 @@
 import { Model } from "@decaf-ts/decorator-validation";
-import { Constructor, Decoration, Metadata } from "@decaf-ts/decoration";
+import { Constructor, Metadata } from "@decaf-ts/decoration";
 import { FabricModelKeys } from "../constants";
 import { SegregatedModel } from "../types";
 import { DBKeys, InternalError } from "@decaf-ts/db-decorators";
-import { index, OrderDirection } from "@decaf-ts/core";
 import {
   ChaincodeMetadata,
   CollectionResolver,
   MirrorMetadata,
 } from "../decorators";
 import { Context, ContextualArgs } from "@decaf-ts/core";
-import { FabricFlavour } from "../constants";
 
 Model.prototype.isShared = function isShared<M extends Model>(
   this: M
@@ -169,13 +167,6 @@ Model.prototype.segregate = function segregate<M extends Model>(
     sharedCols: sharedMeta?.collections || [],
   };
 }.bind(Model);
-
-Decoration.flavouredAs(FabricFlavour)
-  .for(DBKeys.ID)
-  .extend(function pk() {
-    return index([OrderDirection.ASC, OrderDirection.DSC]);
-  })
-  .apply();
 
 (Model as any).chaincodeOf = function chaincodeOf<M extends Model>(
   model: Constructor<M>,
