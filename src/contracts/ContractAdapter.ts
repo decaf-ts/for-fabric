@@ -1286,18 +1286,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     rawInput
                   );
 
+                const queryJson = JSON.stringify(normalizedInput);
+
+                log.debug(
+                  `Querying private collection ${collection} with Mango query: ${queryJson}`
+                );
+
                 try {
-                  FabricContractAdapter.attachGeneratedPrivateUseIndex(
-                    normalizedInput,
-                    log
-                  );
-
-                  const queryJson = JSON.stringify(normalizedInput);
-
-                  log.debug(
-                    `Querying private collection ${collection} with Mango query: ${queryJson}`
-                  );
-
                   const res = await (
                     stub as ChaincodeStub
                   ).getPrivateDataQueryResult(collection, queryJson);
@@ -1316,7 +1311,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     [
                       `Private Mango query failed`,
                       `collection=${collection}`,
-                      `query=${JSON.stringify(normalizedInput)}`,
+                      `query=${queryJson}`,
                       `error=${e instanceof Error ? e.stack || e.message : String(e)}`,
                     ].join("\n")
                   );
