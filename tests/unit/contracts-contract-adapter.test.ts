@@ -10,7 +10,7 @@ import {
 import type { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
 import type { FabricContractSequence } from "../../src/contracts/FabricContractSequence";
 import type { SequenceOptions } from "@decaf-ts/core";
-import { UnsupportedError } from "@decaf-ts/core";
+import { UnsupportedError, pk, table } from "@decaf-ts/core";
 import { OperationKeys } from "@decaf-ts/db-decorators";
 import type { Logger } from "@decaf-ts/logging";
 import { prop } from "@decaf-ts/decoration";
@@ -27,6 +27,13 @@ class TestModel extends Model {
   constructor(data?: Partial<TestModel>) {
     super(data);
   }
+}
+
+@table("audit")
+@model()
+class AuditQueryModel extends Model {
+  @pk()
+  id!: string;
 }
 
 const createContext = (identity?: Partial<ClientIdentity>) => {
@@ -495,6 +502,65 @@ describe("contracts/ContractAdapter helpers", () => {
       expect.stringContaining('"sort":[{"foo":"asc"},{"id":"asc"}]')
     );
     expect(stub.getQueryResultWithPagination).not.toHaveBeenCalled();
+    expect(result.docs).toEqual([{ id: "row-1", foo: "bar" }]);
+  });
+
+  it("attaches the generated id index for private audit queries", async () => {
+    const adapter = new FabricContractAdapter(
+      undefined as any,
+      `adapter-${Math.random().toString(36).slice(2)}`
+    );
+    const context = createContext({
+      getIDBytes: jest.fn().mockReturnValue(Buffer.from("id")),
+      getAttributeValue: jest.fn().mockReturnValue(undefined),
+      getID: jest.fn().mockReturnValue("client"),
+    } as ClientIdentity);
+
+    const iterator = {
+      next: jest
+        .fn()
+        .mockResolvedValueOnce({
+          value: {
+            value: Buffer.from(JSON.stringify({ id: "row-1", foo: "bar" })),
+          },
+          done: false,
+        })
+        .mockResolvedValue({ done: true }),
+      close: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
+    const stub = {
+      getPrivateDataQueryResult: jest.fn().mockResolvedValue({
+        iterator,
+      }),
+      getQueryResultWithPagination: jest.fn(),
+      getQueryResult: jest.fn(),
+      getTxID: jest.fn().mockReturnValue("tx-1"),
+    } as unknown as ChaincodeStub;
+
+    context.accumulate({ stub } as any);
+
+    const proxy = adapter.forPrivate("private-collection");
+    const result = await (proxy as any).raw(
+      {
+        selector: {
+          "??table": "audit",
+          id: { $gt: null },
+        },
+        sort: [{ id: "asc" }],
+        limit: 1,
+      },
+      false,
+      true,
+      context
+    );
+
+    expect(stub.getPrivateDataQueryResult).toHaveBeenCalledWith(
+      "private-collection",
+      expect.stringContaining(
+        '"use_index":["audit_id_asc_index","audit_id_asc_index"]'
+      )
+    );
     expect(result.docs).toEqual([{ id: "row-1", foo: "bar" }]);
   });
 

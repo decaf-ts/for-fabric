@@ -3,6 +3,7 @@ import {
   CouchDBKeys,
   MangoQuery,
   ViewResponse,
+  requireGeneratedUseIndex,
   ensureDeterministicSort as couchEnsureDeterministicSort,
   getSortDirection,
   getSortFields,
@@ -230,6 +231,28 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return createHash("sha256")
       .update(FabricContractAdapter.stableStringify(relevant))
       .digest("base64url");
+  }
+
+  private static attachGeneratedPrivateUseIndex(
+    query: MangoQuery,
+    log?: Logger
+  ): void {
+    const selector = query.selector as Record<string, any> | undefined;
+    const tableName = selector?.[CouchDBKeys.TABLE];
+    if (typeof tableName !== "string" || !tableName.length) {
+      return;
+    }
+
+    let clazz: Constructor<Model> | undefined;
+    try {
+      clazz = Model.fromTable(tableName) as Constructor<Model>;
+    } catch {
+      return;
+    }
+
+    requireGeneratedUseIndex(clazz, query, log, {
+      requireSortCoverage: true,
+    });
   }
 
   private static countSelectorFieldOccurrences(
@@ -1177,6 +1200,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
                     FabricContractAdapter.normalizeMangoQueryForExecution(
                       rawInput
                     );
+                  FabricContractAdapter.attachGeneratedPrivateUseIndex(
+                    normalizedInput,
+                    log
+                  );
                   log.debug(
                     `Querying collection ${collection} for ${JSON.stringify(normalizedInput)}`
                   );
@@ -1249,6 +1276,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
                 const normalizedQuery =
                   FabricContractAdapter.normalizeMangoQueryForExecution(query);
+                FabricContractAdapter.attachGeneratedPrivateUseIndex(
+                  normalizedQuery,
+                  log
+                );
 
                 log.debug(
                   `Private paginated query input collection=${collection} limit=${limit} skip=${skip} bookmark=${bookmark} sortField=${sortField} direction=${sortDirection} synthetic=${Boolean(
@@ -1380,11 +1411,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ...args: ContextualArgs<FabricContractContext>
   ): Promise<Iterators.StateQueryIterator> {
-    return stub.getQueryResult(
-      JSON.stringify(
-        FabricContractAdapter.normalizeMangoQueryForExecution(rawInput)
-      )
-    );
+    const normalizedInput =
+      FabricContractAdapter.normalizeMangoQueryForExecution(rawInput);
+    FabricContractAdapter.attachGeneratedPrivateUseIndex(normalizedInput);
+    return stub.getQueryResult(JSON.stringify(normalizedInput));
   }
 
   protected async queryResultPaginated(
@@ -1396,10 +1426,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ...args: any[]
   ): Promise<StateQueryResponse<Iterators.StateQueryIterator>> {
+    const normalizedInput =
+      FabricContractAdapter.normalizeMangoQueryForExecution(rawInput);
+    FabricContractAdapter.attachGeneratedPrivateUseIndex(normalizedInput);
     return stub.getQueryResultWithPagination(
-      JSON.stringify(
-        FabricContractAdapter.normalizeMangoQueryForExecution(rawInput)
-      ),
+      JSON.stringify(normalizedInput),
       limit,
       bookmark?.toString()
     );
