@@ -220,6 +220,45 @@ export class FabricContractAdapter extends CouchDBAdapter<
       .join(",")}}`;
   }
 
+  private static toBuffer(value: unknown): Buffer {
+    if (Buffer.isBuffer(value)) {
+      return value;
+    }
+
+    if (value instanceof Uint8Array) {
+      return Buffer.from(value);
+    }
+
+    if (typeof value === "string") {
+      return Buffer.from(value, "utf8");
+    }
+
+    if (value instanceof ArrayBuffer) {
+      return Buffer.from(value);
+    }
+
+    if (
+      value &&
+      typeof value === "object" &&
+      "buffer" in value &&
+      (value as any).buffer instanceof ArrayBuffer
+    ) {
+      const typed = value as {
+        buffer: ArrayBuffer;
+        byteOffset?: number;
+        byteLength?: number;
+      };
+
+      return Buffer.from(typed.buffer, typed.byteOffset || 0, typed.byteLength);
+    }
+
+    throw new SerializationError(
+      `Cannot convert private query value to Buffer: ${Object.prototype.toString.call(
+        value
+      )}`
+    );
+  }
+
   private static privateQueryHash(query: Record<string, any>): string {
     const relevant = {
       selector: query.selector || {},
@@ -270,7 +309,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
       return counts;
     }
 
-    for (const [key, value] of Object.entries(selector as Record<string, any>)) {
+    for (const [key, value] of Object.entries(
+      selector as Record<string, any>
+    )) {
       if (!["$and", "$or", "$not"].includes(key)) {
         counts.set(key, (counts.get(key) || 0) + 1);
       }
@@ -294,13 +335,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
 
     const [operator, bound] = entries[0];
-    return (
-      (operator === "$gt" || operator === "$gte") &&
-      bound === null
-    );
+    return (operator === "$gt" || operator === "$gte") && bound === null;
   }
 
-  private static normalizeMangoQueryForExecution(query: MangoQuery): MangoQuery {
+  private static normalizeMangoQueryForExecution(
+    query: MangoQuery
+  ): MangoQuery {
     const normalized: MangoQuery = {
       ...query,
       selector:
@@ -519,48 +559,97 @@ export class FabricContractAdapter extends CouchDBAdapter<
   ): Promise<Array<{ key: string; value: Buffer }>> {
     const paged: Array<{ key: string; value: Buffer }> = [];
 
-    for (const query of queries) {
+    for (const q of queries) {
       if (paged.length >= pageSize + 1) {
         break;
       }
 
       const remaining = pageSize + 1 - paged.length;
-      const queryForExecution: MangoQuery =
-        FabricContractAdapter.normalizeMangoQueryForExecution({
-          ...query,
-          limit: remaining,
-        });
-      delete (queryForExecution as Record<string, any>).skip;
-      delete (queryForExecution as Record<string, any>).bookmark;
+
+      const queryForExecution: MangoQuery = {
+        ...q,
+        limit: remaining,
+      };
+
+      delete queryForExecution.skip;
+      delete queryForExecution.bookmark;
+
+      const queryJson = JSON.stringify(queryForExecution);
 
       log.debug(
-        `Querying collection ${collection} for ${JSON.stringify(
-          queryForExecution
-        )}`
+        `Querying private collection ${collection} with Mango query: ${queryJson}`
       );
 
-      const response = await stub.getPrivateDataQueryResult(
-        collection,
-        JSON.stringify(queryForExecution)
-      );
+      let response: unknown;
+
+      try {
+        response = await stub.getPrivateDataQueryResult(collection, queryJson);
+      } catch (e: unknown) {
+        log.error(
+          [
+            `Private Mango paginated query failed`,
+            `collection=${collection}`,
+            `query=${queryJson}`,
+            `error=${e instanceof Error ? e.stack || e.message : String(e)}`,
+          ].join("\n")
+        );
+
+        throw e;
+      }
 
       const iterator = ((response as any).iterator ||
         response) as Iterators.StateQueryIterator;
 
+      if (!iterator || typeof iterator.next !== "function") {
+        throw new QueryError(
+          `Private paginated query on collection ${collection} did not return a valid iterator`
+        );
+      }
+
       try {
         while (paged.length < pageSize + 1) {
           const res = await iterator.next();
-          if (res.done) break;
-          if (!res.value || !res.value.value) continue;
+
+          if (res.done) {
+            break;
+          }
+
+          if (!res.value || !res.value.value) {
+            continue;
+          }
+
           paged.push({
             key: res.value.key as string,
-            value: Buffer.isBuffer(res.value.value)
-              ? res.value.value
-              : Buffer.from((res.value.value as any).toString("utf8")),
+            value: FabricContractAdapter.toBuffer(res.value.value),
           });
         }
+      } catch (e: unknown) {
+        log.error(
+          [
+            `Failed while reading private Mango iterator`,
+            `collection=${collection}`,
+            `query=${queryJson}`,
+            `error=${e instanceof Error ? e.stack || e.message : String(e)}`,
+          ].join("\n")
+        );
+
+        throw e;
       } finally {
-        await iterator.close();
+        try {
+          await iterator.close();
+        } catch (e: unknown) {
+          log.error(
+            [
+              `Failed to close private Mango iterator`,
+              `collection=${collection}`,
+              `query=${queryJson}`,
+              `error=${e instanceof Error ? e.stack || e.message : String(e)}`,
+            ].join("\n")
+          );
+
+          // eslint-disable-next-line no-unsafe-finally
+          throw e;
+        }
       }
     }
 
@@ -607,9 +696,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
   private static parseSyntheticPrivateBookmark(
     bookmark: unknown
-  ):
-    | PrivateSyntheticBookmark
-    | undefined {
+  ): PrivateSyntheticBookmark | undefined {
     if (typeof bookmark !== "string") return undefined;
     if (!bookmark.startsWith(FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX))
       return undefined;
@@ -617,17 +704,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
       FabricContractAdapter.PRIVATE_BOOKMARK_PREFIX.length
     );
     try {
-      const parsed = JSON.parse(
-        Buffer.from(raw, "base64url").toString("utf8")
-      );
+      const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
       if (
         !parsed ||
         typeof parsed !== "object" ||
         typeof parsed.sortField !== "string" ||
         typeof parsed.direction !== "string" ||
         typeof parsed.idField !== "string" ||
-        typeof parsed.lastId !== "string"
-        || typeof parsed.queryHash !== "string"
+        typeof parsed.lastId !== "string" ||
+        typeof parsed.queryHash !== "string"
       ) {
         return undefined;
       }
@@ -1195,29 +1280,48 @@ export class FabricContractAdapter extends CouchDBAdapter<
               case "queryResult": {
                 const [stub, rawInput, ...args] = argsList;
                 const { log } = thisArg["logCtx"](args, prop);
+
+                const normalizedInput =
+                  FabricContractAdapter.normalizeMangoQueryForExecution(
+                    rawInput
+                  );
+
                 try {
-                  const normalizedInput =
-                    FabricContractAdapter.normalizeMangoQueryForExecution(
-                      rawInput
-                    );
                   FabricContractAdapter.attachGeneratedPrivateUseIndex(
                     normalizedInput,
                     log
                   );
+
+                  const queryJson = JSON.stringify(normalizedInput);
+
                   log.debug(
-                    `Querying collection ${collection} for ${JSON.stringify(normalizedInput)}`
+                    `Querying private collection ${collection} with Mango query: ${queryJson}`
                   );
-                  const res = await stub.getPrivateDataQueryResult(
-                    collection,
-                    JSON.stringify(normalizedInput)
+
+                  const res = await (
+                    stub as ChaincodeStub
+                  ).getPrivateDataQueryResult(collection, queryJson);
+
+                  const iterator = (res as any).iterator || res;
+
+                  if (!iterator || typeof iterator.next !== "function") {
+                    throw new QueryError(
+                      `Private query on collection ${collection} did not return a valid iterator`
+                    );
+                  }
+
+                  return iterator;
+                } catch (e: unknown) {
+                  log.error(
+                    [
+                      `Private Mango query failed`,
+                      `collection=${collection}`,
+                      `query=${JSON.stringify(normalizedInput)}`,
+                      `error=${e instanceof Error ? e.stack || e.message : String(e)}`,
+                    ].join("\n")
                   );
-                  log.verbose(
-                    `iterator from collection ${collection} received`
-                  );
-                  return res.iterator || res;
-                } catch (e: any) {
-                  log.error(e);
-                  return [];
+
+                  throw thisArg.parseError ? thisArg.parseError(e as Error) : e;
                 }
               }
               case "queryResultPaginated": {
@@ -1263,16 +1367,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   );
                 }
 
-                const { sortField, direction: sortDirection, idField } =
-                  FabricContractAdapter.ensureDeterministicPrivateSort(
-                    query,
-                    queryPkField
-                  );
-
-                warnScanProneMangoOperators(
-                  query.selector || {},
-                  log
+                const {
+                  sortField,
+                  direction: sortDirection,
+                  idField,
+                } = FabricContractAdapter.ensureDeterministicPrivateSort(
+                  query,
+                  queryPkField
                 );
+
+                warnScanProneMangoOperators(query.selector || {}, log);
 
                 const normalizedQuery =
                   FabricContractAdapter.normalizeMangoQueryForExecution(query);
@@ -1322,8 +1426,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
                 let nextBookmark = "";
                 if (hasMore && docs.length) {
                   const last = docs[docs.length - 1];
-                  const lastDoc =
-                    FabricContractAdapter.parsePrivateResultValue(last.value);
+                  const lastDoc = FabricContractAdapter.parsePrivateResultValue(
+                    last.value
+                  );
 
                   if (!(sortField in lastDoc)) {
                     throw new PagingError(
@@ -1332,10 +1437,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
                   }
 
                   const lastIdValue = lastDoc[idField];
-                  if (
-                    lastIdValue === undefined ||
-                    lastIdValue === null
-                  ) {
+                  if (lastIdValue === undefined || lastIdValue === null) {
                     throw new PagingError(
                       `Cannot build private pagination bookmark: id field "${idField}" is missing from the last result`
                     );
@@ -1631,7 +1733,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
         ? String(originalInput["__pkField"])
         : String(ctx?.getOrUndefined("privatePaginationTieBreaker") || "id");
     const hasSkip = skip !== undefined && skip !== null && Number(skip) > 0;
-    const hasBookmark = bookmark !== undefined && bookmark !== null && bookmark !== "";
+    const hasBookmark =
+      bookmark !== undefined && bookmark !== null && bookmark !== "";
     const paginationActive = Boolean(limit || hasSkip || hasBookmark);
     const shouldPaginate = Boolean(
       paginationActive &&
@@ -2086,8 +2189,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
       >
     | FabricContextualizedArgs<ARGS, METHOD extends string ? true : false> {
     const ctx = args[args.length - 1];
-    let mergedOverrides =
-      overrides as Partial<FlagsOf<FabricContractContext>> | Ctx | undefined;
+    let mergedOverrides = overrides as
+      | Partial<FlagsOf<FabricContractContext>>
+      | Ctx
+      | undefined;
 
     if (
       ctx instanceof FabricContractContext &&
@@ -2096,7 +2201,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
     ) {
       const transientOverrides = this.readTransientOverrides(ctx);
       if (transientOverrides) {
-        mergedOverrides = Object.assign({}, overrides || {}, transientOverrides);
+        mergedOverrides = Object.assign(
+          {},
+          overrides || {},
+          transientOverrides
+        );
       }
     }
 
