@@ -22,6 +22,7 @@ import {
 } from "@decaf-ts/db-decorators";
 import { CouchDBKeys } from "@decaf-ts/for-couchdb";
 import { FabricClientPaginator } from "./FabricClientPaginator";
+import { QueryResultTooLargeError } from "../shared/errors";
 
 /**
  * @description Repository implementation for Fabric client operations
@@ -114,12 +115,22 @@ export class FabricClientRepository<
     log.verbose(
       `listing ${Model.tableName(this.class)} by ${key as string} ${order}`
     );
-    return (await this.statement(
-      this.listBy.name,
-      key,
-      order,
-      ...ctxArgs
-    )) as any;
+    try {
+      return (await this.statement(
+        this.listBy.name,
+        key,
+        order,
+        ...ctxArgs
+      )) as any;
+    } catch (e: unknown) {
+      if (e instanceof QueryResultTooLargeError) {
+        log.warn(
+          `listBy result set too large for ${Model.tableName(this.class)} key=${String(key)} order=${order}. Returning empty list. Use paginateBy for large datasets.`
+        );
+        return [] as M[];
+      }
+      throw e;
+    }
   }
 
   override async findBy(

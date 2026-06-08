@@ -3,6 +3,7 @@ import {
   CouchDBGroupOperator,
   CouchDBKeys,
   CouchDBOperator,
+  CouchDBQueryLimit,
   MangoOperator,
   MangoQuery,
   MangoSelector,
@@ -170,6 +171,12 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
     const hasManualAggregate = !!this.manualAggregation;
     if (this.limitSelector) {
       query.limit = this.limitSelector;
+    } else if (!hasManualAggregate) {
+      log.warn(
+        `No limit selector defined. Capping at default of ${CouchDBQueryLimit}`
+      );
+      query.limit = CouchDBQueryLimit;
+      (query as any).__isDefaultCap = true;
     }
 
     if (this.offsetSelector) query.skip = this.offsetSelector;

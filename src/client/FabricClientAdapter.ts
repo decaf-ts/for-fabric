@@ -84,6 +84,7 @@ import {
   EndorsementPolicyError,
   MvccReadConflictError,
   PhantomReadConflictError,
+  QueryResultTooLargeError,
   TransactionTimeoutError,
 } from "../shared/errors";
 import { FabricClientFlags } from "./types";
@@ -1972,6 +1973,14 @@ export class FabricClientAdapter extends Adapter<
 
     if (msg.includes("DEADLINE_EXCEEDED"))
       return new TransactionTimeoutError(err) as E;
+
+    if (
+      msg.includes("chaincode stream terminated") ||
+      msg.includes("RESOURCE_EXHAUSTED") ||
+      msg.includes("received message larger than max") ||
+      msg.includes("grpc: received message larger")
+    )
+      return new QueryResultTooLargeError(err) as E;
 
     if (msg.includes("ENDORSEMENT_POLICY_FAILURE"))
       return new EndorsementPolicyError(err) as E;

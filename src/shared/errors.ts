@@ -187,3 +187,9 @@ export class TransactionBufferSizeError extends InternalError {
     super(message, TransactionBufferSizeError.name, 592);
   }
 }
+
+export class QueryResultTooLargeError extends TransactionLimitsError {
+  constructor(message: string | Error) {
+    super(message, QueryResultTooLargeError.name, 593);
+  }
+}
