@@ -16,14 +16,14 @@ function resolvePrimaryKeyField<M extends Model>(
 ): string | undefined {
   try {
     return String(Model.pk(m));
-  } catch (error) {
+  } catch {
     const message = `Skipping ${m.name} while extracting indexes: no primary key is defined`;
     log.verbose(message);
     return undefined;
   }
 }
 
-function withDefaultQueryPkTieBreaker<M extends Model>(
+function withDefaultQueryPkTieBreaker(
   indexes: Index[],
   pkField: string
 ): Index[] {
@@ -65,8 +65,7 @@ function withDefaultQueryPkTieBreaker<M extends Model>(
     const lastDirection = String(
       Object.values(lastField || {})[0] || "asc"
     ).toLowerCase();
-    const direction =
-      lastDirection === "desc" ? "desc" : "asc";
+    const direction = lastDirection === "desc" ? "desc" : "asc";
 
     return Object.assign({}, index, {
       index: Object.assign({}, (index as any).index, {

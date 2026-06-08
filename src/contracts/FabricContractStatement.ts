@@ -3,7 +3,6 @@ import {
   CouchDBGroupOperator,
   CouchDBKeys,
   CouchDBOperator,
-  CouchDBQueryLimit,
   MangoOperator,
   MangoQuery,
   MangoSelector,
@@ -168,15 +167,8 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
       }
     }
 
-    const hasManualAggregate = !!this.manualAggregation;
     if (this.limitSelector) {
       query.limit = this.limitSelector;
-    } else if (!hasManualAggregate) {
-      log.warn(
-        `No limit selector defined. Capping at default of ${CouchDBQueryLimit}`
-      );
-      query.limit = CouchDBQueryLimit;
-      (query as any).__isDefaultCap = true;
     }
 
     if (this.offsetSelector) query.skip = this.offsetSelector;
@@ -222,14 +214,15 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
       }
       if (!this.selectSelector) {
         if (this.groupBySelectors?.length) {
-          const grouped = this.revertGroupedResults(
-            results,
-            (r) => this.processRecord(r, ctx)
+          const grouped = this.revertGroupedResults(results, (r) =>
+            this.processRecord(r, ctx)
           ) as R;
           return (await this.applyAfterHandlersToResult(grouped, ctx)) as R;
         }
         if (Array.isArray(results)) {
-          const mapped = results.map((r) => this.processRecord(r, ctx)) as unknown as R;
+          const mapped = results.map((r) =>
+            this.processRecord(r, ctx)
+          ) as unknown as R;
           return (await this.applyAfterHandlersToResult(mapped, ctx)) as R;
         }
         const single = this.processRecord(results, ctx) as unknown as R;

@@ -1718,7 +1718,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     const originalInput = { ...(rawInput as Record<string, any>) };
     const { skip, limit } = originalInput;
-    const isDefaultCap = Boolean(originalInput["__isDefaultCap"]);
     const bookmark = originalInput["bookmark"];
     const hasSort =
       Array.isArray((originalInput as Record<string, any>).sort) &&
@@ -1731,9 +1730,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const hasSkip = skip !== undefined && skip !== null && Number(skip) > 0;
     const hasBookmark =
       bookmark !== undefined && bookmark !== null && bookmark !== "";
-    const paginationActive = Boolean(
-      !isDefaultCap && (limit || hasSkip || hasBookmark)
-    );
+    const paginationActive = Boolean(limit || hasSkip || hasBookmark);
     const shouldPaginate = Boolean(
       paginationActive &&
         (enableSegregates || hasSkip || hasBookmark || hasSort)
@@ -1742,7 +1739,6 @@ export class FabricContractAdapter extends CouchDBAdapter<
     delete baseInput["skip"];
     delete baseInput["bookmark"];
     delete baseInput["__pkField"];
-    delete baseInput["__isDefaultCap"];
     let resp = { docs: [], bookmark: undefined as string | undefined };
     log.debug(
       `raw query start fullySegregated=${fullySegregated} enableSegregates=${enableSegregates} paginationActive=${paginationActive} limit=${limit} skip=${skip} bookmark=${bookmark} pkField=${pkField} query=${JSON.stringify(
