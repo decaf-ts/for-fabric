@@ -332,7 +332,13 @@ export class FabricClientAdapter extends Adapter<
     id: PrimaryKeyType,
     model: Record<string, any>,
     ...args: MaybeContextualArg<FabricClientContext>
-  ): [Constructor<M>, PrimaryKeyType, Record<string, any>, ...any[], FabricClientContext] {
+  ): [
+    Constructor<M>,
+    PrimaryKeyType,
+    Record<string, any>,
+    ...any[],
+    FabricClientContext,
+  ] {
     const { ctxArgs } = this.logCtx(args, this.createPrefix);
     const tableName = Model.tableName(clazz);
     const record: Record<string, any> = {};
@@ -769,7 +775,8 @@ export class FabricClientAdapter extends Adapter<
 
   private hasMeaningfulTransientData(value: unknown): boolean {
     if (value === undefined || value === null) return false;
-    if (Array.isArray(value)) return value.some((item) => this.hasMeaningfulTransientData(item));
+    if (Array.isArray(value))
+      return value.some((item) => this.hasMeaningfulTransientData(item));
     if (typeof value !== "object") return true;
     const entries = Object.entries(value as Record<string, unknown>);
     if (!entries.length) return false;
@@ -1239,10 +1246,13 @@ export class FabricClientAdapter extends Adapter<
       const proposalOptions: ProposalOptions = {
         arguments: normalizedArgs,
         transientData: transientEntries.length
-          ? transientEntries.reduce<Record<string, string>>((acc, [key, val]) => {
-              acc[key] = JSON.stringify(val);
-              return acc;
-            }, {})
+          ? transientEntries.reduce<Record<string, string>>(
+              (acc, [key, val]) => {
+                acc[key] = JSON.stringify(val);
+                return acc;
+              },
+              {}
+            )
           : undefined,
         endorsingOrganizations: ctx.getOrUndefined("allowManualEndorsingOrgs")
           ? endorsingOrganizations || undefined
@@ -1314,9 +1324,7 @@ export class FabricClientAdapter extends Adapter<
     return picked;
   }
 
-  private buildLegacyPeerConfigs(
-    ctx: FabricClientContext
-  ): LegacyPeerTarget[] {
+  private buildLegacyPeerConfigs(ctx: FabricClientContext): LegacyPeerTarget[] {
     const peers: LegacyPeerTarget[] = [
       {
         mspId: this.config.mspId,
@@ -1642,15 +1650,16 @@ export class FabricClientAdapter extends Adapter<
     reference: string,
     ...args: MaybeContextualArg<FabricClientContext>
   ): Promise<Uint8Array> {
-    const { ctxArgs } = (
-      await this.logCtx([args], PersistenceKeys.MIGRATION, true)
+    const { ctx } = (
+      await this.logCtx(args, PersistenceKeys.MIGRATION, true)
     ).for(this.migrate);
     return this.submitTransaction(
-      ctxArgs[0] as FabricClientContext,
+      ctx,
       "migrate",
       [reference, args],
       undefined,
-      undefined
+      undefined,
+      "MigrationContract"
     );
   }
 

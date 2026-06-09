@@ -123,7 +123,7 @@ export class MigrationContract extends Contract {
       flavour: string;
     }> = [];
 
-    const migrationList = (Metadata as any).migrations();
+    const migrationList = Metadata.migrations();
 
     for (const [, MigrationClass] of migrationList) {
       const meta = Metadata.get(MigrationClass, PersistenceKeys.MIGRATION);
