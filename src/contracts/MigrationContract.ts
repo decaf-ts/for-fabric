@@ -69,8 +69,8 @@ export class MigrationContract extends Contract {
         throw new InternalError("Migration arguments must be an array");
       }
     }
-    const { log, ctx, ctxArgs } = (
-      await this.logCtx([...argz, context], PersistenceKeys.MIGRATION, true)
+    const { log, ctx } = (
+      await this.logCtx([context], PersistenceKeys.MIGRATION, true)
     ).for(this.migrate);
 
     const migrations = this.getRegisteredMigrations();
@@ -87,6 +87,7 @@ export class MigrationContract extends Contract {
     const m = new MigrationClass();
     // For Fabric, use the context as the query runner
     const qr: any = ctx;
+    const ctxArgs = [...argz, ctx] as [...any[], typeof ctx];
 
     try {
       log.verbose(`migration ${reference} up`);
