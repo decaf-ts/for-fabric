@@ -251,7 +251,7 @@ describe("OtherProductShared contract version flow with relations", () => {
     ensureCommitted();
     const keys = Object.keys(stub.privateState[collection] || {});
     for (const key of keys) {
-      if (!key.startsWith(tableName + "_")) continue;
+      if (!key.startsWith("\x00" + tableName + "\x00")) continue;
       const raw = stub.privateState[collection][key];
       const parsed =
         typeof raw === "string"

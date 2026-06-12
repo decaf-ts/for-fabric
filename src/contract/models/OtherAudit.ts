@@ -64,6 +64,7 @@ export class OtherAudit extends BaseModel {
   @required()
   @readonly()
   @index([OrderDirection.ASC, OrderDirection.DSC])
+  @index([OrderDirection.ASC, OrderDirection.DSC], ["id"])
   @description("model/entity affected by the action")
   @defaultQueryAttr()
   model!: string;

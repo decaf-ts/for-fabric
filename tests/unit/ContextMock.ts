@@ -242,7 +242,39 @@ export function getStubMock() {
       return new Date();
     },
     createCompositeKey: (objectType: string, attributes: string[]) => {
-      return objectType + "_" + attributes.join("_");
+      // Real Fabric format: \x00{objectType}\x00{attr1}\x00{attr2}\x00...
+      return `\x00${objectType}\x00${attributes.map((a) => `${a}\x00`).join("")}`;
+    },
+    splitCompositeKey: (compositeKey: string) => {
+      // Inverse of createCompositeKey: \x00{objectType}\x00{attr1}\x00{attr2}\x00...
+      if (!compositeKey.startsWith("\x00"))
+        return { objectType: "", attributes: [] };
+      const inner = compositeKey.slice(1); // remove leading \x00
+      const parts = inner.split("\x00");
+      // parts = [objectType, attr1, attr2, ..., ""]  (trailing empty from final \x00)
+      const objectType = parts[0];
+      const attributes = parts.slice(1).filter((p) => p !== "");
+      return { objectType, attributes };
+    },
+    getStateByRange: async (startKey: string, endKey: string) => {
+      // [startKey, endKey) — empty endKey means no upper bound
+      const rows = Object.entries(state)
+        .filter(([key]) => key >= startKey && (endKey === "" || key < endKey))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => ({ key, value }));
+      return createIterator(rows);
+    },
+    getStateByPartialCompositeKey: async (
+      objectType: string,
+      attributes: string[]
+    ) => {
+      // Returns all state entries whose composite key starts with the partial prefix
+      const prefix = `\x00${objectType}\x00${attributes.map((a) => `${a}\x00`).join("")}`;
+      const rows = Object.entries(state)
+        .filter(([key]) => key.startsWith(prefix))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => ({ key, value }));
+      return createIterator(rows);
     },
     getState: async (key: string) => {
       // Reads only from committed state (Fabric behaviour)
@@ -342,8 +374,35 @@ export function getStubMock() {
     // purgePrivateData(collection: string, key: string): Promise<void>;
     // setPrivateDataValidationParameter(collection: string, key: string, ep: Uint8Array): Promise<void>;
     // getPrivateDataValidationParameter(collection: string, key: string): Promise<Uint8Array>;
-    // getPrivateDataByRange(collection: string, startKey: string, endKey: string): Promise<Iterators.StateQueryIterator> & AsyncIterable<Iterators.KV>;
-    // getPrivateDataByPartialCompositeKey(collection: string, objectType: string, attributes: string[]): Promise<Iterators.StateQueryIterator> & AsyncIterable<Iterators.KV>;
+    async getPrivateDataByRange(
+      collection: string,
+      startKey: string,
+      endKey: string
+    ) {
+      // [startKey, endKey) — empty endKey means no upper bound
+      const colState = privateState[collection] || {};
+      const rows = Object.entries(colState)
+        .filter(
+          ([key]) => key >= startKey && (endKey === "" || key < endKey)
+        )
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => ({ key, value }));
+      return createIterator(rows);
+    },
+    async getPrivateDataByPartialCompositeKey(
+      collection: string,
+      objectType: string,
+      attributes: string[]
+    ) {
+      // Returns all entries in the collection whose composite key starts with the partial prefix
+      const prefix = `\x00${objectType}\x00${attributes.map((a) => `${a}\x00`).join("")}`;
+      const colState = privateState[collection] || {};
+      const rows = Object.entries(colState)
+        .filter(([key]) => key.startsWith(prefix))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => ({ key, value }));
+      return createIterator(rows);
+    },
 
     async getPrivateDataQueryResult(collection: string, query: string) {
       // Queries only committed private state

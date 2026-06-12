@@ -44,6 +44,7 @@ export class OtherBatchShared extends BaseIdentifiedModel {
   @readonly()
   @pattern(BatchPattern)
   @index([OrderDirection.ASC, OrderDirection.DSC])
+  @index([OrderDirection.ASC, OrderDirection.DSC], ["id"])
   @description("Batch number assigned to the product.")
   batchNumber!: string;
 

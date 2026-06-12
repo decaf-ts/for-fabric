@@ -129,8 +129,8 @@ describe("OtherProductShared persistent counter (@version(true))", () => {
     await contract.create(ctx as any, preparePayload(buildProduct(productCode)));
     const recreated = await loadSharedProduct(productCode);
     const counterSeqKeys = Object.keys((stub as any).privateState?.[collection] || {})
-      .filter((k) => k.startsWith(`${seqTable}_`))
-      .filter((k) => k.endsWith("_counter"));
+      .filter((k) => k.startsWith(`\x00${seqTable}\x00`))
+      .filter((k) => k.endsWith("_counter\x00"));
     expect(counterSeqKeys).toContain(seqKey);
     const seqAfterRecreateRaw = await stub.getPrivateData(collection, seqKey);
     const seqAfterRecreate = JSON.parse(

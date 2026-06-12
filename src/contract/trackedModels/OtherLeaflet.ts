@@ -79,6 +79,7 @@ export class Leaflet extends BaseIdentifiedModel {
   @required()
   @readonly()
   @index([OrderDirection.ASC, OrderDirection.DSC])
+  @index([OrderDirection.ASC, OrderDirection.DSC], ["id"])
   @description("Language code of the leaflet (e.g., 'en', 'pt', 'es').")
   lang!: string; // TODO -> rollback to language property
 

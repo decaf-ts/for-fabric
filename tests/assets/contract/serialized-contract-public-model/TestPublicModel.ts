@@ -1,8 +1,10 @@
 import {
   Cascade,
   column,
+  index,
   oneToMany,
   oneToOne,
+  OrderDirection,
   pk,
   table,
 } from "@decaf-ts/core";
@@ -36,6 +38,10 @@ export class TestPublicModel extends FabricIdentifiedBaseModel {
   @maxlength(9)
   @required()
   nif!: string;
+
+  @column("tst_product_code")
+  @index([OrderDirection.ASC, OrderDirection.DSC])
+  productCode?: string;
 
   @ownedBy()
   owner!: string;

@@ -1843,6 +1843,103 @@ export class FabricContractAdapter extends CouchDBAdapter<
     return resp as any;
   }
 
+  /**
+   * @description Lists all records of a model using range queries (deterministic, write-safe)
+   * @summary Iterates records via `getStateByPartialCompositeKey` (public) and
+   * `getPrivateDataByPartialCompositeKey` (private/shared), following the same collection-routing
+   * logic as `raw()` but using Fabric range queries instead of Mango selectors.
+   * Unlike `raw()`, this method is safe to use in the same transaction as writes because
+   * range queries are deterministic and do not block subsequent `putState`/`putPrivateData` calls.
+   * @template M - Type extending Model
+   * @param {Constructor<M>} clazz - The model constructor
+   * @param {string[]} [attributes=[]] - Partial composite key attributes to filter by (empty = all records)
+   * @param {...ContextualArgs<FabricContractContext>} args - Contextual arguments including the chaincode context
+   * @return {Promise<M[]>} Promise resolving to an array of reconstructed model instances
+   */
+  async rangeList<M extends Model>(
+    clazz: Constructor<M>,
+    attributes: string[] = [],
+    ...args: ContextualArgs<FabricContractContext>
+  ): Promise<M[]> {
+    const { ctx, log } = this.logCtx(args, this.rangeList);
+    const tableName = Model.tableName(clazz);
+    const fullySegregated = ctx.isFullySegregated;
+
+    const deserializeEntry = (raw: Uint8Array): Record<string, any> | undefined => {
+      const str = Buffer.from(raw).toString("utf8");
+      if (!str) return undefined;
+      try {
+        return FabricContractAdapter.serializer.deserialize(str) as Record<string, any>;
+      } catch {
+        try {
+          return JSON.parse(str) as Record<string, any>;
+        } catch {
+          return undefined;
+        }
+      }
+    };
+
+    // Collect raw data keyed by composite key, merging public + private in order (same as read())
+    const rawByKey = new Map<string, Record<string, any>>();
+
+    if (!fullySegregated) {
+      log.debug(`rangeList public: objectType=${tableName} attributes=${JSON.stringify(attributes)}`);
+      const iterator = await ctx.stub.getStateByPartialCompositeKey(tableName, attributes);
+      let next = await iterator.next();
+      while (!next.done) {
+        if (next.value?.value) {
+          const data = deserializeEntry(next.value.value);
+          if (data) rawByKey.set(next.value.key, data);
+        }
+        next = await iterator.next();
+      }
+      await iterator.close();
+      log.debug(`rangeList public: ${rawByKey.size} entries`);
+    }
+
+    const collections = ctx.getReadCollections();
+    if (collections?.length) {
+      for (const collection of collections) {
+        log.debug(`rangeList private: collection=${collection} objectType=${tableName} attributes=${JSON.stringify(attributes)}`);
+        const iterator = await ctx.stub.getPrivateDataByPartialCompositeKey(collection, tableName, attributes);
+        let count = 0;
+        let next = await iterator.next();
+        while (!next.done) {
+          if (next.value?.value) {
+            const data = deserializeEntry(next.value.value);
+            if (data) {
+              const existing = rawByKey.get(next.value.key);
+              if (existing) {
+                Object.assign(existing, data);
+              } else {
+                rawByKey.set(next.value.key, data);
+              }
+              count++;
+            }
+          }
+          next = await iterator.next();
+        }
+        await iterator.close();
+        log.debug(`rangeList private: collection=${collection} ${count} entries`);
+      }
+    }
+
+    const results: M[] = [];
+    for (const [compositeKey, data] of rawByKey) {
+      try {
+        const { attributes: keyParts } = ctx.stub.splitCompositeKey(compositeKey);
+        const id = keyParts[0];
+        if (!id) continue;
+        results.push(this.revert(data, clazz, id, undefined, ctx));
+      } catch (e: unknown) {
+        log.warn(`rangeList: skipping entry ${compositeKey}: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+
+    log.debug(`rangeList: returning ${results.length} ${clazz.name} instances`);
+    return results;
+  }
+
   async view<R>(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ddoc: string,

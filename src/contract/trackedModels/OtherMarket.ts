@@ -42,6 +42,7 @@ export class OtherMarket extends BaseIdentifiedModel {
   @required()
   @defaultQueryAttr()
   @index([OrderDirection.ASC, OrderDirection.DSC])
+  @index([OrderDirection.ASC, OrderDirection.DSC], ["id"])
   @description(
     "Identifier of the market where the product is registered or sold."
   )

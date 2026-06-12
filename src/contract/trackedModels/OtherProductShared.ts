@@ -49,6 +49,7 @@ export class OtherProductShared extends BaseIdentifiedModel {
   @required()
   @defaultQueryAttr()
   @index([OrderDirection.ASC, OrderDirection.DSC])
+  @index([OrderDirection.ASC, OrderDirection.DSC], ["productCode"])
   inventedName!: string;
 
   @column()

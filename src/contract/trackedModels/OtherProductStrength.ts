@@ -61,6 +61,7 @@ export class OtherProductStrength extends BaseIdentifiedModel {
   @required()
   @defaultQueryAttr()
   @index([OrderDirection.ASC, OrderDirection.DSC])
+  @index([OrderDirection.ASC, OrderDirection.DSC], ["id"])
   @description("Product concentration or dosage (e.g., 500mg, 10%).")
   strength!: string;
 

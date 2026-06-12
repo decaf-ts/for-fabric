@@ -98,7 +98,7 @@ describe("History decorator — relation population & audit comparison", () => {
   function scanAuditEntries(action: string): any[] {
     const col = (stub as any).privateState?.["decaf-namespaceAeon"] ?? {};
     return Object.entries(col)
-      .filter(([key]) => key.startsWith("audit_"))
+      .filter(([key]) => key.startsWith("\x00audit\x00"))
       .map(([, val]: [string, any]) => {
         const entry = JSON.parse(Buffer.from(val).toString("utf8"));
         // diffs is stored as a JSON string via @serialize() — parse it back

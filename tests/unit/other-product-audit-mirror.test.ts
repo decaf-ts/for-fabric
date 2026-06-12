@@ -463,13 +463,13 @@ describe("OtherProduct shared audit + mirror coverage", () => {
     const mirrorCollection = privateState["mirror-collection"] || {};
     privateState["mirror-collection"] = mirrorCollection;
     Object.entries(namespaceAuditData).forEach(([key, value]) => {
-      if (key.startsWith("audit_")) {
+      if (key.startsWith("\x00audit\x00")) {
         mirrorCollection[key] = value;
       }
     });
     const mirrorAuditIds = Object.keys(mirrorCollection)
-      .filter((key) => key.startsWith("audit_"))
-      .map((key) => key.replace(/^audit_/, ""));
+      .filter((key) => key.startsWith("\x00audit\x00"))
+      .map((key) => key.replace(/^\x00audit\x00/, "").replace(/\x00$/, ""));
     const readAllIds = auditIds
       .filter((id) => mirrorAuditIds.includes(id))
       .slice(0, 3);

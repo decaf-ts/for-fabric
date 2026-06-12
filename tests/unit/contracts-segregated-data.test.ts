@@ -605,7 +605,7 @@ describe("FabricContractAdapter forPrivate pattern", () => {
     // Verify data was written to private collection
     const privateData = await stub.getPrivateData(
       COLLECTION_A,
-      "public_test_priv-1"
+      stub.createCompositeKey("public_test", ["priv-1"])
     );
     expect(privateData).toBeDefined();
     expect(Buffer.from(privateData).toString()).toContain("private-data");
@@ -622,7 +622,11 @@ describe("FabricContractAdapter forPrivate pattern", () => {
         publicField: "secret",
       })
     );
-    await stub.putPrivateData(COLLECTION_A, "public_test_priv-2", testData);
+    await stub.putPrivateData(
+      COLLECTION_A,
+      stub.createCompositeKey("public_test", ["priv-2"]),
+      testData
+    );
     stub.commit();
 
     const privateAdapter = adapter.forPrivate(COLLECTION_A);
@@ -647,7 +651,11 @@ describe("FabricContractAdapter forPrivate pattern", () => {
         publicField: "to-delete",
       })
     );
-    await stub.putPrivateData(COLLECTION_A, "public_test_priv-3", testData);
+    await stub.putPrivateData(
+      COLLECTION_A,
+      stub.createCompositeKey("public_test", ["priv-3"]),
+      testData
+    );
     stub.commit();
 
     const privateAdapter = adapter.forPrivate(COLLECTION_A);
@@ -656,7 +664,10 @@ describe("FabricContractAdapter forPrivate pattern", () => {
 
     // Verify deletion
     await expect(
-      stub.getPrivateData(COLLECTION_A, "public_test_priv-3")
+      stub.getPrivateData(
+        COLLECTION_A,
+        stub.createCompositeKey("public_test", ["priv-3"])
+      )
     ).rejects.toThrow(NotFoundError);
   });
 
@@ -718,7 +729,7 @@ describe("Private data repository operations", () => {
     await repository.create(model, context);
     stub.commit();
 
-    const privateKey = `private_test_${id}`;
+    const privateKey = stub.createCompositeKey("private_test", [id]);
     const privateData = await stub.getPrivateData(COLLECTION_B, privateKey);
     expect(privateData).toBeDefined();
     const parsed = JSON.parse(
@@ -788,7 +799,7 @@ describe("Private data repository operations", () => {
     await repository.update(updatedModel, updateContext);
     stub.commit();
 
-    const privateKey = `private_test_${id}`;
+    const privateKey = stub.createCompositeKey("private_test", [id]);
     const raw = await stub.getPrivateData(COLLECTION_B, privateKey);
     const parsed = JSON.parse(Buffer.from(raw).toString("utf8")) as Record<
       string,
@@ -823,7 +834,7 @@ describe("Private data repository operations", () => {
     await multiRepository.create(model, context);
     stub.commit();
 
-    const privateKey = `multi_private_test_${id}`;
+    const privateKey = stub.createCompositeKey("multi_private_test", [id]);
     const recordA = JSON.parse(
       Buffer.from(await stub.getPrivateData(COLLECTION_A, privateKey)).toString(
         "utf8"
@@ -868,7 +879,10 @@ describe("Private data repository operations", () => {
     stub.commit();
 
     await expect(
-      stub.getPrivateData(COLLECTION_B, `private_test_${id}`)
+      stub.getPrivateData(
+        COLLECTION_B,
+        stub.createCompositeKey("private_test", [id])
+      )
     ).rejects.toThrow(NotFoundError);
   });
 
@@ -900,7 +914,7 @@ describe("Private data repository operations", () => {
     await multiRepo.create(model, createCtx);
     stub.commit();
 
-    const privateKeyA = `multi_private_test_${id}`;
+    const privateKeyA = stub.createCompositeKey("multi_private_test", [id]);
     const storedA = await stub.getPrivateData(COLLECTION_A, privateKeyA);
     const parsedA = JSON.parse(Buffer.from(storedA).toString("utf8")) as Record<
       string,
@@ -1084,7 +1098,9 @@ describe("Public data flow (baseline verification)", () => {
     );
     stub.commit();
 
-    const publicData = await stub.getState("public_test_pub-1");
+    const publicData = await stub.getState(
+      stub.createCompositeKey("public_test", ["pub-1"])
+    );
     expect(publicData).toBeDefined();
     expect(Buffer.from(publicData).toString()).toContain("public-data");
   });
@@ -1095,7 +1111,10 @@ describe("Public data flow (baseline verification)", () => {
     const testData = Buffer.from(
       JSON.stringify({ $$table: "public_test", publicField: "world-state" })
     );
-    await stub.putState("public_test_pub-2", testData);
+    await stub.putState(
+      stub.createCompositeKey("public_test", ["pub-2"]),
+      testData
+    );
     stub.commit();
 
     const result = await adapter.read(PublicTestModel, "pub-2", context);
@@ -1486,7 +1505,10 @@ describe("Fully Private Models (no public state writes)", () => {
     }
 
     // Verify the private collection has our secret data
-    const privateKey = `fully_private_test_${id}`;
+    const privateKey = trackingMock.stub.createCompositeKey(
+      "fully_private_test",
+      [id]
+    );
     const privateData = await trackingMock.stub.getPrivateData(
       COLLECTION_A,
       privateKey
@@ -1535,7 +1557,10 @@ describe("Fully Private Models (no public state writes)", () => {
     }
 
     // But private collection should have all the data
-    const privateKey = `fully_private_test_${id}`;
+    const privateKey = trackingMock.stub.createCompositeKey(
+      "fully_private_test",
+      [id]
+    );
     const privateData = await trackingMock.stub.getPrivateData(
       COLLECTION_A,
       privateKey
@@ -1637,7 +1662,10 @@ describe("Fully Private Models (no public state writes)", () => {
     expect(privatePuts.some((c) => c.collection === COLLECTION_A)).toBe(true);
 
     // Verify data in private collection
-    const privateKey = `fully_private_test_${id}`;
+    const privateKey = trackingMock.stub.createCompositeKey(
+      "fully_private_test",
+      [id]
+    );
     const privateData = await trackingMock.stub.getPrivateData(
       COLLECTION_A,
       privateKey
@@ -1688,7 +1716,10 @@ describe("Fully Private Models (no public state writes)", () => {
     );
 
     // Verify data is gone from private collection
-    const privateKey = `fully_private_test_${id}`;
+    const privateKey = trackingMock.stub.createCompositeKey(
+      "fully_private_test",
+      [id]
+    );
     await expect(
       trackingMock.stub.getPrivateData(COLLECTION_A, privateKey)
     ).rejects.toThrow(NotFoundError);
@@ -1740,7 +1771,10 @@ describe("Fully Shared Models (no public state writes)", () => {
     expect(sharedPuts.length).toBeGreaterThan(0);
     expect(sharedPuts.some((c) => c.collection === COLLECTION_B)).toBe(true);
 
-    const sharedKey = `fully_shared_test_${id}`;
+    const sharedKey = trackingMock.stub.createCompositeKey(
+      "fully_shared_test",
+      [id]
+    );
     const sharedData = await trackingMock.stub.getPrivateData(
       COLLECTION_B,
       sharedKey
@@ -1907,7 +1941,9 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     expect(mirrorPuts.length).toBeGreaterThanOrEqual(1);
 
     // Verify the mirror collection has the FULL model
-    const privateKey = `mirror_test_${id}`;
+    const privateKey = trackingMock.stub.createCompositeKey("mirror_test", [
+      id,
+    ]);
     const mirrorData = await trackingMock.stub.getPrivateData(
       MIRROR_COLLECTION,
       privateKey
@@ -2144,7 +2180,9 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
       .filter((c) => c.method === "putPrivateData");
     expect(mirrorPuts.length).toBeGreaterThan(0);
 
-    const privateKey = `mirror_test_${id}`;
+    const privateKey = trackingMock.stub.createCompositeKey("mirror_test", [
+      id,
+    ]);
     const mirrorData = await trackingMock.stub.getPrivateData(
       MIRROR_COLLECTION,
       privateKey
@@ -2174,7 +2212,9 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
     trackingMock.stub.commit();
 
     // Verify mirror data was created
-    const privateKey = `mirror_test_${id}`;
+    const privateKey = trackingMock.stub.createCompositeKey("mirror_test", [
+      id,
+    ]);
     const mirrorData = await trackingMock.stub.getPrivateData(
       MIRROR_COLLECTION,
       privateKey
@@ -2363,7 +2403,9 @@ describe("Mirror Decorator - Conditional Read Routing", () => {
 
     // Verify primary data is gone
     await expect(
-      trackingMock.stub.getState(`mirror_test_${id}`)
+      trackingMock.stub.getState(
+        trackingMock.stub.createCompositeKey("mirror_test", [id])
+      )
     ).rejects.toThrow(NotFoundError);
   });
 });

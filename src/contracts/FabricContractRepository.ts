@@ -764,7 +764,7 @@ async function countStoredEntries<M extends Model>(
   if (!stub) return undefined;
 
   const table = Model.tableName(clazz);
-  const prefix = `${table}_`;
+  const prefix = `\x00${table}\x00`;
   const seen = new Set<string>();
 
   if (typeof stub.getStateByPartialCompositeKey === "function") {
