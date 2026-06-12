@@ -1318,6 +1318,52 @@ describe("FabricClientAdapter", () => {
       expect(close).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("migrate", () => {
+    it("builds its own context and forwards extra args as migration payload when no context is provided", async () => {
+      const adapter = newAdapter();
+      const submitSpy = jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(new TextEncoder().encode("{}"));
+
+      await adapter.migrate("test-1.0.0", "product-code-1");
+
+      expect(submitSpy).toHaveBeenCalledTimes(1);
+      const [ctxArg, api, txArgs, , , contractName] = submitSpy.mock.calls[0];
+      expect(ctxArg).toBeInstanceOf(Context);
+      expect(api).toBe("migrate");
+      expect(txArgs).toEqual(["test-1.0.0", ["product-code-1"]]);
+      expect(contractName).toBe("MigrationContract");
+    });
+
+    it("reuses a trailing context and excludes it from the migration payload", async () => {
+      const adapter = newAdapter();
+      const ctx = createContext();
+      const submitSpy = jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(new TextEncoder().encode("{}"));
+
+      await adapter.migrate("test-1.0.0", "product-code-1", ctx);
+
+      expect(submitSpy).toHaveBeenCalledTimes(1);
+      const [ctxArg, , txArgs] = submitSpy.mock.calls[0];
+      expect(ctxArg).toBe(ctx);
+      expect(txArgs).toEqual(["test-1.0.0", ["product-code-1"]]);
+    });
+
+    it("does not throw when called with no migration payload args", async () => {
+      const adapter = newAdapter();
+      const submitSpy = jest
+        .spyOn(adapter as any, "submitTransaction")
+        .mockResolvedValue(new TextEncoder().encode("{}"));
+
+      await adapter.migrate("test-1.0.0");
+
+      expect(submitSpy).toHaveBeenCalledTimes(1);
+      const [, , txArgs] = submitSpy.mock.calls[0];
+      expect(txArgs).toEqual(["test-1.0.0", []]);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

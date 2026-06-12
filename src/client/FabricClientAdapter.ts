@@ -1650,13 +1650,21 @@ export class FabricClientAdapter extends Adapter<
     reference: string,
     ...args: MaybeContextualArg<FabricClientContext>
   ): Promise<Uint8Array> {
-    const { ctx } = (
-      await this.logCtx(args, PersistenceKeys.MIGRATION, true)
-    ).for(this.migrate);
+    const last = args[args.length - 1];
+    const providedCtx =
+      last instanceof Context ? (last as FabricClientContext) : undefined;
+    const migrationArgs = providedCtx ? args.slice(0, -1) : args;
+    const ctx =
+      providedCtx ||
+      (await this.context(
+        PersistenceKeys.MIGRATION,
+        {},
+        undefined as unknown as Constructor<Model<any>>
+      ));
     return this.submitTransaction(
       ctx,
       "migrate",
-      [reference, args],
+      [reference, migrationArgs],
       undefined,
       undefined,
       "MigrationContract"
