@@ -155,15 +155,18 @@ export async function getSigner(keyDirectoryPath: string): Promise<Signer> {
     keyDirectoryPath,
     signerFileReader
   )) as Buffer;
-  // Node based implementation
-  // privateKey = createPrivateKey(privateKeyPem);
-  // --
 
-  // web based implementation
-  const privateKey = await extractPrivateKey(privateKeyPem);
-  const keys = Object.getOwnPropertySymbols(privateKey);
-  const k = (privateKey as any)[keys[0]];
-  // --
+  let k;
+  if (isBrowser()) {
+    // web based implementation
+    const privateKey = await extractPrivateKey(privateKeyPem);
+    const keys = Object.getOwnPropertySymbols(privateKey);
+    k = (privateKey as any)[keys[0]];
+  } else {
+    // Node based implementation
+    const { createPrivateKey } = await import("crypto");
+    k = createPrivateKey(privateKeyPem);
+  }
 
   return signers.newPrivateKeySigner(k as any);
 }
@@ -190,14 +193,15 @@ export async function getSigner(keyDirectoryPath: string): Promise<Signer> {
  *   ExtractPrivateKey-->>Caller: CryptoKey
  */
 export async function extractPrivateKey(pem: Buffer) {
-  const libName = "crypto";
+  // const libName = "node:crypto";
   let subtle;
-  if (isBrowser()) {
-    subtle = (globalThis as any).crypto.subtle;
-  } else {
-    const lib = (await normalizeImport(import(libName))) as any;
-    subtle = lib.subtle || lib.webcrypto.subtle;
-  }
+  // if (isBrowser()) {
+  // eslint-disable-next-line prefer-const
+  subtle = (globalThis as any).crypto.subtle;
+  // } else {
+  //   const lib = (await normalizeImport(import(libName))) as any;
+  //   subtle = lib.subtle || lib.webcrypto.subtle;
+  // }
 
   if (!subtle) throw new Error("Could not load SubtleCrypto module");
 
