@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { model, Model, type ModelArg } from "@decaf-ts/decorator-validation";
 import { defaultQueryAttr, pk } from "@decaf-ts/core";
+import { table } from "@decaf-ts/core";
 import { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
 import { OperationKeys } from "@decaf-ts/db-decorators";
@@ -32,6 +33,17 @@ class MultiDefaultQueryModel extends Model {
   recordId!: string;
 
   constructor(args?: ModelArg<MultiDefaultQueryModel>) {
+    super(args);
+  }
+}
+
+@table("range_pagination")
+@model()
+class RangePaginationModel extends Model {
+  @pk()
+  id!: string;
+
+  constructor(args?: ModelArg<RangePaginationModel>) {
     super(args);
   }
 }
@@ -290,5 +302,116 @@ describe("FabricContractRepository", () => {
     );
     expect(chainA.orderBy).toHaveBeenCalledWith(["model", OrderDirection.ASC]);
     expect(chainB.orderBy).toHaveBeenCalledWith(["recordId", OrderDirection.ASC]);
+  });
+
+  it("delegates pk-ordered pagination to the adapter when enabled", async () => {
+    const repo = new FabricContractRepository<RangePaginationModel>(
+      createAdapter(),
+      RangePaginationModel
+    );
+    const ctx = createFabricContext();
+    ctx.put("pkRangePagination", true);
+    const rangeSpy = jest
+      .spyOn(repo.adapter as FabricContractAdapter, "paginateByPrimaryKeyRange")
+      .mockResolvedValue({
+        current: 1,
+        total: 2,
+        count: 2,
+        data: [],
+        bookmark: "next-bookmark",
+      } as any);
+
+    const firstPage = await repo.paginateBy(
+      "id",
+      OrderDirection.ASC,
+      { limit: 2, offset: 1 },
+      ctx
+    );
+
+    expect(rangeSpy).toHaveBeenCalled();
+    expect(rangeSpy).toHaveBeenCalledWith(
+      RangePaginationModel,
+      OrderDirection.ASC,
+      { limit: 2, offset: 1 },
+      ctx
+    );
+    expect(firstPage).toEqual({
+      current: 1,
+      total: 2,
+      count: 2,
+      data: [],
+      bookmark: "next-bookmark",
+    });
+  });
+
+  it("delegates pk-ordered pagination in descending order when enabled", async () => {
+    const repo = new FabricContractRepository<RangePaginationModel>(
+      createAdapter(),
+      RangePaginationModel
+    );
+    const ctx = createFabricContext();
+    ctx.put("pkRangePagination", true);
+    const rangeSpy = jest
+      .spyOn(repo.adapter as FabricContractAdapter, "paginateByPrimaryKeyRange")
+      .mockResolvedValue({
+        current: 1,
+        total: 2,
+        count: 2,
+        data: [],
+        bookmark: "prev-bookmark",
+      } as any);
+
+    const page = await repo.paginateBy(
+      "id",
+      OrderDirection.DSC,
+      { limit: 2, offset: 1 },
+      ctx
+    );
+
+    expect(rangeSpy).toHaveBeenCalledWith(
+      RangePaginationModel,
+      OrderDirection.DSC,
+      { limit: 2, offset: 1 },
+      ctx
+    );
+    expect(page.bookmark).toBe("prev-bookmark");
+  });
+
+  it("keeps the default mango pagination path when pk-range optimization is disabled", async () => {
+    const repo = new FabricContractRepository<RangePaginationModel>(
+      createAdapter(),
+      RangePaginationModel
+    );
+    const selectSpy = jest.spyOn(repo, "select");
+    const rangeSpy = jest.spyOn(
+      repo.adapter as FabricContractAdapter,
+      "paginateByPrimaryKeyRange"
+    );
+    const paginator = {
+      page: jest.fn().mockResolvedValue([]),
+      serialize: jest.fn().mockReturnValue({
+        current: 1,
+        total: 1,
+        count: 0,
+        data: [],
+        bookmark: undefined,
+      }),
+    };
+    selectSpy.mockReturnValue({
+      orderBy: jest.fn().mockReturnValue({
+        paginate: jest.fn().mockReturnValue(paginator),
+      }),
+    } as any);
+    const ctx = createFabricContext();
+
+    await repo.paginateBy(
+      "id",
+      OrderDirection.ASC,
+      { limit: 1, offset: 1 },
+      ctx
+    );
+
+    expect(selectSpy).toHaveBeenCalled();
+    expect(rangeSpy).not.toHaveBeenCalled();
   });
 });

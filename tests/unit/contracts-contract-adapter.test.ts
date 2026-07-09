@@ -10,11 +10,14 @@ import {
 import type { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
 import type { FabricContractSequence } from "../../src/contracts/FabricContractSequence";
 import type { SequenceOptions } from "@decaf-ts/core";
-import { UnsupportedError, pk, table } from "@decaf-ts/core";
+import { OrderDirection, UnsupportedError, pk, table } from "@decaf-ts/core";
 import { OperationKeys } from "@decaf-ts/db-decorators";
 import type { Logger } from "@decaf-ts/logging";
-import { prop } from "@decaf-ts/decoration";
+import { prop, uses } from "@decaf-ts/decoration";
 import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
+import { privateData } from "../../src/shared/decorators";
+import { FabricFlavour } from "../../src/shared/constants";
+import { getStubMock } from "./ContextMock";
 
 @model()
 class TestModel extends Model {
@@ -36,6 +39,22 @@ class AuditQueryModel extends Model {
   id!: string;
 }
 
+const RANGE_COLLECTION = "range-pk-private";
+
+@uses(FabricFlavour)
+@table("range_pagination")
+@model()
+class RangePaginationModel extends Model {
+  @pk()
+  id!: string;
+
+  @prop()
+  label?: string;
+
+  @privateData(RANGE_COLLECTION)
+  secret?: string;
+}
+
 const createContext = (identity?: Partial<ClientIdentity>) => {
   const context = new FabricContractContext();
   const logger = {
@@ -43,6 +62,7 @@ const createContext = (identity?: Partial<ClientIdentity>) => {
     clear: jest.fn().mockReturnThis(),
     info: jest.fn(),
     error: jest.fn(),
+    warn: jest.fn(),
     verbose: jest.fn(),
     debug: jest.fn(),
   };
@@ -105,6 +125,58 @@ describe("contracts/ContractAdapter helpers", () => {
     expect(results).toEqual([{ foo: "bar" }]);
     expect(iterator.next).toHaveBeenCalledTimes(2);
     expect(iterator.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("paginateByPrimaryKeyRange uses Fabric range APIs and preserves bookmarks", async () => {
+    const adapter = new FabricContractAdapter(
+      undefined as any,
+      `adapter-${Math.random().toString(36).slice(2)}`
+    );
+    jest.spyOn(adapter as any, "revert").mockImplementation(
+      (record: Record<string, any>, _clazz: any, id: string) => ({
+        ...record,
+        id,
+      })
+    );
+    const stub = getStubMock();
+    const ctx = createContext({
+      getID: () => "user",
+      getMSPID: () => "Org1MSP",
+      getAttributeValue: () => "value",
+      getIDBytes: () => Buffer.from("id"),
+    } as ClientIdentity);
+    ctx.put("stub", stub as any);
+    ctx.markFullySegregated();
+    ctx.readFrom(RANGE_COLLECTION);
+
+    for (const entry of [
+      { id: "id-1", label: "one", secret: "s1" },
+      { id: "id-2", label: "two", secret: "s2" },
+      { id: "id-3", label: "three", secret: "s3" },
+    ]) {
+      await stub.putPrivateData(
+        RANGE_COLLECTION,
+        stub.createCompositeKey("range_pagination", [entry.id]),
+        Buffer.from(JSON.stringify(entry), "utf8")
+      );
+    }
+    stub.commit();
+
+    const page = await adapter.paginateByPrimaryKeyRange(
+      RangePaginationModel,
+      OrderDirection.ASC,
+      { limit: 2, offset: 1 },
+      ctx
+    );
+
+    expect(page.current).toBe(1);
+    expect(page.count).toBe(2);
+    expect(page.data.map((m) => m.id)).toEqual(["id-1", "id-2"]);
+    expect(page.data.map((m) => m.label)).toEqual(["one", "two"]);
+    expect(page.data.map((m) => m.secret)).toEqual(["s1", "s2"]);
+    expect(page.bookmark).toBe(
+      stub.createCompositeKey("range_pagination", ["id-2"])
+    );
   });
 
   it("createdByOnFabricCreateUpdate throws UnsupportedError when identity missing", async () => {

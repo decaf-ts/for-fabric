@@ -33,7 +33,6 @@ import {
   applySegregationFlags,
   extractMspId,
 } from "../shared/decorators";
-import { appendFileSync } from "fs";
 
 /**
  * @description Repository for Hyperledger Fabric chaincode models
@@ -326,6 +325,23 @@ export class FabricContractRepository<M extends Model> extends Repository<
     applySegregationFlags(new this.class(), collections, ctx);
     await applyMirrorFlags(this.class, msp, ctx);
 
+    const pk = Model.pk(this.class) as keyof M;
+    const pkRangePagination = !!ctx.getOrUndefined(
+      "pkRangePagination"
+    );
+    if (pkRangePagination && String(key) === String(pk)) {
+      log.verbose(
+        `Using range pagination fast path for ${Model.tableName(this.class)} ordered by primary key ${String(key)}`
+      );
+      const serialization = await this.adapter.paginateByPrimaryKeyRange(
+        this.class,
+        order,
+        ref,
+        ...ctxArgs
+      );
+      return serialization;
+    }
+
     let paginator: Paginator<M>;
     if (offset && bookmark) {
       paginator = await this.override({
@@ -347,30 +363,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
       throw new QueryError(`PaginateBy needs a page or a bookmark`);
     }
     const paged = await paginator.page(offset, bookmark, ...ctxArgs);
-    const totalCount = await countStoredEntries(ctx, this.class);
-    if (typeof totalCount === "number") {
-      (paginator as any)._recordCount = totalCount;
-      (paginator as any)._totalPages = Math.max(
-        1,
-        Math.ceil(totalCount / limit)
-      );
-    }
     const serialization = paginator.serialize(paged) as SerializedPage<M>;
-    if (process.env.PAGE_DEBUG) {
-      appendFileSync(
-        "/tmp/fabric-paginate.log",
-        JSON.stringify(
-          Object.assign(
-            {
-              key,
-              order,
-              ref,
-            },
-            serialization
-          )
-        ) + "\n"
-      );
-    }
     return serialization;
   }
 
@@ -745,69 +738,4 @@ export class FabricContractRepository<M extends Model> extends Repository<
     ctx.put("allowGatewayOverride", undefined);
     return ctx;
   }
-}
-
-async function countStoredEntries<M extends Model>(
-  ctx: FabricContractContext,
-  clazz: Constructor<M>
-): Promise<number | undefined> {
-  const stub = ctx?.stub as
-    | {
-        state?: Record<string, Buffer>;
-        privateState?: Record<string, Record<string, Buffer>>;
-        getStateByPartialCompositeKey?: (
-          objectType: string,
-          attributes: string[]
-        ) => Promise<any>;
-      }
-    | undefined;
-  if (!stub) return undefined;
-
-  const table = Model.tableName(clazz);
-  const prefix = `\x00${table}\x00`;
-  const seen = new Set<string>();
-
-  if (typeof stub.getStateByPartialCompositeKey === "function") {
-    const iterator = await stub.getStateByPartialCompositeKey(table, []);
-    try {
-      while (true) {
-        const result = await iterator.next();
-        if (result?.done) break;
-        const key = result?.value?.key;
-        if (key && key.startsWith(prefix)) {
-          seen.add(key);
-        }
-      }
-    } finally {
-      if (iterator && typeof iterator.close === "function") {
-        await iterator.close();
-      }
-    }
-  }
-
-  if (stub.state) {
-    Object.keys(stub.state)
-      .filter((key) => key.startsWith(prefix))
-      .forEach((key) => seen.add(key));
-  }
-
-  const { privateCols, sharedCols } = Model.collectionsFor(clazz);
-  const resolvers = [...privateCols, ...sharedCols];
-  if (resolvers.length && stub.privateState) {
-    const msp = extractMspId(ctx.identity);
-    const collections = await Promise.all(
-      resolvers.map((resolver) =>
-        typeof resolver === "string" ? resolver : resolver(clazz, msp, ctx)
-      )
-    );
-    for (const collection of collections) {
-      const entries = stub.privateState[collection];
-      if (!entries) continue;
-      Object.keys(entries)
-        .filter((key) => key.startsWith(prefix))
-        .forEach((key) => seen.add(key));
-    }
-  }
-
-  return seen.size ? seen.size : undefined;
 }

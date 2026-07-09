@@ -36,6 +36,7 @@ import { Logger, Logging } from "@decaf-ts/logging";
 import {
   PersistenceKeys,
   RelationsMetadata,
+  SerializedPage,
   Sequence,
   SequenceOptions,
   UnsupportedError,
@@ -51,6 +52,7 @@ import {
   ForbiddenError,
   ConnectionError,
   ContextualizedArgs,
+  DirectionLimitOffset,
   Context,
   RawResult,
   Paginator,
@@ -77,6 +79,7 @@ import {
 import { FabricStatement } from "./FabricContractStatement";
 import { FabricContractSequence } from "./FabricContractSequence";
 import { FabricFlavour, FabricModelKeys } from "../shared/constants";
+import { extractMspId } from "../shared/decorators";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
 import {
   apply,
@@ -1938,6 +1941,138 @@ export class FabricContractAdapter extends CouchDBAdapter<
 
     log.debug(`rangeList: returning ${results.length} ${clazz.name} instances`);
     return results;
+  }
+
+  async paginateByPrimaryKeyRange<M extends Model>(
+    clazz: Constructor<M>,
+    order: OrderDirection,
+    ref: Omit<DirectionLimitOffset, "direction">,
+    ...args: ContextualArgs<FabricContractContext>
+  ): Promise<SerializedPage<M>> {
+    const { ctx, log } = this.logCtx(args, this.paginateByPrimaryKeyRange);
+    const limit = ref.limit || 10;
+    const offset = ref.offset || 1;
+    const bookmark =
+      typeof ref.bookmark === "string"
+        ? ref.bookmark
+        : ref.bookmark != null
+          ? `${ref.bookmark}`
+          : undefined;
+    const tableName = Model.tableName(clazz);
+    const keyPrefix = ctx.stub.createCompositeKey(tableName, []);
+    const rangeEnd = `${keyPrefix}\uffff`;
+    const rows = new Map<string, Record<string, any>>();
+    const maxRowsToRead = limit + 1;
+
+    const deserializeEntry = (
+      raw: Uint8Array
+    ): Record<string, any> | undefined => {
+      const str = Buffer.from(raw).toString("utf8");
+      if (!str) return undefined;
+      try {
+        return JSON.parse(str) as Record<string, any>;
+      } catch {
+        return undefined;
+      }
+    };
+
+    const mergeIterator = async (
+      iterator: any,
+      options?: { skipKey?: string }
+    ) => {
+      let read = 0;
+      try {
+        let next = await iterator.next();
+        while (!next.done && read < maxRowsToRead) {
+          if (next.value?.value) {
+            const data = deserializeEntry(next.value.value);
+            if (data) {
+              const key = next.value.key as string;
+              if (options?.skipKey && key === options.skipKey) {
+                next = await iterator.next();
+                continue;
+              }
+              const existing = rows.get(key);
+              if (existing) {
+                Object.assign(existing, data);
+              } else {
+                rows.set(key, data);
+              }
+              read++;
+            }
+          }
+          next = await iterator.next();
+        }
+      } finally {
+        if (iterator && typeof iterator.close === "function") {
+          await iterator.close();
+        }
+      }
+    };
+
+    log.debug(
+      `range pagination start table=${tableName} prefix=${keyPrefix} end=${rangeEnd} order=${order} bookmark=${bookmark} limit=${limit} offset=${offset}`
+    );
+
+    if (!ctx.isFullySegregated) {
+      log.debug(`range pagination reading public state for ${tableName}`);
+      await mergeIterator(await ctx.stub.getStateByRange(keyPrefix, rangeEnd), {
+        skipKey: bookmark,
+      });
+    } else {
+      log.debug(
+        `range pagination skipping public state because model is fully segregated`
+      );
+    }
+
+    const readCollections = [...new Set(ctx.getReadCollections() || [])];
+    for (const collection of readCollections) {
+      log.debug(
+        `range pagination reading private collection ${collection} for ${tableName}`
+      );
+      await mergeIterator(
+        await ctx.stub.getPrivateDataByRange(collection, keyPrefix, rangeEnd),
+        {
+          skipKey: bookmark,
+        }
+      );
+    }
+
+    const compare = (a: string, b: string) =>
+      order === OrderDirection.DSC ? b.localeCompare(a) : a.localeCompare(b);
+    const sorted = [...rows.entries()].sort(([a], [b]) => compare(a, b));
+    const pageEntries = sorted.slice(0, limit);
+    const hasNext = sorted.length > limit;
+    const data = pageEntries
+      .map(([compositeKey, record]) => {
+        try {
+          const { attributes } = ctx.stub.splitCompositeKey(compositeKey);
+          const id = attributes[0];
+          if (!id) return undefined;
+          return this.revert(record, clazz, id, undefined, ctx);
+        } catch (e: unknown) {
+          log.warn(
+            `range pagination skipping entry ${compositeKey}: ${e instanceof Error ? e.message : e}`
+          );
+          return undefined;
+        }
+      })
+      .filter((m): m is M => !!m);
+
+    const serialization: SerializedPage<M> = {
+      current: offset,
+      total: hasNext ? offset + 1 : offset,
+      count: data.length,
+      data,
+      bookmark:
+        hasNext && pageEntries.length
+          ? pageEntries[pageEntries.length - 1][0]
+          : undefined,
+    };
+    log.debug(
+      `range pagination resolved table=${tableName} current=${serialization.current} total=${serialization.total} count=${serialization.count} bookmark=${serialization.bookmark}`
+    );
+    return serialization;
   }
 
   async view<R>(

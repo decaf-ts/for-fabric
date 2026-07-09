@@ -136,6 +136,11 @@ export type FabricFlags<LOG extends Logger = Logger> = AdapterFlags<LOG> & {
    */
   strictPrivateMangoPagination?: boolean;
   /**
+   * Enables the pk-range pagination optimization for simple pk-ordered queries.
+   * When disabled, repository pagination keeps using the Mango-based path.
+   */
+  pkRangePagination?: boolean;
+  /**
    * Field used as the deterministic tie-breaker for strict private Mango
    * pagination.
    */
