@@ -1,9 +1,10 @@
 import "reflect-metadata";
 
-import { Model } from "@decaf-ts/decorator-validation";
+import { Model, model } from "@decaf-ts/decorator-validation";
 import { InternalError, OperationKeys } from "@decaf-ts/db-decorators";
 import {
   Context,
+  pk,
   PreparedStatementKeys,
   UnsupportedError,
 } from "@decaf-ts/core";
@@ -14,6 +15,7 @@ import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
 import { FabricModelKeys } from "../../src/shared/constants";
+import { mirror } from "../../src/shared/decorators";
 import type { PeerConfig } from "../../src/shared/types";
 
 jest.mock("@hyperledger/fabric-gateway", () => ({
@@ -115,6 +117,13 @@ const config: PeerConfig = {
   mspId: "Org1MSP",
   channel: "mychannel",
 };
+
+@model()
+@mirror("mirror-collection", "Org1MSP")
+class MirroredWallet extends Model {
+  @pk()
+  id!: string;
+}
 
 const createLogStub = () => {
   const stub: Record<string, jest.Mock> = {
@@ -966,6 +975,17 @@ describe("FabricClientAdapter", () => {
       await adapter.submitTransaction(ctx, "create", ["data"]);
 
       expect(legacySpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not promote mirrored models to legacy submissions when allowMirroring is false", () => {
+      const adapter = newAdapter({ allowMirroring: false });
+      const ctx = createContext();
+
+      adapter.prepare(new MirroredWallet({ id: "mirror-id" } as any), ctx);
+
+      expect(ctx.getOrUndefined("legacy")).toBeUndefined();
+      expect(ctx.getOrUndefined("endorsingOrgs")).toBeUndefined();
+      expect(ctx.getOrUndefined("endorsingOrganizations")).toBeUndefined();
     });
 
     it("stringifies non-string args for legacy flow", async () => {

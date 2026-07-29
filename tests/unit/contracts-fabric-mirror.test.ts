@@ -7,13 +7,29 @@ import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
 import type { FabricContractRepository } from "../../src/contracts/FabricContractRepository";
 import {
   createMirrorHandler,
+  deleteMirrorHandler,
+  mirrorWriteGuard,
+  mirror,
   readMirrorHandler,
+  updateMirrorHandler,
+  applyMirrorFlags,
   MirrorMetadata,
 } from "../../src/shared/decorators";
 import { ChaincodeStub } from "fabric-shim-api";
 
 @model()
 class MirrorTestModel extends Model {
+  @pk()
+  id!: string;
+
+  constructor() {
+    super();
+  }
+}
+
+@model()
+@mirror("mirror-collection", "main-org")
+class MirroredRouteModel extends Model {
   @pk()
   id!: string;
 
@@ -180,6 +196,132 @@ describe("mirror decorator handlers", () => {
     expect(context.isFullySegregated).toBe(false);
     // Should NOT register collections — normal public read applies
     expect(context.getReadCollections()).toHaveLength(0);
+  });
+
+  it("does not activate mirror routing when allowMirroring is false", async () => {
+    const context = new FabricContractContext();
+    enableContextPut(context);
+    const readFromSpy = jest.spyOn(context, "readFrom");
+    context.accumulate({
+      allowMirroring: false,
+      identity: {
+        getMSPID: jest.fn().mockReturnValue("main-org"),
+      },
+      logger,
+    } as any);
+
+    await applyMirrorFlags(MirroredRouteModel, "main-org", context);
+
+    expect(readFromSpy).not.toHaveBeenCalled();
+    expect(context.getOrUndefined("mirror")).toBeUndefined();
+    expect(context.getOrUndefined("mirrorCollection")).toBeUndefined();
+    expect(context.isFullySegregated).toBe(false);
+  });
+
+  it("does not create mirror copies when allowMirroring is false", async () => {
+    const overrideSpy = jest.fn();
+    const repository = {
+      _overrides: {},
+      override: overrideSpy,
+      class: MirrorTestModel,
+    } as unknown as FabricContractRepository<MirrorTestModel>;
+    const context = new FabricContractContext();
+    context.accumulate({ allowMirroring: false, logger } as any);
+
+    await createMirrorHandler.call(
+      repository,
+      context,
+      mirrorMetadata,
+      "id",
+      new MirrorTestModel({ id: "mirror-id" })
+    );
+
+    expect(overrideSpy).not.toHaveBeenCalled();
+    expect(context.getOrUndefined("mirror")).toBeUndefined();
+    expect(context.getOrUndefined("mirrorCollection")).toBeUndefined();
+  });
+
+  it("does not update mirror copies when allowMirroring is false", async () => {
+    const overrideSpy = jest.fn();
+    const repository = {
+      _overrides: {},
+      override: overrideSpy,
+      class: MirrorTestModel,
+    } as unknown as FabricContractRepository<MirrorTestModel>;
+    const context = new FabricContractContext();
+    context.accumulate({ allowMirroring: false, logger } as any);
+
+    await updateMirrorHandler.call(
+      repository,
+      context,
+      mirrorMetadata,
+      "id",
+      new MirrorTestModel({ id: "mirror-id" })
+    );
+
+    expect(overrideSpy).not.toHaveBeenCalled();
+    expect(context.getOrUndefined("mirror")).toBeUndefined();
+    expect(context.getOrUndefined("mirrorCollection")).toBeUndefined();
+  });
+
+  it("does not delete mirror copies when allowMirroring is false", async () => {
+    const overrideSpy = jest.fn();
+    const repository = {
+      _overrides: {},
+      override: overrideSpy,
+      class: MirrorTestModel,
+    } as unknown as FabricContractRepository<MirrorTestModel>;
+    const context = new FabricContractContext();
+    context.accumulate({ allowMirroring: false, logger } as any);
+
+    await deleteMirrorHandler.call(
+      repository,
+      context,
+      mirrorMetadata,
+      "id",
+      new MirrorTestModel({ id: "mirror-id" })
+    );
+
+    expect(overrideSpy).not.toHaveBeenCalled();
+    expect(context.getOrUndefined("mirror")).toBeUndefined();
+    expect(context.getOrUndefined("mirrorCollection")).toBeUndefined();
+  });
+
+  it("does not reject mirrored writes when allowMirroring is false", async () => {
+    const context = new FabricContractContext();
+    context.accumulate({
+      allowMirroring: false,
+      identity: {
+        getMSPID: jest.fn().mockReturnValue("main-org"),
+      },
+      logger,
+    } as any);
+
+    await expect(
+      mirrorWriteGuard.call(
+        {} as FabricContractRepository<MirrorTestModel>,
+        context,
+        mirrorMetadata,
+        "id",
+        new MirrorTestModel({ id: "mirror-id" })
+      )
+    ).resolves.toBeUndefined();
+  });
+
+  it("does not enforce mirror authorization when allowMirroring is false", () => {
+    const adapter = new SpyAdapter();
+    const context = new FabricContractContext();
+    context.accumulate({
+      allowMirroring: false,
+      identity: {
+        getMSPID: jest.fn().mockReturnValue("main-org"),
+      },
+      logger,
+    } as any);
+
+    expect(() =>
+      (adapter as any).enforceMirrorAuthorization(MirrorTestModel, context)
+    ).not.toThrow();
   });
 });
 

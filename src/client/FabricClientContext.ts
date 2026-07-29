@@ -3,6 +3,7 @@ import { FabricClientFlags } from "./types";
 
 const CLIENT_OVERRIDE_KEYS: (keyof FabricClientFlags)[] = [
   "allowGenerationOverride",
+  "allowMirroring",
 ];
 
 /**

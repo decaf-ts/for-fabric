@@ -7,6 +7,7 @@ describe("FabricClientContext", () => {
     const ctx = new FabricClientContext();
     ctx.accumulate({
       allowGenerationOverride: true,
+      allowMirroring: false,
       allowContextTransientMap: true,
       operation: "create",
       childContexts: [{}],
@@ -15,6 +16,7 @@ describe("FabricClientContext", () => {
 
     expect(ctx.toOverrides()).toEqual({
       allowGenerationOverride: true,
+      allowMirroring: false,
     });
   });
 });

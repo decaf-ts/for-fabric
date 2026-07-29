@@ -542,6 +542,11 @@ export class FabricClientRepository<
   }
 
   private ensureLegacyMirrorFlag(ctx: ContextOf<A>, model: M): void {
+    if (
+      ctx.getOrUndefined("allowMirroring") === false ||
+      this.adapter.config.allowMirroring === false
+    )
+      return;
     if (Model.mirroredAt(model)) {
       ctx.accumulate({ legacy: true });
     }

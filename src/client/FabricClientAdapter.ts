@@ -646,7 +646,10 @@ export class FabricClientAdapter extends Adapter<
     }
 
     const mirrorMeta = Model.mirroredAt(model);
-    if (mirrorMeta) {
+    const allowMirroring =
+      ctx.getOrUndefined("allowMirroring") !== false &&
+      this.config.allowMirroring !== false;
+    if (mirrorMeta && allowMirroring) {
       const mirrorMsp = mirrorMeta.mspId;
       if (!mirrorMsp) throw new InternalError(`No mirror MSP could be found`);
       let msps = this.getEndorsingOrganizations(ctx) || [];

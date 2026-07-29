@@ -87,6 +87,12 @@ export function extractMspId(
   return identity.getMSPID();
 }
 
+function isMirroringAllowed(context: {
+  getOrUndefined(key: string): any;
+}): boolean {
+  return context.getOrUndefined("allowMirroring") !== false;
+}
+
 /**
  * Decorator for marking methods that require ownership authorization.
  * Checks the owner of the token before allowing the method to be executed.
@@ -294,6 +300,7 @@ export async function createMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
+  if (!isMirroringAllowed(context)) return;
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   const sourceModel = model;
@@ -330,6 +337,7 @@ export async function updateMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
+  if (!isMirroringAllowed(context)) return;
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   const sourceModel = model;
@@ -366,6 +374,7 @@ export async function deleteMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
+  if (!isMirroringAllowed(context)) return;
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   fabricCtx.put("mirror" as any, true);
@@ -409,6 +418,7 @@ export async function mirrorWriteGuard<
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   model: M
 ): Promise<void> {
+  if (!isMirroringAllowed(context)) return;
   const msp = extractMspId(
     context.get("identity") as string | ClientIdentity | undefined
   );
@@ -430,6 +440,7 @@ export async function readMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
+  if (!isMirroringAllowed(context)) return;
   const msp = extractMspId(
     context.get("identity") as string | ClientIdentity | undefined
   );
@@ -587,6 +598,7 @@ export async function applyMirrorFlags<M extends Model>(
   msp: string | undefined,
   ctx: FabricContractContext
 ) {
+  if (!isMirroringAllowed(ctx)) return;
   if (!msp) return;
   const mirrorMeta = Model.mirroredAt(clazz);
   if (!mirrorMeta) return;

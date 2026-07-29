@@ -15,6 +15,7 @@ export type FabricClientFlags = FabricFlags & {
   channel?: string;
   legacy?: boolean;
   allowGatewayOverride?: boolean;
+  allowMirroring?: boolean;
   allowContextTransientMap?: boolean;
   allowManualEndorsingOrgs: boolean;
   encryptTransient?: false | string | (() => string);

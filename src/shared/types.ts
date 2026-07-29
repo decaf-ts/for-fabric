@@ -46,6 +46,7 @@ export type PeerConfig = {
   certCertOrDirectoryPath: string | Buffer;
   tlsCert: string | Buffer;
   allowGatewayOverride?: boolean;
+  allowMirroring?: boolean;
   mspMap?: Record<string, MspDetails[]>;
   legacyMspCount?: number;
   peerEndpoint: string;
@@ -127,6 +128,7 @@ export type FabricFlags<LOG extends Logger = Logger> = AdapterFlags<LOG> & {
   segregated?: string;
   mirror?: boolean;
   mirrorCollection?: string;
+  allowMirroring?: boolean;
   identity?: string | ClientIdentity;
   ownerOverride?: string;
   /**

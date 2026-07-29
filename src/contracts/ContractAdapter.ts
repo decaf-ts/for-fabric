@@ -79,7 +79,6 @@ import {
 import { FabricStatement } from "./FabricContractStatement";
 import { FabricContractSequence } from "./FabricContractSequence";
 import { FabricFlavour, FabricModelKeys } from "../shared/constants";
-import { extractMspId } from "../shared/decorators";
 import { SimpleDeterministicSerializer } from "../shared/SimpleDeterministicSerializer";
 import {
   apply,
@@ -840,10 +839,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.info(`in ADAPTER create with args ${args}`);
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
-      | string
-      | undefined;
-    const fullySegregated = ctx.isFullySegregated && !mirrorCollection;
+    const allowMirroring = this.shouldAllowMirroring(ctx);
+    const mirrorCollection = allowMirroring
+      ? (ctx.getOrUndefined("mirrorCollection") as string | undefined)
+      : undefined;
+    const fullySegregated =
+      allowMirroring && ctx.isFullySegregated && !mirrorCollection;
 
     if (!mirrorCollection) {
       let existing: any;
@@ -942,10 +943,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(clazz);
 
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
-      | string
-      | undefined;
-    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+    const mirrorCollection = this.shouldAllowMirroring(ctx)
+      ? (ctx.getOrUndefined("mirrorCollection") as string | undefined)
+      : undefined;
+    const isMirror =
+      this.shouldAllowMirroring(ctx) &&
+      (ctx.getOrUndefined("mirror") as boolean | undefined);
     if (isMirror && mirrorCollection) {
       try {
         return await this.forPrivate(mirrorCollection).readState(
@@ -1013,10 +1016,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const breakOnSingleFailure = ctx.get("breakOnSingleFailureInBulk") ?? true;
     const continueOnError = !breakOnSingleFailure;
 
-    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
-      | string
-      | undefined;
-    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+    const allowMirroring = this.shouldAllowMirroring(ctx);
+    const mirrorCollection = allowMirroring
+      ? (ctx.getOrUndefined("mirrorCollection") as string | undefined)
+      : undefined;
+    const isMirror =
+      allowMirroring && (ctx.getOrUndefined("mirror") as boolean | undefined);
 
     const readMirror = async <M extends Model>(
       clazz: Constructor<M>,
@@ -1100,9 +1105,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.info(`in ADAPTER update with args ${args}`);
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
-      | string
-      | undefined;
+    const mirrorCollection = this.shouldAllowMirroring(ctx)
+      ? (ctx.getOrUndefined("mirrorCollection") as string | undefined)
+      : undefined;
 
     try {
       log.info(`updating entry in ${tableName} table with pk ${id}`);
@@ -1169,9 +1174,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(clazz);
 
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const mirrorCollection = ctx.getOrUndefined("mirrorCollection") as
-      | string
-      | undefined;
+    const mirrorCollection = this.shouldAllowMirroring(ctx)
+      ? (ctx.getOrUndefined("mirrorCollection") as string | undefined)
+      : undefined;
     let model: Record<string, any>;
 
     if (mirrorCollection) {
@@ -1565,6 +1570,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
       segregated: false,
       rebuildWithTransient: false,
       fullySegregated: false,
+      allowMirroring: this.config.allowMirroring || false,
       strictPrivateMangoPagination: true,
       privatePaginationTieBreaker: "id",
     };
@@ -1736,7 +1742,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const paginationActive = Boolean(limit || hasSkip || hasBookmark);
     const shouldPaginate = Boolean(
       paginationActive &&
-        (enableSegregates || hasSkip || hasBookmark || hasSort)
+      (enableSegregates || hasSkip || hasBookmark || hasSort)
     );
     const baseInput: Record<string, any> = { ...originalInput };
     delete baseInput["skip"];
@@ -1868,11 +1874,16 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const tableName = Model.tableName(clazz);
     const fullySegregated = ctx.isFullySegregated;
 
-    const deserializeEntry = (raw: Uint8Array): Record<string, any> | undefined => {
+    const deserializeEntry = (
+      raw: Uint8Array
+    ): Record<string, any> | undefined => {
       const str = Buffer.from(raw).toString("utf8");
       if (!str) return undefined;
       try {
-        return FabricContractAdapter.serializer.deserialize(str) as Record<string, any>;
+        return FabricContractAdapter.serializer.deserialize(str) as Record<
+          string,
+          any
+        >;
       } catch {
         try {
           return JSON.parse(str) as Record<string, any>;
@@ -1886,8 +1897,13 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const rawByKey = new Map<string, Record<string, any>>();
 
     if (!fullySegregated) {
-      log.debug(`rangeList public: objectType=${tableName} attributes=${JSON.stringify(attributes)}`);
-      const iterator = await ctx.stub.getStateByPartialCompositeKey(tableName, attributes);
+      log.debug(
+        `rangeList public: objectType=${tableName} attributes=${JSON.stringify(attributes)}`
+      );
+      const iterator = await ctx.stub.getStateByPartialCompositeKey(
+        tableName,
+        attributes
+      );
       let next = await iterator.next();
       while (!next.done) {
         if (next.value?.value) {
@@ -1903,8 +1919,14 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const collections = ctx.getReadCollections();
     if (collections?.length) {
       for (const collection of collections) {
-        log.debug(`rangeList private: collection=${collection} objectType=${tableName} attributes=${JSON.stringify(attributes)}`);
-        const iterator = await ctx.stub.getPrivateDataByPartialCompositeKey(collection, tableName, attributes);
+        log.debug(
+          `rangeList private: collection=${collection} objectType=${tableName} attributes=${JSON.stringify(attributes)}`
+        );
+        const iterator = await ctx.stub.getPrivateDataByPartialCompositeKey(
+          collection,
+          tableName,
+          attributes
+        );
         let count = 0;
         let next = await iterator.next();
         while (!next.done) {
@@ -1923,19 +1945,24 @@ export class FabricContractAdapter extends CouchDBAdapter<
           next = await iterator.next();
         }
         await iterator.close();
-        log.debug(`rangeList private: collection=${collection} ${count} entries`);
+        log.debug(
+          `rangeList private: collection=${collection} ${count} entries`
+        );
       }
     }
 
     const results: M[] = [];
     for (const [compositeKey, data] of rawByKey) {
       try {
-        const { attributes: keyParts } = ctx.stub.splitCompositeKey(compositeKey);
+        const { attributes: keyParts } =
+          ctx.stub.splitCompositeKey(compositeKey);
         const id = keyParts[0];
         if (!id) continue;
         results.push(this.revert(data, clazz, id, undefined, ctx));
       } catch (e: unknown) {
-        log.warn(`rangeList: skipping entry ${compositeKey}: ${e instanceof Error ? e.message : e}`);
+        log.warn(
+          `rangeList: skipping entry ${compositeKey}: ${e instanceof Error ? e.message : e}`
+        );
       }
     }
 
@@ -2130,7 +2157,9 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const pk = Model.pk(model.constructor as any);
     const id = model[pk as keyof M];
 
-    const isMirror = ctx.getOrUndefined("mirror") as boolean | undefined;
+    const isMirror =
+      this.shouldAllowMirroring(ctx) &&
+      (ctx.getOrUndefined("mirror") as boolean | undefined);
 
     const mapToRecord = function (
       this: FabricContractAdapter,
@@ -2271,10 +2300,15 @@ export class FabricContractAdapter extends CouchDBAdapter<
     }
   }
 
+  private shouldAllowMirroring(ctx: FabricContractContext): boolean {
+    return ctx.getOrUndefined("allowMirroring") !== false;
+  }
+
   private enforceMirrorAuthorization<M extends Model>(
     clazz: Constructor<M>,
     ctx: FabricContractContext
   ): void {
+    if (!this.shouldAllowMirroring(ctx)) return;
     const mirrorMeta = Model.mirroredAt(clazz);
     if (!mirrorMeta) return;
     const msp = this.getContextMsp(ctx);
