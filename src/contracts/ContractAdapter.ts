@@ -839,12 +839,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
     log.info(`in ADAPTER create with args ${args}`);
     const tableName = Model.tableName(clazz);
     const composedKey = ctx.stub.createCompositeKey(tableName, [String(id)]);
-    const allowMirroring = this.shouldAllowMirroring(ctx);
-    const mirrorCollection = allowMirroring
+    const mirrorCollection = ctx.get("allowMirroring")
       ? (ctx.getOrUndefined("mirrorCollection") as string | undefined)
       : undefined;
     const fullySegregated =
-      allowMirroring && ctx.isFullySegregated && !mirrorCollection;
+      ctx.get("allowMirroring") && ctx.isFullySegregated && !mirrorCollection;
 
     if (!mirrorCollection) {
       let existing: any;
@@ -1016,12 +1015,12 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const breakOnSingleFailure = ctx.get("breakOnSingleFailureInBulk") ?? true;
     const continueOnError = !breakOnSingleFailure;
 
-    const allowMirroring = this.shouldAllowMirroring(ctx);
-    const mirrorCollection = allowMirroring
+    const mirrorCollection = ctx.get("allowMirroring")
       ? (ctx.getOrUndefined("mirrorCollection") as string | undefined)
       : undefined;
     const isMirror =
-      allowMirroring && (ctx.getOrUndefined("mirror") as boolean | undefined);
+      ctx.get("allowMirroring") &&
+      (ctx.getOrUndefined("mirror") as boolean | undefined);
 
     const readMirror = async <M extends Model>(
       clazz: Constructor<M>,
@@ -1570,7 +1569,8 @@ export class FabricContractAdapter extends CouchDBAdapter<
       segregated: false,
       rebuildWithTransient: false,
       fullySegregated: false,
-      allowMirroring: this.config.allowMirroring || false,
+      allowMirroring:
+        (flags as Partial<FabricContractFlags>)?.allowMirroring ?? true,
       strictPrivateMangoPagination: true,
       privatePaginationTieBreaker: "id",
     };
@@ -2301,7 +2301,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   private shouldAllowMirroring(ctx: FabricContractContext): boolean {
-    return ctx.getOrUndefined("allowMirroring") !== false;
+    return ctx.get("allowMirroring");
   }
 
   private enforceMirrorAuthorization<M extends Model>(

@@ -30,6 +30,7 @@ describe("FabricClientRepository mirror gating", () => {
     );
     const repository = new ExposedRepository(adapter as any, MirroredRepositoryModel);
     const context = new Context();
+    context.accumulate({ allowMirroring: false } as any);
 
     repository.applyLegacyMirrorFlag(
       context,

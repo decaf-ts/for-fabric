@@ -4,8 +4,11 @@ const config = {
   verbose: true,
   rootDir: __dirname,
   transform: {
-    "^.+\\.ts$": ["ts-jest", { tsconfig: "<rootDir>/tsconfig.tests.json" }],
+    "^.+\\.[tj]sx?$": ["ts-jest", { tsconfig: "<rootDir>/tsconfig.tests.json" }],
   },
+  transformIgnorePatterns: [
+    "/node_modules/(?!(?:@noble/curves|@noble/hashes|@hyperledger/fabric-gateway)/)",
+  ],
   setupFiles: ["<rootDir>/tests/bootstrap.ts"],
   testEnvironment: "node",
   testRegex: "/tests/.*\\.(test|spec)\\.(ts|tsx)$",

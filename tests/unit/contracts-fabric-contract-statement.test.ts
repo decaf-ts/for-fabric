@@ -57,7 +57,7 @@ describe("FabricStatement", () => {
 
     expect(result).toEqual(rows);
     expect(adapterMock.raw).toHaveBeenCalledWith(
-      { selector: {} },
+      { selector: { "??table": "parent_model" } },
       true,
       context
     );

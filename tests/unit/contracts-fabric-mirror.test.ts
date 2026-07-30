@@ -124,7 +124,7 @@ describe("mirror decorator handlers", () => {
     } as unknown as FabricContractRepository<MirrorTestModel>;
 
     const context = new FabricContractContext();
-    context.accumulate({ logger } as any);
+    context.accumulate({ allowMirroring: true, logger } as any);
 
     const model = new MirrorTestModel({ id: "mirror-id" });
 
@@ -153,7 +153,7 @@ describe("mirror decorator handlers", () => {
     const identity = {
       getMSPID: jest.fn().mockReturnValue("main-org"),
     };
-    context.accumulate({ identity, logger } as any);
+    context.accumulate({ allowMirroring: true, identity, logger } as any);
 
     const model = new MirrorTestModel({ id: "mirror-id" });
 
@@ -177,7 +177,7 @@ describe("mirror decorator handlers", () => {
     const identity = {
       getMSPID: jest.fn().mockReturnValue("other-org"),
     };
-    context.accumulate({ identity, logger } as any);
+    context.accumulate({ allowMirroring: true, identity, logger } as any);
 
     const model = new MirrorTestModel({ id: "mirror-id" });
 

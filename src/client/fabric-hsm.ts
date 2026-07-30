@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { MissingPKCSS11Lib } from "../shared/errors";
 import crypto from "crypto";
-import { p256 } from "@noble/curves/nist";
+import { p256 } from "@noble/curves/nist.js";
 
 export class HSMSignerFactoryCustom {
   static #pkcs11: pkcs11.PKCS11 | null = null;
@@ -172,9 +172,14 @@ export class HSMSignerFactoryCustom {
           // https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/pkcs11-spec-v3.1.html
           Buffer.alloc(p256.Point.Fn.BYTES * 2)
         );
-        return p256.Signature.fromBytes(compactSignature, "compact")
-          .normalizeS()
-          .toBytes("der");
+        // change untested for new @curves api
+        const sig = p256.Signature.fromBytes(compactSignature, "compact");
+        const { n } = p256.Point.CURVE();
+        const normalized = sig.hasHighS()
+          ? new p256.Signature(sig.r, n - sig.s)
+          : sig;
+
+        return normalized.toBytes("der");
       },
       close: () => {
         (HSMSignerFactoryCustom.#pkcs11 as pkcs11.PKCS11).C_CloseSession(

@@ -167,7 +167,7 @@ const createContext = () => {
     verbose: jest.fn(),
     debug: jest.fn(),
   };
-  ctx.accumulate({ logger } as any);
+  ctx.accumulate({ allowMirroring: true, logger } as any);
   return ctx;
 };
 
@@ -255,16 +255,17 @@ describe("FabricClientAdapter", () => {
       { secret: "value" }
     );
 
-    expect(contract.submit).toHaveBeenCalledWith("create", {
-      arguments: [JSON.stringify({ id: "wallet-1" })],
-      transientData: {
-        secret: JSON.stringify("value"),
-        [FabricModelKeys.OVERRIDES]: JSON.stringify({
-          allowGenerationOverride: true,
-        }),
-      },
-      endorsingOrganizations: undefined,
-    });
+      expect(contract.submit).toHaveBeenCalledWith("create", {
+        arguments: [JSON.stringify({ id: "wallet-1" })],
+        transientData: {
+          secret: JSON.stringify("value"),
+          [FabricModelKeys.OVERRIDES]: JSON.stringify({
+            allowGenerationOverride: true,
+            allowMirroring: true,
+          }),
+        },
+        endorsingOrganizations: undefined,
+      });
     expect(contract.evaluate).not.toHaveBeenCalled();
     expect(gateway.close).toHaveBeenCalledTimes(1);
     expect(new TextDecoder().decode(result)).toBe("submit-ok");
@@ -294,15 +295,16 @@ describe("FabricClientAdapter", () => {
       {}
     );
 
-    expect(contract.evaluate).toHaveBeenCalledWith("read", {
-      arguments: [JSON.stringify({ id: "wallet-1" })],
-      transientData: {
-        [FabricModelKeys.OVERRIDES]: JSON.stringify({
-          allowGenerationOverride: true,
-        }),
-      },
-      endorsingOrganizations: undefined,
-    });
+      expect(contract.evaluate).toHaveBeenCalledWith("read", {
+        arguments: [JSON.stringify({ id: "wallet-1" })],
+        transientData: {
+          [FabricModelKeys.OVERRIDES]: JSON.stringify({
+            allowGenerationOverride: true,
+            allowMirroring: true,
+          }),
+        },
+        endorsingOrganizations: undefined,
+      });
     expect(contract.submit).not.toHaveBeenCalled();
     expect(gateway.close).toHaveBeenCalledTimes(1);
     expect(new TextDecoder().decode(result)).toBe("evaluate-ok");
@@ -980,6 +982,7 @@ describe("FabricClientAdapter", () => {
     it("does not promote mirrored models to legacy submissions when allowMirroring is false", () => {
       const adapter = newAdapter({ allowMirroring: false });
       const ctx = createContext();
+      ctx.accumulate({ allowMirroring: false });
 
       adapter.prepare(new MirroredWallet({ id: "mirror-id" } as any), ctx);
 
@@ -1035,6 +1038,7 @@ describe("FabricClientAdapter", () => {
       expect(Buffer.isBuffer(calledTransient.__overrides)).toBe(true);
       expect(JSON.parse(calledTransient.__overrides.toString())).toEqual({
         allowGenerationOverride: true,
+        allowMirroring: true,
       });
       expect(Buffer.isBuffer(calledTransient.secret)).toBe(true);
       expect(calledTransient.secret.toString()).toBe(JSON.stringify("value"));
