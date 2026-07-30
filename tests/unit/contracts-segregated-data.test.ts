@@ -220,6 +220,7 @@ function createMockContext({
 } = {}) {
   const context = new FabricContractContext();
   context.accumulate({
+    allowMirroring: true,
     stub: stub as any,
     identity: identity as any,
     logger: {
@@ -250,6 +251,7 @@ async function buildRepositoryContext(
   const context = await adapter.context(
     operation,
     {
+      allowMirroring: true,
       stub: stub as any,
       identity: identity as any,
     },
@@ -1430,6 +1432,7 @@ async function buildRepositoryContextGeneric<M extends Model>(
   const context = await adapter.context(
     operation,
     {
+      allowMirroring: true,
       stub: stub as any,
       identity: identity as any,
     },

@@ -2301,7 +2301,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
   }
 
   private shouldAllowMirroring(ctx: FabricContractContext): boolean {
-    return ctx.get("allowMirroring");
+    return !!ctx.get("allowMirroring");
   }
 
   private enforceMirrorAuthorization<M extends Model>(

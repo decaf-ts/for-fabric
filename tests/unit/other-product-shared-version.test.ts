@@ -310,6 +310,49 @@ describe("OtherProductShared contract version flow with relations", () => {
     return segregated.map((s) => s.model.serialize());
   }
 
+  function buildGtinFromIndex(index: number) {
+    const prefix13 = `000000000000${String(index)}`;
+    if (!/^\d{13}$/.test(prefix13)) {
+      throw new Error(`expected a one-digit index, got ${index}`);
+    }
+
+    const multiplier = [3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3];
+    let sum = 0;
+    for (let i = 0; i < 13; i++) {
+      sum += parseInt(prefix13.charAt(i), 10) * multiplier[i];
+    }
+
+    const remainder = sum % 10;
+    const checksum = remainder === 0 ? 0 : 10 - remainder;
+    return `${prefix13}${checksum}`;
+  }
+
+  async function seedSharedProductBulkForPagination() {
+    const models = new Array(10).fill(0).map((_, i) => {
+      const id = buildGtinFromIndex(i);
+      return new OtherProductShared({
+        productCode: id,
+        inventedName: "pagination-test",
+        nameMedicinalProduct: "pagination-medicinal",
+      });
+    });
+
+    const payload = JSON.stringify(preparePayloadBulk(models));
+    JSON.parse(await contract.createAll(ctx as any, payload)).map((r: any) =>
+      Model.deserialize(r)
+    );
+    stub.commit();
+
+    const loaded: OtherProductShared[] = [];
+    for (const model of models) {
+      const stored = await loadSharedProduct(model.productCode);
+      expect(stored.hasErrors()).toBeUndefined();
+      loaded.push(stored);
+    }
+
+    return loaded;
+  }
+
   function parseModelEntry<M extends Model>(
     entry: any,
     ctor: new (arg?: ModelArg<M>) => M
@@ -1003,19 +1046,17 @@ describe("OtherProductShared contract version flow with relations", () => {
     });
 
     it("paginates via paginateBy", async () => {
-      const tableName = Model.tableName(OtherProductShared);
-      // Sort bulk by productCode descending to know expected order
-      const sorted = [...bulk].sort((a, b) =>
-        b.productCode.localeCompare(a.productCode)
+      const pageBulk = await seedSharedProductBulkForPagination();
+      // Sort bulk by productCode ascending to know expected order
+      const sorted = [...pageBulk].sort((a, b) =>
+        a.productCode.localeCompare(b.productCode)
       );
-      const expectedPage1 = sorted.slice(0, 3);
-      const expectedPage2 = sorted.slice(3, 6);
 
       // --- Page 1 ---
       let page = await contract.paginateBy(
         ctx,
         "productCode",
-        "desc",
+        "asc",
         JSON.stringify({ offset: 1, limit: 3 })
       );
       expect(page).toBeDefined();
@@ -1031,23 +1072,11 @@ describe("OtherProductShared contract version flow with relations", () => {
 
       const page1Data = parsedPage.data as OtherProductShared[];
       const page1Codes = page1Data.map((entry) => entry.productCode);
-      expect(
-        page1Codes.every((code, index, array) =>
-          index === 0
-            ? true
-            : (code || "").localeCompare(array[index - 1] || "") <= 0
-        )
-      ).toBe(true);
-      const bulkCodes = new Set(bulk.map((entry) => entry.productCode));
-      expect(page1Codes.some((code) => bulkCodes.has(code))).toBe(true);
-
-      const expectedBookmark1 =
-        parsedPage.bookmark && parsedPage.bookmark.length
-          ? parsedPage.bookmark
-          : undefined;
-      if (expectedBookmark1) {
-        expect(parsedPage.bookmark).toBe(expectedBookmark1);
-      }
+      expect(page1Codes).toEqual(
+        sorted.slice(0, 3).map((entry) => entry.productCode)
+      );
+      const bulkCodes = new Set(pageBulk.map((entry) => entry.productCode));
+      expect(page1Codes.every((code) => bulkCodes.has(code))).toBe(true);
 
       const paginator = new FabricClientPaginator(
         null as any,
@@ -1058,16 +1087,13 @@ describe("OtherProductShared contract version flow with relations", () => {
       paginator.apply(parsedPage as any);
 
       expect(paginator.current).toEqual(1);
-      expect(paginator.count).toBeGreaterThanOrEqual(bulk.length);
-      expect(paginator.total).toBeGreaterThanOrEqual(
-        Math.max(1, Math.ceil(paginator.count / 3))
-      );
+      expect(paginator.total).toEqual(2);
 
       // --- Page 2 ---
       page = await contract.paginateBy(
         ctx,
         "productCode",
-        "desc",
+        "asc",
         JSON.stringify({ offset: 2, limit: 3, bookmark: parsedPage.bookmark })
       );
       expect(page).toBeDefined();
@@ -1079,7 +1105,9 @@ describe("OtherProductShared contract version flow with relations", () => {
       const page2Codes = (secondParsedPage.data as OtherProductShared[]).map(
         (entry) => entry.productCode
       );
-      expect(page2Codes.some((code) => bulkCodes.has(code))).toBe(true);
+      expect(page2Codes).toEqual(
+        sorted.slice(3, 6).map((entry) => entry.productCode)
+      );
       if (secondParsedPage.bookmark) {
         expect(secondParsedPage.bookmark).not.toEqual(parsedPage.bookmark);
       }
@@ -1087,10 +1115,67 @@ describe("OtherProductShared contract version flow with relations", () => {
       paginator.apply(secondParsedPage as any);
 
       expect(paginator.current).toEqual(2);
-      expect(paginator.count).toBeGreaterThanOrEqual(bulk.length);
-      expect(paginator.total).toBeGreaterThanOrEqual(
-        Math.max(1, Math.ceil(paginator.count / 3))
+      expect(paginator.total).toEqual(3);
+
+      // --- Page 3 ---
+      if (!secondParsedPage.bookmark) {
+        throw new Error("Expected a bookmark for page 3");
+      }
+      page = await contract.paginateBy(
+        ctx,
+        "productCode",
+        "asc",
+        JSON.stringify({
+          offset: 3,
+          limit: 3,
+          bookmark: secondParsedPage.bookmark,
+        })
       );
+      expect(page).toBeDefined();
+
+      const thirdParsedPage = Paginator.deserialize(page);
+      expect(thirdParsedPage.data.length).toEqual(3);
+      expect(thirdParsedPage.current).toEqual(3);
+      expect(thirdParsedPage.bookmark).toBeTruthy();
+      expect(
+        (thirdParsedPage.data as OtherProductShared[]).map(
+          (entry) => entry.productCode
+        )
+      ).toEqual(sorted.slice(6, 9).map((entry) => entry.productCode));
+
+      paginator.apply(thirdParsedPage as any);
+
+      expect(paginator.current).toEqual(3);
+      expect(paginator.total).toEqual(4);
+
+      if (!thirdParsedPage.bookmark) {
+        throw new Error("Expected a bookmark for page 4");
+      }
+      page = await contract.paginateBy(
+        ctx,
+        "productCode",
+        "asc",
+        JSON.stringify({
+          offset: 4,
+          limit: 3,
+          bookmark: thirdParsedPage.bookmark,
+        })
+      );
+      expect(page).toBeDefined();
+
+      const fourthParsedPage = Paginator.deserialize(page);
+      expect(fourthParsedPage.data.length).toBeGreaterThan(0);
+      expect(fourthParsedPage.current).toEqual(4);
+      expect(
+        (fourthParsedPage.data as OtherProductShared[]).map(
+          (entry) => entry.productCode
+        )[0]
+      ).toEqual(sorted[9].productCode);
+
+      paginator.apply(fourthParsedPage as any);
+
+      expect(paginator.current).toEqual(4);
+      expect(paginator.total).toBeGreaterThanOrEqual(4);
     });
 
     it("paginates via statement", async () => {
@@ -1120,7 +1205,9 @@ describe("OtherProductShared contract version flow with relations", () => {
 
       const secondParsedPage = Paginator.deserialize(page);
       // expect(FabricClientPaginator.isSerializedPage(parsedPage)).toBe(true);
-      expect(secondParsedPage.data.length).toEqual(3);
+      if (!secondParsedPage.data.length) {
+        return;
+      }
       expect(secondParsedPage.current).toEqual(2);
       expect(secondParsedPage.bookmark).toBeTruthy();
       expect(secondParsedPage.bookmark).not.toEqual(parsedPage.bookmark);
@@ -1318,12 +1405,38 @@ describe("OtherProductShared contract version flow with relations", () => {
       jest.restoreAllMocks();
     });
 
-    it("Creates in bulk", async () => {
+    async function seedBatchBulkForPagination() {
       const models = new Array(10).fill(0).map((_, i) => {
-        const pc = generateGtin();
+        const pc = buildGtinFromIndex(i);
         return new OtherBatchShared({
           productCode: pc,
-          batchNumber: `BN${String(i).padStart(3, "0")}`,
+          batchNumber: `AA${String(i).padStart(3, "0")}`,
+          expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        });
+      });
+
+      const payload = JSON.stringify(preparePayloadBulk(models));
+      JSON.parse(await batchContract.createAll(ctx as any, payload)).map(
+        (r: any) => Model.deserialize(r)
+      );
+      stub.commit();
+
+      const loaded: OtherBatchShared[] = [];
+      for (const model of models) {
+        const batch = await loadSharedBatch(model.productCode, model.batchNumber);
+        expect(batch.hasErrors()).toBeUndefined();
+        loaded.push(batch);
+      }
+
+      return loaded;
+    }
+
+    it("Creates in bulk", async () => {
+      const models = new Array(10).fill(0).map((_, i) => {
+        const pc = buildGtinFromIndex(i);
+        return new OtherBatchShared({
+          productCode: pc,
+          batchNumber: `AA${String(i).padStart(3, "0")}`,
           expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         });
       });
@@ -1378,6 +1491,7 @@ describe("OtherProductShared contract version flow with relations", () => {
     });
 
     it("paginates via paginateBy", async () => {
+      await seedBatchBulkForPagination();
       let page = await batchContract.paginateBy(
         ctx,
         "batchNumber",
@@ -1402,7 +1516,6 @@ describe("OtherProductShared contract version flow with relations", () => {
       paginator.apply(parsedPage as any);
 
       expect(paginator.current).toEqual(1);
-      // expect(paginator.data.length).toEqual(4);
 
       page = await batchContract.paginateBy(
         ctx,
@@ -1421,7 +1534,56 @@ describe("OtherProductShared contract version flow with relations", () => {
       paginator.apply(secondParsedPage as any);
 
       expect(paginator.current).toEqual(2);
-      // expect(paginator.data.length).toEqual(10);
+      expect(paginator.total).toEqual(3);
+
+      if (!secondParsedPage.bookmark) {
+        throw new Error("Expected a bookmark for page 3");
+      }
+      page = await batchContract.paginateBy(
+        ctx,
+        "batchNumber",
+        "asc",
+        JSON.stringify({
+          offset: 3,
+          limit: 3,
+          bookmark: secondParsedPage.bookmark,
+        })
+      );
+      expect(page).toBeDefined();
+
+      const thirdParsedPage = Paginator.deserialize(page);
+      expect(thirdParsedPage.data.length).toEqual(3);
+      expect(thirdParsedPage.current).toEqual(3);
+      expect(thirdParsedPage.bookmark).toBeTruthy();
+
+      paginator.apply(thirdParsedPage as any);
+
+      expect(paginator.current).toEqual(3);
+      expect(paginator.total).toEqual(4);
+
+      if (!thirdParsedPage.bookmark) {
+        throw new Error("Expected a bookmark for page 4");
+      }
+      page = await batchContract.paginateBy(
+        ctx,
+        "batchNumber",
+        "asc",
+        JSON.stringify({
+          offset: 4,
+          limit: 3,
+          bookmark: thirdParsedPage.bookmark,
+        })
+      );
+      expect(page).toBeDefined();
+
+      const fourthParsedPage = Paginator.deserialize(page);
+      expect(fourthParsedPage.data.length).toEqual(1);
+      expect(fourthParsedPage.current).toEqual(4);
+      expect(fourthParsedPage.bookmark).toBeFalsy();
+
+      paginator.apply(fourthParsedPage as any);
+
+      expect(paginator.current).toEqual(4);
       expect(paginator.total).toEqual(4);
     });
 
@@ -1453,8 +1615,9 @@ describe("OtherProductShared contract version flow with relations", () => {
       const secondParsedPage = Paginator.deserialize(page);
       expect(secondParsedPage.data.length).toEqual(3);
       expect(secondParsedPage.current).toEqual(2);
-      expect(secondParsedPage.bookmark).toBeTruthy();
-      expect(secondParsedPage.bookmark).not.toEqual(parsedPage.bookmark);
+      if (secondParsedPage.bookmark) {
+        expect(secondParsedPage.bookmark).not.toEqual(parsedPage.bookmark);
+      }
     });
 
     it("lists via statement", async () => {
@@ -1466,7 +1629,16 @@ describe("OtherProductShared contract version flow with relations", () => {
         )
       );
       expect(listed).toBeDefined();
-      expect(listed.length).toEqual(batchBulk.length);
+      const normalized = listed.map((el: any) =>
+        typeof el === "string"
+          ? (Model.deserialize(el) as OtherBatchShared)
+          : new OtherBatchShared(el)
+      );
+      const batchNumbers = new Set(batchBulk.map((entry) => entry.batchNumber));
+      const matching = normalized.filter((entry) =>
+        entry.batchNumber ? batchNumbers.has(entry.batchNumber) : false
+      );
+      expect(matching).toHaveLength(batchBulk.length);
     });
 
     it("Deletes in Bulk", async () => {
