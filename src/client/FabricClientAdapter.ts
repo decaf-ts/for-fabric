@@ -92,7 +92,10 @@ import { DefaultFabricClientFlags } from "./constants";
 import fs from "fs";
 import { CryptoUtils } from "./crypto";
 import { extractIds } from "./ids/id-extraction";
-import { DefaultContractResolver, Identity } from "../shared/index";
+import {
+  DefaultContractResolver,
+  Identity,
+} from "../shared/index";
 
 type LegacyPeerTarget = {
   mspId: string;
@@ -1214,7 +1217,7 @@ export class FabricClientAdapter extends Adapter<
   ): Promise<Uint8Array> {
     const log = this.log.for(this.transaction);
     transientData = this.injectTransientOverrides(transientData, ctx);
-    if (submit && this.shouldUseLegacyGateway(ctx)) {
+    if (submit && (await this.shouldUseLegacyGateway(ctx, clazzOrContractName))) {
       const legacyArgs = this.prepareLegacyArgs(args);
       const transientMap = this.buildLegacyTransient(transientData);
       const peerConfigs = this.buildLegacyPeerConfigs(ctx);
@@ -1276,7 +1279,16 @@ export class FabricClientAdapter extends Adapter<
     return JSON.stringify(arg);
   }
 
-  private shouldUseLegacyGateway(ctx: FabricClientContext): boolean {
+  private async shouldUseLegacyGateway(
+    ctx: FabricClientContext,
+    clazzOrContractName: Constructor<Model<any>> | string | undefined,
+  ): Promise<boolean> {
+    const submissionMode =
+      !clazzOrContractName || typeof clazzOrContractName === "string"
+        ? undefined
+        : await Model.submissionOf(clazzOrContractName, this.config, ctx);
+
+    if (submissionMode) return submissionMode === "legacy";
     return !!ctx.getOrUndefined("legacy") && !!this.config.allowGatewayOverride;
   }
 
@@ -1932,7 +1944,7 @@ export class FabricClientAdapter extends Adapter<
     config: PeerConfig,
     ...args: ContextualArgs<FabricClientContext>
   ) {
-    return Model.chaincodeOf(model, ...args) || config.chaincodeName;
+    return Model.chaincodeOf(model, config, ...args) || config.chaincodeName;
   }
 
   protected static channelFor(
@@ -1940,7 +1952,7 @@ export class FabricClientAdapter extends Adapter<
     config: PeerConfig,
     ...args: ContextualArgs<FabricClientContext>
   ) {
-    return Model.channelOf(model, ...args) || config.channel;
+    return Model.channelOf(model, config, ...args) || config.channel;
   }
 
   protected static contractFor(
@@ -1949,8 +1961,8 @@ export class FabricClientAdapter extends Adapter<
     ...args: ContextualArgs<FabricClientContext>
   ) {
     return (
-      Model.contractOf(model, ...args) ||
-      DefaultContractResolver(model, ...args)
+      Model.contractOf(model, config, ...args) ||
+      DefaultContractResolver(model, config, ...args)
     );
   }
 

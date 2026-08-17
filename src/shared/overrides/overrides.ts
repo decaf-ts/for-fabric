@@ -9,6 +9,7 @@ import {
   MirrorMetadata,
 } from "../decorators";
 import { Context, ContextualArgs } from "@decaf-ts/core";
+import type { PeerConfig } from "../types";
 
 Model.prototype.isShared = function isShared<M extends Model>(
   this: M
@@ -170,6 +171,7 @@ Model.prototype.segregate = function segregate<M extends Model>(
 
 (Model as any).chaincodeOf = function chaincodeOf<M extends Model>(
   model: Constructor<M>,
+  config: PeerConfig,
   ...args: ContextualArgs<any>
 ): string | undefined | Promise<string | undefined> {
   const m: ChaincodeMetadata = Metadata.get(
@@ -181,11 +183,12 @@ Model.prototype.segregate = function segregate<M extends Model>(
   const ctx = args.pop();
   if (!ctx || !(ctx instanceof Context))
     throw new InternalError(`No context provided for chaincode resolution`);
-  return m.resolver(model, ...args, ctx);
+  return m.resolver(model, config, ...(args as any[]), ctx);
 }.bind(Model);
 
 (Model as any).contractOf = function contractOf<M extends Model>(
   model: Constructor<M>,
+  config: PeerConfig,
   ...args: ContextualArgs<any>
 ): string | undefined | Promise<string | undefined> {
   const m: ChaincodeMetadata = Metadata.get(
@@ -197,11 +200,12 @@ Model.prototype.segregate = function segregate<M extends Model>(
   const ctx = args.pop();
   if (!ctx || !(ctx instanceof Context))
     throw new InternalError(`No context provided for chaincode resolution`);
-  return m.resolver(model, ...args, ctx);
+  return m.resolver(model, config, ...(args as any[]), ctx);
 }.bind(Model);
 
 (Model as any).channelOf = function channelOf<M extends Model>(
   model: Constructor<M>,
+  config: PeerConfig,
   ...args: ContextualArgs<any>
 ): string | undefined | Promise<string | undefined> {
   const m: ChaincodeMetadata = Metadata.get(
@@ -213,5 +217,23 @@ Model.prototype.segregate = function segregate<M extends Model>(
   const ctx = args.pop();
   if (!ctx || !(ctx instanceof Context))
     throw new InternalError(`No context provided for chaincode resolution`);
-  return m.resolver(model, ...args, ctx);
+  return m.resolver(model, config, ...(args as any[]), ctx);
+}.bind(Model);
+
+(Model as any).submissionOf = function submissionOf<M extends Model>(
+  model: Constructor<M> | M,
+  config: PeerConfig,
+  ...args: ContextualArgs<any>
+): string | undefined | Promise<string | undefined> {
+  const constr = typeof model === "function" ? model : model.constructor;
+  const m: ChaincodeMetadata = Metadata.get(
+    constr as any,
+    FabricModelKeys.SUBMISSION
+  );
+  if (!m || !m.resolver) return undefined;
+  if (typeof m.resolver === "string") return m.resolver;
+  const ctx = args.pop();
+  if (!ctx || !(ctx instanceof Context))
+    throw new InternalError(`No context provided for submission resolution`);
+  return m.resolver(constr as Constructor<Model>, config, ...(args as any[]), ctx);
 }.bind(Model);

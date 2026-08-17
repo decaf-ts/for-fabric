@@ -1,8 +1,9 @@
 import { SegregatedModel } from "../types";
 import { Constructor } from "@decaf-ts/decoration";
 import "@decaf-ts/decorator-validation";
-import { CollectionResolver, MirrorMetadata } from "../decorators";
+import { CollectionResolver, MirrorMetadata, type SubmissionMode } from "../decorators";
 import { ContextualArgs } from "@decaf-ts/core";
+import type { PeerConfig } from "../types";
 
 declare module "@decaf-ts/decorator-validation" {
   export interface Model {
@@ -38,5 +39,10 @@ declare module "@decaf-ts/decorator-validation" {
       model: Constructor<M>,
       ...args: ContextualArgs<any>
     ): string | undefined | Promise<string | undefined>;
+    function submissionOf<M extends Model>(
+      model: Constructor<M>,
+      config: PeerConfig,
+      ...args: ContextualArgs<any>
+    ): SubmissionMode | undefined | Promise<SubmissionMode | undefined>;
   }
 }

@@ -17,6 +17,7 @@ export enum FabricModelKeys {
   CONTRACT = `${FabricModelKeys.FABRIC}.contract`,
   CHAINCODE = `${FabricModelKeys.FABRIC}.chaincode`,
   CHANNEL = `${FabricModelKeys.FABRIC}.channel`,
+  SUBMISSION = `${FabricModelKeys.FABRIC}.submission`,
   OVERRIDES = `__overrides`,
 }
 /**

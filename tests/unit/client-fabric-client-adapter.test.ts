@@ -15,7 +15,7 @@ import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";
 import { FabricClientDispatch } from "../../src/client/FabricClientDispatch";
 import { FabricClientRepository } from "../../src/client/FabricClientRepository";
 import { FabricModelKeys } from "../../src/shared/constants";
-import { mirror } from "../../src/shared/decorators";
+import { mirror, submission } from "../../src/shared/decorators";
 import type { PeerConfig } from "../../src/shared/types";
 
 jest.mock("@hyperledger/fabric-gateway", () => ({
@@ -121,6 +121,26 @@ const config: PeerConfig = {
 @model()
 @mirror("mirror-collection", "Org1MSP")
 class MirroredWallet extends Model {
+  @pk()
+  id!: string;
+}
+
+@model()
+class PlainWallet extends Model {
+  @pk()
+  id!: string;
+}
+
+@model()
+@submission("legacy")
+class LegacySubmissionWallet extends Model {
+  @pk()
+  id!: string;
+}
+
+@model()
+@submission("gateway")
+class GatewaySubmissionWallet extends Model {
   @pk()
   id!: string;
 }
@@ -930,54 +950,103 @@ describe("FabricClientAdapter", () => {
   });
 
   describe("Legacy endorsement flow", () => {
-    it("does NOT use legacy gateway when only mirror flag is set (no allowGatewayOverride)", async () => {
-      const adapter = newAdapter();
-      const txnSpy = jest
-        .spyOn(adapter as any, "transaction")
-        .mockResolvedValue(new TextEncoder().encode("default"));
-      const legacySpy = jest.spyOn(
-        adapter as any,
-        "submitLegacyWithExplicitEndorsers"
-      );
-      const ctx = createContext();
-      ctx.accumulate({ mirror: true }); // mirror only, no allowGatewayOverride
+    it.each([
+      {
+        title: "undecorated model with allowGatewayOverride off stays on the gateway path",
+        overrides: { allowGatewayOverride: false },
+        ctxLegacy: false,
+        clazz: PlainWallet,
+        expectedLegacy: false,
+      },
+      {
+        title: "undecorated model with allowGatewayOverride on still stays on the gateway path unless the context requests legacy",
+        overrides: { allowGatewayOverride: true },
+        ctxLegacy: false,
+        clazz: PlainWallet,
+        expectedLegacy: false,
+      },
+      {
+        title: "undecorated model with allowGatewayOverride off and legacy context stays on the gateway path",
+        overrides: { allowGatewayOverride: false },
+        ctxLegacy: true,
+        clazz: PlainWallet,
+        expectedLegacy: false,
+      },
+      {
+        title: "undecorated model with allowGatewayOverride on and legacy context uses the legacy path",
+        overrides: { allowGatewayOverride: true },
+        ctxLegacy: true,
+        clazz: PlainWallet,
+        expectedLegacy: true,
+      },
+      {
+        title: "legacy submission decoration always uses the legacy path",
+        overrides: { allowGatewayOverride: false },
+        ctxLegacy: false,
+        clazz: LegacySubmissionWallet,
+        expectedLegacy: true,
+      },
+      {
+        title: "legacy submission decoration ignores allowGatewayOverride and legacy context",
+        overrides: { allowGatewayOverride: true },
+        ctxLegacy: true,
+        clazz: LegacySubmissionWallet,
+        expectedLegacy: true,
+      },
+      {
+        title: "gateway submission decoration always uses the gateway path",
+        overrides: { allowGatewayOverride: false },
+        ctxLegacy: true,
+        clazz: GatewaySubmissionWallet,
+        expectedLegacy: false,
+      },
+      {
+        title: "gateway submission decoration ignores allowGatewayOverride and legacy context",
+        overrides: { allowGatewayOverride: true },
+        ctxLegacy: false,
+        clazz: GatewaySubmissionWallet,
+        expectedLegacy: false,
+      },
+    ])(
+      "$title",
+      async ({
+        overrides,
+        ctxLegacy,
+        clazz,
+        expectedLegacy,
+      }: {
+        title: string;
+        overrides: Partial<PeerConfig>;
+        ctxLegacy: boolean;
+        clazz: typeof PlainWallet | typeof LegacySubmissionWallet | typeof GatewaySubmissionWallet;
+        expectedLegacy: boolean;
+      }) => {
+        const adapter = newAdapter(overrides);
+        const legacySpy = jest.spyOn(
+          adapter as any,
+          "submitLegacyWithExplicitEndorsers"
+        );
+        const gateway = {
+          close: jest.fn(),
+        };
+        const contract = {
+          getContractName: jest.fn(() => "gateway-contract"),
+          submit: jest.fn().mockResolvedValue(new TextEncoder().encode("ok")),
+          evaluate: jest.fn(),
+        };
+        jest.spyOn(adapter as any, "Gateway").mockResolvedValue(gateway as any);
+        jest.spyOn(adapter as any, "Contract").mockResolvedValue(contract as any);
 
-      await adapter.submitTransaction(ctx, "create");
+        const ctx = createContext();
+        if (ctxLegacy) ctx.accumulate({ legacy: true });
 
-      expect(txnSpy).toHaveBeenCalled();
-      expect(legacySpy).not.toHaveBeenCalled();
-    });
+        await adapter.submitTransaction(ctx, "create", ["data"], undefined, undefined, clazz);
 
-    it("does NOT use legacy gateway when only legacy is set without allowGatewayOverride", async () => {
-      const adapter = newAdapter();
-      const txnSpy = jest
-        .spyOn(adapter as any, "transaction")
-        .mockResolvedValue(new TextEncoder().encode("default"));
-      const legacySpy = jest.spyOn(
-        adapter as any,
-        "submitLegacyWithExplicitEndorsers"
-      );
-      const ctx = createContext();
-      ctx.accumulate({ legacy: true }); // legacy only, no allowGatewayOverride
-
-      await adapter.submitTransaction(ctx, "create");
-
-      expect(txnSpy).toHaveBeenCalled();
-      expect(legacySpy).not.toHaveBeenCalled();
-    });
-
-    it("uses legacy gateway when both legacy AND allowGatewayOverride are set", async () => {
-      const adapter = newAdapter({ allowGatewayOverride: true });
-      const legacySpy = jest
-        .spyOn(adapter as any, "submitLegacyWithExplicitEndorsers")
-        .mockResolvedValue(new TextEncoder().encode("legacy"));
-      const ctx = createContext();
-      ctx.accumulate({ legacy: true });
-
-      await adapter.submitTransaction(ctx, "create", ["data"]);
-
-      expect(legacySpy).toHaveBeenCalledTimes(1);
-    });
+        expect(legacySpy).toHaveBeenCalledTimes(expectedLegacy ? 1 : 0);
+        expect(contract.submit).toHaveBeenCalledTimes(expectedLegacy ? 0 : 1);
+        expect(gateway.close).toHaveBeenCalledTimes(expectedLegacy ? 0 : 1);
+      }
+    );
 
     it("does not promote mirrored models to legacy submissions when allowMirroring is false", () => {
       const adapter = newAdapter({ allowMirroring: false });

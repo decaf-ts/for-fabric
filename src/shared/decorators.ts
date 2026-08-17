@@ -36,7 +36,7 @@ import {
   prop,
   propMetadata,
 } from "@decaf-ts/decoration";
-import { FabricFlags } from "./types";
+import { FabricFlags, PeerConfig } from "./types";
 import { toPascalCase } from "@decaf-ts/logging";
 import { FabricContractFlags } from "../contracts/types";
 import "../shared/overrides";
@@ -44,19 +44,26 @@ import { type FabricContractContext } from "../contracts/ContractContext";
 
 export type ResolverFunction<T> = (
   model: Constructor<Model<any>>,
+  config: PeerConfig,
   ...args: ContextualArgs<any>
 ) => Promise<T> | T;
 
 export const DefaultContractResolver = (
   model: Constructor<Model<any>>,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _config?: PeerConfig,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ...args: ContextualArgs<any>
 ) => {
   return model.name + "Contract";
 };
 
-export type ChaincodeMetadata = {
-  resolver: string | ResolverFunction<string>;
+export type SubmissionMode = "legacy" | "gateway";
+
+export type SubmissionResolverFunction = ResolverFunction<SubmissionMode>;
+
+export type ChaincodeMetadata<T = string> = {
+  resolver: string | ResolverFunction<T>;
 };
 
 export function contract(resolver: any) {
@@ -1030,4 +1037,11 @@ export function sharedData(collection: string | CollectionResolver) {
       args: [collection],
     })
     .apply();
+}
+
+export function submission(
+  resolver: SubmissionMode | SubmissionResolverFunction = "gateway"
+) {
+  const meta: ChaincodeMetadata<SubmissionMode> = { resolver };
+  return metadata(FabricModelKeys.SUBMISSION, meta);
 }

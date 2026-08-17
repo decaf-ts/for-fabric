@@ -8,6 +8,7 @@ import {
   channel,
   contract,
   DefaultContractResolver,
+  submission,
 } from "../../src/shared/decorators";
 import type { PeerConfig } from "../../src/shared/types";
 
@@ -38,6 +39,14 @@ class DecoratedContractModel extends Model {
   }
 }
 
+@model()
+@submission("legacy")
+class LegacySubmissionModel extends Model {
+  constructor() {
+    super();
+  }
+}
+
 const createConfig = (): PeerConfig =>
   ({
     channel: "fallback-channel",
@@ -58,9 +67,10 @@ describe("shared/decorators contract resolution", () => {
 
   it("passes the context to functional resolvers", async () => {
     const ctx = new Context();
+    const config = createConfig();
     const resolver = jest.fn(
-      (model: any, suffix: string, inputCtx: Context) => {
-        return `${model.name}:${suffix}:${inputCtx === ctx ? "ctx" : "missing"}`;
+      (model: any, cfg: PeerConfig, suffix: string, inputCtx: Context) => {
+        return `${model.name}:${cfg.channel}:${suffix}:${inputCtx === ctx ? "ctx" : "missing"}`;
       }
     );
 
@@ -68,10 +78,15 @@ describe("shared/decorators contract resolution", () => {
     @contract(resolver)
     class DynamicContractModel extends Model {}
 
-    expect(Model.contractOf(DynamicContractModel, "suffix", ctx as any)).toBe(
-      "DynamicContractModel:suffix:ctx"
+    expect(
+      Model.contractOf(DynamicContractModel, config, "suffix", ctx as any)
+    ).toBe("DynamicContractModel:fallback-channel:suffix:ctx");
+    expect(resolver).toHaveBeenCalledWith(
+      DynamicContractModel,
+      config,
+      "suffix",
+      ctx
     );
-    expect(resolver).toHaveBeenCalledWith(DynamicContractModel, "suffix", ctx);
   });
 
   it("uses the default contract resolver naming convention", () => {
@@ -159,5 +174,29 @@ describe("shared/decorators contract resolution", () => {
       config.chaincodeName,
       "manual-contract"
     );
+  });
+
+  it("resolves submission metadata using the adapter config", async () => {
+    const ctx = new Context();
+    const config = createConfig();
+    const resolver = jest.fn(
+      (model: any, cfg: PeerConfig, inputCtx: Context) => {
+        return `${model.name}:${cfg.channel}:${inputCtx === ctx ? "ctx" : "missing"}`;
+      }
+    );
+
+    @model()
+    @submission(resolver)
+    class DynamicSubmissionModel extends Model {}
+
+    expect(Model.submissionOf(DynamicSubmissionModel, config, ctx as any)).toBe(
+      "DynamicSubmissionModel:fallback-channel:ctx"
+    );
+    expect(resolver).toHaveBeenCalledWith(DynamicSubmissionModel, config, ctx);
+  });
+
+  it("reads static submission metadata directly", async () => {
+    const config = createConfig();
+    expect(Model.submissionOf(LegacySubmissionModel, config)).toBe("legacy");
   });
 });
