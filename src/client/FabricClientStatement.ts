@@ -34,6 +34,7 @@ import {
   findViewMetadata,
   CouchDBViewMetadata,
   ViewResponse,
+  prefixRange,
 } from "@decaf-ts/for-couchdb";
 import { toCamelCase } from "@decaf-ts/logging";
 import { DBKeys, InternalError } from "@decaf-ts/db-decorators";
@@ -61,27 +62,6 @@ type FabricAggregateInfo =
 
 const escapeRegExp = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-function nextLexicographicString(value: string): string {
-  if (!value) return "\u0000";
-  const chars = Array.from(value);
-  for (let i = chars.length - 1; i >= 0; i -= 1) {
-    const code = chars[i].codePointAt(0);
-    if (code === undefined) continue;
-    if (code < 0x10ffff) {
-      chars[i] = String.fromCodePoint(code + 1);
-      return chars.slice(0, i + 1).join("");
-    }
-  }
-  return `${value}\u0000`;
-}
-
-function prefixRange(prefix: string) {
-  return {
-    start: prefix,
-    end: nextLexicographicString(prefix),
-  };
-}
 
 export class FabricClientStatement<M extends Model, R> extends Statement<
   M,
