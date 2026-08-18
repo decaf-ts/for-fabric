@@ -198,6 +198,48 @@ export class AssetContract extends FabricCrudContract<Asset> {
 }
 ```
 
+### Mirroring Private Data
+
+```typescript
+import { mirror } from '@decaf-ts/for-fabric';
+import { model, ModelArg, required } from '@decaf-ts/decorator-validation';
+import { BaseModel, pk } from '@decaf-ts/core';
+
+@model()
+class Account extends BaseModel {
+  @pk()
+  id!: string;
+
+  @required()
+  owner!: string;
+
+  @required()
+  balance!: number;
+
+  constructor(arg?: ModelArg<Account>) {
+    super(arg);
+  }
+}
+
+class AccountContract {
+  @mirror(
+    'accounts_mirror',
+    'Org1MSP',
+    undefined,
+    (ctx) => ctx.get('isMirroringEnabled') === true
+  )
+  private mirroredAnchor?: string;
+}
+```
+
+When `allow(context)` returns `false`, the mirror decorator does nothing for that invocation:
+
+- no mirrored collection reads
+- no mirrored collection writes
+- no mirror flags or params are added to the execution context
+
+Use this when the mirrored path should be conditionally disabled without changing the rest of the contract flow.
+
 ### Using the Contract Adapter Directly
 
 ```typescript

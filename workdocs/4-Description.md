@@ -6,6 +6,7 @@ Key ideas:
 - Keep your domain models as annotated classes (using @decaf-ts/decorator-validation).
 - Use a Repository to persist/read/query models through a Fabric-aware Adapter.
 - Compose reusable CRUD contracts and utilities instead of hand-writing stub calls.
+- Use `@mirror()` to route mirrored reads and writes, with an optional `allow(context)` gate to bypass all mirror logic when it returns `false`.
 - Emit first-class Fabric events from repository operations.
 - Leverage context-aware logging and typed flags during execution.
 
