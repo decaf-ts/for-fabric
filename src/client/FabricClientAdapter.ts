@@ -1,3 +1,4 @@
+import "@decaf-ts/core";
 import "../shared/overrides";
 import {
   CouchDBKeys,
@@ -649,7 +650,11 @@ export class FabricClientAdapter extends Adapter<
     }
 
     const mirrorMeta = Model.mirroredAt(model);
-    if (mirrorMeta && ctx.get("allowMirroring")) {
+    if (
+      mirrorMeta &&
+      ctx.get("allowMirroring") &&
+      (!mirrorMeta.allow || mirrorMeta.allow(ctx))
+    ) {
       const mirrorMsp = mirrorMeta.mspId;
       if (!mirrorMsp) throw new InternalError(`No mirror MSP could be found`);
       let msps = this.getEndorsingOrganizations(ctx) || [];

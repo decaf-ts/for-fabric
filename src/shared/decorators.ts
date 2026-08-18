@@ -260,12 +260,24 @@ export function transactionId() {
 }
 
 export type MirrorCondition = (msp: string) => boolean;
+export type MirrorAllowFunction = (
+  context: Context<FabricContractFlags>
+) => boolean;
 
 export type MirrorMetadata = {
   condition?: MirrorCondition;
+  allow?: MirrorAllowFunction;
   resolver: CollectionResolver | string;
   mspId: string;
 };
+
+function shouldAllowMirrorExecution(
+  context: Context<FabricContractFlags>,
+  data?: Pick<MirrorMetadata, "allow">
+): boolean {
+  if (data?.allow && !data.allow(context)) return false;
+  return !!context.get("allowMirroring");
+}
 
 export async function evalMirrorMetadata<M extends Model>(
   model: M,
@@ -301,7 +313,7 @@ export async function createMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  if (!context.get("allowMirroring")) return;
+  if (!shouldAllowMirrorExecution(context, data)) return;
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   const sourceModel = model;
@@ -338,7 +350,7 @@ export async function updateMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  if (!context.get("allowMirroring")) return;
+  if (!shouldAllowMirrorExecution(context, data)) return;
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   const sourceModel = model;
@@ -375,7 +387,7 @@ export async function deleteMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  if (!context.get("allowMirroring")) return;
+  if (!shouldAllowMirrorExecution(context, data)) return;
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   fabricCtx.put("mirror" as any, true);
@@ -419,7 +431,7 @@ export async function mirrorWriteGuard<
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   model: M
 ): Promise<void> {
-  if (!context.get("allowMirroring")) return;
+  if (!shouldAllowMirrorExecution(context, data)) return;
   const msp = extractMspId(
     context.get("identity") as string | ClientIdentity | undefined
   );
@@ -441,7 +453,7 @@ export async function readMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  if (!context.get("allowMirroring")) return;
+  if (!shouldAllowMirrorExecution(context, data)) return;
   const msp = extractMspId(
     context.get("identity") as string | ClientIdentity | undefined
   );
@@ -468,7 +480,8 @@ export async function readMirrorHandler<
 export function mirror(
   collection: CollectionResolver | string,
   mspIdOrCondition?: string | MirrorCondition,
-  condition?: MirrorCondition
+  conditionOrAllow?: MirrorCondition | MirrorAllowFunction,
+  allow?: MirrorAllowFunction
 ) {
   const isConditionOnly =
     typeof mspIdOrCondition !== "string" && Boolean(mspIdOrCondition);
@@ -477,15 +490,20 @@ export function mirror(
     : (mspIdOrCondition as string | undefined);
   const cond = isConditionOnly
     ? (mspIdOrCondition as MirrorCondition)
-    : condition;
+    : (conditionOrAllow as MirrorCondition | undefined);
+  const allowPredicate = isConditionOnly
+    ? (conditionOrAllow as MirrorAllowFunction | undefined)
+    : allow;
 
   function mirror(
     resolver: CollectionResolver | string,
     mspId: string,
-    condition?: MirrorCondition
+    condition?: MirrorCondition,
+    allow?: MirrorAllowFunction
   ) {
     const meta: MirrorMetadata = {
       condition: condition,
+      allow: allow,
       mspId: mspId,
       resolver: resolver,
     };
@@ -510,7 +528,7 @@ export function mirror(
   return Decoration.for(FabricModelKeys.MIRROR)
     .define({
       decorator: mirror,
-      args: [collection, mspId, cond],
+      args: [collection, mspId, cond, allowPredicate],
     })
     .apply();
 }
@@ -599,10 +617,10 @@ export async function applyMirrorFlags<M extends Model>(
   msp: string | undefined,
   ctx: FabricContractContext
 ) {
-  if (!ctx.get("allowMirroring")) return;
-  if (!msp) return;
   const mirrorMeta = Model.mirroredAt(clazz);
   if (!mirrorMeta) return;
+  if (!shouldAllowMirrorExecution(ctx, mirrorMeta)) return;
+  if (!msp) return;
   const matches =
     msp === mirrorMeta.mspId ||
     (mirrorMeta.condition && mirrorMeta.condition(msp));

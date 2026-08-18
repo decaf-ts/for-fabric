@@ -732,9 +732,10 @@ export abstract class FabricCrudContract<M extends Model>
   }
 
   protected ensureMirrorWritePermissions(ctx: FabricContractContext): void {
-    if (!ctx || !ctx.get("allowMirroring")) return;
     const mirrorMeta = Model.mirroredAt(this.clazz);
     if (!mirrorMeta) return;
+    if (!ctx || !ctx.get("allowMirroring")) return;
+    if (mirrorMeta.allow && !mirrorMeta.allow(ctx)) return;
     const msp = extractMspId(ctx.identity);
     if (
       msp &&

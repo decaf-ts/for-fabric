@@ -13,10 +13,26 @@ class MirroredRepositoryModel extends Model {
   id!: string;
 }
 
+@model()
+@mirror("mirror-collection", "Org1MSP", undefined, () => false)
+class BlockedMirroredRepositoryModel extends Model {
+  @pk()
+  id!: string;
+}
+
 class ExposedRepository extends FabricClientRepository<MirroredRepositoryModel> {
   public applyLegacyMirrorFlag(
     ctx: Context,
     model: MirroredRepositoryModel
+  ): void {
+    (this as any).ensureLegacyMirrorFlag(ctx, model);
+  }
+}
+
+class BlockedExposedRepository extends FabricClientRepository<BlockedMirroredRepositoryModel> {
+  public applyLegacyMirrorFlag(
+    ctx: Context,
+    model: BlockedMirroredRepositoryModel
   ): void {
     (this as any).ensureLegacyMirrorFlag(ctx, model);
   }
@@ -35,6 +51,26 @@ describe("FabricClientRepository mirror gating", () => {
     repository.applyLegacyMirrorFlag(
       context,
       new MirroredRepositoryModel({ id: "mirror-id" } as any)
+    );
+
+    expect(context.getOrUndefined("legacy")).toBeUndefined();
+  });
+
+  it("does not mark mirrored models legacy when allow(context) is false", () => {
+    const adapter = new FabricClientAdapter(
+      { allowMirroring: true } as any,
+      "mirror-repo-test-allow"
+    );
+    const repository = new BlockedExposedRepository(
+      adapter as any,
+      BlockedMirroredRepositoryModel
+    );
+    const context = new Context();
+    context.accumulate({ allowMirroring: true } as any);
+
+    repository.applyLegacyMirrorFlag(
+      context,
+      new BlockedMirroredRepositoryModel({ id: "mirror-id" } as any)
     );
 
     expect(context.getOrUndefined("legacy")).toBeUndefined();

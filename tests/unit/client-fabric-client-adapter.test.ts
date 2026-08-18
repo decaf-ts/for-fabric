@@ -1,5 +1,7 @@
 import "reflect-metadata";
 
+import "@decaf-ts/core";
+import "@decaf-ts/db-decorators";
 import { Model, model } from "@decaf-ts/decorator-validation";
 import { InternalError, OperationKeys } from "@decaf-ts/db-decorators";
 import {
@@ -1053,8 +1055,46 @@ describe("FabricClientAdapter", () => {
       const ctx = createContext();
       ctx.accumulate({ allowMirroring: false });
 
-      adapter.prepare(new MirroredWallet({ id: "mirror-id" } as any), ctx);
+      adapter.prepare(new ERC20Wallet({ id: "mirror-id" } as any), ctx);
 
+      expect(ctx.getOrUndefined("legacy")).toBeUndefined();
+      expect(ctx.getOrUndefined("endorsingOrgs")).toBeUndefined();
+      expect(ctx.getOrUndefined("endorsingOrganizations")).toBeUndefined();
+    });
+
+    it("promotes mirrored models to legacy submissions when allow(context) is true", () => {
+      const adapter = newAdapter({ allowMirroring: true });
+      const ctx = createContext();
+      ctx.accumulate({ allowMirroring: true });
+
+      const mirroredAtSpy = jest.spyOn(Model, "mirroredAt").mockReturnValue({
+        mspId: "Org1MSP",
+        resolver: "mirror-collection",
+        allow: () => true,
+      } as any);
+
+      adapter.prepare(new ERC20Wallet({ id: "mirror-id" } as any), ctx);
+
+      mirroredAtSpy.mockRestore();
+      expect(ctx.getOrUndefined("legacy")).toBe(true);
+      expect(ctx.getOrUndefined("endorsingOrgs")).toContain("Org1MSP");
+      expect(ctx.getOrUndefined("endorsingOrganizations")).toContain("Org1MSP");
+    });
+
+    it("does not promote mirrored models to legacy submissions when allow(context) is false", () => {
+      const adapter = newAdapter({ allowMirroring: true });
+      const ctx = createContext();
+      ctx.accumulate({ allowMirroring: true });
+
+      const mirroredAtSpy = jest.spyOn(Model, "mirroredAt").mockReturnValue({
+        mspId: "Org1MSP",
+        resolver: "mirror-collection",
+        allow: () => false,
+      } as any);
+
+      adapter.prepare(new ERC20Wallet({ id: "mirror-id" } as any), ctx);
+
+      mirroredAtSpy.mockRestore();
       expect(ctx.getOrUndefined("legacy")).toBeUndefined();
       expect(ctx.getOrUndefined("endorsingOrgs")).toBeUndefined();
       expect(ctx.getOrUndefined("endorsingOrganizations")).toBeUndefined();

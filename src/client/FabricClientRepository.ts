@@ -542,7 +542,10 @@ export class FabricClientRepository<
   }
 
   private ensureLegacyMirrorFlag(ctx: ContextOf<A>, model: M): void {
+    const mirrorMeta = Model.mirroredAt(model);
+    if (!mirrorMeta) return;
     if (!ctx.get("allowMirroring")) return;
+    if (mirrorMeta.allow && !mirrorMeta.allow(ctx as any)) return;
     if (Model.mirroredAt(model)) {
       ctx.accumulate({ legacy: true });
     }

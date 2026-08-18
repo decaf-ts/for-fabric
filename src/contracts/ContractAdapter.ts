@@ -1,3 +1,4 @@
+import "@decaf-ts/core";
 import {
   CouchDBAdapter,
   CouchDBKeys,
@@ -2308,9 +2309,10 @@ export class FabricContractAdapter extends CouchDBAdapter<
     clazz: Constructor<M>,
     ctx: FabricContractContext
   ): void {
-    if (!this.shouldAllowMirroring(ctx)) return;
     const mirrorMeta = Model.mirroredAt(clazz);
     if (!mirrorMeta) return;
+    if (!this.shouldAllowMirroring(ctx)) return;
+    if (mirrorMeta.allow && !mirrorMeta.allow(ctx)) return;
     const msp = this.getContextMsp(ctx);
     if (!msp) return;
     if (
