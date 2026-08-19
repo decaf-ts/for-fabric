@@ -54,7 +54,7 @@ class BlockedMirroredRouteModel extends Model {
   "mirror-collection",
   "main-org",
   undefined,
-  (ctx: FabricContractContext) => {
+  (_adapter, ctx: FabricContractContext) => {
     return ctx.get("mirrorGate") === true;
   }
 )
@@ -144,12 +144,6 @@ describe("mirror decorator handlers", () => {
     resolver: "mirror-collection",
     condition: (msp) => msp === "main-org",
     allow: () => false,
-  };
-
-  const allowedMirrorMetadata: MirrorMetadata = {
-    resolver: "mirror-collection",
-    condition: (msp) => msp === "main-org",
-    allow: () => true,
   };
 
   const logger = createLogger();
@@ -243,6 +237,7 @@ describe("mirror decorator handlers", () => {
     const context = new FabricContractContext();
     enableContextPut(context);
     const readFromSpy = jest.spyOn(context, "readFrom");
+    const adapter = new SpyAdapter();
     context.accumulate({
       allowMirroring: false,
       identity: {
@@ -251,7 +246,7 @@ describe("mirror decorator handlers", () => {
       logger,
     } as any);
 
-    await applyMirrorFlags(MirroredRouteModel, "main-org", context);
+    await applyMirrorFlags(adapter, MirroredRouteModel, "main-org", context);
 
     expect(readFromSpy).not.toHaveBeenCalled();
     expect(context.getOrUndefined("mirror")).toBeUndefined();
@@ -263,6 +258,7 @@ describe("mirror decorator handlers", () => {
     const context = new FabricContractContext();
     enableContextPut(context);
     const readFromSpy = jest.spyOn(context, "readFrom");
+    const adapter = new SpyAdapter();
     context.accumulate({
       allowMirroring: true,
       identity: {
@@ -272,9 +268,9 @@ describe("mirror decorator handlers", () => {
     } as any);
 
     const mirrorMeta = Model.mirroredAt(BlockedMirroredRouteModel);
-    expect(mirrorMeta?.allow?.(context as any)).toBe(false);
+    expect(mirrorMeta?.allow?.(adapter as any, context as any)).toBe(false);
 
-    await applyMirrorFlags(BlockedMirroredRouteModel, "main-org", context);
+    await applyMirrorFlags(adapter, BlockedMirroredRouteModel, "main-org", context);
 
     expect(readFromSpy).not.toHaveBeenCalled();
     expect(context.getOrUndefined("mirror")).toBeUndefined();
@@ -286,6 +282,7 @@ describe("mirror decorator handlers", () => {
     const context = new FabricContractContext();
     enableContextPut(context);
     const readFromSpy = jest.spyOn(context, "readFrom");
+    const adapter = new SpyAdapter();
     context.accumulate({
       allowMirroring: true,
       mirrorGate: false,
@@ -296,10 +293,10 @@ describe("mirror decorator handlers", () => {
     } as any);
 
     const mirrorMeta = Model.mirroredAt(FourthSlotAllowMirroredRouteModel);
-    expect(mirrorMeta?.allow?.(context as any)).toBe(false);
+    expect(mirrorMeta?.allow?.(adapter as any, context as any)).toBe(false);
     expect(mirrorMeta?.condition).toBeUndefined();
 
-    await applyMirrorFlags(FourthSlotAllowMirroredRouteModel, "main-org", context);
+    await applyMirrorFlags(adapter, FourthSlotAllowMirroredRouteModel, "main-org", context);
 
     expect(readFromSpy).not.toHaveBeenCalled();
     expect(context.getOrUndefined("mirror")).toBeUndefined();
@@ -357,6 +354,7 @@ describe("mirror decorator handlers", () => {
     const context = new FabricContractContext();
     enableContextPut(context);
     const readFromSpy = jest.spyOn(context, "readFrom");
+    const adapter = new SpyAdapter();
     context.accumulate({
       allowMirroring: true,
       identity: {
@@ -365,14 +363,26 @@ describe("mirror decorator handlers", () => {
       logger,
     } as any);
 
+    const allowSpy = jest.fn((_adapter: any, ctx: FabricContractContext) => {
+      expect(_adapter).toBe(adapter);
+      expect(ctx).toBe(context);
+      return true;
+    });
+
+    const repository = { adapter } as FabricContractRepository<MirrorTestModel>;
     await readMirrorHandler.call(
-      {} as FabricContractRepository<MirrorTestModel>,
+      repository,
       context,
-      allowedMirrorMetadata,
+      {
+        resolver: "mirror-collection",
+        condition: (msp) => msp === "main-org",
+        allow: allowSpy,
+      },
       "id",
       new MirrorTestModel({ id: "mirror-id" })
     );
 
+    expect(allowSpy).toHaveBeenCalledWith(adapter, context);
     expect(readFromSpy).toHaveBeenCalledWith("mirror-collection");
     expect(context.isFullySegregated).toBe(true);
     expect(context.getOrUndefined("mirror")).toBe(true);

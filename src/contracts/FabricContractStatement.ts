@@ -197,7 +197,7 @@ export class FabricStatement<M extends Model, R> extends CouchDBStatement<
     ];
 
     applySegregationFlags(new this.fromSelector(), collections, ctx);
-    await applyMirrorFlags(this.fromSelector, msp, ctx);
+    await applyMirrorFlags(this.adapter, this.fromSelector, msp, ctx);
 
     try {
       if (this.prepared) return this.executePrepared(...(args as any));

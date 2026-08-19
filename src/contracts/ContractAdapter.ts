@@ -2312,7 +2312,7 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const mirrorMeta = Model.mirroredAt(clazz);
     if (!mirrorMeta) return;
     if (!this.shouldAllowMirroring(ctx)) return;
-    if (mirrorMeta.allow && !mirrorMeta.allow(ctx)) return;
+    if (mirrorMeta.allow && !mirrorMeta.allow(this, ctx)) return;
     const msp = this.getContextMsp(ctx);
     if (!msp) return;
     if (

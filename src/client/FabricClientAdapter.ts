@@ -653,7 +653,7 @@ export class FabricClientAdapter extends Adapter<
     if (
       mirrorMeta &&
       ctx.get("allowMirroring") &&
-      (!mirrorMeta.allow || mirrorMeta.allow(ctx))
+      (!mirrorMeta.allow || mirrorMeta.allow(this, ctx))
     ) {
       const mirrorMsp = mirrorMeta.mspId;
       if (!mirrorMsp) throw new InternalError(`No mirror MSP could be found`);

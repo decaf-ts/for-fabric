@@ -545,7 +545,7 @@ export class FabricClientRepository<
     const mirrorMeta = Model.mirroredAt(model);
     if (!mirrorMeta) return;
     if (!ctx.get("allowMirroring")) return;
-    if (mirrorMeta.allow && !mirrorMeta.allow(ctx as any)) return;
+    if (mirrorMeta.allow && !mirrorMeta.allow(this.adapter, ctx as any)) return;
     if (Model.mirroredAt(model)) {
       ctx.accumulate({ legacy: true });
     }

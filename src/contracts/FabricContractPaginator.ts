@@ -160,7 +160,7 @@ export class FabricContractPaginator<
       ),
     ];
     applySegregationFlags(new this.clazz(), collections, ctx);
-    await applyMirrorFlags(this.clazz, msp, ctx);
+    await applyMirrorFlags(this.adapter, this.clazz, msp, ctx);
 
     this._bookmark = bookmark;
     if (this.isPreparedStatement())

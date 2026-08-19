@@ -1,4 +1,5 @@
 import {
+  Adapter,
   AuthorizationError,
   Repo,
   Context,
@@ -261,6 +262,7 @@ export function transactionId() {
 
 export type MirrorCondition = (msp: string) => boolean;
 export type MirrorAllowFunction = (
+  adapter: Adapter<any, any, any, any>,
   context: Context<FabricContractFlags>
 ) => boolean;
 
@@ -272,10 +274,11 @@ export type MirrorMetadata = {
 };
 
 function shouldAllowMirrorExecution(
+  adapter: Adapter<any, any, any, any>,
   context: Context<FabricContractFlags>,
   data?: Pick<MirrorMetadata, "allow">
 ): boolean {
-  if (data?.allow && !data.allow(context)) return false;
+  if (data?.allow && !data.allow(adapter, context)) return false;
   return !!context.get("allowMirroring");
 }
 
@@ -313,7 +316,14 @@ export async function createMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  if (!shouldAllowMirrorExecution(context, data)) return;
+  if (
+    !shouldAllowMirrorExecution(
+      this.adapter as Adapter<any, any, any, any>,
+      context,
+      data
+    )
+  )
+    return;
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   const sourceModel = model;
@@ -350,7 +360,14 @@ export async function updateMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  if (!shouldAllowMirrorExecution(context, data)) return;
+  if (
+    !shouldAllowMirrorExecution(
+      this.adapter as Adapter<any, any, any, any>,
+      context,
+      data
+    )
+  )
+    return;
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   const sourceModel = model;
@@ -387,7 +404,14 @@ export async function deleteMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  if (!shouldAllowMirrorExecution(context, data)) return;
+  if (
+    !shouldAllowMirrorExecution(
+      this.adapter as Adapter<any, any, any, any>,
+      context,
+      data
+    )
+  )
+    return;
   const collection = await evalMirrorMetadata(model, data.resolver, context);
   const fabricCtx = context as FabricContractContext;
   fabricCtx.put("mirror" as any, true);
@@ -431,7 +455,14 @@ export async function mirrorWriteGuard<
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   model: M
 ): Promise<void> {
-  if (!shouldAllowMirrorExecution(context, data)) return;
+  if (
+    !shouldAllowMirrorExecution(
+      this.adapter as Adapter<any, any, any, any>,
+      context,
+      data
+    )
+  )
+    return;
   const msp = extractMspId(
     context.get("identity") as string | ClientIdentity | undefined
   );
@@ -453,7 +484,14 @@ export async function readMirrorHandler<
   key: keyof M,
   model: M
 ): Promise<void> {
-  if (!shouldAllowMirrorExecution(context, data)) return;
+  if (
+    !shouldAllowMirrorExecution(
+      this.adapter as Adapter<any, any, any, any>,
+      context,
+      data
+    )
+  )
+    return;
   const msp = extractMspId(
     context.get("identity") as string | ClientIdentity | undefined
   );
@@ -634,13 +672,14 @@ export function applySegregationFlags<M extends Model>(
 }
 
 export async function applyMirrorFlags<M extends Model>(
+  adapter: Adapter<any, any, any, any>,
   clazz: Constructor<M>,
   msp: string | undefined,
   ctx: FabricContractContext
 ) {
   const mirrorMeta = Model.mirroredAt(clazz);
   if (!mirrorMeta) return;
-  if (!shouldAllowMirrorExecution(ctx, mirrorMeta)) return;
+  if (!shouldAllowMirrorExecution(adapter, ctx, mirrorMeta)) return;
   if (!msp) return;
   const matches =
     msp === mirrorMeta.mspId ||

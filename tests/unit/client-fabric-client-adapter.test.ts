@@ -1070,7 +1070,10 @@ describe("FabricClientAdapter", () => {
       const mirroredAtSpy = jest.spyOn(Model, "mirroredAt").mockReturnValue({
         mspId: "Org1MSP",
         resolver: "mirror-collection",
-        allow: () => true,
+        allow: (mirroringAdapter) => {
+          expect(mirroringAdapter).toBe(adapter);
+          return true;
+        },
       } as any);
 
       adapter.prepare(new ERC20Wallet({ id: "mirror-id" } as any), ctx);
@@ -1089,7 +1092,10 @@ describe("FabricClientAdapter", () => {
       const mirroredAtSpy = jest.spyOn(Model, "mirroredAt").mockReturnValue({
         mspId: "Org1MSP",
         resolver: "mirror-collection",
-        allow: () => false,
+        allow: (mirroringAdapter) => {
+          expect(mirroringAdapter).toBe(adapter);
+          return false;
+        },
       } as any);
 
       adapter.prepare(new ERC20Wallet({ id: "mirror-id" } as any), ctx);

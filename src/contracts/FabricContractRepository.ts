@@ -323,7 +323,7 @@ export class FabricContractRepository<M extends Model> extends Repository<
       ),
     ];
     applySegregationFlags(new this.class(), collections, ctx);
-    await applyMirrorFlags(this.class, msp, ctx);
+    await applyMirrorFlags(this.adapter, this.class, msp, ctx);
 
     const pk = Model.pk(this.class) as keyof M;
     const pkRangePagination = !!ctx.getOrUndefined(
