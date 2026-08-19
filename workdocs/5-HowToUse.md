@@ -232,6 +232,8 @@ class AccountContract {
 }
 ```
 
+If you are using `allow(context)`, keep it in the 4th argument. When there is no MSP condition, pass `undefined` in the 3rd argument explicitly.
+
 When `allow(context)` returns `false`, the mirror decorator does nothing for that invocation:
 
 - no mirrored collection reads

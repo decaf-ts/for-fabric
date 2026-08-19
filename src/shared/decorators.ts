@@ -479,10 +479,31 @@ export async function readMirrorHandler<
 
 export function mirror(
   collection: CollectionResolver | string,
+  mspId: string
+): (target: any, key?: any) => any;
+export function mirror(
+  collection: CollectionResolver | string,
+  mspId: string,
+  condition: MirrorCondition
+): (target: any, key?: any) => any;
+export function mirror(
+  collection: CollectionResolver | string,
+  mspId: string,
+  condition: undefined,
+  allow: MirrorAllowFunction
+): (target: any, key?: any) => any;
+export function mirror(
+  collection: CollectionResolver | string,
+  mspId: string,
+  condition: MirrorCondition,
+  allow: MirrorAllowFunction
+): (target: any, key?: any) => any;
+export function mirror(
+  collection: CollectionResolver | string,
   mspIdOrCondition?: string | MirrorCondition,
   conditionOrAllow?: MirrorCondition | MirrorAllowFunction,
   allow?: MirrorAllowFunction
-) {
+): (target: any, key?: any) => any {
   const isConditionOnly =
     typeof mspIdOrCondition !== "string" && Boolean(mspIdOrCondition);
   const mspId = isConditionOnly

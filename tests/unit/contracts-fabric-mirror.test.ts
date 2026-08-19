@@ -49,6 +49,24 @@ class BlockedMirroredRouteModel extends Model {
   }
 }
 
+@model()
+@mirror(
+  "mirror-collection",
+  "main-org",
+  undefined,
+  (ctx: FabricContractContext) => {
+    return ctx.get("mirrorGate") === true;
+  }
+)
+class FourthSlotAllowMirroredRouteModel extends Model {
+  @pk()
+  id!: string;
+
+  constructor() {
+    super();
+  }
+}
+
 type LoggerSpy = ReturnType<typeof createLogger>;
 
 function createLogger() {
@@ -257,6 +275,31 @@ describe("mirror decorator handlers", () => {
     expect(mirrorMeta?.allow?.(context as any)).toBe(false);
 
     await applyMirrorFlags(BlockedMirroredRouteModel, "main-org", context);
+
+    expect(readFromSpy).not.toHaveBeenCalled();
+    expect(context.getOrUndefined("mirror")).toBeUndefined();
+    expect(context.getOrUndefined("mirrorCollection")).toBeUndefined();
+    expect(context.isFullySegregated).toBe(false);
+  });
+
+  it("treats an explicit fourth argument as allow rather than a mirror condition", async () => {
+    const context = new FabricContractContext();
+    enableContextPut(context);
+    const readFromSpy = jest.spyOn(context, "readFrom");
+    context.accumulate({
+      allowMirroring: true,
+      mirrorGate: false,
+      identity: {
+        getMSPID: jest.fn().mockReturnValue("main-org"),
+      },
+      logger,
+    } as any);
+
+    const mirrorMeta = Model.mirroredAt(FourthSlotAllowMirroredRouteModel);
+    expect(mirrorMeta?.allow?.(context as any)).toBe(false);
+    expect(mirrorMeta?.condition).toBeUndefined();
+
+    await applyMirrorFlags(FourthSlotAllowMirroredRouteModel, "main-org", context);
 
     expect(readFromSpy).not.toHaveBeenCalled();
     expect(context.getOrUndefined("mirror")).toBeUndefined();
