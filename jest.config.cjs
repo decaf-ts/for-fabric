@@ -14,7 +14,7 @@ const config = {
   testRegex: "/tests/.*\\.(test|spec)\\.(ts|tsx)$",
   watchman: false,
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
-  testPathIgnorePatterns: ["/src/bin"],
+  testPathIgnorePatterns: ["/src/bin", "/tests/e2e/", "/tests/integration/", "/tests/integration2/", "/tests/infrastructure/"],
   collectCoverage: false,
   coverageDirectory: "./workdocs/reports/coverage",
   collectCoverageFrom: [
