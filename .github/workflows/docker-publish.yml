@@ -1,9 +1,10 @@
 name: "Docker Publish"
 
 # Thin caller of decaf-ts/reusable-actions/.github/workflows/docker-publish.yml.
-# Builds and publishes this repo's docker image(s) to ghcr.io, running in
-# parallel with publish-on-release (npm) on every GitHub Release. Also
-# triggerable on demand from the Actions UI with the inputs below.
+# Builds and publishes this repo's docker image(s) to the configured
+# registries (default ghcr.io), running in parallel with publish-on-release
+# (npm) on every GitHub Release. Manual dispatch defaults to a full
+# build/test and a trivy scan (no renovate) before the image build.
 
 on:
   release:
@@ -29,6 +30,24 @@ on:
         type: boolean
         required: false
         default: true
+      registries:
+        description: "Comma-separated registries to push to (e.g. 'ghcr.io,docker.io')."
+        required: false
+        default: "ghcr.io"
+      registry-user:
+        description: "Username for the registry logins."
+        required: false
+        default: "decaf-ts-admin"
+      run-build-test:
+        description: "Run a full build + test before building the image."
+        type: boolean
+        required: false
+        default: true
+      run-trivy-scan:
+        description: "Run a trivy vulnerability scan (no renovate) before building the image."
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   docker-contracts:
@@ -44,6 +63,9 @@ jobs:
       push: ${{ inputs.push != false }}
       platforms: ${{ inputs.platforms || 'linux/amd64' }}
       no-cache: ${{ inputs.no-cache != false }}
-      mount-npm-token: true
-      pre-build-command: "npm ci && npm run build:contract:docker"
+      registries: ${{ inputs.registries || 'ghcr.io' }}
+      registry-user: ${{ inputs.registry-user || 'decaf-ts-admin' }}
+      run-build-test: ${{ inputs.run-build-test == true }}
+      run-trivy-scan: ${{ inputs.run-trivy-scan == true }}
+      pre-build-command: "npm run build:contract:docker"
     secrets: inherit
