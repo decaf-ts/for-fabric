@@ -11,7 +11,7 @@ const config = {
   ],
   setupFiles: ["<rootDir>/tests/bootstrap.ts"],
   testEnvironment: "node",
-  testRegex: "/tests/.*\\.(test|spec)\\.(ts|tsx)$",
+  testRegex: "/tests/.*\\.(test|e2e)\\.ts$",
   watchman: false,
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   testPathIgnorePatterns: ["/src/bin", "/tests/e2e/", "/tests/integration/", "/tests/integration2/", "/tests/infrastructure/"],
