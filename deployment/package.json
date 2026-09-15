@@ -7,6 +7,7 @@
     "node": ">=20.9.0"
   },
   "scripts": {
+    "do-install": "NPM_TOKEN=$(cat ../.npmtoken) npm install",
     "infrastructure:up": "npx jest ./tests/infrastructure/boot-infrastructure.setup.ts --testNamePattern=\"Boot Infrastructure\" -u --bail=1 --runInBand --config=./jest.config.cjs",
     "infrastructure:channel:up": "npx jest ./tests/infrastructure/boot-second-channel.setup.ts --testNamePattern=\"Deploy Second Channel\" -u --bail=1 --runInBand --config=./jest.config.cjs",
     "infrastructure:down": "npx jest ./tests/infrastructure/boot-infrastructure.setup.ts --testNamePattern=\"Shutdown Infrastructure\" --bail=1 --runInBand --config=./jest.config.cjs && npx rimraf ./docker/docker-data",
