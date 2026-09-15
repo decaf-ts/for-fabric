@@ -134,7 +134,7 @@ export const DefaultInfrastructureConfig: InfrastructureConfig = {
     name: "simple-chaincode",
     user: "orga.ccaas",
     secret: "SomeRandomPassword",
-    image: "ghcr.io/pharmaledgerassoc/ptp-toolkit:contract-latest",
+    image: "ghcr.io/decaf-ts/for-fabric:contract-latest",
     port: 7070,
     csrHosts:
       "0.0.0.0,localhost,127.0.0.1,orga-ccaas-simple-chaincode,orga-ccaas-simple-on-prem-chaincode,*.orga.org",
@@ -148,7 +148,7 @@ export const DefaultInfrastructureConfig: InfrastructureConfig = {
     name: "simple-on-prem-chaincode",
     user: "orga.ccaas",
     secret: "SomeRandomPassword",
-    image: "ghcr.io/pharmaledgerassoc/ptp-toolkit:contract-latest",
+    image: "ghcr.io/decaf-ts/for-fabric:contract-latest",
     port: 7080,
     csrHosts:
       "0.0.0.0,localhost,127.0.0.1,orga-ccaas-simple-chaincode,*.orga.org",
@@ -231,7 +231,7 @@ export const DefaultOnboardPartnerConfig: OnboardConfig = {
     name: "simple-chaincode",
     user: "orgc.ccaas",
     secret: "SomeRandomPassword",
-    image: "ghcr.io/pharmaledgerassoc/ptp-toolkit:contract-latest",
+    image: "ghcr.io/decaf-ts/for-fabric:contract-latest",
     port: 7170,
     csrHosts: "0.0.0.0,localhost,127.0.0.1,orgc-ccaas-simple-chaincode,*.orgc.org",
     tag: "latest",
@@ -244,7 +244,7 @@ export const DefaultOnboardPartnerConfig: OnboardConfig = {
     name: "simple-on-prem-chaincode",
     user: "orgc.ccaas",
     secret: "SomeRandomPassword",
-    image: "ghcr.io/pharmaledgerassoc/ptp-toolkit:contract-latest",
+    image: "ghcr.io/decaf-ts/for-fabric:contract-latest",
     port: 7180,
     csrHosts:
       "0.0.0.0,localhost,127.0.0.1,orgc-ccaas-simple-on-prem-chaincode,*.orgc.org",
