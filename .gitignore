@@ -32,3 +32,6 @@
 
 /tests/integration/chaincodeTrackers/*
 /tests/integration/chaincodeTrackers/.gitkeep
+/deployment/node_modules
+/deployment/.npmtoken
+/deployment/workdocs/*
