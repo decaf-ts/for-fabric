@@ -115,15 +115,25 @@ export class FabricContractContext extends Context<FabricContractFlags> {
     return !!this.getFromChildren("fullySegregated");
   }
 
-  writeTo(col: string, entry: string[]) {
-    const segregateWrite = this.getFromChildren("segregateWrite") || {};
-    if (!(col in segregateWrite)) segregateWrite[col] = [];
-    segregateWrite[col].push(...entry);
-    this.put("segregateWrite", segregateWrite);
+  writeTo(col: string, entry: string[], table?: string) {
+    // A transaction can write several models to the same collection. Keep each
+    // model's field plan under a separate key so child-context merging cannot
+    // substitute (for example) Audit's fields for Product's fields.
+    const key = table ? `segregateWrite:${table}` as const : "segregateWrite";
+    const existing = this.getFromChildren(key) || {};
+    this.put(key, {
+      ...existing,
+      [col]: [...new Set([...(existing[col] || []), ...entry])],
+    });
+    // Preserve the collection-only API used by sequence routing and callers
+    // which register unscoped writes. Preparation uses the scoped plan only.
+    if (table) this.writeTo(col, entry);
   }
 
-  getSegregatedWrites() {
-    return this.getFromChildren("segregateWrite");
+  getSegregatedWrites(table?: string) {
+    return this.getFromChildren(
+      table ? `segregateWrite:${table}` as const : "segregateWrite"
+    );
   }
 
   put(key: string, value: any) {

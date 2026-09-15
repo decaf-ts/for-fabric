@@ -154,6 +154,45 @@ describe("OtherProductShared CRUD isolation with GtinOwner", () => {
     await expectDeletedWithoutLeakage(productCode);
   });
 
+  it("keeps the full shared payload in its collection when mirror broadcast is enabled", async () => {
+    (ctx as any).allowMirroring = true;
+    const productCode = generateGtin();
+    const created = buildProduct(productCode, "mirrored-create");
+
+    await contract.create(ctx as any, preparePayload(created));
+    stub.commit();
+
+    const privateAfterCreate = await loadPrivateProduct(productCode);
+    expect(privateAfterCreate).toMatchObject({
+      productCode,
+      inventedName: "invented-mirrored-create",
+      nameMedicinalProduct: "med-mirrored-create",
+    });
+
+    const read = Model.deserialize(
+      await contract.read(ctx as any, productCode)
+    ) as OtherProductShared;
+    expect(read).toMatchObject({
+      productCode,
+      inventedName: "invented-mirrored-create",
+      nameMedicinalProduct: "med-mirrored-create",
+    });
+
+    await contract.update(
+      ctx as any,
+      preparePayload(
+        new OtherProductShared({
+          ...read,
+          inventedName: "invented-mirrored-update",
+        })
+      )
+    );
+    stub.commit();
+
+    const privateAfterUpdate = await loadPrivateProduct(productCode);
+    expect(privateAfterUpdate.inventedName).toBe("invented-mirrored-update");
+  });
+
   it("runs bulk CRUD and enforces private/public separation with no data leakage", async () => {
     const codes = [generateGtin(), generateGtin(), generateGtin()];
     const models = codes.map((code, i) => buildProduct(code, `bulk-create-${i}`));

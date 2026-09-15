@@ -27,8 +27,8 @@ const peerConfig: PeerConfig = {
   commitTimeout: 120_000,
 };
 
-const encodeResult = (payload: any) =>
-  new TextEncoder().encode(JSON.stringify(payload));
+const encodeSerializedResult = (payload: string) =>
+  new TextEncoder().encode(payload);
 
 const tableName = Model.tableName(OtherProductShared);
 
@@ -67,6 +67,7 @@ function segregateModel(model: OtherProductShared) {
 function buildReadPayload(model: OtherProductShared) {
   return {
     productCode: model.productCode,
+    counter: model.counter,
     inventedName: model.inventedName,
     nameMedicinalProduct: model.nameMedicinalProduct,
     productRecall: model.productRecall,
@@ -79,7 +80,7 @@ function buildReadPayload(model: OtherProductShared) {
   };
 }
 
-describe.skip("FabricClientAdapter private/shared flow", () => {
+describe("FabricClientAdapter private/shared flow", () => {
   let adapter: FabricClientAdapter;
 
   beforeAll(() => {
@@ -122,9 +123,7 @@ describe.skip("FabricClientAdapter private/shared flow", () => {
     const submitSpy = jest
       .spyOn(adapter as any, "submitTransaction")
       .mockImplementation(async () => {
-        const payload = encodeResult(serialized);
-        console.log("submit payload", new TextDecoder().decode(payload));
-        return payload;
+        return encodeSerializedResult(serialized);
       });
 
     const created = await adapter.create(
@@ -143,7 +142,7 @@ describe.skip("FabricClientAdapter private/shared flow", () => {
         [tableName]: transient,
       }),
       undefined,
-      OtherProductShared.name
+      OtherProductShared
     );
     expect(readSpy).toHaveBeenCalledWith(
       OtherProductShared,
@@ -195,9 +194,7 @@ describe.skip("FabricClientAdapter private/shared flow", () => {
     const submitSpy = jest
       .spyOn(adapter as any, "submitTransaction")
       .mockImplementation(async () => {
-        const payload = encodeResult(serialized);
-        console.log("submit payload", new TextDecoder().decode(payload));
-        return payload;
+        return encodeSerializedResult(serialized);
       });
 
     const updated = await adapter.update(
@@ -216,7 +213,7 @@ describe.skip("FabricClientAdapter private/shared flow", () => {
         [tableName]: transient,
       }),
       undefined,
-      OtherProductShared.name
+      OtherProductShared
     );
     expect(readSpy).toHaveBeenCalledWith(
       OtherProductShared,
@@ -225,5 +222,75 @@ describe.skip("FabricClientAdapter private/shared flow", () => {
     );
     expect(updated).toEqual(readResult);
     expect(updated.productRecall).toBe(true);
+  });
+
+  it("uses the hydrated version for a subsequent update", async () => {
+    const initial = buildSharedModel({ counter: 1 });
+    const firstUpdate = buildSharedModel({
+      ...initial,
+      inventedName: "first-update",
+    });
+    const first = segregateModel(firstUpdate);
+    const ctx = await adapter.context(
+      OperationKeys.UPDATE,
+      {},
+      OtherProductShared
+    );
+    const hydratedFirst = buildReadPayload(
+      buildSharedModel({ ...firstUpdate, counter: 2 })
+    );
+    const readSpy = jest
+      .spyOn(adapter, "read")
+      .mockResolvedValue(hydratedFirst as Record<string, any>);
+    const submitSpy = jest
+      .spyOn(adapter as any, "submitTransaction")
+      .mockResolvedValue(
+        encodeSerializedResult(
+          (adapter as any).serializer.serialize(
+            first.publicModel,
+            OtherProductShared.name
+          )
+        )
+      );
+
+    const firstResult = await adapter.update(
+      OtherProductShared,
+      firstUpdate.productCode,
+      first.publicModel,
+      first.transient,
+      ctx as Context<FabricClientAdapter>
+    );
+
+    expect(firstResult.counter).toBe(2);
+    expect(readSpy).toHaveBeenCalledTimes(1);
+
+    const secondUpdate = buildSharedModel({
+      ...firstResult,
+      productRecall: true,
+    });
+    const second = segregateModel(secondUpdate);
+
+    expect(second.transient).toEqual(
+      expect.objectContaining({ counter: 2 })
+    );
+
+    await adapter.update(
+      OtherProductShared,
+      secondUpdate.productCode,
+      second.publicModel,
+      second.transient,
+      ctx as Context<FabricClientAdapter>
+    );
+
+    expect(submitSpy).toHaveBeenLastCalledWith(
+      ctx,
+      OperationKeys.UPDATE,
+      expect.any(Array),
+      expect.objectContaining({
+        [tableName]: expect.objectContaining({ counter: 2 }),
+      }),
+      undefined,
+      OtherProductShared
+    );
   });
 });
