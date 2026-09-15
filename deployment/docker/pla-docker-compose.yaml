@@ -1,0 +1,572 @@
+services:
+  org-tools:
+    container_name: ${ORG_NAME}-tools
+    hostname: ${ORG_NAME}-tools
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - tools
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - org-tls-server-vol:/weaver/tls/server:rw
+      - org-ca-server-vol:/weaver/ca/server:rw
+      - org-orderer-0-vol:/weaver/orderers/orderer-0:rw
+      - org-orderer-1-vol:/weaver/orderers/orderer-1:rw
+      - org-orderer-2-vol:/weaver/orderers/orderer-2:rw
+      - org-tools-vol:/weaver/tools:rw
+      - org-msp-vol:/weaver/org-msp:rw
+      - org-tls-shared-vol:/weaver/shared:rw
+      - org-contracts-vol:/weaver/contract:rw
+      - org-peer-0-vol:/weaver/peers/peer-0:rw
+      - org-peer-1-vol:/weaver/peers/peer-1:rw
+      - org-peer-2-vol:/weaver/peers/peer-2:rw
+      - org-shared-vol:/tmp:rw
+    networks:
+      org_network:
+    healthcheck:
+      test: bash -c "[ -f /fabric/bin/discover ]"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    command: tail -f /dev/null
+
+  org-tls:
+    container_name: ${ORG_NAME}-tls
+    hostname: ${ORG_NAME}-tls
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - tls
+    environment:
+      - FABRIC_CA_SERVER_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_CLIENT_HOME=/etc/hyperledger/client/admin
+      - FABRIC_CA_CLIENT_TLS_CERTFILES=/etc/hyperledger/fabric-ca-server/tls-ca.crt
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    ports:
+      - "${PORT:-9999}:${PORT:-9999}"
+    working_dir: /etc/hyperledger/fabric-ca-server
+    volumes:
+      - org-tls-server-vol:/etc/hyperledger/fabric-ca-server:rw
+      - org-tls-client-vol:/etc/hyperledger/client:rw
+      - org-ca-tls-vol:/etc/hyperledger/ca/tls:rw
+      - org-tls-shared-vol:/etc/hyperledger/shared:rw
+    networks:
+      org_network:
+    healthcheck:
+      test: bash -c "[ -f /etc/hyperledger/fabric-ca-server/fabric-ca-server-config.yaml ] && curl -s ${OPERATIONS_ADDRESS}/healthz | grep "OK" || exit 1"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    command: sh -c 'fabric-ca-server start -d'
+
+  org-ca:
+    container_name: ${ORG_NAME}-ca
+    hostname: ${ORG_NAME}-ca
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - ca
+    environment:
+      - FABRIC_CA_SERVER_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_CLIENT_HOME=/etc/hyperledger/client/client
+      - FABRIC_CA_CLIENT_TLS_CERTFILES=/etc/hyperledger/shared/tls-cert.pem
+      # - SOFTHSM2_CONF=/var/lib/softhsm/softhsm2.conf
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    ports:
+      - "${PORT:-9999}:${PORT:-9999}"
+    working_dir: /etc/hyperledger/fabric-ca-server
+    networks:
+      org_network:
+    volumes:
+      # - org-hsm-shared-vol:/var/lib/softhsm:rw
+      - org-tls-shared-vol:/etc/hyperledger/shared:rw
+      - org-ca-server-vol:/etc/hyperledger/fabric-ca-server:rw
+      - org-ca-client-vol:/etc/hyperledger/client:rw
+      - org-ca-tls-vol:/etc/hyperledger/tls:rw
+      - org-orderer-0-vol:/etc/hyperledger/client/orderers/orderer-0:rw
+      - org-orderer-1-vol:/etc/hyperledger/client/orderers/orderer-1:rw
+      - org-orderer-2-vol:/etc/hyperledger/client/orderers/orderer-2:rw
+      - org-peer-0-vol:/etc/hyperledger/client/peers/peer-0:rw
+      - org-peer-1-vol:/etc/hyperledger/client/peers/peer-1:rw
+      - org-peer-2-vol:/etc/hyperledger/client/peers/peer-2:rw
+      - org-msp-vol:/etc/hyperledger/org-msp:rw
+      - org-ccaas-tls-vol:/etc/hyperledger/ccaas:rw
+    healthcheck:
+      test: bash -c "[ -f /etc/hyperledger/fabric-ca-server/fabric-ca-server-config.yaml ] && curl -s ${OPERATIONS_ADDRESS}/healthz | grep "OK" || exit 1"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    command: sh -c 'fabric-ca-server start -d'
+
+  org-orderer-0:
+    container_name: ${ORG_NAME}-orderer-0
+    hostname: ${ORG_NAME}-orderer-0
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - orderer-0
+    ports:
+      - "${PORT:-9999}:${PORT:-9999}"
+      - "${OSN_PORT:-9998}:${OSN_PORT:-9998}"
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/fabric/ca
+      - ORDERER_YAML_FILE=/etc/hyperledger/fabric/ca/orderer.yaml
+      - SOFTHSM2_CONF=/var/lib/softhsm/softhsm2.conf
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    networks:
+      org_network:
+    healthcheck:
+      test: bash -c "[ -f /etc/hyperledger/fabric/ca/orderer.yaml ] && curl -s ${OPERATIONS_ADDRESS}/healthz | grep "OK" || exit 1"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    volumes:
+      # - org-hsm-shared-vol:/var/lib/softhsm:rw
+      - org-tls-shared-vol:/etc/hyperledger/shared:rw
+      - org-orderer-0-general-vol:/var/hyperledger:rw
+      - org-orderer-0-vol:/etc/hyperledger/fabric:rw
+    command: orderer start
+
+  org-orderer-1:
+    container_name: ${ORG_NAME}-orderer-1
+    hostname: ${ORG_NAME}-orderer-1
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - orderer-1
+    ports:
+      - "${PORT:-9999}:${PORT:-9999}"
+      - "${OSN_PORT:-9998}:${OSN_PORT:-9998}"
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/fabric/ca
+      - ORDERER_YAML_FILE=/etc/hyperledger/fabric/ca/orderer.yaml
+      - SOFTHSM2_CONF=/var/lib/softhsm/softhsm2.conf
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    networks:
+      org_network:
+    healthcheck:
+      test: bash -c "[ -f /etc/hyperledger/fabric/ca/orderer.yaml ] && curl -s ${OPERATIONS_ADDRESS}/healthz | grep "OK" || exit 1"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    volumes:
+      # - org-hsm-shared-vol:/var/lib/softhsm:rw
+      - org-tls-shared-vol:/etc/hyperledger/shared:rw
+      - org-orderer-1-general-vol:/var/hyperledger:rw
+      - org-orderer-1-vol:/etc/hyperledger/fabric:rw
+    command: orderer start
+
+  org-orderer-2:
+    container_name: ${ORG_NAME}-orderer-2
+    hostname: ${ORG_NAME}-orderer-2
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - orderer-2
+    ports:
+      - "${PORT:-9999}:${PORT:-9999}"
+      - "${OSN_PORT:-9998}:${OSN_PORT:-9998}"
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/fabric/ca
+      - ORDERER_YAML_FILE=/etc/hyperledger/fabric/ca/orderer.yaml
+      - SOFTHSM2_CONF=/var/lib/softhsm/softhsm2.conf
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    networks:
+      org_network:
+    healthcheck:
+      test: bash -c "[ -f /etc/hyperledger/fabric/ca/orderer.yaml ] && curl -s ${OPERATIONS_ADDRESS}/healthz | grep "OK" || exit 1"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    volumes:
+      # - org-hsm-shared-vol:/var/lib/softhsm:rw
+      - org-tls-shared-vol:/etc/hyperledger/shared:rw
+      - org-orderer-2-general-vol:/var/hyperledger:rw
+      - org-orderer-2-vol:/etc/hyperledger/fabric:rw
+    command: orderer start
+
+  org-peer-0-couchdb:
+    container_name: ${ORG_NAME}-peer-0-couchdb
+    hostname: ${ORG_NAME}-peer-0-couchdb
+    restart: unless-stopped
+    profiles:
+      - peer-0-couchdb
+    image: ${COUCHDB_IMAGE-none}
+    environment:
+      COUCHDB_USER: ${COUCHDB_USER-none}
+      COUCHDB_PASSWORD: ${COUCHDB_SECRET-none}
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    volumes:
+      - org-peer-0-couchdb-vol:/opt/couchdb/data
+    networks:
+      org_network:
+    ports:
+      - ${COUCHDB_PORT-8000}:5984
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: curl -f http://localhost:5984/ || exit 1
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  org-peer-1-couchdb:
+    container_name: ${ORG_NAME}-peer-1-couchdb
+    hostname: ${ORG_NAME}-peer-1-couchdb
+    restart: unless-stopped
+    profiles:
+      - peer-1-couchdb
+    image: ${COUCHDB_IMAGE-none}
+    environment:
+      COUCHDB_USER: ${COUCHDB_USER-none}
+      COUCHDB_PASSWORD: ${COUCHDB_SECRET-none}
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    volumes:
+      - org-peer-1-couchdb-vol:/opt/couchdb/data
+    networks:
+      org_network:
+    ports:
+      - ${COUCHDB_PORT-8000}:5984
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: curl -f http://localhost:5984/ || exit 1
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  org-peer-2-couchdb:
+    container_name: ${ORG_NAME}-peer-2-couchdb
+    hostname: ${ORG_NAME}-peer-2-couchdb
+    restart: unless-stopped
+    profiles:
+      - peer-2-couchdb
+    image: ${COUCHDB_IMAGE-none}
+    environment:
+      COUCHDB_USER: ${COUCHDB_USER-none}
+      COUCHDB_PASSWORD: ${COUCHDB_SECRET-none}
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    volumes:
+      - org-peer-2-couchdb-vol:/opt/couchdb/data
+    networks:
+      org_network:
+    ports:
+      - ${COUCHDB_PORT-8000}:5984
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: curl -f http://localhost:5984/ || exit 1
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  org-peer-0:
+    container_name: ${ORG_NAME}-peer-0
+    hostname: ${ORG_NAME}-peer-0
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - peer-0
+    ports:
+      - "${PORT:-9999}:${PORT:-9999}"
+    environment:
+      - SOFTHSM2_CONF=/var/lib/softhsm/softhsm2.conf
+      - FABRIC_CFG_PATH=/etc/hyperledger/fabric/ca
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/ca/msp
+      - FABRIC_LOGGING_SPEC=gateway=debug:comm=debug:grpc=debug
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - org-peer-0-vol:/etc/hyperledger/fabric:rw
+      - org-peer-0-general-vol:/var/hyperledger:rw
+      - org-contracts-vol:/etc/hyperledger/contract:rw
+      - org-tls-shared-vol:/etc/hyperledger/shared:rw
+      # - org-hsm-shared-vol:/var/lib/softhsm:rw
+      - org-shared-vol:/tmp:rw
+    networks:
+      org_network:
+    healthcheck:
+      test: bash -c "[ -f /etc/hyperledger/fabric/ca/core.yaml ] && curl -s ${OPERATIONS_ADDRESS}/healthz | grep "OK" || exit 1"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    command: peer node start
+
+  org-peer-1:
+    container_name: ${ORG_NAME}-peer-1
+    hostname: ${ORG_NAME}-peer-1
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - peer-1
+    ports:
+      - "${PORT:-9999}:${PORT:-9999}"
+    environment:
+      - SOFTHSM2_CONF=/var/lib/softhsm/softhsm2.conf
+      - FABRIC_CFG_PATH=/etc/hyperledger/fabric/ca
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/ca/msp
+      - FABRIC_LOGGING_SPEC=gateway=debug:comm=debug:grpc=debug
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - org-peer-1-vol:/etc/hyperledger/fabric:rw
+      - org-peer-1-general-vol:/var/hyperledger:rw
+      - org-contracts-vol:/etc/hyperledger/contract:rw
+      - org-tls-shared-vol:/etc/hyperledger/shared:rw
+      # - org-hsm-shared-vol:/var/lib/softhsm:rw
+      - org-shared-vol:/tmp:rw
+
+    networks:
+      org_network:
+    healthcheck:
+      test: bash -c "[ -f /etc/hyperledger/fabric/ca/core.yaml ] && curl -s ${OPERATIONS_ADDRESS}/healthz | grep "OK" || exit 1"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    command: peer node start
+
+  org-peer-2:
+    container_name: ${ORG_NAME}-peer-2
+    hostname: ${ORG_NAME}-peer-2
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - peer-2
+    ports:
+      - "${PORT:-9999}:${PORT:-9999}"
+    environment:
+      - SOFTHSM2_CONF=/var/lib/softhsm/softhsm2.conf
+      - FABRIC_CFG_PATH=/etc/hyperledger/fabric/ca
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/ca/msp
+    labels:
+      - "pla_mah_index_name=${ORG_NAME}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - org-peer-2-vol:/etc/hyperledger/fabric:rw
+      - org-peer-2-general-vol:/var/hyperledger:rw
+      - org-contracts-vol:/etc/hyperledger/contract:rw
+      - org-tls-shared-vol:/etc/hyperledger/shared:rw
+      # - org-hsm-shared-vol:/var/lib/softhsm:rw
+      - org-shared-vol:/tmp:rw
+
+    networks:
+      org_network:
+    healthcheck:
+      test: bash -c "[ -f /etc/hyperledger/fabric/ca/core.yaml ] && curl -s ${OPERATIONS_ADDRESS}/healthz | grep "OK" || exit 1"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    command: peer node start
+
+  org-ccaas:
+    container_name: ${ORG_NAME}-ccaas-${CONTRACT_NAME}
+    hostname: ${ORG_NAME}-ccaas-${CONTRACT_NAME}
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - ccaas
+    volumes:
+      - org-ccaas-tls-vol:/opt/hyperledger/tls:rw
+    ports:
+      - "${PORT:-9999}:${PORT:-9999}"
+    environment:
+      - CHAINCODE_SERVER_ADDRESS=0.0.0.0:${PORT:-9999}
+      - CHAINCODE_ID=${PACKAGE_ID:-none}
+      - CHAINCODE_TLS_CERT=/opt/hyperledger/tls/tls-client-cert.pem
+      - CHAINCODE_TLS_KEY=/opt/hyperledger/tls/tls-client-key.pem
+      - CORE_CHAINCODE_LOGGING_LEVEL=${LOG_LEVEL:-debug}
+      - CORE_CHAINCODE_LOGGING_SHIM=${LOG_LEVEL:-debug}
+      - CHAINCODE_MAXRECVMSGSIZE=${CHAINCODE_MAXRECVMSGSIZE:-15728640}
+      - CHAINCODE_MAXSENDMSGSIZE=${CHAINCODE_MAXSENDMSGSIZE:-15728640}
+      # - CORE_PEER_LOCALMSPID=${CORE_PEER_LOCALMSPID}
+    networks:
+      org_network:
+    # healthcheck:
+    #   test:
+    #     [
+    #       "CMD",
+    #       "grpc_health_probe",
+    #       "-addr=:${PORT:-9999}",
+    #       "-connect_timeout=5s",
+    #       "-rpc_timeout=5s",
+    #     ]
+    #   interval: 10s
+    #   timeout: 3s
+    #   retries: 3
+    #   start_period: 5s
+    command: npm run start
+
+  org-ccaas-on-prem:
+    container_name: ${ORG_NAME}-ccaas-${CONTRACT_NAME}
+    hostname: ${ORG_NAME}-ccaas-${CONTRACT_NAME}
+    image: ${IMAGE:-none}
+    restart: unless-stopped
+    profiles:
+      - ccaas-on-prem
+    volumes:
+      - org-ccaas-tls-vol:/opt/hyperledger/tls:rw
+    ports:
+      - "${PORT:-9999}:${PORT:-9999}"
+    environment:
+      - CHAINCODE_SERVER_ADDRESS=0.0.0.0:${PORT:-9999}
+      - CHAINCODE_ID=${PACKAGE_ID:-none}
+      - CHAINCODE_TLS_CERT=/opt/hyperledger/tls/tls-client-cert.pem
+      - CHAINCODE_TLS_KEY=/opt/hyperledger/tls/tls-client-key.pem
+      - CORE_CHAINCODE_LOGGING_LEVEL=${LOG_LEVEL:-debug}
+      - CORE_CHAINCODE_LOGGING_SHIM=${LOG_LEVEL:-debug}
+      - CHAINCODE_MAXRECVMSGSIZE=${CHAINCODE_MAXRECVMSGSIZE:-15728640}
+      - CHAINCODE_MAXSENDMSGSIZE=${CHAINCODE_MAXSENDMSGSIZE:-15728640}
+      # - CORE_PEER_LOCALMSPID=${CORE_PEER_LOCALMSPID}
+    networks:
+      org_network:
+    # healthcheck:
+    #   test:
+    #     [
+    #       "CMD",
+    #       "grpc_health_probe",
+    #       "-addr=:${PORT:-9999}",
+    #       "-connect_timeout=5s",
+    #       "-rpc_timeout=5s",
+    #     ]
+    #   interval: 10s
+    #   timeout: 3s
+    #   retries: 3
+    #   start_period: 5s
+    command: npm run start
+
+  # org-softhsm:
+  #   container_name: ${ORG_NAME}-hsm
+  #   hostname: ${ORG_NAME}-hsm
+  #   image: alpine:3.20
+  #   restart: unless-stopped
+  #   profiles:
+  #     - hsm
+  #   networks:
+  #     org_network:
+  #   volumes:
+  #     - org-hsm-shared-vol:/var/lib/softhsm
+  #   environment:
+  #     - SOFTHSM2_CONF=/var/lib/softhsm/softhsm2.conf
+  #   labels:
+  #     - "pla_mah_index_name=${ORG_NAME}"
+  #   command: >
+  #     sh -c "
+  #       apk add --no-cache softhsm &&
+  #       if [ ! -f /var/lib/softhsm/softhsm2.conf ]; then
+  #         mkdir -p /var/lib/softhsm
+  #         echo 'directories.tokendir = /var/lib/softhsm/tokens' > /var/lib/softhsm/softhsm2.conf
+  #         mkdir -p /var/lib/softhsm/tokens
+  #         softhsm2-util --init-token --free --label ${HSM_LABEL} --so-pin ${HSM_SO_PIN} --pin ${HSM_PIN}
+  #       else
+  #         echo 'SoftHSM already initialized — skipping setup.'
+  #       fi
+  #       exec tail -f /dev/null
+  #     "
+
+networks:
+  org_network:
+    name: ${ORG_NAME}_network
+    driver: bridge
+
+volumes:
+  # org-hsm-shared-vol:
+  #   name: ${ORG_NAME}-hsm-shared-vol
+  #   driver: local
+  #   driver_opts:
+  #     type: none
+  #     device: ../tests/infrastructure/storage/softhsm/${ORG_NAME}
+  #     o: bind
+
+  org-tls-server-vol:
+    name: ${ORG_NAME}-tls-server-vol
+  org-tls-client-vol:
+    name: ${ORG_NAME}-tls-client-vol
+  org-tls-shared-vol:
+    name: ${ORG_NAME}-tls-shared-vol
+
+  org-ca-tls-vol:
+    name: ${ORG_NAME}-ca-tls-vol
+  org-ca-server-vol:
+    name: ${ORG_NAME}-ca-server-vol
+  org-ca-client-vol:
+    name: ${ORG_NAME}-ca-client-vol
+
+  org-orderer-0-vol:
+    name: ${ORG_NAME}-orderer-0-vol
+  org-orderer-0-general-vol:
+    name: ${ORG_NAME}-orderer-0-general-vol
+
+  org-orderer-1-vol:
+    name: ${ORG_NAME}-orderer-1-vol
+  org-orderer-1-general-vol:
+    name: ${ORG_NAME}-orderer-1-general-vol
+
+  org-orderer-2-vol:
+    name: ${ORG_NAME}-orderer-2-vol
+  org-orderer-2-general-vol:
+    name: ${ORG_NAME}-orderer-2-general-vol
+
+  org-peer-0-couchdb-vol:
+    name: ${ORG_NAME}-peer-0-couchdb-vol
+  org-peer-1-couchdb-vol:
+    name: ${ORG_NAME}-peer-1-couchdb-vol
+  org-peer-2-couchdb-vol:
+    name: ${ORG_NAME}-peer-2-couchdb-vol
+
+  org-peer-0-vol:
+    name: ${ORG_NAME}-peer-0-vol
+  org-peer-0-general-vol:
+    name: ${ORG_NAME}-peer-0-general-vol
+
+  org-peer-1-vol:
+    name: ${ORG_NAME}-peer-1-vol
+  org-peer-1-general-vol:
+    name: ${ORG_NAME}-peer-1-general-vol
+
+  org-peer-2-vol:
+    name: ${ORG_NAME}-peer-2-vol
+  org-peer-2-general-vol:
+    name: ${ORG_NAME}-peer-2-general-vol
+
+  org-tools-vol:
+    name: ${ORG_NAME}-tools-vol
+
+  org-msp-vol:
+    name: ${ORG_NAME}-msp-vol
+
+  org-contracts-vol:
+    name: ${ORG_NAME}-contracts-vol
+  org-ccaas-tls-vol:
+    name: ${ORG_NAME}-ccaas-tls-vol
+
+  org-shared-vol:
+    name: ${ORG_NAME}-shared-vol
