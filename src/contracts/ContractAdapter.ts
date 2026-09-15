@@ -2193,7 +2193,11 @@ export class FabricContractAdapter extends CouchDBAdapter<
       `Preparing record for ${tableName} table with pk ${(model as any)[pk]}`
     );
 
-    const segregatedWriteKeys = ctx.getSegregatedWrites();
+    const segregatedWriteKeys = ctx.getSegregatedWrites(tableName);
+    const { privateCols, sharedCols } = Model.collectionsFor(model.constructor as Constructor<M>);
+    if (!isMirror && !segregatedWriteKeys && (privateCols.length || sharedCols.length)) {
+      throw new InternalError(`Missing segregated write plan for ${tableName}`);
+    }
     const segregatedWrites: Record<string, any> = {};
     // Only apply segregated writes when the current model actually has a transient split.
     // The same FabricContractContext can be reused across nested operations (for example

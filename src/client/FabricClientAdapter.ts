@@ -93,10 +93,7 @@ import { DefaultFabricClientFlags } from "./constants";
 import fs from "fs";
 import { CryptoUtils } from "./crypto";
 import { extractIds } from "./ids/id-extraction";
-import {
-  DefaultContractResolver,
-  Identity,
-} from "../shared/index";
+import { DefaultContractResolver, Identity } from "../shared/index";
 
 type LegacyPeerTarget = {
   mspId: string;
@@ -1222,7 +1219,10 @@ export class FabricClientAdapter extends Adapter<
   ): Promise<Uint8Array> {
     const log = this.log.for(this.transaction);
     transientData = this.injectTransientOverrides(transientData, ctx);
-    if (submit && (await this.shouldUseLegacyGateway(ctx, clazzOrContractName))) {
+    if (
+      submit &&
+      (await this.shouldUseLegacyGateway(ctx, clazzOrContractName))
+    ) {
       const legacyArgs = this.prepareLegacyArgs(args);
       const transientMap = this.buildLegacyTransient(transientData);
       const peerConfigs = this.buildLegacyPeerConfigs(ctx);
@@ -1286,7 +1286,7 @@ export class FabricClientAdapter extends Adapter<
 
   private async shouldUseLegacyGateway(
     ctx: FabricClientContext,
-    clazzOrContractName: Constructor<Model<any>> | string | undefined,
+    clazzOrContractName: Constructor<Model<any>> | string | undefined
   ): Promise<boolean> {
     const submissionMode =
       !clazzOrContractName || typeof clazzOrContractName === "string"
