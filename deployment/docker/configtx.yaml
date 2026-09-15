@@ -1,0 +1,153 @@
+Organizations:
+  - &OrgDef
+    Name: ${ORG_NAME}
+    SkipAsForeign: false
+    ID: ${ORG_MSPID}
+    MSPDir: ${ORG_MSPDIR}
+    Policies: &OrgDefPolicies
+      Readers:
+        Type: Signature
+        Rule: "OR('${ORG_MSPID}.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('${ORG_MSPID}.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('${ORG_MSPID}.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('${ORG_MSPID}.peer')"
+    AnchorPeers:
+      - Host: ${PEER0_HOST}
+        Port: ${PEER0_PORT}
+      - Host: ${PEER1_HOST}
+        Port: ${PEER1_PORT}
+      - Host: ${PEER2_HOST}
+        Port: ${PEER2_PORT}
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+Application: &ApplicationDefaults
+  Organizations:
+  Policies: &ApplicationPolicies
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+
+    Admins:
+      Type: Signature
+      Rule: "OutOf(1, '${ORG_MSPID}.admin')"
+
+    LifecycleEndorsement:
+      Type: Signature
+      Rule: "OutOf(1, '${ORG_MSPID}.admin', '${ORG_MSPID}.peer')"
+
+    Endorsement:
+      Type: Signature
+      Rule: "OutOf(2, '${ORG_MSPID}.peer', '${ORG_MSPID}.peer')"
+
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - ${ORDERER0_HOST}:${ORDERER0_PORT}
+    - ${ORDERER1_HOST}:${ORDERER1_PORT}
+    - ${ORDERER2_HOST}:${ORDERER2_PORT}
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 500
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 2 MB
+  MaxChannels: 0
+  EtcdRaft:
+    Consenters:
+      - Host: ${ORDERER0_HOST}
+        Port: ${ORDERER0_PORT}
+        ClientTLSCert: /weaver/orderers/orderer-0/tls/msp/signcerts/cert.pem
+        ServerTLSCert: /weaver/orderers/orderer-0/tls/msp/signcerts/cert.pem
+      - Host: ${ORDERER1_HOST}
+        Port: ${ORDERER1_PORT}
+        ClientTLSCert: /weaver/orderers/orderer-1/tls/msp/signcerts/cert.pem
+        ServerTLSCert: /weaver/orderers/orderer-1/tls/msp/signcerts/cert.pem
+      - Host: ${ORDERER2_HOST}
+        Port: ${ORDERER2_PORT}
+        ClientTLSCert: /weaver/orderers/orderer-2/tls/msp/signcerts/cert.pem
+        ServerTLSCert: /weaver/orderers/orderer-2/tls/msp/signcerts/cert.pem
+    Options:
+      TickInterval: 500ms
+      ElectionTick: 10
+      HeartbeatTick: 1
+      MaxInflightBlocks: 5
+      SnapshotIntervalSize: 16 MB
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: Signature
+      Rule: "OutOf(1, '${ORG_MSPID}.admin')"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: Signature
+      Rule: "OutOf(1, '${ORG_MSPID}.admin')"
+  Capabilities:
+    <<: *ChannelCapabilities
+Profiles:
+  ${CHANNEL_PROFILE}:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - <<: *OrgDef
+
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - <<: *OrgDef
+      Capabilities: *ApplicationCapabilities
+
+  ${ON_PREM_CHANNEL_PROFILE}:
+    <<: *ChannelDefaults
+
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - <<: *OrgDef
+
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - <<: *OrgDef
+      Policies:
+        <<: *ApplicationPolicies
+        Endorsement:
+          Type: ImplicitMeta
+          Rule: "ANY Endorsement"
+      Capabilities: *ApplicationCapabilities
