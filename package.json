@@ -107,6 +107,8 @@
     "extract:indexes": "decaf fabric extract-indexes --folder ./lib/cjs/contract/trackedModels --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract}",
     "extract:collections": "decaf fabric extract-collections --folder ./lib/cjs/contract/trackedModels --outDir ./docker/infrastructure/chaincode/${CONTRACT_NAME:-GlobalContract} --mspIds '[\"org-a\",\"org-c\"]' --mainMspId org-b",
     "infrastructure:up": "docker compose -f ./docker/infrastructure/docker-compose.yaml up -d",
+    "infrastructure:shared:up": "cd deployment && npm run infrastructure:full:up && npm run setup:orgs",
+    "infrastructure:shared:down": "cd deployment && npm run infrastructure:full:down",
     "infrastructure:down": "docker compose -f ./docker/infrastructure/docker-compose.yaml down --rmi local -v && rm -rf ./docker/docker-data && rm -f ./tests/integration/chaincodeTrackers/*.count",
     "infrastructure-hsm:up": "docker compose -f ./docker/infrastructure/docker-compose-hsm.yaml up -d",
     "infrastructure-hsm:down": "docker compose -f ./docker/infrastructure/docker-compose-hsm.yaml down --rmi local -v",
