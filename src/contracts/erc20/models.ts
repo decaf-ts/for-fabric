@@ -1,4 +1,11 @@
-import { BaseModel, column, pk, table } from "@decaf-ts/core";
+import {
+  BaseModel,
+  column,
+  index,
+  OrderDirection,
+  pk,
+  table,
+} from "@decaf-ts/core";
 import { model, type ModelArg, required } from "@decaf-ts/decorator-validation";
 
 /**
@@ -130,10 +137,20 @@ export class Allowance extends BaseModel {
   @pk({ type: String })
   /**
    * @description Allowance unique identifier
-   * @summary Primary key for the allowance; typically a unique identifier for the approval relationship
+   * @summary Composite primary key combining the owner and spender wallet
+   * identifiers, so an owner can grant one allowance per spender
    */
   @column()
   @required()
+  /**
+   * @description Allowance composite identifier
+   * @summary `${owner}_${spender}`; set when the allowance is created
+   */
+  id!: string;
+
+  @column()
+  @required()
+  @index([OrderDirection.ASC, OrderDirection.DSC])
   /**
    * @description Owner wallet identifier
    * @summary Wallet that authorizes the allowance
