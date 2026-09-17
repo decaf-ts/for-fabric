@@ -848,11 +848,7 @@ export async function segregatedDataOnCreate<M extends Model>(
 
   const keyStrings = keyArray.map((key) => String(key));
   // Store the segregated model — prepare() will filter to collection-specific fields
-  (context as FabricContractContext).writeTo(
-    collection,
-    keyStrings,
-    Model.tableName(model.constructor as Constructor<M>)
-  );
+  (context as FabricContractContext).writeTo(collection, keyStrings);
 }
 
 export async function segregatedDataOnRead<M extends Model>(
@@ -939,11 +935,7 @@ export async function segregatedDataOnUpdate<M extends Model>(
 
   const keyStrings = (keyArray as (keyof M)[]).map((key) => String(key));
   // Store the original model — prepare() will filter to collection-specific fields
-  (context as FabricContractContext).writeTo(
-    collection,
-    keyStrings,
-    Model.tableName(model.constructor as Constructor<M>)
-  );
+  (context as FabricContractContext).writeTo(collection, keyStrings);
 }
 
 export async function segregatedDataOnDelete<

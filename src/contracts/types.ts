@@ -27,7 +27,6 @@ export interface FabricContractFlags extends FabricFlags {
   cert: string;
 
   segregateWrite?: Record<string, string[]>;
-  [key: `segregateWrite:${string}`]: Record<string, string[]> | undefined;
   segregateRead?: string | string[];
   forceSegregateWrite?: boolean;
   fullySegregated?: boolean;
