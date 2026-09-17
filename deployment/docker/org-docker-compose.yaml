@@ -152,6 +152,12 @@ services:
       - CHAINCODE_MAXSENDMSGSIZE=${CHAINCODE_MAXSENDMSGSIZE:-15728640}
     networks:
       org_network:
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 ${PORT:-9999}"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     command: npm run start
 
   org-ccaas-on-prem:
@@ -177,6 +183,12 @@ services:
       - CHAINCODE_MAXSENDMSGSIZE=${CHAINCODE_MAXSENDMSGSIZE:-15728640}
     networks:
       org_network:
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 ${PORT:-9999}"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     command: npm run start
 
   org-tools:

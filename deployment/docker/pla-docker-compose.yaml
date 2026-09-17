@@ -448,19 +448,12 @@ services:
       # - CORE_PEER_LOCALMSPID=${CORE_PEER_LOCALMSPID}
     networks:
       org_network:
-    # healthcheck:
-    #   test:
-    #     [
-    #       "CMD",
-    #       "grpc_health_probe",
-    #       "-addr=:${PORT:-9999}",
-    #       "-connect_timeout=5s",
-    #       "-rpc_timeout=5s",
-    #     ]
-    #   interval: 10s
-    #   timeout: 3s
-    #   retries: 3
-    #   start_period: 5s
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 ${PORT:-9999}"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     command: npm run start
 
   # org-softhsm:
