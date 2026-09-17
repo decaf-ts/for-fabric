@@ -4813,9 +4813,12 @@ describe("Deploy Pharmaledger Infrastructure", () => {
             stdio: "inherit",
           });
 
-          execSync(`docker create --name ${contractContainer} ${contractImage}`, {
-            stdio: "inherit",
-          });
+          execSync(
+            `docker create --name ${contractContainer} ${contractImage}`,
+            {
+              stdio: "inherit",
+            }
+          );
 
           execSync(
             `docker cp ${contractContainer}:/contract/. ${contractsLocalFolder}`,
