@@ -35,3 +35,4 @@
 /deployment/node_modules
 /deployment/.npmtoken
 /deployment/workdocs/*
+/deployment/tests/infrastructure/storage/*
