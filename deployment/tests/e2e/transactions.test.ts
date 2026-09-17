@@ -59,6 +59,11 @@ const chaincode = plaEnv.CONTRACT__NAME;
 const orgs = orgEnvFiles.map(loadOrg);
 const [orga, orgb, orgc] = orgs;
 
+// Every contract is registered under its own @Info title, so transaction
+// names are prefixed with the contract name to avoid relying on the
+// chaincode's default contract resolution.
+const PRODUCT_CONTRACT = "OtherProductContract";
+
 function shellEscape(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
@@ -117,25 +122,35 @@ function chaincodeArgs(org: OrgConfig, fn: string, args: unknown[]): string {
   const serialized = args.map((arg) =>
     typeof arg === "string" ? arg : JSON.stringify(arg)
   );
-  const json = JSON.stringify({ Args: [fn, ...serialized] });
+  const json = JSON.stringify({ Args: [`${fn}`, ...serialized] });
   return shellEscape(json);
 }
 
-function invoke(org: OrgConfig, fn: string, args: unknown[]): void {
-  // The channel Application/Endorsement policy is
-  // OutOf(2, 'OrgaMSP.peer', 'OrgaMSP.peer'): every invoke must collect
-  // signatures from two orga peers, regardless of which org submits it.
+function invoke(submitter: OrgConfig, fn: string, args: unknown[]): void {
+  // Two endorsement layers must be satisfied:
+  // 1. The channel Application/Endorsement policy
+  //    OutOf(2, 'OrgaMSP.peer', 'OrgaMSP.peer'): requires signatures from
+  //    two orga peers, regardless of which org submits the transaction.
+  // 2. The private data collection endorsement policies (e.g.
+  //    decaf-namespaceOrgbMSP = AND('OrgbMSP.peer','PharmaledgerassocMSP.peer')):
+  //    writes touching collections owned by the submitter org require one of
+  //    that org's peers to endorse as well.
   const peerFlags = [
     `--peerAddresses ${orga.name}-peer-0:${orga.peerPort} --tlsRootCertFiles ${orga.peerTlsCaFile}`,
     `--peerAddresses ${orga.name}-peer-1:${plaEnv.PEER1__PORT} --tlsRootCertFiles ${orga.peerTlsCaFile}`,
+    ...(submitter.name !== orga.name
+      ? [
+          `--peerAddresses localhost:${submitter.peerPort} --tlsRootCertFiles ${submitter.peerTlsCaFile}`,
+        ]
+      : []),
   ].join(" ");
   execInPeer(
-    org,
+    submitter,
     `peer chaincode invoke -C ${channel} -n ${chaincode} ` +
-      `-o ${ordererAddress} --tls --cafile ${org.ordererCaFile} ` +
+      `-o ${ordererAddress} --tls --cafile ${submitter.ordererCaFile} ` +
       `${peerFlags} ` +
       `--connTimeout 30s --waitForEvent ` +
-      `-c ${chaincodeArgs(org, fn, args)}`
+      `-c ${chaincodeArgs(submitter, fn, args)}`
   );
 }
 
@@ -160,17 +175,30 @@ function tryQuery(org: OrgConfig, fn: string, args: unknown[]): string | null {
   return output.trim();
 }
 
-function balance(org: OrgConfig, owner: string): number {
-  const result = tryQuery(org, "BalanceOf", [owner]);
-  if (result === null) return 0;
-  return parseInt(result, 10);
+/**
+ * Generates a random valid GTIN (14 digits including the GS1 check digit),
+ * so every run creates a fresh OtherProduct and stays idempotent.
+ */
+function generateGtin(): string {
+  const beforeChecksum = (Math.floor(Math.random() * 9999999999999) + "")
+    .padStart(13, "0");
+  const multiplier = [3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3];
+  const sum = beforeChecksum
+    .split("")
+    .reduce((acc, digit, i) => acc + parseInt(digit, 10) * multiplier[i], 0);
+  const remainder = sum % 10;
+  const checksum = remainder === 0 ? 0 : 10 - remainder;
+  return `${beforeChecksum}${checksum}`;
 }
 
-const TOKEN = {
-  name: "decaf-e2e-token",
-  symbol: "DET",
-  decimals: 2,
-};
+interface OtherProduct {
+  productCode: string;
+  inventedName: string;
+  nameMedicinalProduct: string;
+  productRecall?: boolean;
+  counter?: number;
+  ownedBy?: string;
+}
 
 describe("E2E Transactions", () => {
   beforeAll(() => {
@@ -178,43 +206,57 @@ describe("E2E Transactions", () => {
   });
 
   it("Performs transactions on " + orgs.map((o) => o.name).join(", "), () => {
-    // STEP-1 orga initializes the token (skipped if already initialized)
-    if (tryQuery(orga, "CheckInitialized", []) === null) {
-      invoke(orga, "Initialize", [TOKEN]);
-    }
-    expect(tryQuery(orga, "CheckInitialized", [])).toBeDefined();
+    const productCode = generateGtin();
+    const product: OtherProduct = {
+      productCode,
+      inventedName: "E2E Invented",
+      nameMedicinalProduct: "E2E Medicinal",
+      productRecall: false,
+    };
 
-    // STEP-2 orga mints and owns the initial supply
-    const orgaId = query(orga, "ClientAccountID", []);
-    const orgaBeforeMint = balance(orga, orgaId);
-    invoke(orga, "Mint", [1000]);
-    expect(balance(orga, orgaId)).toBe(orgaBeforeMint + 1000);
+    // STEP-1 orgb creates an OtherProduct record.
+    // Writes must be submitted by a partner org: orga owns the mirror
+    // collection (PharmaledgerassocMSP) and is not authorized to modify
+    // mirrored data. The contract's DeterministicSerializer requires the
+    // __model class anchor to rebuild the model instance from the payload.
+    invoke(orgb, `${PRODUCT_CONTRACT}:create`, [
+      JSON.stringify({ ...product, __model: "OtherProduct" }),
+    ]);
+    const created = JSON.parse(
+      query(orgb, `${PRODUCT_CONTRACT}:read`, [productCode])
+    ) as OtherProduct;
+    expect(created.productCode).toBe(productCode);
+    expect(created.inventedName).toBe(product.inventedName);
+    expect(created.ownedBy).toBeDefined();
+    expect(created.counter).toBeDefined();
 
-    // STEP-3 orgb reads orga's balance from its own peer (same ledger)
-    const orgbId = query(orgb, "ClientAccountID", []);
-    const orgcId = query(orgc, "ClientAccountID", []);
-    expect(balance(orgb, orgaId)).toBe(orgaBeforeMint + 1000);
+    // STEP-2 orga and orgc read orgb's record from their own peers (same ledger)
+    const orgaRead = JSON.parse(
+      query(orga, `${PRODUCT_CONTRACT}:read`, [productCode])
+    ) as OtherProduct;
+    expect(orgaRead).toEqual(created);
+    const orgcRead = JSON.parse(
+      query(orgc, `${PRODUCT_CONTRACT}:read`, [productCode])
+    ) as OtherProduct;
+    expect(orgcRead).toEqual(created);
 
-    // STEP-4 orga approves allowances for orgb and orgc
-    invoke(orga, "Approve", [orgbId, 500]);
-    invoke(orga, "Approve", [orgcId, 200]);
+    // STEP-3 orgc submits an update; orga reads it back
+    const updatedModel: OtherProduct = {
+      ...orgcRead,
+      inventedName: "E2E Invented Updated",
+    };
+    invoke(orgc, `${PRODUCT_CONTRACT}:update`, [JSON.stringify(updatedModel)]);
+    const afterUpdate = JSON.parse(
+      query(orga, `${PRODUCT_CONTRACT}:read`, [productCode])
+    ) as OtherProduct;
+    expect(afterUpdate.inventedName).toBe("E2E Invented Updated");
+    // the version counter is incremented on update
+    expect(afterUpdate.counter).toBe((updatedModel.counter || 0) + 1);
 
-    // STEP-5 orgb submits a transfer from orga's allowance
-    const orgbBefore = balance(orgb, orgbId);
-    invoke(orgb, "TransferFrom", [orgaId, orgbId, 500]);
-    expect(balance(orgc, orgbId)).toBe(orgbBefore + 500);
-
-    // STEP-6 orgc submits a transfer from orga's allowance
-    const orgcBefore = balance(orgc, orgcId);
-    invoke(orgc, "TransferFrom", [orgaId, orgcId, 200]);
-    expect(balance(orga, orgcId)).toBe(orgcBefore + 200);
-
-    // STEP-7 final balances: orga spent 700 of the minted tokens
-    expect(balance(orga, orgaId)).toBe(orgaBeforeMint + 1000 - 500 - 200);
-    expect(balance(orgb, orgbId)).toBe(orgbBefore + 500);
-    expect(balance(orgc, orgcId)).toBe(orgcBefore + 200);
-    expect(parseInt(query(orga, "TotalSupply", []), 10)).toBe(
-      orgaBeforeMint + orgbBefore + orgcBefore + 1000
-    );
+    // STEP-4 orgb deletes the record; every org sees it gone
+    invoke(orgb, `${PRODUCT_CONTRACT}:delete`, [productCode]);
+    expect(tryQuery(orga, `${PRODUCT_CONTRACT}:read`, [productCode])).toBeNull();
+    expect(tryQuery(orgb, `${PRODUCT_CONTRACT}:read`, [productCode])).toBeNull();
+    expect(tryQuery(orgc, `${PRODUCT_CONTRACT}:read`, [productCode])).toBeNull();
   });
 });
