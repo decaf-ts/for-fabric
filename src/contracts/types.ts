@@ -22,6 +22,12 @@ export interface FabricContractFlags extends FabricFlags {
    */
   identity: ClientIdentity;
 
+  /**
+   * @description Fabric-style alias for the client identity (mirrors
+   * fabric-contract-api's Context API)
+   */
+  clientIdentity?: ClientIdentity;
+
   roles?: string[];
 
   cert: string;

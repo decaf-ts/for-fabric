@@ -6,6 +6,8 @@ import {
   ViewResponse,
   requireGeneratedUseIndex,
   ensureDeterministicSort as couchEnsureDeterministicSort,
+  getEqualitySelectorFields,
+  getRangeSelectorFields,
   getSortDirection,
   getSortFields,
   warnScanProneMangoOperators,
@@ -282,6 +284,19 @@ export class FabricContractAdapter extends CouchDBAdapter<
     const selector = query.selector as Record<string, any> | undefined;
     const tableName = selector?.[CouchDBKeys.TABLE];
     if (typeof tableName !== "string" || !tableName.length) {
+      return;
+    }
+
+    const equalityFields = getEqualitySelectorFields(selector || {});
+    equalityFields.delete(CouchDBKeys.TABLE);
+    const rangeFields = getRangeSelectorFields(selector || {});
+    const sortFields = getSortFields(query);
+    if (!equalityFields.size && !rangeFields.size && !sortFields.length) {
+      if (log) {
+        log.debug(
+          `Skipping generated use index for fieldless query on table ${tableName}`
+        );
+      }
       return;
     }
 
