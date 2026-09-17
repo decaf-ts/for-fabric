@@ -122,20 +122,13 @@ function chaincodeArgs(org: OrgConfig, fn: string, args: unknown[]): string {
 }
 
 function invoke(org: OrgConfig, fn: string, args: unknown[]): void {
-  // The channel default endorsement policy is MAJORITY Endorsement: with
-  // three orgs on the channel every invoke must be endorsed by two of them.
-  const endorsers = [
-    org,
-    ...orgs.filter((o) => o.name !== org.name).slice(0, 1),
-  ];
-  const peerFlags = endorsers
-    .map(
-      (e) =>
-        // docker-network addresses (resolvable + present in the peer TLS
-        // cert SANs); localhost:<port> only exists on the docker host.
-        `--peerAddresses ${e.peerContainer}:${e.peerPort} --tlsRootCertFiles ${e.peerTlsCaFile}`
-    )
-    .join(" ");
+  // The channel Application/Endorsement policy is
+  // OutOf(2, 'OrgaMSP.peer', 'OrgaMSP.peer'): every invoke must collect
+  // signatures from two orga peers, regardless of which org submits it.
+  const peerFlags = [
+    `--peerAddresses ${orga.name}-peer-0:${orga.peerPort} --tlsRootCertFiles ${orga.peerTlsCaFile}`,
+    `--peerAddresses ${orga.name}-peer-1:${plaEnv.PEER1__PORT} --tlsRootCertFiles ${orga.peerTlsCaFile}`,
+  ].join(" ");
   execInPeer(
     org,
     `peer chaincode invoke -C ${channel} -n ${chaincode} ` +
