@@ -36,3 +36,4 @@
 /deployment/.npmtoken
 /deployment/workdocs/*
 /deployment/tests/infrastructure/storage/*
+/deployment/tests/infrastructure/tmp/*
