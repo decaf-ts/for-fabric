@@ -28,6 +28,7 @@
     "infrastructure:orgs:up": "npm run infrastructure:up && npm run build:contract:simple && npm run deploy:contract:simple && npm run setup:orgs",
     "infrastructure:orgs:down": "ONBOARD_ENV_FILE=.env.onboard.orgc npm run onboard:down && ONBOARD_ENV_FILE=.env.onboard.orgb npm run onboard:down && npm run infrastructure:down",
     "test:transactions": "npx jest ./tests/e2e/transactions.test.ts --runInBand --config=./jest.config.cjs",
+    "test:client": "npx jest ./tests/e2e/orgb-client.test.ts --runInBand --config=./jest.config.cjs",
     "setup:orgs": "npx jest ./tests/e2e/setup.test.ts --runInBand --config=./jest.config.cjs"
   },
   "devDependencies": {
