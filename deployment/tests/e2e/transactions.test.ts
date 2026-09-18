@@ -180,8 +180,9 @@ function tryQuery(org: OrgConfig, fn: string, args: unknown[]): string | null {
  * so every run creates a fresh OtherProduct and stays idempotent.
  */
 function generateGtin(): string {
-  const beforeChecksum = (Math.floor(Math.random() * 9999999999999) + "")
-    .padStart(13, "0");
+  const beforeChecksum = (
+    Math.floor(Math.random() * 9999999999999) + ""
+  ).padStart(13, "0");
   const multiplier = [3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3];
   const sum = beforeChecksum
     .split("")
@@ -255,8 +256,14 @@ describe("E2E Transactions", () => {
 
     // STEP-4 orgb deletes the record; every org sees it gone
     invoke(orgb, `${PRODUCT_CONTRACT}:delete`, [productCode]);
-    expect(tryQuery(orga, `${PRODUCT_CONTRACT}:read`, [productCode])).toBeNull();
-    expect(tryQuery(orgb, `${PRODUCT_CONTRACT}:read`, [productCode])).toBeNull();
-    expect(tryQuery(orgc, `${PRODUCT_CONTRACT}:read`, [productCode])).toBeNull();
+    expect(
+      tryQuery(orga, `${PRODUCT_CONTRACT}:read`, [productCode])
+    ).toBeNull();
+    expect(
+      tryQuery(orgb, `${PRODUCT_CONTRACT}:read`, [productCode])
+    ).toBeNull();
+    expect(
+      tryQuery(orgc, `${PRODUCT_CONTRACT}:read`, [productCode])
+    ).toBeNull();
   });
 });
