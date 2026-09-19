@@ -161,6 +161,8 @@ function removeSrcFromPath(path: string): string {
   return path.replace(/^\.\/src\//, "./");
 }
 
+const CLI_MODULE_FILES = ["cli-module.cjs", "cli-module.cjs.map"];
+
 function copyFolderContents(sourceDir: string, targetDir: string) {
   if (!fs.existsSync(sourceDir)) {
     throw new Error(`Source directory does not exist: ${sourceDir}`);
@@ -169,6 +171,7 @@ function copyFolderContents(sourceDir: string, targetDir: string) {
   fs.mkdirSync(targetDir, { recursive: true });
 
   for (const item of fs.readdirSync(sourceDir)) {
+    if (CLI_MODULE_FILES.includes(item)) continue;
     const sourcePath = path.join(sourceDir, item);
     const targetPath = path.join(targetDir, item);
 
@@ -680,7 +683,10 @@ const extractCollections = new Command()
             log
               .for(Model.tableName(clazz))
               .verbose(`generating indexes for collections`);
-            indexes = generateModelIndexes(clazz, log.for(Model.tableName(clazz)));
+            indexes = generateModelIndexes(
+              clazz,
+              log.for(Model.tableName(clazz))
+            );
             log
               .for(Model.tableName(clazz))
               .info(`found ${indexes.length} indexes`);

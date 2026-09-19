@@ -62,6 +62,34 @@ const logger: Logger = Logging.for("Onboard Partner");
 const orchestrator: DeploymentOrchestrator =
   OrchestratorFactory.getOrchestrator();
 
+const fabricCliFile = path.resolve(__dirname, "../../../lib/cjs/bin/cli.cjs");
+const repoRoot = path.resolve(__dirname, "../../..");
+
+// The PLA (orga) environment carries its own peer port
+const plaPeerPort =
+  dotenv.parse(
+    fs.readFileSync(path.join(__dirname, "../environment/.env.pla"), "utf8")
+  ).PEER0__PORT || "7050";
+
+// Organizations onboarded before the current one, passed down by setup.test.ts
+// as a comma-separated list of env files (e.g. ".env.onboard.orgb").
+function onboardedOrgs(): { org: string; peerAddress: string; peerPort: string }[] {
+  return (process.env.ONBOARDED_ORGS || "")
+    .split(",")
+    .map((f) => f.trim())
+    .filter(Boolean)
+    .map((f) => {
+      const parsed = dotenv.parse(
+        fs.readFileSync(path.join(__dirname, "../environment", path.basename(f)), "utf8")
+      );
+      return {
+        org: parsed.ORG_NAME,
+        peerAddress: `${parsed.ORG_NAME}-${DeploymentStage.PEER}-0`,
+        peerPort: parsed.PEER0__PORT,
+      };
+    });
+}
+
 describe("Onboard Partner", () => {
   let abort = false;
   let err: any;
@@ -2082,6 +2110,84 @@ describe("Onboard Partner", () => {
       }
     });
 
+    it("Updates Contract Collections", async () => {
+      if (!env.enableCollections) return;
+      try {
+        const previous = onboardedOrgs();
+        const orgsSoFar = [
+          env.pla.orgName,
+          ...previous.map((o) => o.org),
+          env.orgName,
+        ];
+        const mspIds = orgsSoFar.map((o) => generateMspId(o.toLowerCase()));
+        const mainMspId = generateMspId(env.pla.orgName.toLowerCase());
+
+        logger.info(
+          `Generating collections config for [${mspIds.join(", ")}] (main: ${mainMspId})`
+        );
+
+        const outDir = path.join(
+          __dirname,
+          STORAGE_DIR_NAME,
+          env.orgName,
+          "collections"
+        );
+        fs.rmSync(outDir, { recursive: true, force: true });
+        fs.mkdirSync(outDir, { recursive: true });
+
+        execSync(
+          `node ${fabricCliFile} extract-collections ` +
+            `--folder ./lib/cjs/contract/trackedModels ` +
+            `--outDir ${outDir} ` +
+            `--mspIds '${JSON.stringify(mspIds)}' ` +
+            `--mainMspId ${mainMspId}`,
+          {
+            cwd: repoRoot,
+            stdio: "inherit",
+          }
+        );
+
+        const metaInf = path.join(outDir, "META-INF");
+        const toolsPath = `/weaver/contract/${env.contract.name}/META-INF`;
+        const peerPath = `/etc/hyperledger/contract/${env.contract.name}/META-INF`;
+
+        // The PLA tools container is the source for the onboarding org's
+        // package build: refresh it so the new package carries the config
+        await orchestrator.executeInContainer(env.pla.toolsAddress, [
+          "rm",
+          "-rf",
+          toolsPath,
+        ]);
+        await orchestrator.copyToAndFromContainer(
+          env.pla.toolsAddress,
+          metaInf,
+          toolsPath
+        );
+
+        // The PLA peer approves and commits the new definition
+        const plaPeer = env.pla.peerAddress;
+        await orchestrator.executeInContainer(plaPeer, ["rm", "-rf", peerPath]);
+        await orchestrator.copyToAndFromContainer(plaPeer, metaInf, peerPath);
+
+        // Previously onboarded orgs must also approve the new definition
+        for (const prev of previous) {
+          const prevPeer = prev.peerAddress;
+          if (!(await orchestrator.isContainerRunning(prevPeer))) continue;
+          await orchestrator.executeInContainer(prevPeer, [
+            "rm",
+            "-rf",
+            peerPath,
+          ]);
+          await orchestrator.copyToAndFromContainer(prevPeer, metaInf, peerPath);
+        }
+      } catch (e: unknown) {
+        err = e;
+        logger.error("Failed to update contract collections", e as Error);
+        expect(e).toBeUndefined();
+        return;
+      }
+    });
+
     it("Shutdown old Contract CaaS Service", async () => {
       try {
         // Resolve container name
@@ -2141,6 +2247,10 @@ describe("Onboard Partner", () => {
         const seq = match ? Number(match[1]) : 0;
 
         sequence = seq;
+
+        // When collections are enabled the onboarding org deploys a new
+        // definition (with collections) on top of the currently committed one.
+        if (env.enableCollections && seq > 0) sequence = seq + 1;
       } catch (e: unknown) {
         err = e;
         logger.error("Failed to query contract sequence", e as Error);
@@ -2460,6 +2570,79 @@ describe("Onboard Partner", () => {
       }
     });
 
+    it("Approves Contract On Other Orgs", async () => {
+      if (!env.enableCollections) return;
+      try {
+        const approvals: { peer: string; caFile: string }[] = [
+          {
+            peer: env.pla.peerAddress,
+            caFile: `/etc/hyperledger/shared/tls-cert.pem`,
+          },
+          ...onboardedOrgs().map((o) => ({
+            peer: o.peerAddress,
+            caFile: `/etc/hyperledger/fabric/orderer-tls.pem`,
+          })),
+        ];
+
+        for (const approval of approvals) {
+          if (!(await orchestrator.isContainerRunning(approval.peer))) {
+            logger.info(`${approval.peer} is not running.`);
+            continue;
+          }
+
+          const queryBuilder = new FabricPeerLifecycleChaincodeCommandBuilder();
+          const queryCommand = queryBuilder
+            .setCommand(PeerLifecycleChaincodeCommands.QUERYINSTALLED)
+            .build();
+
+          const installed = await orchestrator.exec(approval.peer, queryCommand, [
+            `CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/admin/ca/msp`,
+          ]);
+
+          const idMatch = installed
+            .toString()
+            .match(new RegExp(`${env.contract.name}_ccaas:[a-f0-9]+`));
+
+          if (!idMatch) {
+            logger.warn(
+              `No installed package found on ${approval.peer}. Skipping approval.`
+            );
+            continue;
+          }
+
+          const builder = new FabricPeerLifecycleChaincodeCommandBuilder();
+
+          const command = builder
+            .setCommand(PeerLifecycleChaincodeCommands.APPROVEFORMYORG)
+            .setChannelID(env.channel.name)
+            .setOrdererAddress(
+              `${env.pla.ordererAddress}:${env.pla.ordererPort}`
+            )
+            .setPackageID(idMatch[0])
+            .setVersion(env.contract.version.toString() || "1.0")
+            .setSequence(sequence.toString())
+            .enableTLS(true)
+            .setTLSCAFile(approval.caFile)
+            .setContractName(env.contract.name)
+            .setCollectionsConfigPath(
+              `/etc/hyperledger/contract/${env.contract.name}/META-INF/collections_config.json`
+            )
+            .build();
+
+          logger.info(`Running command on ${approval.peer}: ${command}`);
+
+          await orchestrator.exec(approval.peer, command, [
+            `CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/admin/ca/msp`,
+          ]);
+        }
+      } catch (e: unknown) {
+        err = e;
+        logger.error("Failed to approve contract on other orgs", e as Error);
+        expect(e).toBeUndefined();
+        return;
+      }
+    });
+
     it("Approves Contract", async () => {
       try {
         // Resolve container name
@@ -2501,6 +2684,99 @@ describe("Onboard Partner", () => {
       } catch (e: unknown) {
         err = e;
         logger.error("Failed to install contract package", e as Error);
+        expect(e).toBeUndefined();
+        return;
+      }
+    });
+
+    it("Commits Contract", async () => {
+      if (!env.enableCollections) return;
+      try {
+        // The commit runs from the PLA peer-0, which is always available
+        const committer = env.pla.peerAddress;
+
+        if (!(await orchestrator.isContainerRunning(committer))) {
+          logger.info(`${committer} is not running.`);
+          return;
+        }
+
+        // All orgs currently on the channel endorse the commit transaction
+        const endorsers: { address: string; port: string; org: string }[] = [
+          {
+            address: env.pla.peerAddress,
+            port: plaPeerPort,
+            org: env.pla.orgName,
+          },
+          ...onboardedOrgs().map((o) => ({
+            address: o.peerAddress,
+            port: o.peerPort,
+            org: o.org,
+          })),
+          {
+            address: `${env.orgName}-${DeploymentStage.PEER}-0`,
+            port: env.peer0.port.toString(),
+            org: env.orgName,
+          },
+        ];
+
+        const peerAddresses: string[] = [];
+        const peerTLSRoots: string[] = [];
+
+        for (const endorser of endorsers) {
+          peerAddresses.push(`${endorser.address}:${endorser.port}`);
+
+          // The PLA peer already has its own TLS chain under shared/
+          if (endorser.org === env.pla.orgName) {
+            peerTLSRoots.push(`/etc/hyperledger/shared/tls-cert.pem`);
+            continue;
+          }
+
+          // Copy each org's TLS chain into the committing peer
+          const root = `/etc/hyperledger/shared/${endorser.org}-tls.pem`;
+          const exists = await orchestrator.executeInContainer(committer, [
+            "sh",
+            "-c",
+            `test -f ${root} && echo yes || echo no`,
+          ]);
+          if (exists.toString().trim() !== "yes") {
+            const chain = execSync(
+              `docker exec ${endorser.address} sh -c "cat /etc/hyperledger/fabric/tls/msp/tlsintermediatecerts/*.pem /etc/hyperledger/fabric/tls/msp/tlscacerts/*.pem"`,
+              { encoding: "utf8", maxBuffer: 1 << 20 }
+            );
+            const tmp = path.join("/tmp", "opencode", `${endorser.org}-tls.pem`);
+            fs.mkdirSync(path.dirname(tmp), { recursive: true });
+            fs.writeFileSync(tmp, chain);
+            await orchestrator.copyToAndFromContainer(committer, tmp, root);
+          }
+          peerTLSRoots.push(root);
+        }
+
+        const builder = new FabricPeerLifecycleChaincodeCommandBuilder();
+
+        const command = builder
+          .setCommand(PeerLifecycleChaincodeCommands.COMMIT)
+          .setChannelID(env.channel.name)
+          .setOrdererAddress(`${env.pla.ordererAddress}:${env.pla.ordererPort}`)
+          .setVersion(env.contract.version.toString() || "1.0")
+          .setSequence(sequence.toString())
+          .enableTLS(true)
+          .setTLSCAFile(`/etc/hyperledger/shared/tls-cert.pem`)
+          .setContractName(env.contract.name)
+          .setCollectionsConfigPath(
+            `/etc/hyperledger/contract/${env.contract.name}/META-INF/collections_config.json`
+          )
+          .setPeerAddresses(peerAddresses)
+          .setPeerTLSRoots(peerTLSRoots)
+          .build();
+
+        logger.info(`Running command: ${command}`);
+
+        await orchestrator.exec(committer, command, [
+          `CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/admin/ca/msp`,
+        ]);
+      } catch (e: unknown) {
+        err = e;
+        logger.error("Failed to commit contract", e as Error);
         expect(e).toBeUndefined();
         return;
       }

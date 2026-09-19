@@ -4800,37 +4800,53 @@ describe("Deploy Pharmaledger Infrastructure", () => {
 
           fs.mkdirSync(contractsLocalFolder, { recursive: true });
 
-          // The contract is provided as a docker image (CONTRACT__IMAGE).
-          // Extract the pre-built contract bundle from the image.
-          const contractImage = InfrastructureEnvironment.contract.image;
-          const contractContainer = `${InfrastructureEnvironment.orgName}-contract-build`;
-
-          logger.info(
-            `Extracting contract bundle from image ${contractImage} into ${contractsLocalFolder}.`
+          // The contract is generated locally from the for-fabric repository models.
+          // Indexes are resolved from the local folder, mirroring ptp-workspace's
+          // approach of generating indexes from the toolkit dependency.
+          const fabricCliFile = path.resolve(
+            __dirname,
+            "../../../lib/cjs/bin/cli.cjs"
           );
 
-          execSync(`docker rm -f ${contractContainer} 2>/dev/null || true`, {
-            stdio: "inherit",
-          });
+          const repoRoot = path.resolve(__dirname, "../../..");
+          const outDir = `./deployment/tests/infrastructure/${STORAGE_DIR_NAME}/${InfrastructureEnvironment.orgName}/contracts`;
 
-          execSync(`docker create --name ${contractContainer} ${contractImage}`, {
-            stdio: "inherit",
-          });
+          logger.info(
+            `Generating contract indexes from local for-fabric models into ${contractsLocalFolder}.`
+          );
 
           execSync(
-            `docker cp ${contractContainer}:/contract/. ${contractsLocalFolder}`,
+            `LEVEL=verbose node ${fabricCliFile} extract-indexes --folder ./lib/cjs/contract/trackedModels --outDir ${outDir}`,
             {
               stdio: "inherit",
+              cwd: repoRoot,
             }
           );
 
-          execSync(`docker rm ${contractContainer}`, {
-            stdio: "inherit",
-          });
+          if (InfrastructureEnvironment.enableCollections) {
+            const mspIds = JSON.stringify(
+              InfrastructureEnvironment.participatingOrgs
+                .split(",")
+                .map((org: string) => generateMspId(org.toLowerCase()))
+              // eslint-disable-next-line no-useless-escape
+            ).replace(/"/g, '\"');
+
+            logger.info(
+              `Executing command to generate collections for: ${mspIds}`
+            );
+
+            execSync(
+              `LEVEL=verbose node ${fabricCliFile} extract-collections --folder ./lib/cjs/contract/trackedModels --outDir ${outDir} --mspIds '${mspIds}' --mainMspId ${generateMspId(InfrastructureEnvironment.orgName.toLowerCase())}`,
+              {
+                stdio: "inherit",
+                cwd: repoRoot,
+              }
+            );
+          }
 
           if (!fs.existsSync(toolkitMetaInfFolder)) {
             throw new Error(
-              `Contract bundle does not contain a META-INF folder (${toolkitMetaInfFolder}). Check the contract image ${contractImage}.`
+              `Contract bundle does not contain a META-INF folder (${toolkitMetaInfFolder}). Check the local contract generation.`
             );
           }
 

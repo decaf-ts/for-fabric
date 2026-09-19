@@ -14,7 +14,7 @@ const orgs = (
 const SETUP_PATTERN =
   "Onboard Partner (Boot Infrastructure|Channel|Stop Idle Containers|Deploy Contract|Update Image Contract)";
 
-function onboardOrg(envFile: string) {
+function onboardOrg(envFile: string, onboarded: string) {
   const envFilePath = path.join(
     __dirname,
     "../environment",
@@ -34,6 +34,9 @@ function onboardOrg(envFile: string) {
     env: {
       ...process.env,
       ONBOARD_ENV_FILE: envFile,
+      // Orgs onboarded before this one: the onboarding flow bumps the
+      // chaincode sequence and needs their MSPs for approvals/commit.
+      ONBOARDED_ORGS: onboarded,
     },
   });
 
@@ -52,8 +55,10 @@ function onboardOrg(envFile: string) {
 
 describe("Setup E2E", () => {
   it("Onboards Organizations", () => {
+    const onboarded: string[] = [];
     for (const envFile of orgs) {
-      onboardOrg(envFile.trim());
+      onboardOrg(envFile.trim(), onboarded.join(","));
+      onboarded.push(envFile.trim());
     }
   });
 });
