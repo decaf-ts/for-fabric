@@ -30,11 +30,11 @@ end-to-end test suites and shuts everything down again.
 
 ## Ports
 
-| Org  | TLS (apiserver) | CA    | Peer  |
-| ---- | --------------- | ----- | ----- |
-| orga | 7100            | 7110  | 7150  |
-| orgb | 7200            | 7210  | 7250  |
-| orgc | 7300            | 7310  | 7350  |
+| Org  | TLS (apiserver) | CA   | Peer |
+| ---- | --------------- | ---- | ---- |
+| orga | 7100            | 7110 | 7150 |
+| orgb | 7200            | 7210 | 7250 |
+| orgc | 7300            | 7310 | 7350 |
 
 Make sure these ports are free before booting.
 

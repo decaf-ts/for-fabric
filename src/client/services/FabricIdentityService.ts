@@ -455,8 +455,7 @@ export class FabricIdentityService extends ClientBasedService<
 
       // Revoke the previous certificate only, so the old cert becomes invalid.
       log.debug(`Revoking previous certificates for ${enrollmentId}`);
-      const { aki, serial } = getAkiAndSerialFromCert(identity.certificate);
-      await this.revoke(enrollmentId, { aki, serial }, args);
+      await this.revokeCertificate(enrollmentId, identity.certificate, args);
 
       log.debug(`Renew identity successful for ${enrollmentId}`);
       return renewedIdentity;
@@ -466,7 +465,12 @@ export class FabricIdentityService extends ClientBasedService<
   }
 
   /**
-   * Revokes the enrollment of an identity with the specified enrollment ID.
+   * Revokes the identity with the specified enrollment ID.
+   *
+   * Revokes ALL certificates issued to the enrollment ID and disables the
+   * identity: all future enrollments with this ID will be rejected by the CA.
+   * To revoke a single certificate while keeping the identity usable, use
+   * {@link FabricIdentityService.revokeCertificate} instead.
    *
    * @param enrollmentId - The enrollment ID of the identity to be revoked.
    *
@@ -477,10 +481,71 @@ export class FabricIdentityService extends ClientBasedService<
    */
   async revoke(
     enrollmentId: string,
+    ...args: MaybeContextualArg<any>
+  ): Promise<IServiceResponse> {
+    return this.executeRevoke(enrollmentId, { reason: "User Deletion" }, args);
+  }
+
+  /**
+   * Revokes a single certificate of an identity, keeping the identity usable.
+   *
+   * The target certificate is identified by its Authority Key Identifier (AKI)
+   * and serial number, either passed explicitly or derived from a certificate
+   * PEM string.
+   *
+   * @param enrollmentId - The enrollment ID owning the certificate to revoke.
+   * @param certificate - Certificate PEM string, or an object with the `aki` and `serial` of the certificate to revoke.
+   *
+   * @returns A Promise that resolves to the result of the revocation operation.
+   *
+   * @throws {NotFoundError} If the enrollment with the specified ID does not exist.
+   * @throws {InternalError} If there is an error during the revocation process or the AKI/serial are missing.
+   */
+  async revokeCertificate(
+    enrollmentId: string,
+    certificate: string | { aki: string; serial: string },
+    ...args: MaybeContextualArg<any>
+  ): Promise<IServiceResponse> {
+    const akiAndSerial =
+      typeof certificate === "string"
+        ? getAkiAndSerialFromCert(certificate)
+        : certificate;
+    const { aki, serial } = akiAndSerial || {};
+    if (!aki || !serial)
+      throw new InternalError(
+        `Both the certificate serial number and AKI are required to revoke a certificate for enrollment id ${enrollmentId}`
+      );
+    return this.executeRevoke(
+      enrollmentId,
+      { aki, serial, reason: "Revoke User Certificate" },
+      args
+    );
+  }
+
+  /**
+   * Submits a revocation request to the CA for the given enrollment ID.
+   *
+   * A request with only the enrollment ID revokes all certificates and
+   * disables the identity; a request including both `aki` and `serial`
+   * revokes only the matching certificate.
+   *
+   * @param enrollmentId - The enrollment ID of the identity to be revoked.
+   * @param revokeOptions - Revocation request fields without the enrollment ID.
+   * @param args - Optional contextual arguments.
+   *
+   * @returns A Promise that resolves to the result of the revocation operation.
+   *
+   * @throws {NotFoundError} If the enrollment with the specified ID does not exist.
+   * @throws {InternalError} If there is an error during the revocation process.
+   */
+  protected async executeRevoke(
+    enrollmentId: string,
     revokeOptions: Omit<IRevokeRequest, "enrollmentID">,
     ...args: MaybeContextualArg<any>
   ): Promise<IServiceResponse> {
-    const { log } = (await this.logCtx(args, "revoke", true)).for(this.revoke);
+    const { log } = (await this.logCtx(args, "revoke", true)).for(
+      this.executeRevoke
+    );
     log.verbose(`Revoking identity with enrollment ID ${enrollmentId}`);
     const identity = await this.read(enrollmentId);
     if (!identity)
@@ -489,13 +554,7 @@ export class FabricIdentityService extends ClientBasedService<
       );
     let result: IServiceResponse;
     try {
-      const reason =
-        Boolean(revokeOptions.serial) || Boolean(revokeOptions.aki)
-          ? "Revoke User Certificate"
-          : "User Deletion";
-
       const revokeRequest: IRevokeRequest = {
-        reason,
         ...revokeOptions,
         enrollmentID: identity.id,
       };
