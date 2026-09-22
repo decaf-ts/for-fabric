@@ -38,4 +38,5 @@
 /deployment/tests/infrastructure/storage/*
 /deployment/tests/infrastructure/tmp/*
 /deployment/tests/infrastructure/sequence.txt
-/tmp
+/tmp/.claude/
+/.claude/
