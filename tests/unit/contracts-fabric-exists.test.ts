@@ -45,6 +45,42 @@ describe("FabricStatement EXISTS translation", () => {
     expect(query.selector).toEqual({ name: { $exists: true } });
   });
 
+  it("builds the negated field-level EXISTS condition shape", () => {
+    const condition = Condition.attribute<ExistsFabricModel>("name").exists(
+      false
+    );
+
+    expect(condition.operator).toBe(Operator.EXISTS);
+    expect((condition as any).attr1).toBe("name");
+    expect((condition as any).comparison).toBe(false);
+  });
+
+  it("maps a negated field-level EXISTS condition to a $exists:false selector", () => {
+    const statement = new FabricStatement({} as any, {} as any);
+    (statement as any).fromSelector = ExistsFabricModel;
+
+    const query = (statement as any).parseCondition(
+      Condition.attribute<ExistsFabricModel>("name").exists(false)
+    );
+
+    expect(query.selector).toEqual({ name: { $exists: false } });
+  });
+
+  it("combines a negated EXISTS leg with a positive EXISTS leg", () => {
+    const statement = new FabricStatement({} as any, {} as any);
+    (statement as any).fromSelector = ExistsFabricModel;
+
+    const query = (statement as any).parseCondition(
+      Condition.attribute<ExistsFabricModel>("name")
+        .exists(false)
+        .and(Condition.attribute<ExistsFabricModel>("id").exists())
+    );
+
+    expect(query.selector).toEqual({
+      $and: [{ name: { $exists: false } }, { id: { $exists: true } }],
+    });
+  });
+
   it("builds the exists action from the existsBy naming convention", () => {
     const result = MethodQueryBuilder.build("existsByName");
 
