@@ -100,7 +100,7 @@ describe("FabricStatement EXISTS translation", () => {
     );
   });
 
-  it("squashes a single negated EXISTS condition to existsNotOf through prepare()", async () => {
+  it("squashes a single negated EXISTS condition to listByNotExists through prepare()", async () => {
     const statement = new FabricClientStatement({} as any, {} as any);
     (statement as any).fromSelector = ExistsFabricModel;
     statement.where(
@@ -113,12 +113,12 @@ describe("FabricStatement EXISTS translation", () => {
     } as any);
 
     expect((statement as any).prepared).toMatchObject({
-      method: "existsNotOf",
+      method: "listByNotExists",
       args: ["name"],
     });
   });
 
-  it("still squashes a single positive EXISTS condition to existsOf through prepare()", async () => {
+  it("still squashes a single positive EXISTS condition to listByExists through prepare()", async () => {
     const statement = new FabricClientStatement({} as any, {} as any);
     (statement as any).fromSelector = ExistsFabricModel;
     statement.where(Condition.attribute<ExistsFabricModel>("name").exists());
@@ -129,7 +129,7 @@ describe("FabricStatement EXISTS translation", () => {
     } as any);
 
     expect((statement as any).prepared).toMatchObject({
-      method: "existsOf",
+      method: "listByExists",
       args: ["name"],
     });
   });

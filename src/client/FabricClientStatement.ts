@@ -104,6 +104,11 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
         // unary existence assertions carry their single attribute in `args`
         // already; no direction/limit parameters to append.
         break;
+      case PreparedStatementKeys.LIST_BY_EXISTS:
+      case PreparedStatementKeys.LIST_BY_NOT_EXISTS:
+        // list-returning existence selects: same unary attribute in `args`,
+        // no direction/limit parameters to append.
+        break;
       default:
         throw new InternalError(`Unsupported method ${method}`);
     }
@@ -131,6 +136,22 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
       ));
 
     if (!ctx) throw new InternalError("No context available for statement");
+
+    // A single EXISTS condition is unary and always squashes to its
+    // list-returning prepared statement, whether or not the force flags are
+    // set, so a select keeps full-list semantics. Mirrors the core
+    // `Statement.prepare()` behavior.
+    if (
+      this.isSimpleQuery() &&
+      this.whereCondition &&
+      this.whereCondition["operator"] === Operator.EXISTS
+    ) {
+      const squashed = this.squash(ctx);
+      if (squashed) {
+        this.prepared = squashed;
+        return this;
+      }
+    }
 
     if (this.isSimpleQuery() && ctx.get("forcePrepareSimpleQueries")) {
       const squashed = this.squash(ctx);
