@@ -9,6 +9,7 @@ import {
 } from "@decaf-ts/core";
 import { model, Model, ModelArg } from "@decaf-ts/decorator-validation";
 import { FabricStatement } from "../../src/contracts/FabricContractStatement";
+import { FabricClientStatement } from "../../src/client/FabricClientStatement";
 import { FabricContractAdapter } from "../../src/contracts/ContractAdapter";
 
 @table("exists_fabric_model")
@@ -97,5 +98,39 @@ describe("FabricStatement EXISTS translation", () => {
         .exists()
         .and(Condition.attribute("age").exists())
     );
+  });
+
+  it("squashes a single negated EXISTS condition to existsNotOf through prepare()", async () => {
+    const statement = new FabricClientStatement({} as any, {} as any);
+    (statement as any).fromSelector = ExistsFabricModel;
+    statement.where(
+      Condition.attribute<ExistsFabricModel>("name").exists(false)
+    );
+
+    await statement.prepare({
+      get: (key: string) =>
+        key === "forcePrepareSimpleQueries" ? true : undefined,
+    } as any);
+
+    expect((statement as any).prepared).toMatchObject({
+      method: "existsNotOf",
+      args: ["name"],
+    });
+  });
+
+  it("still squashes a single positive EXISTS condition to existsOf through prepare()", async () => {
+    const statement = new FabricClientStatement({} as any, {} as any);
+    (statement as any).fromSelector = ExistsFabricModel;
+    statement.where(Condition.attribute<ExistsFabricModel>("name").exists());
+
+    await statement.prepare({
+      get: (key: string) =>
+        key === "forcePrepareSimpleQueries" ? true : undefined,
+    } as any);
+
+    expect((statement as any).prepared).toMatchObject({
+      method: "existsOf",
+      args: ["name"],
+    });
   });
 });

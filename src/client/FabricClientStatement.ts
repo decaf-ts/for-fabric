@@ -99,6 +99,11 @@ export class FabricClientStatement<M extends Model, R> extends Statement<
         break;
       case PreparedStatementKeys.FIND_ONE_BY:
         break;
+      case PreparedStatementKeys.EXISTS_OF:
+      case PreparedStatementKeys.EXISTS_NOT_OF:
+        // unary existence assertions carry their single attribute in `args`
+        // already; no direction/limit parameters to append.
+        break;
       default:
         throw new InternalError(`Unsupported method ${method}`);
     }
