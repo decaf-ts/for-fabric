@@ -25,14 +25,14 @@
   },
   {
     "name": "ptp-historyOrgb",
-    "policy": "OR('orgb.member','orga.member')",
+    "policy": "OR('orga.member','orga.member')",
     "requiredPeerCount": 1,
     "maxPeerCount": 2,
     "blockToLive": 0,
     "memberOnlyRead": true,
     "memberOnlyWrite": true,
     "endorsementPolicy": {
-      "signaturePolicy": "AND('orgb.peer','orga.peer')"
+      "signaturePolicy": "AND('orga.peer')"
     }
   },
   {
@@ -49,14 +49,14 @@
   },
   {
     "name": "decaf-namespaceOrgb",
-    "policy": "OR('orgb.member','orga.member')",
+    "policy": "OR('orga.member','orga.member')",
     "requiredPeerCount": 1,
     "maxPeerCount": 2,
     "blockToLive": 0,
     "memberOnlyRead": true,
     "memberOnlyWrite": true,
     "endorsementPolicy": {
-      "signaturePolicy": "AND('orgb.peer','orga.peer')"
+      "signaturePolicy": "AND('orga.peer')"
     }
   },
   {
