@@ -29,7 +29,7 @@ import {
 export class OtherBatchShared extends BaseIdentifiedModel {
   @pk()
   @historyDec()
-  @mirror("mirror-collection", "PharmaledgerassocMSP")
+  @mirror("mirror-collection", "orga")
   @composed(["productCode", "batchNumber"], ":")
   @description("Unique identifier composed of product code and batch number.")
   id!: string;

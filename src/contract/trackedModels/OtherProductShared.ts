@@ -40,7 +40,7 @@ export class OtherProductShared extends BaseIdentifiedModel {
   @gtin()
   @historyDec()
   @assignProductOwner()
-  @mirror("mirror-collection", "PharmaledgerassocMSP")
+  @mirror("mirror-collection", "orga")
   @audit(OtherProductShared)
   @defaultQueryAttr()
   productCode!: string;

@@ -40,7 +40,7 @@ import { OtherLeafletFile } from "./OtherLeafletFile";
 export class Leaflet extends BaseIdentifiedModel {
   @pk()
   @historyDec()
-  @mirror("mirror-collection", "PharmaledgerassocMSP")
+  @mirror("mirror-collection", "orga")
   @audit(Leaflet)
   @composed(
     ["productCode", "batchNumber", "leafletType", "lang", "epiMarket"],

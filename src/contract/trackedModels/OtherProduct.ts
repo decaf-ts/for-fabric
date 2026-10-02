@@ -7,11 +7,7 @@ import { BaseIdentifiedModel } from "../models/BaseIdentifiedModel";
 import { gtin } from "../models/gtin";
 
 import { audit } from "../models/decorators";
-import {
-  FabricFlavour,
-  mirror,
-  ownedBy,
-} from "../../shared/index";
+import { FabricFlavour, mirror, ownedBy } from "../../shared/index";
 import { version } from "@decaf-ts/db-decorators";
 import { historyDec } from "../models/history-dec";
 
@@ -24,7 +20,7 @@ export class OtherProduct extends BaseIdentifiedModel {
   @pk()
   @gtin()
   @historyDec()
-  @mirror("mirror-collection", "PharmaledgerassocMSP")
+  @mirror("mirror-collection", "orga")
   @audit(OtherProduct)
   productCode!: string;
 
