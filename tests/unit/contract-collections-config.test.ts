@@ -31,6 +31,13 @@ const EXPECTED_CONFIG_PATH = path.join(
   "expected-collections-config.json"
 );
 
+const EXPECTED_OWNERSHIP_CONFIG_PATH = path.join(
+  ROOT,
+  "tests",
+  "assets",
+  "expected-collections-config-ownership.json"
+);
+
 function sortByCollectionName(
   cols: Array<Record<string, unknown>>
 ): Array<Record<string, unknown>> {
@@ -102,6 +109,77 @@ describe("normal usage", () => {
         // 4. compare against the expected results
         const expected = JSON.parse(
           fs.readFileSync(EXPECTED_CONFIG_PATH, "utf-8")
+        ) as Array<Record<string, unknown>>;
+
+        expect(sortByCollectionName(generated)).toEqual(
+          sortByCollectionName(expected)
+        );
+      } finally {
+        fs.rmSync(outDir, { recursive: true, force: true });
+      }
+    },
+    10 * 60 * 1000
+  );
+});
+
+describe("ownership override", () => {
+  it(
+    "runs extract-collections with --override-owners and compares against the ownership expected result",
+    () => {
+      // 1. build the package so lib/cjs (including the cli-module) is up to date
+      execSync("npm run build", {
+        cwd: ROOT,
+        stdio: "pipe",
+        encoding: "utf-8",
+        maxBuffer: 50 * 1024 * 1024,
+      });
+
+      expect(fs.existsSync(TRACKED_MODELS_FOLDER)).toBe(true);
+
+      const outDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "decaf-fabric-extract-collections-owners-")
+      );
+
+      try {
+        // 2. run the extract-collections command with the owners override
+        execFileSync(
+          process.execPath,
+          [
+            DECAF_CLI,
+            "fabric",
+            "extract-collections",
+            `--folder`,
+            TRACKED_MODELS_FOLDER,
+            `--outDir`,
+            outDir,
+            `--mspIds`,
+            '["orgb","orgc"]',
+            `--mainMspId`,
+            "orga",
+            `--override-owners`,
+            '["orgb"]',
+          ],
+          {
+            cwd: ROOT,
+            stdio: "pipe",
+            encoding: "utf-8",
+          }
+        );
+
+        // 3. read the generated collections file
+        const generatedPath = path.join(
+          outDir,
+          "META-INF",
+          "collections_config.json"
+        );
+        expect(fs.existsSync(generatedPath)).toBe(true);
+        const generated = JSON.parse(
+          fs.readFileSync(generatedPath, "utf-8")
+        ) as Array<Record<string, unknown>>;
+
+        // 4. compare against the ownership expected results
+        const expected = JSON.parse(
+          fs.readFileSync(EXPECTED_OWNERSHIP_CONFIG_PATH, "utf-8")
         ) as Array<Record<string, unknown>>;
 
         expect(sortByCollectionName(generated)).toEqual(

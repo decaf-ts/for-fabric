@@ -557,6 +557,10 @@ const extractCollections = new Command()
     "--overrides [String]",
     "stringified override object {requiredPeerCount: number, maxPeerCount: number, blockToLive: number, memberOnlyRead: number, memberOnlyWrite: number, endorsementPolicy:  {}}"
   )
+  .option(
+    "--override-owners [String]",
+    "stringified array of mspIds whose collections have their owners overridden by the mainMspId"
+  )
   .description(
     "Creates a the JSON index files to be submitted to along with the contract"
   )
@@ -573,11 +577,18 @@ const extractCollections = new Command()
     );
 
     // eslint-disable-next-line prefer-const
-    let { file, folder, outDir, mspIds, mainMspId } = options;
+    let { file, folder, outDir, mspIds, mainMspId, overrideOwners } = options;
 
     try {
       try {
         mspIds = mspIds ? JSON.parse(mspIds) : undefined;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (e: unknown) {
+        //  do nothing
+      }
+      try {
+        overrideOwners = overrideOwners ? JSON.parse(overrideOwners) : undefined;
+        if (typeof overrideOwners === "string") overrideOwners = [overrideOwners];
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (e: unknown) {
         //  do nothing
@@ -634,7 +645,8 @@ const extractCollections = new Command()
               //   sharedCols: Object.assign({}, overrides.sharedCols),
               //   privateCols: Object.assign({}, overrides.privateCols),
               // },
-              !!mirrorMeta
+              !!mirrorMeta,
+              overrideOwners && overrideOwners.includes(msp) ? msp : undefined
             );
           }
 

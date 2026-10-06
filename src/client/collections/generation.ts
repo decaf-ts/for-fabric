@@ -120,8 +120,9 @@ export function sharedCollectionFor(
     memberOnlyRead,
     memberOnlyWrite
   );
+  const uniqueMspIds = [...new Set(mspIds)];
   c.endorsementPolicy = {
-    signaturePolicy: `AND(${mspIds.map((m) => `'${m}.peer'`).join(",")})`,
+    signaturePolicy: `AND(${uniqueMspIds.map((m) => `'${m}.peer'`).join(",")})`,
   };
   return c;
 }
@@ -133,7 +134,8 @@ export async function extractCollections<M extends Model>(
     privateCols?: Partial<PrivateCollection>;
     sharedCols?: Partial<PrivateCollection>;
   } = {},
-  mirror: boolean = false
+  mirror: boolean = false,
+  ownerOverride?: string
 ) {
   let { privateCols, sharedCols } = Model.collectionsFor(m);
 
@@ -145,6 +147,15 @@ export async function extractCollections<M extends Model>(
       throw new InternalError(e as Error);
     }
   }
+
+  // when an owner override is in effect, the overridden msp is replaced by the
+  // main msp for policy generation, while collection names keep the original
+  // msp suffix (names are resolved from the original mspIds)
+  const ownerList = mspIds.map((id) =>
+    ownerOverride && id === ownerOverride
+      ? (mspIds.find((x) => x !== ownerOverride) ?? id)
+      : id
+  );
 
   privateCols = privateCols.map(resolveCollection);
   sharedCols = sharedCols.map(resolveCollection);
@@ -174,7 +185,7 @@ export async function extractCollections<M extends Model>(
 
   const mirrorMeta = mirror ? Model.mirroredAt(m) : undefined;
 
-  const privates = mspIds
+  const privates = ownerList
     .map((mspId) =>
       (privateCols as string[]).map((p) => {
         const { requiredPeerCount, maxPeerCount, blockToLive, memberOnlyRead } =
@@ -228,7 +239,7 @@ export async function extractCollections<M extends Model>(
       memberOnlyWrite,
     } = sharedDefaults;
     return sharedCollectionFor(
-      mspIds,
+      ownerList,
       p,
       requiredPeerCount,
       maxPeerCount,
