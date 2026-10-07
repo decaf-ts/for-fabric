@@ -228,6 +228,9 @@ export async function transactionIdOnCreate<
   key: keyof M,
   model: M
 ): Promise<void> {
+  const allowGenerationOverride =
+    context.getOrUndefined("allowGenerationOverride") || false;
+  if (allowGenerationOverride && typeof model[key] !== "undefined") return;
   const { stub } = context as any;
   model[key] = stub.getTxID();
 }

@@ -147,6 +147,9 @@ export async function createdByOnFabricCreateUpdate<
   key: keyof M,
   model: M
 ): Promise<void> {
+  const allowGenerationOverride =
+    context.getOrUndefined("allowGenerationOverride") || false;
+  if (allowGenerationOverride && typeof model[key] !== "undefined") return;
   try {
     const user = context.get("identity") as ClientIdentity;
     model[key] = user.getID() as M[typeof key];

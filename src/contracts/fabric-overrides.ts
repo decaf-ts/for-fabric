@@ -21,6 +21,9 @@ export async function createdByOnFabricCreateUpdate(
   key: PropertyKey,
   model: any
 ): Promise<void> {
+  const allowGenerationOverride =
+    context.getOrUndefined("allowGenerationOverride") || false;
+  if (allowGenerationOverride && typeof model[key] !== "undefined") return;
   try {
     const user = context.get("identity");
     model[key] = user.getID();
