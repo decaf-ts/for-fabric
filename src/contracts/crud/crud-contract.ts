@@ -153,6 +153,23 @@ export abstract class FabricCrudContract<M extends Model>
     super(name);
   }
 
+  /**
+   * @description Provides the decaf context to the fabric runtime
+   * @summary fabric-contract-api calls this before every transaction and
+   * injects the stub/client identity via setChaincodeStub/setClientIdentity.
+   * The constructor is spoofed to fabric's Context so the runtime metadata
+   * parameter filter recognizes the contract methods' context parameter.
+   * @return {Context} A fresh FabricContractContext instance
+   */
+  override createContext(): Ctx {
+    const ctx = new FabricContractContext();
+    Object.defineProperty(ctx, "constructor", {
+      value: Ctx,
+      configurable: true,
+    });
+    return ctx as unknown as Ctx;
+  }
+
   async refresh(
     table: Constructor<M> | string,
     event: AllOperationKeys,
@@ -793,10 +810,12 @@ export abstract class FabricCrudContract<M extends Model>
       throw new MissingContextError(`No valid context provided...`);
     }
     const contextualized = FabricCrudContract.adapter["logCtx"](
-      [this.clazz as any, ...args] as any,
+      (allowCreate
+        ? [this.clazz as any, ...args]
+        : [this.clazz as any, ...args, ctx]) as any,
       operation,
       allowCreate as any,
-      allowCreate && overrides ? ctx.accumulate(overrides) : ctx
+      allowCreate ? (overrides ? ctx.accumulate(overrides) : ctx) : undefined
     ) as
       | FabricContextualizedArgs<ARGS, METHOD extends string ? true : false>
       | Promise<

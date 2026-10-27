@@ -1,4 +1,5 @@
 import { Context } from "@decaf-ts/core";
+import { Logging } from "@decaf-ts/logging";
 import { FabricContractFlags } from "./types";
 import { ChaincodeStub, ClientIdentity } from "fabric-shim-api";
 
@@ -42,6 +43,38 @@ export class FabricContractContext extends Context<FabricContractFlags> {
   }
 
   /**
+   * @description Receives the chaincode stub from the fabric runtime
+   * @summary Called by fabric-contract-api's context injection (mirrors the
+   * base fabric Context API), storing the stub in the context cache so that
+   * contract methods and repositories can access ledger APIs through the
+   * decaf context.
+   * @param {ChaincodeStub} stub - The chaincode stub provided by the fabric runtime
+   * @return {void}
+   */
+  setChaincodeStub(stub: ChaincodeStub): void {
+    this.accumulate({
+      stub,
+      logger: this.getOrUndefined("logger") || Logging.get(),
+    });
+  }
+
+  /**
+   * @description Receives the client identity from the fabric runtime
+   * @summary Called by fabric-contract-api's context injection (mirrors the
+   * base fabric Context API), storing the submitter's identity in the context
+   * cache under both the decaf ("identity") and fabric ("clientIdentity") keys.
+   * @param {ClientIdentity} identity - The ClientIdentity of the transaction submitter
+   * @return {void}
+   */
+  setClientIdentity(identity: ClientIdentity): void {
+    this.accumulate({
+      identity,
+      clientIdentity: identity,
+      user: identity.getID(),
+    });
+  }
+
+  /**
    * @description Gets the chaincode stub
    * @summary Returns the ChaincodeStub instance for interacting with the ledger
    * @return {ChaincodeStub} The chaincode stub
@@ -66,6 +99,16 @@ export class FabricContractContext extends Context<FabricContractFlags> {
    */
   get identity(): ClientIdentity {
     return this.get("identity");
+  }
+
+  /**
+   * @description Gets the fabric client identity
+   * @summary Returns the ClientIdentity under the fabric "clientIdentity" key,
+   * mirroring fabric-contract-api's Context API for legacy call sites
+   * @return {ClientIdentity} The client identity
+   */
+  get clientIdentity(): ClientIdentity {
+    return this.get("clientIdentity") as ClientIdentity;
   }
   //
   // private _segregateWrite: Record<string, SegregatedWriteEntry[]> = {};
