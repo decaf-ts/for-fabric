@@ -32,6 +32,7 @@ jest.mock("@grpc/grpc-js", () => {
   });
   return {
     Client,
+    loadPackageDefinition: jest.fn(() => ({})),
     credentials: {
       createSsl: jest.fn(() => "tls"),
     },
