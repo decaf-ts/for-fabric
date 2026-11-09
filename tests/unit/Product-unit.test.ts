@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { FabricContractAdapter, FabricCrudContract } from "../../src/contracts";
 console.log("Using adapter:", FabricContractAdapter.name);
 import { getMockCtx, getStubMock } from "./ContextMock";

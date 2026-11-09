@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { OtherProductShared } from "../../src/contract/trackedModels/OtherProductShared";
 import {
   extractCollections,

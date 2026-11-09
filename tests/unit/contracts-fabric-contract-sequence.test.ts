@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import "reflect-metadata";
 
 import { Repository, Sequence, SequenceOptions } from "@decaf-ts/core";

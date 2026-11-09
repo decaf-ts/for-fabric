@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import "reflect-metadata";
 
 import { Adapter, Context } from "@decaf-ts/core";

@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import "reflect-metadata";
 
 import { Model, model, type ModelArg } from "@decaf-ts/decorator-validation";

@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { FabricClientAdapter } from "../../src/client";
 
 import { Context, Repo, Repository } from "@decaf-ts/core";

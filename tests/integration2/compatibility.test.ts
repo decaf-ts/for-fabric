@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { Observer, PersistenceService, Repository } from "@decaf-ts/core";
 import { FabricClientAdapter } from "../../src/index";
 import { getOrgEnv } from "./environment";

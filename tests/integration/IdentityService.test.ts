@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { Service, service } from "@decaf-ts/core";
 import { CAConfig } from "../../src/shared/index";
 import { FabricIdentityService } from "../../src/client/index";

@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { CryptoUtils } from "../../src/client/crypto";
 
 const PRIVATE_KEY_PEM = `-----BEGIN PRIVATE KEY-----

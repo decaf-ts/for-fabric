@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import "../../src/shared/overrides";
 import { pk, column, table, index } from "@decaf-ts/core";
 import { model, Model, ModelArg } from "@decaf-ts/decorator-validation";

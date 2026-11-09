@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { SimpleDeterministicSerializer } from "../../src/shared/SimpleDeterministicSerializer";
 import "@decaf-ts/core";
 

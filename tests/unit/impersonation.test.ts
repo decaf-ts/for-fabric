@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { Context, ModelService, Repo, Repository } from "@decaf-ts/core";
 import { InternalError } from "@decaf-ts/db-decorators";
 import { Product } from "../../src/contract/models/Product";

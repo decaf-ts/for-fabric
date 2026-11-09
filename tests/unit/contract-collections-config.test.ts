@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { execFileSync, execSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";

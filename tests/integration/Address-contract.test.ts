@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { execSync } from "child_process";
 import { ensureInfrastructureBooted } from "../utils";
 import * as fs from "fs";

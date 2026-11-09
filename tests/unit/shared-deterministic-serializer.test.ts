@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { DeterministicSerializer } from "../../src/shared/DeterministicSerializer";
 
 describe("shared/DeterministicSerializer", () => {

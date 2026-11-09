@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import "reflect-metadata";
 
 import { FabricClientAdapter } from "../../src/client/FabricClientAdapter";

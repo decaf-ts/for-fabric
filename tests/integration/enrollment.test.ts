@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { execSync } from "child_process";
 import * as fs from "fs";
 import { Credentials, CAConfig, PeerConfig } from "../../src/shared/types";

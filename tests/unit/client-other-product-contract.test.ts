@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import "reflect-metadata";
 
 import { Context, PersistenceKeys, Paginator } from "@decaf-ts/core";

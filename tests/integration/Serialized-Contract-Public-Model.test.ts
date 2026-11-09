@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import * as fs from "fs";
 import * as path from "path";
 import {

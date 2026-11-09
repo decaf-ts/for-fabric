@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { TestPublicModelContract } from "../assets/contract/serialized-contract-public-model/TestPublicModelContract";
 import { TestPublicModel } from "../assets/contract/serialized-contract-public-model/TestPublicModel";
 import { getMockCtx } from "./ContextMock";

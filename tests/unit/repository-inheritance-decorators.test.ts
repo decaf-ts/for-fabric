@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import "../bootstrap";
 import { Info } from "fabric-contract-api";
 import { NotFoundError } from "@decaf-ts/db-decorators";

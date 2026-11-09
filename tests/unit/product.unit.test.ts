@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { ProductContract } from "../../src/contract/ProductContract";
 import { getMockCtx } from "./ContextMock";
 import { Model } from "@decaf-ts/decorator-validation";

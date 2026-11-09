@@ -1,3 +1,4 @@
+import { it } from "@decaf-ts/for-testing";
 import { MigrationContract } from "../../src/contracts/MigrationContract";
 import { AbsMigration, migration, MigrationError } from "@decaf-ts/core/migrations";
 import { getMockCtx } from "./ContextMock";
