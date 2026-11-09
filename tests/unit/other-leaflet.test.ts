@@ -140,16 +140,16 @@ describe("OtherLeaflet relations and mirror enforcement", () => {
     const baseCtx = getMockCtx();
     const orgBStub = Object.create(stub);
     orgBStub.getCreator = async () => ({
-      idBytes: Buffer.from("creator-Pharmaledgerassoc"),
-      mspid: "PharmaledgerassocMSP",
+      idBytes: Buffer.from("creator-orga"),
+      mspid: "orga",
     });
-    orgBStub.getMspID = () => "PharmaledgerassocMSP";
+    orgBStub.getMspID = () => "orga";
     return Object.assign(baseCtx, {
       stub: orgBStub,
       clientIdentity: {
-        getID: () => "id-Pharmaledgerassoc",
-        getMSPID: () => "PharmaledgerassocMSP",
-        getIDBytes: () => Buffer.from("creator-Pharmaledgerassoc"),
+        getID: () => "id-orga",
+        getMSPID: () => "orga",
+        getIDBytes: () => Buffer.from("creator-orga"),
         getAttributeValue: (name: string) =>
           name === "roles" ? ["admin"] : undefined,
       },

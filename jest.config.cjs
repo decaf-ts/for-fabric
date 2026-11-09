@@ -7,7 +7,7 @@ const config = {
     "^.+\\.[tj]sx?$": ["ts-jest", { tsconfig: "<rootDir>/tsconfig.tests.json" }],
   },
   transformIgnorePatterns: [
-    "/node_modules/(?!(?:@noble/curves|@noble/hashes|@hyperledger/fabric-gateway|@peculiar|asn1js)/)",
+    "/node_modules/(?!(?:@noble/curves|@noble/hashes|@hyperledger/fabric-gateway|@peculiar|asn1js|webcrypto-core)/)",
   ],
   setupFiles: ["<rootDir>/tests/bootstrap.ts"],
   testEnvironment: "node",

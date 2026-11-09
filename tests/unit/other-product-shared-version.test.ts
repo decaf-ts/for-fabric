@@ -2458,7 +2458,7 @@ describe("OtherProductShared contract version flow with relations", () => {
     });
   });
 
-  describe("mirror behavior with org-b identity", () => {
+  describe("mirror behavior with the configured mirror MSP identity", () => {
     let mirrorProducts: OtherProductShared[];
     let mirrorBatches: OtherBatchShared[];
 
@@ -2466,23 +2466,23 @@ describe("OtherProductShared contract version flow with relations", () => {
       const baseCtx = getMockCtx();
       const orgBStub = Object.create(stub);
       const orgBIdentity = {
-        getID: () => "id-Pharmaledgerassoc",
-        getMSPID: () => "PharmaledgerassocMSP",
-        getIDBytes: () => Buffer.from("creator-Pharmaledgerassoc"),
+        getID: () => "id-orga",
+        getMSPID: () => "orga",
+        getIDBytes: () => Buffer.from("creator-orga"),
         getAttributeValue: (name: string) =>
           name === "roles" ? ["admin"] : undefined,
       };
       orgBStub.getCreator = async () => ({
-        idBytes: Buffer.from("creator-Pharmaledgerassoc"),
-        mspid: "PharmaledgerassocMSP",
+        idBytes: Buffer.from("creator-orga"),
+        mspid: "orga",
       });
-      orgBStub.getMspID = () => "PharmaledgerassocMSP";
+      orgBStub.getMspID = () => "orga";
       const orgBCtx = new FabricContractContext();
       return orgBCtx.accumulate({
         stub: orgBStub,
         identity: orgBIdentity,
         clientIdentity: orgBIdentity,
-        logger: baseCtx.logging.getLogger("PharmaledgerassocMSP"),
+        logger: baseCtx.logging.getLogger("orga"),
       } as any);
     }
 
@@ -2959,7 +2959,7 @@ describe("OtherProductShared contract version flow with relations", () => {
         // Diagnostic: check mirroredAt and mirror data
         const mirrorMeta = (Model as any).mirroredAt(OtherBatchShared);
         expect(mirrorMeta).toBeDefined();
-        expect(mirrorMeta.mspId).toBe("PharmaledgerassocMSP");
+        expect(mirrorMeta.mspId).toBe("orga");
 
         const batchKey = stub.createCompositeKey("other_batch_shared", [
           mirrorBatches[0].id,

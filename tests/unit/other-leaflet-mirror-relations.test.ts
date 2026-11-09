@@ -141,16 +141,16 @@ describe("OtherLeaflet relation and mirror integration", () => {
     const mirrorCtx = getMockCtx();
     const mirrorStub = Object.create(stub);
     mirrorStub.getCreator = async () => ({
-      idBytes: Buffer.from("creator-Pharmaledgerassoc"),
-      mspid: "PharmaledgerassocMSP",
+      idBytes: Buffer.from("creator-orga"),
+      mspid: "orga",
     });
-    mirrorStub.getMspID = () => "PharmaledgerassocMSP";
+    mirrorStub.getMspID = () => "orga";
     return Object.assign(mirrorCtx, {
       stub: mirrorStub,
       clientIdentity: {
-        getID: () => "id-Pharmaledgerassoc",
-        getMSPID: () => "PharmaledgerassocMSP",
-        getIDBytes: () => Buffer.from("creator-Pharmaledgerassoc"),
+        getID: () => "id-orga",
+        getMSPID: () => "orga",
+        getIDBytes: () => Buffer.from("creator-orga"),
         getAttributeValue: (name: string) =>
           name === "roles" ? ["admin"] : undefined,
       },
