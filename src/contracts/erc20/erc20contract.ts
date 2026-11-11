@@ -384,6 +384,7 @@ export abstract class FabricERC20Contract extends FabricCrudContract<ERC20Wallet
       await this.allowanceRepository.update(allowance, ...ctxArgs);
     } else {
       allowance = new Allowance({
+        id: `${owner}_${spender}`,
         owner: owner,
         spender: spender,
         value: value,
