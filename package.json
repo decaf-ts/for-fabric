@@ -1,6 +1,6 @@
 {
   "name": "@decaf-ts/for-fabric",
-  "version": "0.19.3",
+  "version": "0.19.4",
   "packageManager": "npm@12.2.2",
   "description": "Abstracts fabric logic",
   "type": "module",
