@@ -342,9 +342,17 @@ export class FabricIdentityService extends ClientBasedService<
     let identity: Identity;
     try {
       log.debug(`Enrolling ${enrollmentId}`);
+      const caIdentity = (await this.identities.getOne(
+        enrollmentId,
+        this.user
+      )) as { result: { attrs?: IKeyValueAttribute[] } };
+      const attrReqs: IAttributeRequest[] = (caIdentity.result.attrs || []).map(
+        ({ name }) => ({ name, optional: false })
+      );
       const enrollment: IEnrollResponse = await this.client.enroll({
         enrollmentID: enrollmentId,
         enrollmentSecret: registration,
+        attr_reqs: attrReqs,
       });
       identity = FabricIdentityService.identityFromEnrollment(
         enrollment,
@@ -418,12 +426,16 @@ export class FabricIdentityService extends ClientBasedService<
       // Update attributes in the CA registry (admin operation). This changes the "source of truth".
       const identityService = this.client.newIdentityService();
 
-      const caUserIdentity = (await identityService.getOne(
+      await identityService.update(enrollmentId, identityRequest, this.user); // as IServiceResponse & { result: IIdentityRequest };
+
+      // Attribute names must be read after the registry update. Reading them
+      // before the update silently omits newly-added attributes (notably
+      // `roles`) from the reenrollment request, leaving them out of the new
+      // certificate even though the CA registry now has their current values.
+      const updatedCaIdentity = (await identityService.getOne(
         enrollmentId,
         this.user
       )) as { result: { attrs?: IKeyValueAttribute[] } };
-
-      await identityService.update(enrollmentId, identityRequest, this.user); // as IServiceResponse & { result: IIdentityRequest };
 
       // Reenroll as the user. Request must be signed using the existing certificate.
       const reenrollUser = User.createUser(
@@ -435,12 +447,13 @@ export class FabricIdentityService extends ClientBasedService<
       );
       reenrollUser.setCryptoSuite(this.user.getCryptoSuite());
 
-      const enrollmentAttrs: IAttributeRequest[] = (
-        caUserIdentity.result.attrs || []
-      ).map(({ name }) => ({
-        name,
-        optional: false,
-      }));
+      const enrollmentAttrNames = new Set([
+        ...(updatedCaIdentity.result.attrs || []).map(({ name }) => name),
+        ...(identityRequest.attrs || []).map(({ name }) => name),
+      ]);
+      const enrollmentAttrs: IAttributeRequest[] = [...enrollmentAttrNames].map(
+        (name) => ({ name, optional: false })
+      );
 
       const enrollment = await this.client.reenroll(
         reenrollUser,
